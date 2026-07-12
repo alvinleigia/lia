@@ -21,33 +21,7 @@ const highlights = [
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f8fa] text-[#111111]">
-      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-between px-6 py-8 sm:px-10 lg:px-12">
-        <header className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#111111] font-semibold text-white">
-              L
-            </div>
-            <div>
-              <p className="text-lg font-semibold">Lia AI</p>
-              <p className="text-sm text-[#626976]">by LS</p>
-            </div>
-          </div>
-          <nav className="flex items-center gap-2">
-            <Link
-              className="rounded-md border border-[#d8dce3] bg-white px-4 py-2 text-sm font-medium shadow-sm transition hover:bg-[#eef1f5]"
-              href="/sign-in"
-            >
-              Sign In
-            </Link>
-            <Link
-              className="rounded-md bg-[#111111] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#2c2c2c]"
-              href="/sign-up"
-            >
-              Get Started
-            </Link>
-          </nav>
-        </header>
-
+      <section className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col justify-between px-6 py-8 sm:px-10 lg:px-12">
         <div className="grid items-center gap-10 py-16 lg:grid-cols-[1.04fr_0.96fr]">
           <div className="max-w-2xl">
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.12em] text-[#16794f]">
