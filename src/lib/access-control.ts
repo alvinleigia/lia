@@ -13,6 +13,10 @@ export type Permission = (typeof PERMISSIONS)[number];
 
 const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   COMPANY_OWNER: [...PERMISSIONS],
+  COMPANY_MEMBER: PERMISSIONS.filter(
+    (permission) =>
+      permission !== "company.members.manage" && permission !== "audit.view",
+  ),
 };
 
 export function canAccess(

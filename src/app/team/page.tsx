@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { canAccess } from "@/lib/access-control";
+import { formatCompanyRole } from "@/lib/company-roles";
 import { listCompanyInvitations, listCompanyMembers } from "@/lib/invitations";
 import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
 import { cancelTeamInvitationAction } from "./actions";
@@ -86,7 +87,9 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
                   </div>
                   <div className="flex flex-col gap-2 sm:items-end">
                     <div className="text-left sm:text-right">
-                      <p className="text-xs">{memberAccess.role}</p>
+                      <p className="text-xs">
+                        {formatCompanyRole(memberAccess.role)}
+                      </p>
                       <p className="text-xs capitalize text-muted-foreground">
                         {memberAccess.status}
                       </p>
@@ -127,7 +130,8 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
                   <div>
                     <p className="font-medium">{invitation.email}</p>
                     <p className="text-xs text-muted-foreground">
-                      Expires {invitation.expiresAt.toLocaleDateString()}
+                      {formatCompanyRole(invitation.role)} - Expires{" "}
+                      {invitation.expiresAt.toLocaleDateString()}
                     </p>
                   </div>
                   {canManageMembers && (

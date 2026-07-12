@@ -2,12 +2,13 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import { companies, companyMemberships } from "@/lib/db-schema";
 
-export const COMPANY_ROLES = ["COMPANY_OWNER"] as const;
-export const COMPANY_MEMBERSHIP_STATUSES = ["active", "disabled"] as const;
-
-export type CompanyRole = (typeof COMPANY_ROLES)[number];
-export type CompanyMembershipStatus =
-  (typeof COMPANY_MEMBERSHIP_STATUSES)[number];
+export {
+  COMPANY_MEMBERSHIP_STATUSES,
+  COMPANY_ROLES,
+  type CompanyMembershipStatus,
+  type CompanyRole,
+  formatCompanyRole,
+} from "@/lib/company-roles";
 
 export const INACTIVE_ACCOUNT_ERROR_MESSAGE =
   "Your account is not active. Contact support.";

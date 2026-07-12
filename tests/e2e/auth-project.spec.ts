@@ -651,7 +651,8 @@ test("platform admin can manage tenant detail support workflows", async ({
   const tenantName = `E2E Platform Support Tenant ${runId}`;
   const tenantEmail = `e2e-platform-support-${runId}@example.test`;
   const projectName = `E2E Platform Support Project ${runId}`;
-  const inviteEmail = `e2e-platform-support-invite-${runId}@example.test`;
+  const memberEmail = `e2e-platform-support-member-${runId}@example.test`;
+  const pendingInviteEmail = `e2e-platform-support-invite-${runId}@example.test`;
 
   const tenantContext = await browser.newContext();
   const tenantPage = await tenantContext.newPage();
@@ -664,12 +665,33 @@ test("platform admin can manage tenant detail support workflows", async ({
   await createProjectFromProjectsPage(tenantPage, projectName);
   await tenantPage.goto("/team/invite");
   await expect(tenantPage.getByText("Invite Member").first()).toBeVisible();
-  await tenantPage.getByLabel("Invite Email").fill(inviteEmail);
+  await tenantPage.getByLabel("Invite Email").fill(memberEmail);
   await tenantPage.getByRole("button", { name: "Create Invite" }).click();
   await expect(tenantPage).toHaveURL(/invited=1/);
   await expect(
     tenantPage.getByText(/Invitation (created|emailed)/),
   ).toBeVisible();
+  const memberInviteUrl = await tenantPage
+    .locator("input[readonly]")
+    .inputValue();
+  const memberInviteUrlParts = new URL(memberInviteUrl, tenantPage.url());
+  const memberInvitePath = `${memberInviteUrlParts.pathname}${memberInviteUrlParts.search}`;
+
+  const memberContext = await browser.newContext();
+  const memberPage = await memberContext.newPage();
+  await memberPage.goto(memberInvitePath);
+  await expect(memberPage.getByText("Accept Invite").first()).toBeVisible();
+  await memberPage.getByRole("link", { name: "Create Account" }).click();
+  await finishInviteSignUpFromCurrentPage(memberPage, {
+    name: `E2E Platform Support Member ${runId}`,
+    password,
+  });
+  await memberContext.close();
+
+  await tenantPage.goto("/team/invite");
+  await tenantPage.getByLabel("Invite Email").fill(pendingInviteEmail);
+  await tenantPage.getByRole("button", { name: "Create Invite" }).click();
+  await expect(tenantPage).toHaveURL(/invited=1/);
   await tenantContext.close();
 
   const adminContext = await browser.newContext();
@@ -698,7 +720,7 @@ test("platform admin can manage tenant detail support workflows", async ({
     "xpath=ancestor::div[contains(@class, 'rounded-md')][1]",
   );
   await expect(memberCard).toBeVisible();
-  await expect(memberCard).toContainText(tenantEmail);
+  await expect(memberCard).toContainText(memberEmail);
   await memberCard.getByRole("button", { name: "Disable" }).click();
   await expect(adminPage).toHaveURL(/memberUpdated=1/);
   const disabledMemberActionForm = adminPage
@@ -708,7 +730,7 @@ test("platform admin can manage tenant detail support workflows", async ({
   const disabledMemberCard = disabledMemberActionForm.locator(
     "xpath=ancestor::div[contains(@class, 'rounded-md')][1]",
   );
-  await expect(disabledMemberCard).toContainText(tenantEmail);
+  await expect(disabledMemberCard).toContainText(memberEmail);
   await expect(disabledMemberCard).toContainText("disabled");
 
   await disabledMemberCard.getByRole("button", { name: "Enable" }).click();
@@ -720,11 +742,11 @@ test("platform admin can manage tenant detail support workflows", async ({
   const enabledMemberCard = enabledMemberActionForm.locator(
     "xpath=ancestor::div[contains(@class, 'rounded-md')][1]",
   );
-  await expect(enabledMemberCard).toContainText(tenantEmail);
+  await expect(enabledMemberCard).toContainText(memberEmail);
   await expect(enabledMemberCard).toContainText("active");
 
   const invitationCard = adminPage
-    .getByText(inviteEmail)
+    .getByText(pendingInviteEmail)
     .locator("xpath=ancestor::div[contains(@class, 'rounded-md')][1]");
   await expect(invitationCard).toBeVisible();
   await expect(
@@ -788,6 +810,10 @@ test("company owner can invite a teammate and teammate can accept", async ({
   await expect(page.getByText("Team").first()).toBeVisible();
   await expect(page.getByText(ownerEmail)).toBeVisible();
   await expect(page.getByText(teammateEmail)).toBeVisible();
+  await expect(page.getByText("COMPANY MEMBER")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Invite Member" })).toHaveCount(
+    0,
+  );
   await expect(page.getByText("No pending invitations.")).toBeVisible();
 });
 

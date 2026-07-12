@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 type NavigationActionsProps = {
+  canManageMembers: boolean;
+  canViewAudit: boolean;
   isPlatformAdmin: boolean;
   isSignedIn: boolean;
   signedInUserEmail: string | null;
@@ -47,6 +49,8 @@ type NavigationActionsProps = {
 };
 
 export function NavigationActions({
+  canManageMembers,
+  canViewAudit,
   isPlatformAdmin,
   isSignedIn,
   signedInUserEmail,
@@ -194,51 +198,67 @@ export function NavigationActions({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={buttonVariants({ variant: "ghost" })}
-                type="button"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-                Admin
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Account Admin</DropdownMenuLabel>
-              <DropdownMenuItem asChild>
-                <Link href="/team">
-                  <Users className="h-4 w-4 mr-2" />
-                  Team
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/team/invite">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Invite Member
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/projects/audit">
-                  <ShieldCheck className="h-4 w-4 mr-2" />
-                  Audit Logs
-                </Link>
-              </DropdownMenuItem>
-              {isPlatformAdmin && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Platform</DropdownMenuLabel>
-                  <DropdownMenuItem asChild>
-                    <Link href="/platform">
-                      <ShieldCheck className="h-4 w-4 mr-2" />
-                      Tenants
-                    </Link>
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {(canManageMembers || canViewAudit || isPlatformAdmin) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={buttonVariants({ variant: "ghost" })}
+                  type="button"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  Admin
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {(canManageMembers || canViewAudit) && (
+                  <>
+                    <DropdownMenuLabel>Account Admin</DropdownMenuLabel>
+                    {canManageMembers && (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link href="/team">
+                            <Users className="h-4 w-4 mr-2" />
+                            Team
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href="/team/invite">
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            Invite Member
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {canViewAudit && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link href="/projects/audit">
+                            <ShieldCheck className="h-4 w-4 mr-2" />
+                            Audit Logs
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </>
+                )}
+                {isPlatformAdmin && (
+                  <>
+                    {(canManageMembers || canViewAudit) && (
+                      <DropdownMenuSeparator />
+                    )}
+                    <DropdownMenuLabel>Platform</DropdownMenuLabel>
+                    <DropdownMenuItem asChild>
+                      <Link href="/platform">
+                        <ShieldCheck className="h-4 w-4 mr-2" />
+                        Tenants
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </>
       )}
 

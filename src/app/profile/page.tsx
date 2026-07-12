@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { canAccess } from "@/lib/access-control";
+import { formatCompanyRole } from "@/lib/company-roles";
 import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
 import { updateProfileAction } from "./actions";
 
@@ -17,6 +19,7 @@ type ProfilePageProps = {
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const params = await searchParams;
   const { user, company, membership } = await resolvePageUserAndWorkspace();
+  const canManageCompany = canAccess(membership, "company.members.manage");
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -50,7 +53,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 Access
               </p>
               <p className="mt-1 font-medium">
-                {membership.role.replaceAll("_", " ")}
+                {formatCompanyRole(membership.role)}
               </p>
               <p className="text-sm capitalize text-muted-foreground">
                 {membership.status}
@@ -103,15 +106,23 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                     defaultValue={company.name}
                     placeholder="Your account name"
                     maxLength={120}
+                    readOnly={!canManageCompany}
+                    aria-readonly={!canManageCompany}
                     required
                   />
+                  {!canManageCompany && (
+                    <p className="text-xs text-muted-foreground">
+                      Company members can view the account name, but only owners
+                      can rename it.
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-md border bg-white p-4">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">
                     Access
                   </p>
                   <p className="mt-1 font-medium">
-                    {membership.role.replaceAll("_", " ")}
+                    {formatCompanyRole(membership.role)}
                   </p>
                 </div>
                 <div className="rounded-md border bg-white p-4">

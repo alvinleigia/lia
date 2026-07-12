@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
-import type { CompanyRole } from "@/lib/companies";
+import { and, asc, count, eq } from "drizzle-orm";
+import type { CompanyRole } from "@/lib/company-roles";
 import { db } from "@/lib/db-config";
 import {
   companies,
@@ -97,7 +97,7 @@ export async function createCompanyInvitation(input: {
       companyId: input.companyId,
       invitedByUserId: input.invitedByUserId,
       email,
-      role: input.role ?? "COMPANY_OWNER",
+      role: input.role ?? "COMPANY_MEMBER",
       status: "pending",
       tokenHash,
       expiresAt: getDefaultInviteExpiry(),
@@ -159,6 +159,43 @@ export async function updateCompanyMembershipStatus(input: {
     .returning();
 
   return membership ?? null;
+}
+
+export async function updateCompanyMembershipRole(input: {
+  companyId: number;
+  membershipId: number;
+  role: CompanyRole;
+}) {
+  const [membership] = await db
+    .update(companyMemberships)
+    .set({
+      role: input.role,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(companyMemberships.companyId, input.companyId),
+        eq(companyMemberships.id, input.membershipId),
+      ),
+    )
+    .returning();
+
+  return membership ?? null;
+}
+
+export async function getActiveCompanyOwnerCount(companyId: number) {
+  const [row] = await db
+    .select({ value: count() })
+    .from(companyMemberships)
+    .where(
+      and(
+        eq(companyMemberships.companyId, companyId),
+        eq(companyMemberships.role, "COMPANY_OWNER"),
+        eq(companyMemberships.status, "active"),
+      ),
+    );
+
+  return row?.value ?? 0;
 }
 
 export async function cancelCompanyInvitation(input: {

@@ -52,7 +52,7 @@ export const companyMemberships = pgTable(
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
-    role: text("role").notNull().default("COMPANY_OWNER"),
+    role: text("role").notNull().default("COMPANY_MEMBER"),
     status: text("status").notNull().default("active"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -78,7 +78,7 @@ export const companyInvitations = pgTable(
     invitedByUserId: integer("invited_by_user_id").references(() => users.id),
     acceptedByUserId: integer("accepted_by_user_id").references(() => users.id),
     email: text("email").notNull(),
-    role: text("role").notNull().default("COMPANY_OWNER"),
+    role: text("role").notNull().default("COMPANY_MEMBER"),
     status: text("status").notNull().default("pending"),
     tokenHash: text("token_hash").notNull(),
     expiresAt: timestamp("expires_at").notNull(),

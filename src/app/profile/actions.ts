@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { assertPermission } from "@/lib/access-control";
+import { canAccess } from "@/lib/access-control";
 import { writeAuditLog } from "@/lib/audit";
 import {
   clearActiveProjectCookie,
@@ -72,9 +72,15 @@ export async function updateProfileAction(formData: FormData) {
   }
 
   const context = await resolveUserAndWorkspace();
-  assertPermission(context.membership, "company.members.manage");
+  const canManageCompany = canAccess(
+    context.membership,
+    "company.members.manage",
+  );
   const name = parsed.data.name.trim() || null;
-  const companyName = parsed.data.companyName.trim();
+  const requestedCompanyName = parsed.data.companyName.trim();
+  const companyName = canManageCompany
+    ? requestedCompanyName
+    : context.company.name;
   const updatedUser = await updateUserProfile({
     userId: context.user.id,
     name,

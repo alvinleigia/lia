@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { CompanySelectorModal } from "@/components/company-selector-modal";
 import { NavigationActions } from "@/components/navigation-actions";
 import { ProjectSelectorModal } from "@/components/project-selector-modal";
+import { canAccess } from "@/lib/access-control";
 import {
   getActiveProjectIdCookie,
   resolveUserAndWorkspace,
@@ -25,6 +26,8 @@ export const Navigation = async () => {
   let selectedCompanyId: number | null = null;
   let selectableCompanies: { id: number; name: string; role: string }[] = [];
   let isPlatformAdmin = false;
+  let canManageMembers = false;
+  let canViewAudit = false;
   let signedInUserName = session?.user?.name ?? null;
   let signedInUserEmail = session?.user?.email ?? null;
 
@@ -32,7 +35,14 @@ export const Navigation = async () => {
     isPlatformAdmin = await isCurrentUserPlatformAdmin();
 
     try {
-      const { user, company, workspace } = await resolveUserAndWorkspace();
+      const {
+        user,
+        company,
+        membership: companyMembership,
+        workspace,
+      } = await resolveUserAndWorkspace();
+      canManageMembers = canAccess(companyMembership, "company.members.manage");
+      canViewAudit = canAccess(companyMembership, "audit.view");
       signedInUserName = user.name;
       signedInUserEmail = user.email;
       selectedCompanyLabel = `${company.name} (#${company.id})`;
@@ -100,6 +110,8 @@ export const Navigation = async () => {
         </div>
 
         <NavigationActions
+          canManageMembers={canManageMembers}
+          canViewAudit={canViewAudit}
           isPlatformAdmin={isPlatformAdmin}
           isSignedIn={isSignedIn}
           signedInUserEmail={signedInUserEmail}

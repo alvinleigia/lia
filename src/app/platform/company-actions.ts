@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/audit";
-import { updateCompanyMembershipStatus } from "@/lib/invitations";
+import {
+  getActiveCompanyOwnerCount,
+  listCompanyMembers,
+  updateCompanyMembershipStatus,
+} from "@/lib/invitations";
 import { resolvePlatformAdmin } from "@/lib/platform-admin";
 
 const memberStatusSchema = z.object({
@@ -27,6 +31,28 @@ export async function updatePlatformCompanyMemberStatusAction(
   }
 
   const platformUser = await resolvePlatformAdmin();
+  const members = await listCompanyMembers(parsed.data.companyId);
+  const targetMember = members.find(
+    ({ membership }) => membership.id === parsed.data.membershipId,
+  );
+
+  if (!targetMember) {
+    redirect(
+      `/platform/companies/${parsed.data.companyId}?error=Member%20not%20found.`,
+    );
+  }
+
+  if (
+    parsed.data.status === "disabled" &&
+    targetMember.membership.role === "COMPANY_OWNER" &&
+    targetMember.membership.status === "active" &&
+    (await getActiveCompanyOwnerCount(parsed.data.companyId)) <= 1
+  ) {
+    redirect(
+      `/platform/companies/${parsed.data.companyId}?error=At%20least%20one%20active%20company%20owner%20is%20required.`,
+    );
+  }
+
   const member = await updateCompanyMembershipStatus(parsed.data);
 
   if (!member) {

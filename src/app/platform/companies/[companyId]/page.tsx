@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { writeAuditLog } from "@/lib/audit";
+import { formatCompanyRole } from "@/lib/company-roles";
 import { listCompanyInvitations, listCompanyMembers } from "@/lib/invitations";
 import {
   getTenantCompanyById,
@@ -145,7 +146,7 @@ export default async function PlatformCompanyPage({
                       {user.email}
                     </p>
                     <p className="mt-1 text-xs">
-                      {membership.role} / {membership.status}
+                      {formatCompanyRole(membership.role)} / {membership.status}
                     </p>
                   </div>
                   <form action={updatePlatformCompanyMemberStatusAction}>
@@ -238,7 +239,8 @@ export default async function PlatformCompanyPage({
                     {invitedBy?.name ?? invitedBy?.email ?? "Unknown user"}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Expires {invitation.expiresAt.toLocaleDateString()}
+                    {formatCompanyRole(invitation.role)} - Expires{" "}
+                    {invitation.expiresAt.toLocaleDateString()}
                   </p>
                 </div>
               ))

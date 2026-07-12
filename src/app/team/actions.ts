@@ -6,10 +6,14 @@ import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndWorkspace } from "@/lib/auth-project";
+import { COMPANY_ROLES } from "@/lib/company-roles";
 import {
   cancelCompanyInvitation,
   createCompanyInvitation,
+  getActiveCompanyOwnerCount,
+  listCompanyMembers,
   sendCompanyInvitationEmail,
+  updateCompanyMembershipRole,
   updateCompanyMembershipStatus,
 } from "@/lib/invitations";
 
@@ -21,6 +25,10 @@ const invitationIdSchema = z.coerce.number().int().positive();
 const membershipStatusSchema = z.object({
   membershipId: z.coerce.number().int().positive(),
   status: z.enum(["active", "disabled"]),
+});
+const membershipRoleSchema = z.object({
+  membershipId: z.coerce.number().int().positive(),
+  role: z.enum(COMPANY_ROLES),
 });
 
 export async function createTeamInvitationAction(formData: FormData) {
@@ -124,6 +132,26 @@ export async function updateTeamMemberStatusAction(formData: FormData) {
     redirect("/team?error=You%20cannot%20disable%20your%20own%20access.");
   }
 
+  const members = await listCompanyMembers(context.company.id);
+  const targetMember = members.find(
+    ({ membership }) => membership.id === parsed.data.membershipId,
+  );
+
+  if (!targetMember) {
+    redirect("/team?error=Member%20not%20found.");
+  }
+
+  if (
+    parsed.data.status === "disabled" &&
+    targetMember.membership.role === "COMPANY_OWNER" &&
+    targetMember.membership.status === "active" &&
+    (await getActiveCompanyOwnerCount(context.company.id)) <= 1
+  ) {
+    redirect(
+      "/team?error=At%20least%20one%20active%20company%20owner%20is%20required.",
+    );
+  }
+
   const member = await updateCompanyMembershipStatus({
     companyId: context.company.id,
     membershipId: parsed.data.membershipId,
@@ -146,5 +174,69 @@ export async function updateTeamMemberStatusAction(formData: FormData) {
   });
 
   revalidatePath("/team");
+  redirect("/team?memberUpdated=1");
+}
+
+export async function updateTeamMemberRoleAction(formData: FormData) {
+  const parsed = membershipRoleSchema.safeParse({
+    membershipId: formData.get("membershipId"),
+    role: formData.get("role"),
+  });
+
+  if (!parsed.success) {
+    redirect("/team?error=Invalid%20member%20role.");
+  }
+
+  const context = await resolveUserAndWorkspace();
+  assertPermission(context.membership, "company.members.manage");
+
+  if (parsed.data.membershipId === context.membership.id) {
+    redirect("/team?error=You%20cannot%20change%20your%20own%20role.");
+  }
+
+  const members = await listCompanyMembers(context.company.id);
+  const targetMember = members.find(
+    ({ membership }) => membership.id === parsed.data.membershipId,
+  );
+
+  if (!targetMember) {
+    redirect("/team?error=Member%20not%20found.");
+  }
+
+  if (
+    targetMember.membership.role === "COMPANY_OWNER" &&
+    targetMember.membership.status === "active" &&
+    parsed.data.role !== "COMPANY_OWNER" &&
+    (await getActiveCompanyOwnerCount(context.company.id)) <= 1
+  ) {
+    redirect(
+      "/team?error=At%20least%20one%20active%20company%20owner%20is%20required.",
+    );
+  }
+
+  const member = await updateCompanyMembershipRole({
+    companyId: context.company.id,
+    membershipId: parsed.data.membershipId,
+    role: parsed.data.role,
+  });
+
+  if (!member) {
+    redirect("/team?error=Member%20not%20found.");
+  }
+
+  await writeAuditLog({
+    ...context,
+    action: "company_member.role_updated",
+    targetType: "company_membership",
+    targetId: member.id,
+    metadata: {
+      memberUserId: member.userId,
+      role: member.role,
+    },
+  });
+
+  revalidatePath("/team");
+  revalidatePath(`/team/members/${member.id}`);
+  revalidatePath("/", "layout");
   redirect("/team?memberUpdated=1");
 }

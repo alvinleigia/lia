@@ -5,9 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { canAccess } from "@/lib/access-control";
+import { COMPANY_ROLES, formatCompanyRole } from "@/lib/company-roles";
 import { listCompanyMembers } from "@/lib/invitations";
 import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
-import { updateTeamMemberStatusAction } from "../../actions";
+import {
+  updateTeamMemberRoleAction,
+  updateTeamMemberStatusAction,
+} from "../../actions";
 
 type TeamMemberPageProps = {
   params: Promise<{
@@ -65,7 +69,9 @@ export default async function TeamMemberPage({ params }: TeamMemberPageProps) {
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                   Role
                 </p>
-                <p className="mt-1 font-medium">{memberAccess.role}</p>
+                <p className="mt-1 font-medium">
+                  {formatCompanyRole(memberAccess.role)}
+                </p>
               </div>
               <div className="rounded-md border bg-white p-4">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -78,23 +84,55 @@ export default async function TeamMemberPage({ params }: TeamMemberPageProps) {
             </div>
 
             {canManageMembers && !isSelf ? (
-              <form action={updateTeamMemberStatusAction}>
-                <input
-                  type="hidden"
-                  name="membershipId"
-                  value={memberAccess.id}
-                />
-                <input type="hidden" name="status" value={nextStatus} />
-                <FormSubmitButton
-                  label={
-                    memberAccess.status === "active"
-                      ? "Disable Member"
-                      : "Enable Member"
-                  }
-                  pendingLabel="Updating..."
-                  variant="outline"
-                />
-              </form>
+              <div className="space-y-4">
+                <form action={updateTeamMemberRoleAction} className="space-y-2">
+                  <input
+                    type="hidden"
+                    name="membershipId"
+                    value={memberAccess.id}
+                  />
+                  <label htmlFor="memberRole" className="text-sm font-medium">
+                    Member Role
+                  </label>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <select
+                      id="memberRole"
+                      name="role"
+                      defaultValue={memberAccess.role}
+                      className="h-9 flex-1 rounded-md border bg-white px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                    >
+                      {COMPANY_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {formatCompanyRole(role)}
+                        </option>
+                      ))}
+                    </select>
+                    <FormSubmitButton
+                      label="Update Role"
+                      pendingLabel="Updating..."
+                      variant="outline"
+                    />
+                  </div>
+                </form>
+
+                <form action={updateTeamMemberStatusAction}>
+                  <input
+                    type="hidden"
+                    name="membershipId"
+                    value={memberAccess.id}
+                  />
+                  <input type="hidden" name="status" value={nextStatus} />
+                  <FormSubmitButton
+                    label={
+                      memberAccess.status === "active"
+                        ? "Disable Member"
+                        : "Enable Member"
+                    }
+                    pendingLabel="Updating..."
+                    variant="outline"
+                  />
+                </form>
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">
                 This member cannot be updated from your account.

@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { formatCompanyRole } from "@/lib/company-roles";
 
 type CompanyOption = {
   id: number;
@@ -108,7 +109,7 @@ export function CompanySelectorModal({
                     <div>
                       <p className="font-medium">{company.name}</p>
                       <p className="text-muted-foreground text-xs">
-                        {company.role.replaceAll("_", " ")}
+                        {formatCompanyRole(company.role)}
                       </p>
                     </div>
                     {company.id === selectedCompanyId ? (
