@@ -504,9 +504,7 @@ test("non platform admin cannot open platform admin routes", async ({
   ).toBeVisible();
 });
 
-test("disabled tenant owner lands on the disabled account page", async ({
-  browser,
-}) => {
+test("disabled tenant owner is blocked at sign in", async ({ browser }) => {
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const tenantName = `E2E Disabled Tenant ${runId}`;
   const tenantEmail = `e2e-disabled-${runId}@example.test`;
@@ -568,15 +566,17 @@ test("disabled tenant owner lands on the disabled account page", async ({
   const disabledContext = await browser.newContext();
   const disabledPage = await disabledContext.newPage();
   await signInWithEmail(disabledPage, tenantEmail);
-  await expect(disabledPage).toHaveURL(/\/account-disabled/);
+  await expect(disabledPage).toHaveURL(/\/sign-in\?accountDisabled=1/);
   await expect(
-    disabledPage.getByText("Account Disabled").first(),
+    disabledPage
+      .getByText(
+        "This account is currently disabled. Contact the platform administrator to restore access.",
+      )
+      .first(),
   ).toBeVisible();
   await disabledPage.goto("/projects");
-  await expect(disabledPage).toHaveURL(/\/account-disabled/);
-  await expect(
-    disabledPage.getByText("Account Disabled").first(),
-  ).toBeVisible();
+  await expect(disabledPage).toHaveURL(/\/$/);
+  await expect(disabledPage.getByText("SaaS chatbot platform")).toBeVisible();
 
   const disabledWidgetChatResponse = await disabledPage.request.post(
     `/api/widget/chat?token=${encodeURIComponent(widgetToken)}`,
@@ -602,34 +602,6 @@ test("disabled tenant owner lands on the disabled account page", async ({
   expect(disabledWidgetFlowResponse.status()).toBe(403);
   await expect(disabledWidgetFlowResponse.json()).resolves.toEqual({
     message: "Widget is unavailable.",
-  });
-
-  const disabledProjectChatResponse = await disabledPage.request.post(
-    "/api/chat",
-    {
-      data: {
-        messages: [],
-        projectId,
-      },
-    },
-  );
-  expect(disabledProjectChatResponse.status()).toBe(423);
-  await expect(disabledProjectChatResponse.text()).resolves.toBe(
-    "This account is currently disabled.",
-  );
-
-  const disabledProjectFlowResponse = await disabledPage.request.post(
-    "/api/actions/flow",
-    {
-      data: {
-        actionId: 999_999_999,
-        event: "start",
-      },
-    },
-  );
-  expect(disabledProjectFlowResponse.status()).toBe(423);
-  await expect(disabledProjectFlowResponse.json()).resolves.toEqual({
-    message: "This account is currently disabled.",
   });
 
   const disabledWhatsAppVerifyResponse = await disabledPage.request.get(

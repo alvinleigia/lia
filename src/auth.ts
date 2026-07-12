@@ -3,6 +3,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { z } from "zod";
+import { isUserBlockedFromSignIn } from "@/lib/account-status";
 import { createUser, getUserByEmail } from "@/lib/users";
 import { getOrCreateDefaultWorkspaceForUser } from "@/lib/workspaces";
 
@@ -44,6 +45,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        if (await isUserBlockedFromSignIn(user.id)) {
+          return null;
+        }
+
         return {
           id: String(user.id),
           email: user.email,
@@ -74,6 +79,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name ?? undefined,
           passwordHash: "oauth:google",
         }));
+
+      if (await isUserBlockedFromSignIn(appUser.id)) {
+        return "/sign-in?accountDisabled=1";
+      }
 
       await getOrCreateDefaultWorkspaceForUser(appUser);
 

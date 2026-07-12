@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { Navigation } from "@/components/navigation";
 import { NavigationProgress } from "@/components/navigation-progress";
+import { NavigationShell } from "@/components/navigation-shell";
 import "@xyflow/react/dist/style.css";
 import "./globals.css";
 
@@ -34,7 +35,9 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>
-        <Navigation />
+        <NavigationShell>
+          <Navigation />
+        </NavigationShell>
         {children}
       </body>
     </html>
