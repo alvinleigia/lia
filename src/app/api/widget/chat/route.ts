@@ -145,7 +145,7 @@ export async function POST(req: Request) {
     );
     const result = streamText({
       model: openai("gpt-5-mini"),
-      messages: convertToModelMessages(messages),
+      messages: await convertToModelMessages(messages),
       tools: hasDocuments
         ? {
             searchKnowledgeBase: tool({
