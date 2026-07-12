@@ -226,7 +226,9 @@ curl -X POST http://localhost:3000/api/upload/process-next \
   -H "Authorization: Bearer YOUR_UPLOAD_QUEUE_SECRET"
 ```
 
-On Vercel, `vercel.json` schedules this endpoint every minute.
+On Vercel Hobby, `vercel.json` schedules this endpoint once per day to stay
+within cron limits. If the project moves to Vercel Pro, this can be changed to
+run more frequently.
 
 ### Media Library
 
@@ -571,7 +573,6 @@ Operations notes:
 
 ## Current Limitations
 
-- The public home page still uses default starter content.
 - Granular role-management UI is not implemented yet.
 - Invitation emails use SMTP2GO and still show a manual link as fallback.
 - Roles are still intentionally minimal.

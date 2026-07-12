@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/upload/process-next",
-      "schedule": "*/1 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
