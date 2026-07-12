@@ -125,7 +125,7 @@ export default async function PlatformPage({
                       <th className="py-2 pr-4">Members</th>
                       <th className="py-2 pr-4">Projects</th>
                       <th className="py-2 pr-4">Status</th>
-                      <th className="py-2 pr-4 text-right">Action</th>
+                      <th className="py-2 pr-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -158,30 +158,43 @@ export default async function PlatformPage({
                             <StatusBadge status={company.status} />
                           </td>
                           <td className="py-3 pr-4">
-                            <form
-                              action={updateTenantStatusAction}
-                              className="flex justify-end"
-                            >
-                              <input
-                                type="hidden"
-                                name="companyId"
-                                value={company.id}
-                              />
-                              <input
-                                type="hidden"
-                                name="status"
-                                value={
-                                  company.status === "active"
-                                    ? "disabled"
-                                    : "active"
-                                }
-                              />
-                              <Button type="submit" variant="outline" size="sm">
-                                {company.status === "active"
-                                  ? "Disable"
-                                  : "Enable"}
+                            <div className="flex justify-end gap-2">
+                              <Button asChild variant="outline" size="sm">
+                                <Link
+                                  href={`/platform/companies/${company.id}`}
+                                >
+                                  View
+                                </Link>
                               </Button>
-                            </form>
+                              <form
+                                action={updateTenantStatusAction}
+                                className="flex justify-end"
+                              >
+                                <input
+                                  type="hidden"
+                                  name="companyId"
+                                  value={company.id}
+                                />
+                                <input
+                                  type="hidden"
+                                  name="status"
+                                  value={
+                                    company.status === "active"
+                                      ? "disabled"
+                                      : "active"
+                                  }
+                                />
+                                <Button
+                                  type="submit"
+                                  variant="outline"
+                                  size="sm"
+                                >
+                                  {company.status === "active"
+                                    ? "Disable"
+                                    : "Enable"}
+                                </Button>
+                              </form>
+                            </div>
                           </td>
                         </tr>
                       ),

@@ -135,7 +135,7 @@ Goal: confirm SaaS admin basics work before inviting real testers.
   Status:
   Notes:
 
-- [ ] Open a tenant detail page.
+- [ ] Open a tenant detail page by clicking `View` on a tenant row.
   Expected result: Members, projects, and invitations are visible.
   Status:
   Notes:
