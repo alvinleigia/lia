@@ -136,17 +136,12 @@ Goal: confirm SaaS admin basics work before inviting real testers.
   Notes:
 
 - [ ] Open a tenant detail page by clicking `View` on a tenant row.
-  Expected result: Members, projects, and invitations are visible.
+  Expected result: Members, projects, and read-only pending invitations are visible.
   Status:
   Notes:
 
-- [ ] Create a tenant invitation.
-  Expected result: Invitation is created and listed.
-  Status:
-  Notes:
-
-- [ ] Cancel a pending invitation.
-  Expected result: Invitation is cancelled or removed from active list.
+- [ ] Confirm platform admin cannot create tenant invitations.
+  Expected result: No invite form or cancel button is available on the platform tenant detail page.
   Status:
   Notes:
 
@@ -187,7 +182,7 @@ Goal: confirm account setup and project management.
   Notes:
 
 - [ ] Invite a teammate.
-  Expected result: Pending invite is created.
+  Expected result: Pending invite is created from the company owner Team area.
   Status:
   Notes:
 

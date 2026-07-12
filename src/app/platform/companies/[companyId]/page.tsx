@@ -1,11 +1,9 @@
-import { ArrowLeft, Copy, FolderKanban, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, FolderKanban, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { writeAuditLog } from "@/lib/audit";
 import { listCompanyInvitations, listCompanyMembers } from "@/lib/invitations";
 import {
@@ -13,20 +11,12 @@ import {
   listTenantProjectsForCompany,
   resolvePlatformAdmin,
 } from "@/lib/platform-admin";
-import {
-  cancelPlatformCompanyInvitationAction,
-  createPlatformCompanyInvitationAction,
-  updatePlatformCompanyMemberStatusAction,
-} from "../../company-actions";
+import { updatePlatformCompanyMemberStatusAction } from "../../company-actions";
 
 type PlatformCompanyPageProps = {
   params: Promise<{ companyId: string }>;
   searchParams: Promise<{
     error?: string;
-    emailSent?: string;
-    invited?: string;
-    inviteCancelled?: string;
-    inviteUrl?: string;
     memberUpdated?: string;
   }>;
 };
@@ -218,7 +208,7 @@ export default async function PlatformCompanyPage({
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
-              Invitations
+              Pending Invitations
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -227,79 +217,32 @@ export default async function PlatformCompanyPage({
                 {query.error}
               </p>
             )}
-            {query.invited === "1" && query.inviteUrl && (
-              <div className="space-y-2 rounded-md border bg-green-50 p-3">
-                <p className="text-sm font-medium text-green-800">
-                  {query.emailSent === "0"
-                    ? "Invitation created, but email delivery failed."
-                    : "Invitation emailed."}
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input readOnly value={query.inviteUrl} />
-                  <Button asChild variant="outline">
-                    <a href={query.inviteUrl}>
-                      <Copy className="h-4 w-4" />
-                      Open
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            )}
-            {query.inviteCancelled === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Invitation cancelled.
-              </p>
-            )}
+            <p className="text-sm text-muted-foreground">
+              Platform admins can review pending invitations for support
+              visibility. Company owners manage invitations from the Team area.
+            </p>
 
-            {pendingInvitations.map(({ invitation }) => (
-              <div
-                key={invitation.id}
-                className="flex items-center justify-between rounded-md border bg-white px-4 py-3"
-              >
-                <div>
+            {pendingInvitations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No pending invitations.
+              </p>
+            ) : (
+              pendingInvitations.map(({ invitation, invitedBy }) => (
+                <div
+                  key={invitation.id}
+                  className="rounded-md border bg-white px-4 py-3"
+                >
                   <p className="font-medium">{invitation.email}</p>
                   <p className="text-xs text-muted-foreground">
+                    Invited by{" "}
+                    {invitedBy?.name ?? invitedBy?.email ?? "Unknown user"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Expires {invitation.expiresAt.toLocaleDateString()}
                   </p>
                 </div>
-                <form action={cancelPlatformCompanyInvitationAction}>
-                  <input type="hidden" name="companyId" value={companyId} />
-                  <input
-                    type="hidden"
-                    name="invitationId"
-                    value={invitation.id}
-                  />
-                  <FormSubmitButton
-                    label="Cancel"
-                    pendingLabel="Cancelling..."
-                    variant="outline"
-                  />
-                </form>
-              </div>
-            ))}
-
-            <form
-              action={createPlatformCompanyInvitationAction}
-              className="space-y-4 border-t pt-4"
-            >
-              <input type="hidden" name="companyId" value={companyId} />
-              <div className="space-y-2">
-                <Label htmlFor="platformInviteEmail">Invite Email</Label>
-                <Input
-                  id="platformInviteEmail"
-                  name="email"
-                  type="email"
-                  placeholder="teammate@example.com"
-                  required
-                />
-              </div>
-              <FormSubmitButton
-                className="w-full"
-                label="Create Invite"
-                pendingLabel="Creating..."
-                icon={<UserPlus className="h-4 w-4" />}
-              />
-            </form>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

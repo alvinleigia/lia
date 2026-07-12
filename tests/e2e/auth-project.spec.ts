@@ -657,6 +657,14 @@ test("platform admin can manage tenant detail support workflows", async ({
   });
   await signInWithEmail(tenantPage, tenantEmail);
   await createProjectFromProjectsPage(tenantPage, projectName);
+  await tenantPage.goto("/team/invite");
+  await expect(tenantPage.getByText("Invite Member").first()).toBeVisible();
+  await tenantPage.getByLabel("Invite Email").fill(inviteEmail);
+  await tenantPage.getByRole("button", { name: "Create Invite" }).click();
+  await expect(tenantPage).toHaveURL(/invited=1/);
+  await expect(
+    tenantPage.getByText(/Invitation (created|emailed)/),
+  ).toBeVisible();
   await tenantContext.close();
 
   const adminContext = await browser.newContext();
@@ -710,21 +718,21 @@ test("platform admin can manage tenant detail support workflows", async ({
   await expect(enabledMemberCard).toContainText(tenantEmail);
   await expect(enabledMemberCard).toContainText("active");
 
-  await adminPage.getByLabel("Invite Email").fill(inviteEmail);
-  await adminPage.getByRole("button", { name: "Create Invite" }).click();
-  await expect(adminPage).toHaveURL(/invited=1/);
-  await expect(adminPage.locator("input[readonly]")).toHaveValue(
-    /\/invite\/accept\?token=/,
-  );
   const invitationCard = adminPage
     .getByText(inviteEmail)
     .locator("xpath=ancestor::div[contains(@class, 'rounded-md')][1]");
   await expect(invitationCard).toBeVisible();
-
-  await invitationCard.getByRole("button", { name: "Cancel" }).click();
-  await expect(adminPage).toHaveURL(/inviteCancelled=1/);
-  await expect(adminPage.getByText("Invitation cancelled.")).toBeVisible();
-  await expect(adminPage.getByText(inviteEmail)).toBeHidden();
+  await expect(
+    adminPage.getByText(
+      "Company owners manage invitations from the Team area.",
+    ),
+  ).toBeVisible();
+  await expect(
+    adminPage.getByRole("button", { name: "Create Invite" }),
+  ).toHaveCount(0);
+  await expect(
+    invitationCard.getByRole("button", { name: "Cancel" }),
+  ).toHaveCount(0);
 
   await adminContext.close();
 });

@@ -20,7 +20,7 @@ Implemented SaaS admin capabilities:
 - Tenant companies can be enabled or disabled.
 - Tenant detail pages show status, owner and created date.
 - Tenant members can be listed and enabled or disabled.
-- Tenant invitations can be created and cancelled.
+- Pending tenant invitations can be reviewed read-only for support visibility.
 - Tenant projects can be listed for support visibility.
 
 Current platform actions write audit events for:
@@ -28,8 +28,6 @@ Current platform actions write audit events for:
 - `platform.tenants_reviewed`
 - `platform.tenant_reviewed`
 - `platform.tenant_status_updated`
-- `platform.company_invitation.created`
-- `platform.company_invitation.cancelled`
 - `platform.company_member.status_updated`
 
 ## Blueprint Comparison
@@ -50,7 +48,7 @@ smaller:
 
 - `/platform` currently combines the dashboard and tenant list.
 - `/platform/companies/[companyId]` combines tenant summary, members,
-  invitations and project visibility.
+  read-only pending invitations and project visibility.
 - Company creation, domain management, platform-wide user membership browsing
   and audit-log export are not implemented yet.
 
@@ -62,6 +60,8 @@ should be split before the admin surface becomes busy.
 - No support impersonation has been added.
 - Platform admins can inspect tenant metadata and manage access, but they do not
   directly edit tenant chatbot content from the platform area.
+- Platform admins cannot create or cancel tenant invitations. Company owners
+  manage invites from the Team area.
 - Custom domains and subdomain testing remain deferred until Blueprint
   Hardening 5/6.
 - Billing, plans and feature limits remain deferred until the billing design
@@ -81,7 +81,7 @@ should be split before the admin surface becomes busy.
 - tenant disable behavior
 - tenant detail project visibility
 - tenant member disable/enable
-- tenant invitation create/cancel
+- read-only pending invitation visibility
 - disabled tenant app redirect
 - disabled tenant widget runtime block
 - disabled tenant API runtime block
