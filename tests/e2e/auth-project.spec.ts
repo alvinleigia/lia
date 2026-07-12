@@ -712,36 +712,24 @@ test("platform admin can manage tenant detail support workflows", async ({
   await expect(adminPage.getByText(tenantName).first()).toBeVisible();
   await expect(adminPage.getByText(projectName).first()).toBeVisible();
 
-  const memberActionForm = adminPage
-    .locator("form")
-    .filter({ has: adminPage.locator('input[name="membershipId"]') })
-    .first();
-  const memberCard = memberActionForm.locator(
-    "xpath=ancestor::div[contains(@class, 'rounded-md')][1]",
-  );
+  const memberCard = adminPage
+    .getByText(memberEmail)
+    .locator("xpath=ancestor::div[contains(@class, 'rounded-md')][1]");
   await expect(memberCard).toBeVisible();
   await expect(memberCard).toContainText(memberEmail);
   await memberCard.getByRole("button", { name: "Disable" }).click();
   await expect(adminPage).toHaveURL(/memberUpdated=1/);
-  const disabledMemberActionForm = adminPage
-    .locator("form")
-    .filter({ has: adminPage.locator('input[name="membershipId"]') })
-    .first();
-  const disabledMemberCard = disabledMemberActionForm.locator(
-    "xpath=ancestor::div[contains(@class, 'rounded-md')][1]",
-  );
+  const disabledMemberCard = adminPage
+    .getByText(memberEmail)
+    .locator("xpath=ancestor::div[contains(@class, 'rounded-md')][1]");
   await expect(disabledMemberCard).toContainText(memberEmail);
   await expect(disabledMemberCard).toContainText("disabled");
 
   await disabledMemberCard.getByRole("button", { name: "Enable" }).click();
   await expect(adminPage).toHaveURL(/memberUpdated=1/);
-  const enabledMemberActionForm = adminPage
-    .locator("form")
-    .filter({ has: adminPage.locator('input[name="membershipId"]') })
-    .first();
-  const enabledMemberCard = enabledMemberActionForm.locator(
-    "xpath=ancestor::div[contains(@class, 'rounded-md')][1]",
-  );
+  const enabledMemberCard = adminPage
+    .getByText(memberEmail)
+    .locator("xpath=ancestor::div[contains(@class, 'rounded-md')][1]");
   await expect(enabledMemberCard).toContainText(memberEmail);
   await expect(enabledMemberCard).toContainText("active");
 
