@@ -3,15 +3,13 @@
 Use this checklist to test Lia AI in phases instead of trying to validate the
 whole application in one sitting.
 
-Record the UAT environment details before starting.
+## UAT Environment
 
-| Item | Value |
-| --- | --- |
-| UAT URL |  |
-| Vercel deployment commit |  |
-| Database/environment |  |
-| Tester name |  |
-| Test date |  |
+- UAT URL:
+- Vercel deployment commit:
+- Database/environment:
+- Tester name:
+- Test date:
 
 ## UAT Rules
 
@@ -22,18 +20,48 @@ Record the UAT environment details before starting.
 - Use fresh test users where possible.
 - Do not use real customer data during UAT.
 
+## How To Mark Each Item
+
+Use this simple status style under each checklist item:
+
+```text
+Status: Not started / Pass / Fail / Blocked
+Notes:
+```
+
 ## Phase 0 - Environment Readiness
 
 Goal: confirm the UAT environment is safe to test.
 
-| Check | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Open the UAT URL | Landing page loads with one top navbar only |  |  |
-| Confirm latest commit | Deployment uses the intended GitHub commit |  |  |
-| Confirm env variables | App has database, auth, OpenAI, app URL, and admin email configured |  |  |
-| Confirm database schema | Latest migrations are applied |  |  |
-| Confirm platform admin email | `support@leigia.com` is included in platform admin emails |  |  |
-| Confirm cron setup | Upload queue cron is configured for daily processing |  |  |
+- [ ] Open the UAT URL.
+  Expected result: Landing page loads with one top navbar only.
+  Status:
+  Notes:
+
+- [ ] Confirm latest commit.
+  Expected result: Deployment uses the intended GitHub commit.
+  Status:
+  Notes:
+
+- [ ] Confirm env variables.
+  Expected result: App has database, auth, OpenAI, app URL, and admin email configured.
+  Status:
+  Notes:
+
+- [ ] Confirm database schema.
+  Expected result: Latest migrations are applied.
+  Status:
+  Notes:
+
+- [ ] Confirm platform admin email.
+  Expected result: `support@leigia.com` is included in platform admin emails.
+  Status:
+  Notes:
+
+- [ ] Confirm cron setup.
+  Expected result: Upload queue cron is configured for daily processing.
+  Status:
+  Notes:
 
 Suggested technical checks:
 
@@ -49,15 +77,40 @@ Exit gate: UAT URL loads, sign-in/sign-up pages load, and no deployment error is
 
 Goal: confirm public access, signup, signin, and signout work.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Open `/` while signed out | Landing page displays Lia AI and auth actions |  |  |
-| Click `Sign Up` | Signup page opens |  |  |
-| Create a new test account | Account is created and user is redirected into the app |  |  |
-| Sign out | User returns to signed-out state |  |  |
-| Sign in with the same account | User can access the project area again |  |  |
-| Try wrong password | Login fails with a clear error |  |  |
-| Use profile menu signout | User is signed out successfully |  |  |
+- [ ] Open `/` while signed out.
+  Expected result: Landing page displays Lia AI and auth actions.
+  Status:
+  Notes:
+
+- [ ] Click `Sign Up`.
+  Expected result: Signup page opens.
+  Status:
+  Notes:
+
+- [ ] Create a new test account.
+  Expected result: Account is created and user is redirected into the app.
+  Status:
+  Notes:
+
+- [ ] Sign out.
+  Expected result: User returns to signed-out state.
+  Status:
+  Notes:
+
+- [ ] Sign in with the same account.
+  Expected result: User can access the project area again.
+  Status:
+  Notes:
+
+- [ ] Try wrong password.
+  Expected result: Login fails with a clear error.
+  Status:
+  Notes:
+
+- [ ] Use profile menu signout.
+  Expected result: User is signed out successfully.
+  Status:
+  Notes:
 
 Test data:
 
@@ -72,16 +125,45 @@ Exit gate: a normal user can sign up, sign in, and sign out.
 
 Goal: confirm SaaS admin basics work before inviting real testers.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Sign in as `support@leigia.com` | User lands on or can open `/platform` |  |  |
-| Open `/platform` | Tenant/company list is visible |  |  |
-| Open a tenant detail page | Members, projects, and invitations are visible |  |  |
-| Create a tenant invitation | Invitation is created and listed |  |  |
-| Cancel a pending invitation | Invitation is cancelled or removed from active list |  |  |
-| Disable a tenant | Tenant owner cannot use the app normally |  |  |
-| Re-enable the tenant | Tenant owner can use the app again |  |  |
-| Sign in as non-admin and open `/platform` | Access is denied or redirected |  |  |
+- [ ] Sign in as `support@leigia.com`.
+  Expected result: User lands on or can open `/platform`.
+  Status:
+  Notes:
+
+- [ ] Open `/platform`.
+  Expected result: Tenant/company list is visible.
+  Status:
+  Notes:
+
+- [ ] Open a tenant detail page.
+  Expected result: Members, projects, and invitations are visible.
+  Status:
+  Notes:
+
+- [ ] Create a tenant invitation.
+  Expected result: Invitation is created and listed.
+  Status:
+  Notes:
+
+- [ ] Cancel a pending invitation.
+  Expected result: Invitation is cancelled or removed from active list.
+  Status:
+  Notes:
+
+- [ ] Disable a tenant.
+  Expected result: Tenant owner cannot use the app normally.
+  Status:
+  Notes:
+
+- [ ] Re-enable the tenant.
+  Expected result: Tenant owner can use the app again.
+  Status:
+  Notes:
+
+- [ ] Sign in as non-admin and open `/platform`.
+  Expected result: Access is denied or redirected.
+  Status:
+  Notes:
 
 Exit gate: platform admin can manage tenants without exposing admin pages to normal users.
 
@@ -89,18 +171,55 @@ Exit gate: platform admin can manage tenants without exposing admin pages to nor
 
 Goal: confirm account setup and project management.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Open `/profile` | User details, account details, and access state display correctly |  |  |
-| Update display name | Header/profile show the updated user name |  |  |
-| Open `/team` | Member list is visible |  |  |
-| Invite a teammate | Pending invite is created |  |  |
-| Accept teammate invite | Teammate can join the same company/account |  |  |
-| Disable teammate | Disabled teammate cannot access active tenant resources |  |  |
-| Create a new project | Project appears in project list and selector |  |  |
-| Rename project | New project name displays in list/header |  |  |
-| Archive project | Project becomes archived and widget access is disabled |  |  |
-| Unarchive project | Project becomes available again |  |  |
+- [ ] Open `/profile`.
+  Expected result: User details, account details, and access state display correctly.
+  Status:
+  Notes:
+
+- [ ] Update display name.
+  Expected result: Header/profile show the updated user name.
+  Status:
+  Notes:
+
+- [ ] Open `/team`.
+  Expected result: Member list is visible.
+  Status:
+  Notes:
+
+- [ ] Invite a teammate.
+  Expected result: Pending invite is created.
+  Status:
+  Notes:
+
+- [ ] Accept teammate invite.
+  Expected result: Teammate can join the same company/account.
+  Status:
+  Notes:
+
+- [ ] Disable teammate.
+  Expected result: Disabled teammate cannot access active tenant resources.
+  Status:
+  Notes:
+
+- [ ] Create a new project.
+  Expected result: Project appears in project list and selector.
+  Status:
+  Notes:
+
+- [ ] Rename project.
+  Expected result: New project name displays in list/header.
+  Status:
+  Notes:
+
+- [ ] Archive project.
+  Expected result: Project becomes archived and widget access is disabled.
+  Status:
+  Notes:
+
+- [ ] Unarchive project.
+  Expected result: Project becomes available again.
+  Status:
+  Notes:
 
 Exit gate: one company account can manage users and multiple projects.
 
@@ -108,15 +227,40 @@ Exit gate: one company account can manage users and multiple projects.
 
 Goal: confirm knowledge-base upload, indexing, and RAG chat.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Open `/projects/documents` | Document page loads for selected project |  |  |
-| Upload a small `.txt` or `.md` file | Source document is created |  |  |
-| Process queued document | Chunks are created and status updates |  |  |
-| Open `/projects/chat` | Chat page loads |  |  |
-| Ask a question answered by the uploaded file | Assistant answers from project documents |  |  |
-| Ask unrelated question | Assistant handles missing context safely |  |  |
-| Delete document | Document and related knowledge are removed from UI |  |  |
+- [ ] Open `/projects/documents`.
+  Expected result: Document page loads for selected project.
+  Status:
+  Notes:
+
+- [ ] Upload a small `.txt` or `.md` file.
+  Expected result: Source document is created.
+  Status:
+  Notes:
+
+- [ ] Process queued document.
+  Expected result: Chunks are created and status updates.
+  Status:
+  Notes:
+
+- [ ] Open `/projects/chat`.
+  Expected result: Chat page loads.
+  Status:
+  Notes:
+
+- [ ] Ask a question answered by the uploaded file.
+  Expected result: Assistant answers from project documents.
+  Status:
+  Notes:
+
+- [ ] Ask unrelated question.
+  Expected result: Assistant handles missing context safely.
+  Status:
+  Notes:
+
+- [ ] Delete document.
+  Expected result: Document and related knowledge are removed from UI.
+  Status:
+  Notes:
 
 Suggested test document:
 
@@ -136,18 +280,55 @@ Exit gate: selected project can upload knowledge and chat can retrieve it.
 
 Goal: confirm actions and visual flow setup are usable.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Open `/projects/actions` | Actions list loads |  |  |
-| Apply a bundled template | Template creates an action with steps |  |  |
-| Create a custom action | Action is saved as draft |  |  |
-| Open action detail | Step list and settings are visible |  |  |
-| Open visual canvas | Canvas displays the action steps and routes |  |  |
-| Add a message step | Step is saved and appears in the flow |  |  |
-| Add a collect input step | Field key and validation settings save correctly |  |  |
-| Add a choice step | Options save correctly |  |  |
-| Add a branch rule | Rule appears in diagnostics/canvas |  |  |
-| Publish or activate action | Missing setup warnings are clear; valid flow can become active |  |  |
+- [ ] Open `/projects/actions`.
+  Expected result: Actions list loads.
+  Status:
+  Notes:
+
+- [ ] Apply a bundled template.
+  Expected result: Template creates an action with steps.
+  Status:
+  Notes:
+
+- [ ] Create a custom action.
+  Expected result: Action is saved as draft.
+  Status:
+  Notes:
+
+- [ ] Open action detail.
+  Expected result: Step list and settings are visible.
+  Status:
+  Notes:
+
+- [ ] Open visual canvas.
+  Expected result: Canvas displays the action steps and routes.
+  Status:
+  Notes:
+
+- [ ] Add a message step.
+  Expected result: Step is saved and appears in the flow.
+  Status:
+  Notes:
+
+- [ ] Add a collect input step.
+  Expected result: Field key and validation settings save correctly.
+  Status:
+  Notes:
+
+- [ ] Add a choice step.
+  Expected result: Options save correctly.
+  Status:
+  Notes:
+
+- [ ] Add a branch rule.
+  Expected result: Rule appears in diagnostics/canvas.
+  Status:
+  Notes:
+
+- [ ] Publish or activate action.
+  Expected result: Missing setup warnings are clear; valid flow can become active.
+  Status:
+  Notes:
 
 Exit gate: tester can create or modify a basic flow without developer help.
 
@@ -155,18 +336,55 @@ Exit gate: tester can create or modify a basic flow without developer help.
 
 Goal: confirm flows run in project chat and save submissions.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Set trigger phrase for an active action | Trigger phrase is saved |  |  |
-| Open `/projects/chat` | Chat loads selected project |  |  |
-| Type trigger phrase | Action flow starts |  |  |
-| Enter valid answers | Flow advances step by step |  |  |
-| Enter invalid email/phone/date where applicable | Validation message appears |  |  |
-| Test branch answer | Runtime follows expected branch |  |  |
-| Confirm final submission | Submission is saved |  |  |
-| Open `/projects/submissions` | Submission appears in list |  |  |
-| Open submission detail | Fields, status, and events are visible |  |  |
-| Update submission status | Status change is saved |  |  |
+- [ ] Set trigger phrase for an active action.
+  Expected result: Trigger phrase is saved.
+  Status:
+  Notes:
+
+- [ ] Open `/projects/chat`.
+  Expected result: Chat loads selected project.
+  Status:
+  Notes:
+
+- [ ] Type trigger phrase.
+  Expected result: Action flow starts.
+  Status:
+  Notes:
+
+- [ ] Enter valid answers.
+  Expected result: Flow advances step by step.
+  Status:
+  Notes:
+
+- [ ] Enter invalid email, phone, or date where applicable.
+  Expected result: Validation message appears.
+  Status:
+  Notes:
+
+- [ ] Test branch answer.
+  Expected result: Runtime follows expected branch.
+  Status:
+  Notes:
+
+- [ ] Confirm final submission.
+  Expected result: Submission is saved.
+  Status:
+  Notes:
+
+- [ ] Open `/projects/submissions`.
+  Expected result: Submission appears in list.
+  Status:
+  Notes:
+
+- [ ] Open submission detail.
+  Expected result: Fields, status, and events are visible.
+  Status:
+  Notes:
+
+- [ ] Update submission status.
+  Expected result: Status change is saved.
+  Status:
+  Notes:
 
 Exit gate: project chat can complete an action flow and create a submission.
 
@@ -174,18 +392,55 @@ Exit gate: project chat can complete an action flow and create a submission.
 
 Goal: confirm embeddable widget setup and runtime.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Open `/projects/widget` | Widget settings page loads |  |  |
-| Generate or rotate token | Token is created and active |  |  |
-| Add allowed domain | Allowed domain saves correctly |  |  |
-| Copy embed snippet | Snippet contains UAT app URL and token |  |  |
-| Open widget embed page | Widget UI loads |  |  |
-| Send normal chat message | Widget receives a response |  |  |
-| Trigger active action flow | Widget starts the same channel-independent flow |  |  |
-| Complete widget flow | Submission is saved with widget source |  |  |
-| Disable token | Widget access is blocked |  |  |
-| Re-enable token | Widget access works again |  |  |
+- [ ] Open `/projects/widget`.
+  Expected result: Widget settings page loads.
+  Status:
+  Notes:
+
+- [ ] Generate or rotate token.
+  Expected result: Token is created and active.
+  Status:
+  Notes:
+
+- [ ] Add allowed domain.
+  Expected result: Allowed domain saves correctly.
+  Status:
+  Notes:
+
+- [ ] Copy embed snippet.
+  Expected result: Snippet contains UAT app URL and token.
+  Status:
+  Notes:
+
+- [ ] Open widget embed page.
+  Expected result: Widget UI loads.
+  Status:
+  Notes:
+
+- [ ] Send normal chat message.
+  Expected result: Widget receives a response.
+  Status:
+  Notes:
+
+- [ ] Trigger active action flow.
+  Expected result: Widget starts the same channel-independent flow.
+  Status:
+  Notes:
+
+- [ ] Complete widget flow.
+  Expected result: Submission is saved with widget source.
+  Status:
+  Notes:
+
+- [ ] Disable token.
+  Expected result: Widget access is blocked.
+  Status:
+  Notes:
+
+- [ ] Re-enable token.
+  Expected result: Widget access works again.
+  Status:
+  Notes:
 
 Exit gate: widget works as a customer-facing channel for the selected project.
 
@@ -193,17 +448,50 @@ Exit gate: widget works as a customer-facing channel for the selected project.
 
 Goal: confirm reusable media and catalog blocks are ready for flows.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Open `/projects/media` | Media library loads |  |  |
-| Upload small image/PDF | Media asset is saved under selected project |  |  |
-| Archive media asset | Asset is no longer active |  |  |
-| Open `/projects/catalog` | Catalog page loads |  |  |
-| Create a catalog | Catalog appears in list |  |  |
-| Add a product | Product appears with name, price, and optional URL/image |  |  |
-| Configure WhatsApp catalog IDs if available | WhatsApp metadata saves |  |  |
-| Use media/product step in action | Flow can reference selected media/product |  |  |
-| Run flow in chat/widget | Media/product content renders with fallback where needed |  |  |
+- [ ] Open `/projects/media`.
+  Expected result: Media library loads.
+  Status:
+  Notes:
+
+- [ ] Upload small image/PDF.
+  Expected result: Media asset is saved under selected project.
+  Status:
+  Notes:
+
+- [ ] Archive media asset.
+  Expected result: Asset is no longer active.
+  Status:
+  Notes:
+
+- [ ] Open `/projects/catalog`.
+  Expected result: Catalog page loads.
+  Status:
+  Notes:
+
+- [ ] Create a catalog.
+  Expected result: Catalog appears in list.
+  Status:
+  Notes:
+
+- [ ] Add a product.
+  Expected result: Product appears with name, price, and optional URL/image.
+  Status:
+  Notes:
+
+- [ ] Configure WhatsApp catalog IDs if available.
+  Expected result: WhatsApp metadata saves.
+  Status:
+  Notes:
+
+- [ ] Use media/product step in action.
+  Expected result: Flow can reference selected media/product.
+  Status:
+  Notes:
+
+- [ ] Run flow in chat/widget.
+  Expected result: Media/product content renders with fallback where needed.
+  Status:
+  Notes:
 
 Exit gate: project-scoped media and catalog data can be used in flows.
 
@@ -211,18 +499,55 @@ Exit gate: project-scoped media and catalog data can be used in flows.
 
 Goal: confirm integrations and manual review workflows.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Open `/projects/operations` | Provider and operation pages load |  |  |
-| Create manual review provider | Provider is saved |  |  |
-| Create webhook or n8n provider if test URL is available | Provider is saved without exposing secrets |  |  |
-| Create an operation | Operation is saved and can be enabled/disabled |  |  |
-| Add operation step to flow | Step references selected operation |  |  |
-| Run flow with operation | Attempt is logged as success/failure |  |  |
-| Replay or retry attempt | New attempt is logged |  |  |
-| Add handoff step | Submission moves to Under Review |  |  |
-| Open `/projects/handoffs` | Handoff queue lists unassigned items |  |  |
-| Claim and release handoff | Assignment state updates correctly |  |  |
+- [ ] Open `/projects/operations`.
+  Expected result: Provider and operation pages load.
+  Status:
+  Notes:
+
+- [ ] Create manual review provider.
+  Expected result: Provider is saved.
+  Status:
+  Notes:
+
+- [ ] Create webhook or n8n provider if test URL is available.
+  Expected result: Provider is saved without exposing secrets.
+  Status:
+  Notes:
+
+- [ ] Create an operation.
+  Expected result: Operation is saved and can be enabled/disabled.
+  Status:
+  Notes:
+
+- [ ] Add operation step to flow.
+  Expected result: Step references selected operation.
+  Status:
+  Notes:
+
+- [ ] Run flow with operation.
+  Expected result: Attempt is logged as success/failure.
+  Status:
+  Notes:
+
+- [ ] Replay or retry attempt.
+  Expected result: New attempt is logged.
+  Status:
+  Notes:
+
+- [ ] Add handoff step.
+  Expected result: Submission moves to Under Review.
+  Status:
+  Notes:
+
+- [ ] Open `/projects/handoffs`.
+  Expected result: Handoff queue lists unassigned items.
+  Status:
+  Notes:
+
+- [ ] Claim and release handoff.
+  Expected result: Assignment state updates correctly.
+  Status:
+  Notes:
 
 Exit gate: operations and handoff queues are usable for internal follow-up.
 
@@ -231,14 +556,35 @@ Exit gate: operations and handoff queues are usable for internal follow-up.
 Goal: confirm WhatsApp setup screens and shared-flow readiness. Skip live sends
 if Meta test credentials are not available.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Open `/projects/channels/whatsapp` | WhatsApp channel page loads |  |  |
-| Save test channel settings | Settings save for selected project |  |  |
-| Verify webhook token flow if configured | Webhook verification succeeds |  |  |
-| Send test message if credentials are available | Test message sends or shows clear provider error |  |  |
-| Use approved template settings in a flow | Template block saves and validates variables |  |  |
-| Test media/product fallback behavior | Flow still works without native WhatsApp send |  |  |
+- [ ] Open `/projects/channels/whatsapp`.
+  Expected result: WhatsApp channel page loads.
+  Status:
+  Notes:
+
+- [ ] Save test channel settings.
+  Expected result: Settings save for selected project.
+  Status:
+  Notes:
+
+- [ ] Verify webhook token flow if configured.
+  Expected result: Webhook verification succeeds.
+  Status:
+  Notes:
+
+- [ ] Send test message if credentials are available.
+  Expected result: Test message sends or shows clear provider error.
+  Status:
+  Notes:
+
+- [ ] Use approved template settings in a flow.
+  Expected result: Template block saves and validates variables.
+  Status:
+  Notes:
+
+- [ ] Test media/product fallback behavior.
+  Expected result: Flow still works without native WhatsApp send.
+  Status:
+  Notes:
 
 Exit gate: WhatsApp can be configured later without changing the flow builder model.
 
@@ -246,15 +592,40 @@ Exit gate: WhatsApp can be configured later without changing the flow builder mo
 
 Goal: confirm admin visibility and tenant boundaries.
 
-| Step | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Open `/projects/analytics` | Chat/widget metrics are visible |  |  |
-| Confirm recent chat/widget activity | Counts and route rows update after tests |  |  |
-| Open `/projects/audit` | Recent company-scoped events are visible |  |  |
-| Confirm project/document/widget/action events | Sensitive actions appear in audit log |  |  |
-| Create second user/company | Separate company/project is created |  |  |
-| Try opening first tenant project from second tenant | Access is blocked |  |  |
-| Try widget token from disabled tenant | Widget access is blocked |  |  |
+- [ ] Open `/projects/analytics`.
+  Expected result: Chat/widget metrics are visible.
+  Status:
+  Notes:
+
+- [ ] Confirm recent chat/widget activity.
+  Expected result: Counts and route rows update after tests.
+  Status:
+  Notes:
+
+- [ ] Open `/projects/audit`.
+  Expected result: Recent company-scoped events are visible.
+  Status:
+  Notes:
+
+- [ ] Confirm project/document/widget/action events.
+  Expected result: Sensitive actions appear in audit log.
+  Status:
+  Notes:
+
+- [ ] Create second user/company.
+  Expected result: Separate company/project is created.
+  Status:
+  Notes:
+
+- [ ] Try opening first tenant project from second tenant.
+  Expected result: Access is blocked.
+  Status:
+  Notes:
+
+- [ ] Try widget token from disabled tenant.
+  Expected result: Widget access is blocked.
+  Status:
+  Notes:
 
 Suggested technical checks:
 
@@ -269,14 +640,35 @@ Exit gate: testers cannot see or mutate another tenant's data.
 
 Goal: confirm the UAT build is acceptable for the next release decision.
 
-| Check | Expected Result | Status | Notes |
-| --- | --- | --- | --- |
-| Run smoke test across phases 1-7 | No critical workflow is blocked |  |  |
-| Review open UAT bugs | Critical and high bugs are resolved or accepted |  |  |
-| Review audit warnings | Known npm audit residuals are understood |  |  |
-| Confirm no test data contains real customer information | UAT data is safe |  |  |
-| Confirm backups/restore plan for UAT database | Recovery path is known |  |  |
-| Confirm deferred items | Billing, custom domains, RLS, object storage remain documented deferrals |  |  |
+- [ ] Run smoke test across phases 1-7.
+  Expected result: No critical workflow is blocked.
+  Status:
+  Notes:
+
+- [ ] Review open UAT bugs.
+  Expected result: Critical and high bugs are resolved or accepted.
+  Status:
+  Notes:
+
+- [ ] Review audit warnings.
+  Expected result: Known npm audit residuals are understood.
+  Status:
+  Notes:
+
+- [ ] Confirm no test data contains real customer information.
+  Expected result: UAT data is safe.
+  Status:
+  Notes:
+
+- [ ] Confirm backups/restore plan for UAT database.
+  Expected result: Recovery path is known.
+  Status:
+  Notes:
+
+- [ ] Confirm deferred items.
+  Expected result: Billing, custom domains, RLS, and object storage remain documented deferrals.
+  Status:
+  Notes:
 
 Suggested final commands:
 
@@ -291,9 +683,17 @@ npm run test:e2e
 
 ## Issue Log
 
-| ID | Phase | Severity | Summary | Owner | Status | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| UAT-001 |  |  |  |  |  |  |
+Use this format for each issue:
+
+```text
+ID:
+Phase:
+Severity: Critical / High / Medium / Low
+Summary:
+Owner:
+Status:
+Notes:
+```
 
 Severity guide:
 
@@ -304,9 +704,23 @@ Severity guide:
 
 ## Sign-Off
 
-| Role | Name | Date | Approved? | Notes |
-| --- | --- | --- | --- | --- |
-| Product owner |  |  |  |  |
-| Technical owner |  |  |  |  |
-| UAT tester |  |  |  |  |
+Product owner:
 
+- Name:
+- Date:
+- Approved:
+- Notes:
+
+Technical owner:
+
+- Name:
+- Date:
+- Approved:
+- Notes:
+
+UAT tester:
+
+- Name:
+- Date:
+- Approved:
+- Notes:
