@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": ">=20.9.0"
   },
   "scripts": {
     "clean:next": "node scripts/clean-next-cache.mjs",
@@ -71,15 +71,15 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^0.544.0",
     "nanoid": "^5.1.5",
-    "next": "15.5.20",
+    "next": "16.2.10",
     "next-auth": "^5.0.0-beta.30",
     "next-themes": "^0.4.6",
     "pdf-parse": "^1.1.1",
     "pg": "^8.20.0",
     "postgres": "^3.4.8",
-    "react": "19.1.0",
+    "react": "19.2.7",
     "react-day-picker": "^9.10.0",
-    "react-dom": "19.1.0",
+    "react-dom": "19.2.7",
     "react-hook-form": "^7.62.0",
     "react-resizable-panels": "^3.0.6",
     "react-syntax-highlighter": "^15.6.6",
@@ -97,8 +97,8 @@
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5"

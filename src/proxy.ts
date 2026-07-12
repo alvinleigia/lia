@@ -9,7 +9,7 @@ const publicRoutes = new Set([
   "/reset-password",
 ]);
 
-export default function middleware(req: NextRequest) {
+export default function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isPublicRoute = publicRoutes.has(pathname);
   const isAuthRoute = pathname.startsWith("/api/auth");
