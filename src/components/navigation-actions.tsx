@@ -246,7 +246,11 @@ export function NavigationActions({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className={buttonVariants({ variant: "outline" })}
+              className={buttonVariants({
+                variant: "outline",
+                className:
+                  "bg-white text-slate-950 hover:bg-slate-50 hover:text-slate-950 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-50 dark:hover:text-slate-950",
+              })}
               type="button"
             >
               <UserCircle className="h-4 w-4" />
