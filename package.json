@@ -2,6 +2,9 @@
   "name": "ls-lia",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "clean:next": "node scripts/clean-next-cache.mjs",
     "predev": "node scripts/assert-dev-port-free.mjs && node scripts/clean-next-cache.mjs",
@@ -25,7 +28,7 @@
     "@ai-sdk/react": "^2.0.47",
     "@hookform/resolvers": "^5.2.2",
     "@langchain/core": "^1.1.38",
-    "@langchain/textsplitters": "^0.1.0",
+    "@langchain/textsplitters": "^1.0.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
