@@ -1,0 +1,2 @@
+ALTER TABLE "source_documents" ADD COLUMN "file_hash" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "source_documents_project_file_hash_unique" ON "source_documents" USING btree ("project_id","file_hash");

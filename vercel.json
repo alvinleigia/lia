@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/upload/process-next",
+      "schedule": "*/1 * * * *"
+    }
+  ]
+}

@@ -1,0 +1,715 @@
+{
+  "templates": [
+    {
+      "key": "spa_service_booking",
+      "name": "Spa Service Booking",
+      "description": "Creates a spa booking action that collects category, service, preferred schedule, and guest contact details.",
+      "businessTypes": ["spa", "resort", "wellness"],
+      "action": {
+        "name": "Book Spa Service",
+        "description": "Guides guests through requesting a spa appointment by collecting their service category, service choice, preferred schedule, and contact information.",
+        "status": "active",
+        "triggerPhrases": [
+          "book spa",
+          "spa appointment",
+          "book massage",
+          "schedule massage"
+        ],
+        "settings": {
+          "templateKey": "spa_service_booking",
+          "catalogId": "cat_spa_services"
+        }
+      },
+      "steps": [
+        {
+          "sortOrder": 1,
+          "stepType": "collect_input",
+          "fieldKey": "serviceCategoryId",
+          "label": "Service Category",
+          "prompt": "Which spa service category would you like?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {
+            "sourceType": "catalog_categories",
+            "sourceConfig": {
+              "catalogId": "cat_spa_services"
+            }
+          }
+        },
+        {
+          "sortOrder": 2,
+          "stepType": "collect_input",
+          "fieldKey": "serviceItemId",
+          "label": "Service",
+          "prompt": "Which service would you like?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {
+            "sourceType": "catalog_items",
+            "sourceConfig": {
+              "catalogId": "cat_spa_services",
+              "filterByField": "serviceCategoryId"
+            }
+          }
+        },
+        {
+          "sortOrder": 3,
+          "stepType": "collect_input",
+          "fieldKey": "preferredDate",
+          "label": "Preferred Date",
+          "prompt": "What date would you prefer for the spa appointment?",
+          "inputType": "date",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 4,
+          "stepType": "collect_input",
+          "fieldKey": "preferredTime",
+          "label": "Preferred Time",
+          "prompt": "What time would you prefer?",
+          "inputType": "time",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 5,
+          "stepType": "collect_input",
+          "fieldKey": "guestName",
+          "label": "Guest Name",
+          "prompt": "What name should we put on the request?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 6,
+          "stepType": "collect_input",
+          "fieldKey": "guestEmail",
+          "label": "Guest Email",
+          "prompt": "What email should we use to contact you?",
+          "inputType": "email",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 7,
+          "stepType": "collect_input",
+          "fieldKey": "guestPhone",
+          "label": "Guest Phone",
+          "prompt": "What phone number should we use if the spa team needs to reach you?",
+          "inputType": "phone",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 8,
+          "stepType": "confirmation",
+          "fieldKey": null,
+          "label": "Confirm Request",
+          "prompt": "Please review your spa appointment request before we save it.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 9,
+          "stepType": "submit",
+          "fieldKey": null,
+          "label": "Submit Request",
+          "prompt": "Submitting your spa appointment request.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        }
+      ]
+    },
+    {
+      "key": "salon_service_booking",
+      "name": "Salon Service Booking",
+      "description": "Creates a salon booking action using salon categories and services from the sample catalog.",
+      "businessTypes": ["salon", "beauty"],
+      "action": {
+        "name": "Book Salon Service",
+        "description": "Guides guests through requesting a salon appointment by collecting their service category, service choice, preferred schedule, and contact information.",
+        "status": "active",
+        "triggerPhrases": [
+          "book salon",
+          "salon appointment",
+          "book haircut",
+          "book manicure"
+        ],
+        "settings": {
+          "templateKey": "salon_service_booking",
+          "catalogId": "cat_salon_services"
+        }
+      },
+      "steps": [
+        {
+          "sortOrder": 1,
+          "stepType": "collect_input",
+          "fieldKey": "serviceCategoryId",
+          "label": "Service Category",
+          "prompt": "Which salon service category would you like?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {
+            "sourceType": "catalog_categories",
+            "sourceConfig": {
+              "catalogId": "cat_salon_services"
+            }
+          }
+        },
+        {
+          "sortOrder": 2,
+          "stepType": "collect_input",
+          "fieldKey": "serviceItemId",
+          "label": "Service",
+          "prompt": "Which service would you like?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {
+            "sourceType": "catalog_items",
+            "sourceConfig": {
+              "catalogId": "cat_salon_services",
+              "filterByField": "serviceCategoryId"
+            }
+          }
+        },
+        {
+          "sortOrder": 3,
+          "stepType": "collect_input",
+          "fieldKey": "preferredDate",
+          "label": "Preferred Date",
+          "prompt": "What date would you prefer for the salon appointment?",
+          "inputType": "date",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 4,
+          "stepType": "collect_input",
+          "fieldKey": "preferredTime",
+          "label": "Preferred Time",
+          "prompt": "What time would you prefer?",
+          "inputType": "time",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 5,
+          "stepType": "collect_input",
+          "fieldKey": "guestName",
+          "label": "Guest Name",
+          "prompt": "What name should we put on the request?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 6,
+          "stepType": "collect_input",
+          "fieldKey": "guestEmail",
+          "label": "Guest Email",
+          "prompt": "What email should we use to contact you?",
+          "inputType": "email",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 7,
+          "stepType": "collect_input",
+          "fieldKey": "guestPhone",
+          "label": "Guest Phone",
+          "prompt": "What phone number should we use if the salon team needs to reach you?",
+          "inputType": "phone",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 8,
+          "stepType": "confirmation",
+          "fieldKey": null,
+          "label": "Confirm Request",
+          "prompt": "Please review your salon appointment request before we save it.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 9,
+          "stepType": "submit",
+          "fieldKey": null,
+          "label": "Submit Request",
+          "prompt": "Submitting your salon appointment request.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        }
+      ]
+    },
+    {
+      "key": "hotel_enquiry",
+      "name": "Hotel Enquiry",
+      "description": "Creates a hotel enquiry flow for stay dates, room needs, guest count, and contact details.",
+      "businessTypes": ["hotel", "resort", "serviced apartment"],
+      "action": {
+        "name": "Hotel Stay Enquiry",
+        "description": "Collects stay requirements and guest contact details for a hotel enquiry.",
+        "status": "active",
+        "triggerPhrases": [
+          "hotel enquiry",
+          "book room",
+          "room availability",
+          "stay enquiry"
+        ],
+        "settings": {
+          "templateKey": "hotel_enquiry"
+        }
+      },
+      "steps": [
+        {
+          "sortOrder": 1,
+          "stepType": "date_range",
+          "fieldKey": "stayDates",
+          "label": "Stay Dates",
+          "prompt": "What check-in and check-out dates are you looking for? Use YYYY-MM-DD to YYYY-MM-DD.",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 2,
+          "stepType": "number",
+          "fieldKey": "guestCount",
+          "label": "Guest Count",
+          "prompt": "How many guests will be staying?",
+          "inputType": "int",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 3,
+          "stepType": "choice",
+          "fieldKey": "roomType",
+          "label": "Room Type",
+          "prompt": "Which room type are you interested in?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [
+            { "label": "Standard", "value": "standard" },
+            { "label": "Deluxe", "value": "deluxe" },
+            { "label": "Suite", "value": "suite" }
+          ],
+          "settings": {}
+        },
+        {
+          "sortOrder": 4,
+          "stepType": "collect_input",
+          "fieldKey": "guestName",
+          "label": "Guest Name",
+          "prompt": "What name should we put on the enquiry?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 5,
+          "stepType": "email",
+          "fieldKey": "guestEmail",
+          "label": "Guest Email",
+          "prompt": "What email should we use to contact you?",
+          "inputType": "email",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 6,
+          "stepType": "phone",
+          "fieldKey": "guestPhone",
+          "label": "Guest Phone",
+          "prompt": "What phone number should we use if the team needs to reach you?",
+          "inputType": "phone",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 7,
+          "stepType": "confirmation",
+          "fieldKey": null,
+          "label": "Confirm Enquiry",
+          "prompt": "Please review your hotel enquiry before we save it.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 8,
+          "stepType": "submit",
+          "fieldKey": null,
+          "label": "Submit Enquiry",
+          "prompt": "Submitting your hotel enquiry.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        }
+      ]
+    },
+    {
+      "key": "restaurant_reservation",
+      "name": "Restaurant Reservation",
+      "description": "Creates a restaurant reservation request flow for party size, date, time, and contact details.",
+      "businessTypes": ["restaurant", "cafe", "bar"],
+      "action": {
+        "name": "Restaurant Reservation",
+        "description": "Collects reservation details and contact information for a dining request.",
+        "status": "active",
+        "triggerPhrases": [
+          "book table",
+          "reserve table",
+          "restaurant reservation",
+          "dinner booking"
+        ],
+        "settings": {
+          "templateKey": "restaurant_reservation"
+        }
+      },
+      "steps": [
+        {
+          "sortOrder": 1,
+          "stepType": "number",
+          "fieldKey": "partySize",
+          "label": "Party Size",
+          "prompt": "How many people is the reservation for?",
+          "inputType": "int",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 2,
+          "stepType": "date",
+          "fieldKey": "preferredDate",
+          "label": "Preferred Date",
+          "prompt": "What date would you like to reserve?",
+          "inputType": "date",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 3,
+          "stepType": "time",
+          "fieldKey": "preferredTime",
+          "label": "Preferred Time",
+          "prompt": "What time would you prefer?",
+          "inputType": "time",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 4,
+          "stepType": "choice",
+          "fieldKey": "seatingPreference",
+          "label": "Seating Preference",
+          "prompt": "Do you have a seating preference?",
+          "inputType": "text",
+          "isRequired": false,
+          "options": [
+            { "label": "Indoor", "value": "indoor" },
+            { "label": "Outdoor", "value": "outdoor" },
+            { "label": "No preference", "value": "no_preference" }
+          ],
+          "settings": {}
+        },
+        {
+          "sortOrder": 5,
+          "stepType": "collect_input",
+          "fieldKey": "guestName",
+          "label": "Guest Name",
+          "prompt": "What name should we put on the reservation?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 6,
+          "stepType": "phone",
+          "fieldKey": "guestPhone",
+          "label": "Guest Phone",
+          "prompt": "What phone number should we use if the restaurant needs to reach you?",
+          "inputType": "phone",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 7,
+          "stepType": "confirmation",
+          "fieldKey": null,
+          "label": "Confirm Reservation",
+          "prompt": "Please review your restaurant reservation before we save it.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 8,
+          "stepType": "submit",
+          "fieldKey": null,
+          "label": "Submit Reservation",
+          "prompt": "Submitting your restaurant reservation.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        }
+      ]
+    },
+    {
+      "key": "support_ticket",
+      "name": "Support Ticket",
+      "description": "Creates a support ticket flow for issue category, priority, description, and contact information.",
+      "businessTypes": ["saas", "support", "service business"],
+      "action": {
+        "name": "Create Support Ticket",
+        "description": "Collects issue details and creates a structured support request.",
+        "status": "active",
+        "triggerPhrases": [
+          "support ticket",
+          "need help",
+          "report issue",
+          "contact support"
+        ],
+        "settings": {
+          "templateKey": "support_ticket"
+        }
+      },
+      "steps": [
+        {
+          "sortOrder": 1,
+          "stepType": "choice",
+          "fieldKey": "issueCategory",
+          "label": "Issue Category",
+          "prompt": "What kind of issue do you need help with?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [
+            { "label": "Billing", "value": "billing" },
+            { "label": "Technical issue", "value": "technical" },
+            { "label": "Account access", "value": "account_access" },
+            { "label": "Other", "value": "other" }
+          ],
+          "settings": {}
+        },
+        {
+          "sortOrder": 2,
+          "stepType": "choice",
+          "fieldKey": "priority",
+          "label": "Priority",
+          "prompt": "How urgent is this?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [
+            { "label": "Low", "value": "low" },
+            { "label": "Normal", "value": "normal" },
+            { "label": "High", "value": "high" }
+          ],
+          "settings": {}
+        },
+        {
+          "sortOrder": 3,
+          "stepType": "collect_input",
+          "fieldKey": "issueDescription",
+          "label": "Issue Description",
+          "prompt": "Please describe the issue.",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 4,
+          "stepType": "collect_input",
+          "fieldKey": "customerName",
+          "label": "Customer Name",
+          "prompt": "What is your name?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 5,
+          "stepType": "email",
+          "fieldKey": "customerEmail",
+          "label": "Customer Email",
+          "prompt": "What email should support use to contact you?",
+          "inputType": "email",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 6,
+          "stepType": "confirmation",
+          "fieldKey": null,
+          "label": "Confirm Ticket",
+          "prompt": "Please review your support ticket before we save it.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 7,
+          "stepType": "submit",
+          "fieldKey": null,
+          "label": "Submit Ticket",
+          "prompt": "Submitting your support ticket.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        }
+      ]
+    },
+    {
+      "key": "lead_capture",
+      "name": "Lead Capture",
+      "description": "Creates a generic lead capture flow for enquiry type, budget, timeline, and contact details.",
+      "businessTypes": ["agency", "consulting", "sales"],
+      "action": {
+        "name": "New Lead Enquiry",
+        "description": "Collects lead qualification details and contact information.",
+        "status": "active",
+        "triggerPhrases": [
+          "contact sales",
+          "get quote",
+          "request demo",
+          "talk to sales"
+        ],
+        "settings": {
+          "templateKey": "lead_capture"
+        }
+      },
+      "steps": [
+        {
+          "sortOrder": 1,
+          "stepType": "choice",
+          "fieldKey": "enquiryType",
+          "label": "Enquiry Type",
+          "prompt": "What can we help you with?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [
+            { "label": "Product demo", "value": "demo" },
+            { "label": "Pricing", "value": "pricing" },
+            { "label": "Custom project", "value": "custom_project" },
+            { "label": "General enquiry", "value": "general" }
+          ],
+          "settings": {}
+        },
+        {
+          "sortOrder": 2,
+          "stepType": "collect_input",
+          "fieldKey": "companyName",
+          "label": "Company Name",
+          "prompt": "What company are you contacting us from?",
+          "inputType": "text",
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 3,
+          "stepType": "choice",
+          "fieldKey": "timeline",
+          "label": "Timeline",
+          "prompt": "When are you hoping to move forward?",
+          "inputType": "text",
+          "isRequired": false,
+          "options": [
+            { "label": "Immediately", "value": "immediately" },
+            { "label": "This month", "value": "this_month" },
+            { "label": "1-3 months", "value": "1_3_months" },
+            { "label": "Just researching", "value": "researching" }
+          ],
+          "settings": {}
+        },
+        {
+          "sortOrder": 4,
+          "stepType": "collect_input",
+          "fieldKey": "contactName",
+          "label": "Contact Name",
+          "prompt": "What is your name?",
+          "inputType": "text",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 5,
+          "stepType": "email",
+          "fieldKey": "contactEmail",
+          "label": "Contact Email",
+          "prompt": "What email should we use to follow up?",
+          "inputType": "email",
+          "isRequired": true,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 6,
+          "stepType": "confirmation",
+          "fieldKey": null,
+          "label": "Confirm Enquiry",
+          "prompt": "Please review your enquiry before we save it.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        },
+        {
+          "sortOrder": 7,
+          "stepType": "submit",
+          "fieldKey": null,
+          "label": "Submit Enquiry",
+          "prompt": "Submitting your enquiry.",
+          "inputType": null,
+          "isRequired": false,
+          "options": [],
+          "settings": {}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,300 @@
+{
+  "success": true,
+  "source": "mock_business_api",
+  "projectExternalId": "demo-resort-001",
+  "fetchedAt": "2026-04-29T00:00:00.000Z",
+  "catalogs": [
+    {
+      "id": "cat_spa_services",
+      "name": "Spa Services",
+      "type": "services",
+      "businessType": "spa",
+      "currency": "USD",
+      "categories": [
+        {
+          "id": "spa_massage",
+          "name": "Massage",
+          "description": "Relaxation and therapeutic massage treatments.",
+          "sortOrder": 1,
+          "items": [
+            {
+              "id": "spa_swedish_massage",
+              "name": "Swedish Massage",
+              "description": "A gentle full-body massage focused on relaxation.",
+              "durationMinutes": 60,
+              "price": 120,
+              "isActive": true,
+              "metadata": {
+                "requiresTherapist": true,
+                "couplesAllowed": false
+              }
+            },
+            {
+              "id": "spa_deep_tissue_massage",
+              "name": "Deep Tissue Massage",
+              "description": "A focused massage for deeper muscle tension.",
+              "durationMinutes": 75,
+              "price": 150,
+              "isActive": true,
+              "metadata": {
+                "requiresTherapist": true,
+                "couplesAllowed": false
+              }
+            },
+            {
+              "id": "spa_aromatherapy_massage",
+              "name": "Aromatherapy",
+              "description": "A relaxation massage using essential oils.",
+              "durationMinutes": 60,
+              "price": 135,
+              "isActive": true,
+              "metadata": {
+                "requiresTherapist": true,
+                "couplesAllowed": false
+              }
+            },
+            {
+              "id": "spa_couples_massage",
+              "name": "Couples Massage",
+              "description": "A side-by-side massage experience for two guests.",
+              "durationMinutes": 90,
+              "price": 260,
+              "isActive": true,
+              "metadata": {
+                "requiresTherapist": true,
+                "couplesAllowed": true,
+                "guestCount": 2
+              }
+            }
+          ]
+        },
+        {
+          "id": "spa_facials",
+          "name": "Facials",
+          "description": "Skin care treatments for cleansing and rejuvenation.",
+          "sortOrder": 2,
+          "items": [
+            {
+              "id": "spa_classic_facial",
+              "name": "Classic Facial",
+              "description": "Cleanse, exfoliation, mask, and hydration.",
+              "durationMinutes": 45,
+              "price": 95,
+              "isActive": true,
+              "metadata": {
+                "requiresTherapist": true
+              }
+            },
+            {
+              "id": "spa_anti_ageing_facial",
+              "name": "Anti-Ageing Facial",
+              "description": "A facial focused on firming and brightening.",
+              "durationMinutes": 60,
+              "price": 140,
+              "isActive": true,
+              "metadata": {
+                "requiresTherapist": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "spa_body_treatments",
+          "name": "Body Treatments",
+          "description": "Scrubs, wraps, and full-body rituals.",
+          "sortOrder": 3,
+          "items": [
+            {
+              "id": "spa_body_scrub",
+              "name": "Body Scrub",
+              "description": "Full-body exfoliation and hydration.",
+              "durationMinutes": 50,
+              "price": 110,
+              "isActive": true,
+              "metadata": {
+                "requiresTherapist": true
+              }
+            },
+            {
+              "id": "spa_mud_wrap",
+              "name": "Mud Wrap",
+              "description": "A detoxifying wrap followed by hydration.",
+              "durationMinutes": 75,
+              "price": 155,
+              "isActive": true,
+              "metadata": {
+                "requiresTherapist": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cat_salon_services",
+      "name": "Salon Services",
+      "type": "services",
+      "businessType": "salon",
+      "currency": "USD",
+      "categories": [
+        {
+          "id": "salon_hair",
+          "name": "Hair",
+          "description": "Cuts, styling, color, and hair treatments.",
+          "sortOrder": 1,
+          "items": [
+            {
+              "id": "salon_womens_haircut",
+              "name": "Women's Haircut",
+              "description": "Consultation, wash, cut, and basic styling.",
+              "durationMinutes": 60,
+              "price": 70,
+              "isActive": true,
+              "metadata": {
+                "requiresStylist": true
+              }
+            },
+            {
+              "id": "salon_hair_color",
+              "name": "Hair Color",
+              "description": "Single-process color service.",
+              "durationMinutes": 120,
+              "price": 140,
+              "isActive": true,
+              "metadata": {
+                "requiresStylist": true,
+                "consultationRecommended": true
+              }
+            },
+            {
+              "id": "salon_blow_dry",
+              "name": "Blow Dry",
+              "description": "Wash and blow-dry styling.",
+              "durationMinutes": 45,
+              "price": 55,
+              "isActive": true,
+              "metadata": {
+                "requiresStylist": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "salon_nails",
+          "name": "Nails",
+          "description": "Manicure and pedicure services.",
+          "sortOrder": 2,
+          "items": [
+            {
+              "id": "salon_manicure",
+              "name": "Manicure",
+              "description": "Nail shaping, cuticle care, and polish.",
+              "durationMinutes": 40,
+              "price": 45,
+              "isActive": true,
+              "metadata": {
+                "requiresTechnician": true
+              }
+            },
+            {
+              "id": "salon_pedicure",
+              "name": "Pedicure",
+              "description": "Foot soak, nail care, and polish.",
+              "durationMinutes": 50,
+              "price": 60,
+              "isActive": true,
+              "metadata": {
+                "requiresTechnician": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "salon_makeup",
+          "name": "Makeup",
+          "description": "Occasion and bridal makeup services.",
+          "sortOrder": 3,
+          "items": [
+            {
+              "id": "salon_event_makeup",
+              "name": "Event Makeup",
+              "description": "Makeup for parties, events, and photoshoots.",
+              "durationMinutes": 75,
+              "price": 110,
+              "isActive": true,
+              "metadata": {
+                "requiresArtist": true
+              }
+            },
+            {
+              "id": "salon_bridal_makeup",
+              "name": "Bridal Makeup",
+              "description": "Full bridal makeup service.",
+              "durationMinutes": 150,
+              "price": 250,
+              "isActive": true,
+              "metadata": {
+                "requiresArtist": true,
+                "trialRecommended": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "suggestedActionFlow": {
+    "actionName": "Book Service",
+    "steps": [
+      {
+        "fieldKey": "serviceCategoryId",
+        "label": "Service Category",
+        "inputType": "text",
+        "sourceType": "catalog_categories",
+        "sourceConfig": {
+          "catalogId": "cat_spa_services"
+        }
+      },
+      {
+        "fieldKey": "serviceItemId",
+        "label": "Service",
+        "inputType": "text",
+        "sourceType": "catalog_items",
+        "sourceConfig": {
+          "catalogId": "cat_spa_services",
+          "filterByField": "serviceCategoryId"
+        }
+      },
+      {
+        "fieldKey": "preferredDate",
+        "label": "Preferred Date",
+        "inputType": "date",
+        "sourceType": "static_input"
+      },
+      {
+        "fieldKey": "preferredTime",
+        "label": "Preferred Time",
+        "inputType": "time",
+        "sourceType": "static_input"
+      },
+      {
+        "fieldKey": "guestName",
+        "label": "Guest Name",
+        "inputType": "text",
+        "sourceType": "static_input"
+      },
+      {
+        "fieldKey": "guestEmail",
+        "label": "Guest Email",
+        "inputType": "email",
+        "sourceType": "static_input"
+      },
+      {
+        "fieldKey": "guestPhone",
+        "label": "Guest Phone",
+        "inputType": "phone",
+        "sourceType": "static_input"
+      }
+    ]
+  }
+}
