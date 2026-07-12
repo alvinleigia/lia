@@ -3,11 +3,11 @@ import Link from "next/link";
 import { NoProjectState } from "@/components/no-project-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getProjectActionFlowAnalytics } from "@/lib/action-flow-analytics";
+import { getProjectChatAnalytics } from "@/lib/chat-analytics";
 import {
   getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
-import { getProjectChatAnalytics } from "@/lib/chat-analytics";
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
@@ -57,7 +57,7 @@ function SummaryCard({
 
 export default async function ProjectAnalyticsPage() {
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="Analytics need a project" />;

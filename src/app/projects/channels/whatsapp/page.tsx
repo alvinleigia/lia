@@ -8,8 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { assertPermission } from "@/lib/access-control";
 import {
   getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 import {
   getProjectWhatsAppChannel,
   getWhatsAppWebhookUrl,
@@ -52,7 +52,7 @@ export default async function WhatsAppChannelPage({
 }: WhatsAppChannelPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="WhatsApp setup needs a project" />;

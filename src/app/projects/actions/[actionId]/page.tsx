@@ -45,8 +45,8 @@ import {
 } from "@/lib/action-flows";
 import {
   getActiveProjectIdCookie,
-  resolveUserAndProject,
-} from "@/lib/auth-project";
+  resolvePageUserAndProject,
+} from "@/lib/protected-page";
 import { toRuntimeAction } from "@/lib/runtime-actions";
 import { createTestActionSubmissionAction } from "../../submissions/actions";
 import {
@@ -298,7 +298,7 @@ export default async function ActionDetailPage({
   }
 
   const activeProjectId = await getActiveProjectIdCookie();
-  const { project } = await resolveUserAndProject(activeProjectId);
+  const { project } = await resolvePageUserAndProject(activeProjectId);
   const action = await getProjectAction(project.id, actionId);
 
   if (!action) {

@@ -7,14 +7,14 @@ import {
   listActionSubmissionsWithActions,
 } from "@/lib/action-flows";
 import {
-  getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
-import {
   getConnectFlowReportingCounts,
   getConnectFlowSubmissionSummary,
   hasConnectFlowRelationship,
 } from "@/lib/connect-flow-reporting";
+import {
+  getActiveProjectIdCookie,
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 
 type SubmissionsPageProps = {
   searchParams: Promise<{
@@ -62,7 +62,7 @@ export default async function SubmissionsPage({
 }: SubmissionsPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="Submissions need a project" />;

@@ -8,8 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { listActionTemplates } from "@/lib/action-templates";
 import {
   getActiveProjectIdCookie,
-  resolveUserAndProject,
-} from "@/lib/auth-project";
+  resolvePageUserAndProject,
+} from "@/lib/protected-page";
 import {
   applyActionTemplateAction,
   createProjectActionBuilderAction,
@@ -26,7 +26,7 @@ export default async function NewActionPage({
 }: NewActionPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const { project } = await resolveUserAndProject(activeProjectId);
+  const { project } = await resolvePageUserAndProject(activeProjectId);
   const templates = listActionTemplates();
 
   return (

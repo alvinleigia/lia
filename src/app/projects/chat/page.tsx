@@ -2,16 +2,16 @@ import { redirect } from "next/navigation";
 import { ChatPageClient } from "@/components/chat-page-client";
 import {
   getActiveProjectIdCookie,
-  resolveUserAndProject,
-} from "@/lib/auth-project";
+  resolvePageUserAndProject,
+} from "@/lib/protected-page";
 import { listRuntimeProjectActions } from "@/lib/runtime-actions";
 
 export default async function ProjectChatPage() {
   const activeProjectId = await getActiveProjectIdCookie();
-  let context: Awaited<ReturnType<typeof resolveUserAndProject>>;
+  let context: Awaited<ReturnType<typeof resolvePageUserAndProject>>;
 
   try {
-    context = await resolveUserAndProject(activeProjectId);
+    context = await resolvePageUserAndProject(activeProjectId);
   } catch (error) {
     if (
       error instanceof Error &&

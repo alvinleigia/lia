@@ -2,16 +2,16 @@ import { Puzzle } from "lucide-react";
 import { NoProjectState } from "@/components/no-project-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WidgetManager } from "@/components/widget-manager";
+import { getRequiredAppBaseUrl } from "@/lib/email";
 import {
   getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
-import { getRequiredAppBaseUrl } from "@/lib/email";
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 import { getProjectWidgetConfig } from "@/lib/widget-keys";
 
 export default async function ProjectWidgetPage() {
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="Widget setup needs a project" />;

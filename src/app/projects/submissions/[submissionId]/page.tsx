@@ -23,10 +23,6 @@ import {
   listActionSubmissionsWithActions,
 } from "@/lib/action-flows";
 import {
-  getActiveProjectIdCookie,
-  resolveUserAndProject,
-} from "@/lib/auth-project";
-import {
   buildConnectFlowRelationship,
   getConnectFlowSubmissionSummary,
 } from "@/lib/connect-flow-reporting";
@@ -35,6 +31,10 @@ import {
   isFlowMediaUploadValue,
 } from "@/lib/flow-media-values";
 import { listOperationAttemptsWithDetailsForSubmission } from "@/lib/operations";
+import {
+  getActiveProjectIdCookie,
+  resolvePageUserAndProject,
+} from "@/lib/protected-page";
 import {
   importSubmissionMediaAction,
   updateActionSubmissionStatusAction,
@@ -203,7 +203,7 @@ export default async function SubmissionDetailPage({
   }
 
   const activeProjectId = await getActiveProjectIdCookie();
-  const { project } = await resolveUserAndProject(activeProjectId);
+  const { project } = await resolvePageUserAndProject(activeProjectId);
   const submission = await getActionSubmission(project.id, submissionId);
 
   if (!submission) {

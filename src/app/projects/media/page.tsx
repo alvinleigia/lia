@@ -10,13 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import {
-  getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
-import {
   listProjectMediaAssets,
   MAX_MEDIA_UPLOAD_BYTES,
 } from "@/lib/media-assets";
+import {
+  getActiveProjectIdCookie,
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 
 type MediaPageProps = {
   searchParams: Promise<{
@@ -47,7 +47,7 @@ export default async function ProjectMediaPage({
 }: MediaPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="Media needs a project" />;

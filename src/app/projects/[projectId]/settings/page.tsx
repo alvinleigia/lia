@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { resolveStrictUserAndProject } from "@/lib/auth-project";
+import { resolveStrictPageUserAndProject } from "@/lib/protected-page";
 import { renameProjectAction } from "../../actions";
 
 type ProjectSettingsPageProps = {
@@ -30,9 +30,11 @@ export default async function ProjectSettingsPage({
     notFound();
   }
 
-  let projectContext: Awaited<ReturnType<typeof resolveStrictUserAndProject>>;
+  let projectContext: Awaited<
+    ReturnType<typeof resolveStrictPageUserAndProject>
+  >;
   try {
-    projectContext = await resolveStrictUserAndProject(parsedProjectId);
+    projectContext = await resolveStrictPageUserAndProject(parsedProjectId);
   } catch (error) {
     if (error instanceof Error && error.message === "Project not found.") {
       notFound();

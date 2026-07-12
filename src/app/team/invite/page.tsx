@@ -6,7 +6,7 @@ import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { canAccess } from "@/lib/access-control";
-import { resolveUserAndWorkspace } from "@/lib/auth-project";
+import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
 import { createTeamInvitationAction } from "../actions";
 
 type InviteTeamPageProps = {
@@ -22,7 +22,7 @@ export default async function InviteTeamPage({
   searchParams,
 }: InviteTeamPageProps) {
   const params = await searchParams;
-  const { membership } = await resolveUserAndWorkspace();
+  const { membership } = await resolvePageUserAndWorkspace();
   const canManageMembers = canAccess(membership, "company.members.manage");
 
   return (

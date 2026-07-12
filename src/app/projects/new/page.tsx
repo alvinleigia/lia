@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { resolveUserAndWorkspace } from "@/lib/auth-project";
+import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
 import { createProjectAction } from "../actions";
 
 type NewProjectPageProps = {
@@ -17,7 +17,7 @@ export default async function NewProjectPage({
   searchParams,
 }: NewProjectPageProps) {
   const params = await searchParams;
-  const { company } = await resolveUserAndWorkspace();
+  const { company } = await resolvePageUserAndWorkspace();
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">

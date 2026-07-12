@@ -9,13 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { UploadFormClient } from "@/components/upload-form-client";
 import {
-  getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
-import {
   getProjectDocumentStats,
   getProjectSourceDocuments,
 } from "@/lib/documents";
+import {
+  getActiveProjectIdCookie,
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 
 type DocumentsPageProps = {
   searchParams: Promise<{
@@ -33,7 +33,7 @@ export default async function ProjectDocumentsPage({
 }: DocumentsPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="Documents need a project" />;

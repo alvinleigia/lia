@@ -572,6 +572,11 @@ test("disabled tenant owner lands on the disabled account page", async ({
   await expect(
     disabledPage.getByText("Account Disabled").first(),
   ).toBeVisible();
+  await disabledPage.goto("/projects");
+  await expect(disabledPage).toHaveURL(/\/account-disabled/);
+  await expect(
+    disabledPage.getByText("Account Disabled").first(),
+  ).toBeVisible();
 
   const disabledWidgetChatResponse = await disabledPage.request.post(
     `/api/widget/chat?token=${encodeURIComponent(widgetToken)}`,

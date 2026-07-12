@@ -17,8 +17,8 @@ import {
 } from "@/lib/action-flows";
 import {
   getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 import { cn } from "@/lib/utils";
 import { updateHandoffQueueAction } from "../submissions/actions";
 
@@ -128,7 +128,7 @@ export default async function HandoffsPage({
 }: HandoffsPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="Handoffs need a project" />;

@@ -23,8 +23,8 @@ import {
 } from "@/lib/action-templates";
 import {
   getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 import { applyActionTemplateAction } from "../actions/actions";
 
 type TemplatesPageProps = {
@@ -128,7 +128,7 @@ export default async function TemplatesPage({
 }: TemplatesPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="Templates need a project" />;

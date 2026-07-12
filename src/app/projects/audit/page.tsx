@@ -2,7 +2,7 @@ import { ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { assertPermission } from "@/lib/access-control";
 import { listCompanyAuditLogs } from "@/lib/audit";
-import { resolveUserAndWorkspace } from "@/lib/auth-project";
+import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
 
 function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
@@ -23,7 +23,7 @@ function formatActor(
 }
 
 export default async function ProjectAuditPage() {
-  const context = await resolveUserAndWorkspace();
+  const context = await resolvePageUserAndWorkspace();
   assertPermission(context.membership, "audit.view");
 
   const auditRows = await listCompanyAuditLogs(context.company.id, 100);

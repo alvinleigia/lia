@@ -3,8 +3,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
-import { resolveUserAndWorkspace } from "@/lib/auth-project";
 import { listProjectsForWorkspace } from "@/lib/projects";
+import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
 import {
   archiveProjectAction,
   setActiveProjectAction,
@@ -24,7 +24,7 @@ export default async function ProjectsPage({
   searchParams,
 }: ProjectsPageProps) {
   const params = await searchParams;
-  const { company, workspace } = await resolveUserAndWorkspace();
+  const { company, workspace } = await resolvePageUserAndWorkspace();
   const projects = await listProjectsForWorkspace(workspace.id);
   const availableProjects = projects.filter((project) => !project.isArchived);
   const archivedProjects = projects.filter((project) => project.isArchived);

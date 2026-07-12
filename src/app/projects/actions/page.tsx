@@ -17,8 +17,8 @@ import {
 } from "@/lib/action-flows";
 import {
   getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 
 type ActionBuilderPageProps = {
   searchParams: Promise<{
@@ -96,7 +96,7 @@ export default async function ActionBuilderPage({
 }: ActionBuilderPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="Actions need a project" />;

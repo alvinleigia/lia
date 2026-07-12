@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { resolveUserAndWorkspace } from "@/lib/auth-project";
+import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
 import { updateProfileAction } from "./actions";
 
 type ProfilePageProps = {
@@ -16,7 +16,7 @@ type ProfilePageProps = {
 
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const params = await searchParams;
-  const { user, company, membership } = await resolveUserAndWorkspace();
+  const { user, company, membership } = await resolvePageUserAndWorkspace();
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">

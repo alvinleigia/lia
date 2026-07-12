@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   getActiveProjectIdCookie,
-  resolveUserAndProject,
-} from "@/lib/auth-project";
+  resolvePageUserAndProject,
+} from "@/lib/protected-page";
 import { importActionFlowBuilderAction } from "../actions";
 
 type ImportActionFlowPageProps = {
@@ -21,7 +21,7 @@ export default async function ImportActionFlowPage({
 }: ImportActionFlowPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const { project } = await resolveUserAndProject(activeProjectId);
+  const { project } = await resolvePageUserAndProject(activeProjectId);
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">

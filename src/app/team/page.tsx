@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { canAccess } from "@/lib/access-control";
-import { resolveUserAndWorkspace } from "@/lib/auth-project";
 import { listCompanyInvitations, listCompanyMembers } from "@/lib/invitations";
+import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
 import { cancelTeamInvitationAction } from "./actions";
 
 type TeamPageProps = {
@@ -19,7 +19,7 @@ type TeamPageProps = {
 
 export default async function TeamPage({ searchParams }: TeamPageProps) {
   const params = await searchParams;
-  const { company, membership } = await resolveUserAndWorkspace();
+  const { company, membership } = await resolvePageUserAndWorkspace();
   const [members, invitationRows] = await Promise.all([
     listCompanyMembers(company.id),
     listCompanyInvitations(company.id),

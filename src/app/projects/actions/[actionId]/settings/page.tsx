@@ -17,8 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { getProjectAction } from "@/lib/action-flows";
 import {
   getActiveProjectIdCookie,
-  resolveUserAndProject,
-} from "@/lib/auth-project";
+  resolvePageUserAndProject,
+} from "@/lib/protected-page";
 import {
   deleteProjectActionBuilderAction,
   updateProjectActionBuilderAction,
@@ -100,7 +100,7 @@ export default async function ActionSettingsPage({
   }
 
   const activeProjectId = await getActiveProjectIdCookie();
-  const { project } = await resolveUserAndProject(activeProjectId);
+  const { project } = await resolvePageUserAndProject(activeProjectId);
   const action = await getProjectAction(project.id, actionId);
 
   if (!action) {

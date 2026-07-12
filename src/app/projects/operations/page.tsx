@@ -9,10 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { assertPermission } from "@/lib/access-control";
 import {
-  getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
-import {
   getOperationAttemptMappedOutput,
   getProjectOperationAttemptWithDetails,
   INTEGRATION_PROVIDER_TYPES,
@@ -21,6 +17,10 @@ import {
   listProjectOperations,
   OPERATION_ATTEMPT_STATUSES,
 } from "@/lib/operations";
+import {
+  getActiveProjectIdCookie,
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 import {
   createApiRequestOperationAction,
   createIntegrationProviderAction,
@@ -137,7 +137,7 @@ export default async function OperationsPage({
 }: OperationsPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="Operations need a project" />;

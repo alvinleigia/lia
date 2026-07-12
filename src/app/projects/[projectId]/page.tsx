@@ -11,7 +11,7 @@ import {
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { resolveStrictUserAndProject } from "@/lib/auth-project";
+import { resolveStrictPageUserAndProject } from "@/lib/protected-page";
 
 type ProjectLandingPageProps = {
   params: Promise<{
@@ -34,9 +34,11 @@ export default async function ProjectLandingPage({
     notFound();
   }
 
-  let projectContext: Awaited<ReturnType<typeof resolveStrictUserAndProject>>;
+  let projectContext: Awaited<
+    ReturnType<typeof resolveStrictPageUserAndProject>
+  >;
   try {
-    projectContext = await resolveStrictUserAndProject(parsedProjectId);
+    projectContext = await resolveStrictPageUserAndProject(parsedProjectId);
   } catch (error) {
     if (error instanceof Error && error.message === "Project not found.") {
       notFound();

@@ -12,10 +12,6 @@ import { NoProjectState } from "@/components/no-project-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  getActiveProjectIdCookie,
-  resolveOptionalUserAndProject,
-} from "@/lib/auth-project";
-import {
   getContactLabel,
   listContactAttributes,
   listContactConversations,
@@ -24,6 +20,10 @@ import {
   listContactTags,
   listProjectContacts,
 } from "@/lib/contacts";
+import {
+  getActiveProjectIdCookie,
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
 
 type ContactsPageProps = {
   searchParams: Promise<{
@@ -52,7 +52,7 @@ export default async function ContactsPage({
 }: ContactsPageProps) {
   const params = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
-  const context = await resolveOptionalUserAndProject(activeProjectId);
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
 
   if (!context) {
     return <NoProjectState title="Contacts need a project" />;

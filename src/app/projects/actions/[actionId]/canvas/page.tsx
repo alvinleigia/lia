@@ -10,16 +10,16 @@ import {
   listActiveProjectActions,
   validateActionFlowRoutes,
 } from "@/lib/action-flows";
-import {
-  getActiveProjectIdCookie,
-  resolveUserAndProject,
-} from "@/lib/auth-project";
 import { listProjectMediaAssets } from "@/lib/media-assets";
 import { listProjectOperations } from "@/lib/operations";
 import {
   listProjectCatalogProducts,
   listProjectCatalogs,
 } from "@/lib/product-catalogs";
+import {
+  getActiveProjectIdCookie,
+  resolvePageUserAndProject,
+} from "@/lib/protected-page";
 
 type ActionCanvasPageProps = {
   params: Promise<{
@@ -38,7 +38,7 @@ export default async function ActionCanvasPage({
   }
 
   const activeProjectId = await getActiveProjectIdCookie();
-  const { project } = await resolveUserAndProject(activeProjectId);
+  const { project } = await resolvePageUserAndProject(activeProjectId);
   const action = await getProjectAction(project.id, actionId);
 
   if (!action) {

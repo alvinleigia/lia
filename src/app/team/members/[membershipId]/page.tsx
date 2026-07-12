@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { canAccess } from "@/lib/access-control";
-import { resolveUserAndWorkspace } from "@/lib/auth-project";
 import { listCompanyMembers } from "@/lib/invitations";
+import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
 import { updateTeamMemberStatusAction } from "../../actions";
 
 type TeamMemberPageProps = {
@@ -22,7 +22,7 @@ export default async function TeamMemberPage({ params }: TeamMemberPageProps) {
     notFound();
   }
 
-  const { company, membership } = await resolveUserAndWorkspace();
+  const { company, membership } = await resolvePageUserAndWorkspace();
   const members = await listCompanyMembers(company.id);
   const memberRow = members.find(
     ({ membership: memberAccess }) => memberAccess.id === parsedMembershipId,
