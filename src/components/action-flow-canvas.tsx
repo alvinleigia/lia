@@ -47,6 +47,7 @@ import {
   setCanvasDefaultRouteAction,
   updateCanvasBranchRuleAction,
   updateCanvasStepAction,
+  updateCanvasStepBasicsAction,
 } from "@/app/projects/actions/canvas-actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -183,6 +184,13 @@ type CanvasStepInput = {
   whatsappTemplateName: string;
   whatsappTemplateStatus: string;
   whatsappTemplateVariables: string;
+};
+
+type CanvasStepBasicsInput = {
+  isEnabled: boolean;
+  isRequired: boolean;
+  label: string;
+  prompt: string;
 };
 
 const CANVAS_INPUT_TYPES = [
@@ -666,6 +674,17 @@ function readStepForm(form: HTMLFormElement): CanvasStepInput {
     whatsappTemplateVariables: String(
       formData.get("whatsappTemplateVariables") ?? "",
     ),
+  };
+}
+
+function readStepBasicsForm(form: HTMLFormElement): CanvasStepBasicsInput {
+  const formData = new FormData(form);
+
+  return {
+    isEnabled: formData.get("isEnabled") === "on",
+    isRequired: formData.get("isRequired") === "on",
+    label: String(formData.get("label") ?? ""),
+    prompt: String(formData.get("prompt") ?? ""),
   };
 }
 
@@ -1912,6 +1931,102 @@ function StepCreateForm({
   );
 }
 
+function StepBasicsForm({
+  isPending,
+  onSubmit,
+  step,
+}: {
+  isPending: boolean;
+  onSubmit: (input: CanvasStepBasicsInput) => void;
+  step: FlowStep;
+}) {
+  const collectsAnswer = step.inputType !== null;
+
+  return (
+    <form
+      key={`quick-edit-${step.id}`}
+      className="space-y-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(readStepBasicsForm(event.currentTarget));
+      }}
+    >
+      <div className="space-y-2">
+        <label className="text-sm font-medium" htmlFor="quick-step-label">
+          Step name
+        </label>
+        <input
+          id="quick-step-label"
+          name="label"
+          defaultValue={step.label ?? ""}
+          placeholder="Give this step a clear name"
+          className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        />
+        <p className="text-xs text-muted-foreground">
+          This name helps your team identify the step on the canvas.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium" htmlFor="quick-step-prompt">
+          Message shown to the visitor
+        </label>
+        <textarea
+          id="quick-step-prompt"
+          name="prompt"
+          rows={4}
+          defaultValue={step.prompt ?? ""}
+          placeholder="Write what the chatbot should say or ask"
+          className="flex min-h-28 w-full resize-y rounded-md border border-input bg-transparent px-3 py-3 text-sm leading-6 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {collectsAnswer && (
+          <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
+            <input
+              type="checkbox"
+              name="isRequired"
+              defaultChecked={step.isRequired}
+              className="mt-0.5 h-4 w-4"
+            />
+            <span>
+              <span className="block text-sm font-medium">Answer required</span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Visitors must answer before the flow continues.
+              </span>
+            </span>
+          </label>
+        )}
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
+          <input
+            type="checkbox"
+            name="isEnabled"
+            defaultChecked={step.isEnabled}
+            className="mt-0.5 h-4 w-4"
+          />
+          <span>
+            <span className="block text-sm font-medium">Step active</span>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Include this step when the flow runs.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
+        {isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Save className="h-4 w-4" />
+        )}
+        Save changes
+      </Button>
+    </form>
+  );
+}
+
 function BranchRuleForm({
   branchRules,
   isPending,
@@ -2255,6 +2370,26 @@ export function ActionFlowCanvas({
     [actionId, router],
   );
 
+  const updateStepBasics = useCallback(
+    (stepId: number, input: CanvasStepBasicsInput) => {
+      setFeedback("");
+      startTransition(async () => {
+        const result = await updateCanvasStepBasicsAction({
+          actionId,
+          stepId,
+          ...input,
+        });
+
+        setFeedback(result.message);
+        if (result.ok) {
+          setSelection(null);
+          router.refresh();
+        }
+      });
+    },
+    [actionId, router],
+  );
+
   const saveLayout = useCallback(() => {
     setFeedback("");
     startTransition(async () => {
@@ -2501,7 +2636,7 @@ export function ActionFlowCanvas({
           }
         }}
       >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-4xl">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {selectedStep ? (
@@ -2523,7 +2658,7 @@ export function ActionFlowCanvas({
             </DialogTitle>
             <DialogDescription>
               {selectedStep
-                ? "Update this step or create a branch from it."
+                ? "Update the visitor-facing content and common behavior."
                 : selectedBranchRule
                   ? "Update this conditional route."
                   : "Review or clear this route."}
@@ -2539,48 +2674,75 @@ export function ActionFlowCanvas({
 
           {selectedStep && (
             <div className="space-y-5">
-              <div className="rounded-md border p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Selected Step
-                </p>
-                <p className="font-medium">
-                  {selectedStep.sortOrder}. {getStepLabel(selectedStep)}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
+              <div className="flex items-start justify-between gap-4 rounded-md border bg-gray-50 p-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Step {selectedStep.sortOrder}
+                  </p>
+                  <p className="mt-1 font-medium">
+                    {getStepLabel(selectedStep)}
+                  </p>
+                </div>
+                <span className="rounded-full border bg-white px-2.5 py-1 text-xs text-muted-foreground">
                   {getFlowComponentLabel(selectedStep.stepType)}
-                  {selectedStep.fieldKey ? ` - ${selectedStep.fieldKey}` : ""}
-                </p>
+                </span>
               </div>
 
-              <StepCreateForm
-                branchRules={branchRules}
-                catalogProducts={catalogProducts}
+              <StepBasicsForm
                 isPending={isPending}
-                mediaAssets={mediaAssets}
-                onSubmit={(input) => updateStep(selectedStep.id, input)}
-                operations={operations}
-                productCatalogs={productCatalogs}
-                projectActions={projectActions}
+                onSubmit={(input) => updateStepBasics(selectedStep.id, input)}
                 step={selectedStep}
-                steps={steps}
-                submitLabel="Save Step"
               />
 
-              <div className="border-t pt-5">
-                <p className="mb-3 flex items-center gap-2 text-sm font-medium">
-                  <GitBranch className="h-4 w-4" />
-                  Create Branch
-                </p>
-                <BranchRuleForm
-                  key={`create-branch-${selectedStep.id}`}
-                  branchRules={branchRules}
-                  isPending={isPending}
-                  mode="create"
-                  onSubmit={createBranchRule}
-                  sourceStep={selectedStep}
-                  steps={steps}
-                />
-              </div>
+              <details className="group rounded-md border bg-white">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
+                  <span className="flex items-center gap-2">
+                    <Wand2 className="h-4 w-4" />
+                    Advanced settings
+                  </span>
+                  <span className="text-xs font-normal text-muted-foreground group-open:hidden">
+                    Validation, integrations, and channel controls
+                  </span>
+                </summary>
+                <div className="border-t p-4">
+                  <StepCreateForm
+                    branchRules={branchRules}
+                    catalogProducts={catalogProducts}
+                    isPending={isPending}
+                    mediaAssets={mediaAssets}
+                    onSubmit={(input) => updateStep(selectedStep.id, input)}
+                    operations={operations}
+                    productCatalogs={productCatalogs}
+                    projectActions={projectActions}
+                    step={selectedStep}
+                    steps={steps}
+                    submitLabel="Save Advanced Settings"
+                  />
+                </div>
+              </details>
+
+              <details className="group rounded-md border bg-white">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
+                  <span className="flex items-center gap-2">
+                    <GitBranch className="h-4 w-4" />
+                    Branching
+                  </span>
+                  <span className="text-xs font-normal text-muted-foreground group-open:hidden">
+                    Add a conditional route from this step
+                  </span>
+                </summary>
+                <div className="border-t p-4">
+                  <BranchRuleForm
+                    key={`create-branch-${selectedStep.id}`}
+                    branchRules={branchRules}
+                    isPending={isPending}
+                    mode="create"
+                    onSubmit={createBranchRule}
+                    sourceStep={selectedStep}
+                    steps={steps}
+                  />
+                </div>
+              </details>
             </div>
           )}
 

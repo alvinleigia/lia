@@ -357,6 +357,14 @@ const canvasStepSchema = z
       });
     }
   });
+const canvasStepBasicsSchema = z.object({
+  actionId: z.coerce.number().int().positive(),
+  stepId: z.coerce.number().int().positive(),
+  isEnabled: z.coerce.boolean(),
+  isRequired: z.coerce.boolean(),
+  label: z.string().trim().max(160),
+  prompt: z.string().trim().max(1000),
+});
 const canvasBranchRuleSchema = z
   .object({
     actionId: z.coerce.number().int().positive(),
@@ -1273,6 +1281,89 @@ export async function updateCanvasStepAction(
       targetId: step.id,
       metadata: {
         actionId: action.id,
+        fieldKey: step.fieldKey,
+        sortOrder: step.sortOrder,
+        stepType: step.stepType,
+      },
+    });
+  } catch {
+    return { ok: false, message: "Could not update the step." };
+  }
+
+  revalidateCanvasPaths(action.id);
+
+  return { ok: true, message: "Step updated." };
+}
+
+export async function updateCanvasStepBasicsAction(
+  input: unknown,
+): Promise<CanvasRouteActionResult> {
+  const parsed = canvasStepBasicsSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return { ok: false, message: "Please check the step details." };
+  }
+
+  const context = await resolveCanvasAction(parsed.data.actionId);
+  if ("error" in context) {
+    return { ok: false, message: context.error ?? "Action not found." };
+  }
+
+  const { action, project } = context;
+  const existingStep = await getActionFlowStep(
+    project.id,
+    action.id,
+    parsed.data.stepId,
+  );
+
+  if (!existingStep) {
+    return { ok: false, message: "Step not found." };
+  }
+
+  const isInputStep = isInputStepType(existingStep.stepType);
+  const requiresPrompt =
+    isInputStep ||
+    ["display_result", "handoff", "message"].includes(existingStep.stepType);
+
+  if (isInputStep && !parsed.data.label) {
+    return { ok: false, message: "Add a step name before saving." };
+  }
+
+  if (requiresPrompt && !parsed.data.prompt) {
+    return { ok: false, message: "Add the message shown to visitors." };
+  }
+
+  try {
+    const step = await updateActionFlowStep({
+      projectId: project.id,
+      actionId: action.id,
+      stepId: existingStep.id,
+      sortOrder: existingStep.sortOrder,
+      stepType: existingStep.stepType,
+      fieldKey: existingStep.fieldKey,
+      label: parsed.data.label || null,
+      prompt: parsed.data.prompt || null,
+      inputType: existingStep.inputType,
+      operationId: existingStep.operationId,
+      nextStepId: existingStep.nextStepId,
+      isRequired: isInputStep ? parsed.data.isRequired : false,
+      isEnabled: parsed.data.isEnabled,
+      options: existingStep.options,
+      settings: existingStep.settings,
+    });
+
+    if (!step) {
+      return { ok: false, message: "Could not update the step." };
+    }
+
+    await writeAuditLog({
+      ...context,
+      action: "chatbot_action.canvas_step_updated",
+      targetType: "action_flow_step",
+      targetId: step.id,
+      metadata: {
+        actionId: action.id,
+        editMode: "basic",
         fieldKey: step.fieldKey,
         sortOrder: step.sortOrder,
         stepType: step.stepType,
