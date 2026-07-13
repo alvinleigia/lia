@@ -4,6 +4,7 @@ import {
   BarChart3,
   Bot,
   ChevronDown,
+  ClipboardCheck,
   ClipboardList,
   ContactRound,
   FileImage,
@@ -129,6 +130,12 @@ export function NavigationActions({
                 <Link href="/projects/channels/whatsapp">
                   <Smartphone className="h-4 w-4 mr-2" />
                   WhatsApp
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/projects/answer-tests">
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Answer Tests
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

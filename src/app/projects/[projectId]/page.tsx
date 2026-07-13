@@ -1,5 +1,6 @@
 import {
   CheckCircle2,
+  ClipboardCheck,
   ClipboardList,
   MessageSquare,
   PlugZap,
@@ -154,6 +155,19 @@ export default async function ProjectLandingPage({
             </div>
             <p className="text-sm text-muted-foreground">
               Review saved action submissions and status history.
+            </p>
+          </Link>
+
+          <Link
+            href="/projects/answer-tests"
+            className="rounded-lg border bg-white p-6 hover:bg-accent transition-colors"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <ClipboardCheck className="h-5 w-5" />
+              <h2 className="text-lg font-semibold">Answer Tests</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Validate chatbot answers before UAT.
             </p>
           </Link>
 
