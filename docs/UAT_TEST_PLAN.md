@@ -349,59 +349,187 @@ Exit gate: answer tests pass for the selected project without long, generic, or 
 
 ## Phase 6 - Flow Builder Basics
 
-Goal: confirm actions and visual flow setup are usable.
+Goal: confirm a non-technical user can create, edit, route, and publish a
+visual flow without affecting an existing live action.
+
+Use a disposable action for these checks. Do not modify the published `Book
+Spa Service` action while learning the builder.
+
+### 6.1 Confirm the actions area
 
 - [ ] Open `/projects/actions`.
-  Expected result: Actions list loads.
+  Instructions: Confirm the selected project is correct, then review the
+  existing actions and their status.
+  Expected result: The actions list loads and `New Action` is available.
   Status:
   Notes:
 
-- [ ] Apply a bundled template.
-  Expected result: Template creates an action with steps.
+- [ ] Confirm the bundled template created earlier.
+  Instructions: Open `Book Spa Service` and confirm its nine steps and current
+  published version are still present. Return to the actions list without
+  changing it.
+  Expected result: The template action remains available and unchanged.
   Status:
   Notes:
 
-- [ ] Create a custom action.
-  Expected result: Action is saved as draft.
+### 6.2 Create a disposable test action
+
+- [ ] Create a blank action.
+  Instructions: Select `New Action`, scroll to `Blank Action`, and enter:
+  Action Name: `UAT Flow Test`
+  Description: `Temporary flow used for builder acceptance testing.`
+  Trigger Phrases: `start uat flow`
+  Select `Create Action`.
+  Expected result: A draft action named `UAT Flow Test` is created and its
+  detail page opens.
   Status:
   Notes:
 
-- [ ] Open action detail.
-  Expected result: Step list and settings are visible.
+- [ ] Open the visual canvas.
+  Instructions: Select `Canvas` from the action detail page.
+  Expected result: The canvas loads with the Blocks panel, an empty canvas,
+  canvas controls, and no error overlay.
   Status:
   Notes:
 
-- [ ] Open visual canvas.
-  Expected result: Canvas displays the action steps and routes.
-  Status:
-  Notes:
+### 6.3 Create the basic steps
 
 - [ ] Add a message step.
-  Expected result: Step is saved and appears in the flow.
-  Status:
-  Notes:
-
-- [ ] Add a collect input step.
-  Expected result: Field key and validation settings save correctly.
+  Instructions: Select `Message` from the Blocks panel. In the Create Step
+  dialog, set the label to `Welcome`, enter `Welcome to the UAT flow.` as the
+  visitor-facing message, keep the step enabled, and create it.
+  Expected result: A Welcome node appears on the canvas and its content is
+  readable without overflowing the node.
   Status:
   Notes:
 
 - [ ] Add a choice step.
-  Expected result: Options save correctly.
+  Instructions: Select `Choice` from the Blocks panel. Set the label to
+  `Service Choice`, the prompt to `Which option would you like?`, and add
+  `Sales` and `Support` as choices. Create the step.
+  Expected result: A Service Choice node appears and shows both choices.
   Status:
   Notes:
 
-- [ ] Add a branch rule.
-  Expected result: Rule appears in diagnostics/canvas.
+- [ ] Add a collect-input step.
+  Instructions: Select `Ask Question` from the Blocks panel. Set the label to
+  `Email`, field key to `customerEmail`, prompt to `What is your email?`, input
+  type to `Email`, and enable `Required`. Create the step.
+  Expected result: An Email node appears with the field key and required input
+  configuration saved.
   Status:
   Notes:
 
-- [ ] Publish or activate action.
-  Expected result: Missing setup warnings are clear; valid flow can become active.
+- [ ] Add a terminal step.
+  Instructions: Select `Message` from the Blocks panel. Set the label to
+  `Complete` and the message to `Thank you. Your request is complete.` Create
+  the step and configure it as the final step if the dialog presents terminal
+  routing controls.
+  Expected result: A Complete node appears and the flow has a final path.
   Status:
   Notes:
 
-Exit gate: tester can create or modify a basic flow without developer help.
+### 6.4 Test canvas content editing
+
+- [ ] Edit content directly inside a node.
+  Instructions: On the Welcome node, select the pencil icon beside its content.
+  Change the message to `Welcome. How can we help today?` and save it.
+  Expected result: The node updates without leaving the canvas or opening a
+  full-page editor.
+  Status:
+  Notes:
+
+- [ ] Add another content block inside the node.
+  Instructions: On the Welcome node, select `Add content`, choose `Text
+  message`, enter `Please choose an option below.`, and save it.
+  Expected result: Both messages appear in the node in the saved order.
+  Status:
+  Notes:
+
+- [ ] Reorder and duplicate node content.
+  Instructions: Use the arrow controls to move the second message above the
+  first. Duplicate one text message, edit the duplicate, then remove the
+  duplicate.
+  Expected result: Move, duplicate, edit, and remove operations persist; node
+  borders and text remain fully visible.
+  Status:
+  Notes:
+
+- [ ] Confirm content persists after reload.
+  Instructions: Refresh the browser and reopen the UAT Flow Test canvas.
+  Expected result: The saved steps, content, order, and canvas positions remain
+  unchanged.
+  Status:
+  Notes:
+
+### 6.5 Test compact and advanced editing
+
+- [ ] Open the compact Edit Step dialog.
+  Instructions: Select the Email node itself, outside its inline controls.
+  Change its prompt to `Where can we contact you?` and save the common
+  settings.
+  Expected result: A focused Edit Step dialog opens and the updated prompt is
+  visible on the node.
+  Status:
+  Notes:
+
+- [ ] Test advanced validation.
+  Instructions: Select the Email node again, expand `Advanced settings`, set an
+  invalid-value message to `Enter a valid email address.`, and save.
+  Expected result: Advanced settings remain hidden until expanded and the
+  validation message persists after reopening the node.
+  Status:
+  Notes:
+
+### 6.6 Test routing and branching
+
+- [ ] Confirm the normal route order.
+  Instructions: Connect or configure the default path as Welcome, Service
+  Choice, Email, Complete. Save the layout if `Save Layout` becomes enabled.
+  Expected result: The canvas shows the intended route and diagnostics report
+  no blocking route error.
+  Status:
+  Notes:
+
+- [ ] Add a conditional branch.
+  Instructions: Select the Service Choice node, expand `Branching`, create a
+  rule that sends `Support` to the Complete step, and save it.
+  Expected result: A branch route appears on the canvas and the branch count
+  increases.
+  Status:
+  Notes:
+
+- [ ] Edit the branch from the canvas.
+  Instructions: Select the branch line, confirm its condition and destination,
+  then close the dialog without changing it.
+  Expected result: The branch is understandable and editable from the canvas.
+  Status:
+  Notes:
+
+### 6.7 Validate and publish
+
+- [ ] Review diagnostics before publishing.
+  Instructions: Return to the action detail page and review readiness warnings.
+  Expected result: Missing configuration is described clearly. A valid flow is
+  marked ready to publish.
+  Status:
+  Notes:
+
+- [ ] Publish the UAT Flow Test action.
+  Instructions: Select `Publish` only after diagnostics show no blockers.
+  Expected result: Published Version changes from none to version 1 and the
+  version appears in Version History.
+  Status:
+  Notes:
+
+- [ ] Confirm the existing template was not changed.
+  Instructions: Reopen `Book Spa Service` and check its version and nine steps.
+  Expected result: The original Spa flow remains unchanged.
+  Status:
+  Notes:
+
+Exit gate: the tester can create, visually edit, route, reload, and publish a
+basic disposable flow without developer help or damage to an existing action.
 
 ## Phase 7 - Flow Runtime And Submissions
 
