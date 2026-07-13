@@ -784,7 +784,7 @@ function getStepSettingNumber(step: FlowStep | undefined, key: string) {
 }
 
 function getComponentGroupLabel(group: FlowComponentGroup) {
-  return group === "message" ? "Messages" : "Actions";
+  return group === "message" ? "Message types" : "Actions";
 }
 
 function groupFlowComponents(components: readonly FlowComponentDefinition[]) {
@@ -813,13 +813,13 @@ function FlowComponentPalette({
           Blocks
         </p>
       </div>
-      <div className="max-h-[690px] space-y-5 overflow-y-auto p-3">
+      <div className="h-[716px] space-y-5 overflow-y-auto p-3">
         {groups.map((group) => (
           <div key={group} className="space-y-2">
             <p className="px-1 text-xs uppercase tracking-wide text-muted-foreground">
               {getComponentGroupLabel(group)}
             </p>
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
               {enabledGroups[group].map((component) => (
                 <button
                   key={component.key}
@@ -827,22 +827,22 @@ function FlowComponentPalette({
                   onClick={() =>
                     component.stepType && onSelectStepType(component.stepType)
                   }
-                  className={`w-full rounded-md border px-3 py-2 text-left transition-colors hover:bg-gray-50 ${
+                  className={`min-h-24 w-full rounded-md border px-2 py-2 text-center transition-colors hover:bg-gray-50 ${
                     selectedStepType === component.stepType
                       ? "border-gray-900 bg-gray-50"
                       : "border-gray-200"
                   }`}
                 >
-                  <span className="flex items-start gap-2">
+                  <span className="flex h-full flex-col items-center justify-center gap-2">
                     <span
-                      className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                      className="h-3 w-3 shrink-0 rounded-full"
                       style={{ backgroundColor: component.color }}
                     />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium">
+                    <span className="min-w-0 space-y-1">
+                      <span className="block text-sm font-medium leading-tight">
                         {component.label}
                       </span>
-                      <span className="line-clamp-2 text-xs text-muted-foreground">
+                      <span className="line-clamp-2 text-xs leading-tight text-muted-foreground">
                         {component.description}
                       </span>
                     </span>
@@ -863,30 +863,32 @@ function FlowComponentPalette({
                 <p className="px-1 text-xs font-medium text-muted-foreground">
                   {getComponentGroupLabel(group)}
                 </p>
-                {plannedGroups[group].map((component) => (
-                  <div
-                    key={component.key}
-                    className="rounded-md border border-dashed px-3 py-2 opacity-75"
-                  >
-                    <span className="flex items-start gap-2">
-                      <span
-                        className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: component.color }}
-                      />
-                      <span className="min-w-0">
-                        <span className="flex items-center justify-between gap-2 text-sm font-medium">
-                          {component.label}
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
+                <div className="grid grid-cols-2 gap-2">
+                  {plannedGroups[group].map((component) => (
+                    <div
+                      key={component.key}
+                      className="min-h-24 rounded-md border border-dashed px-2 py-2 text-center opacity-75"
+                    >
+                      <span className="flex h-full flex-col items-center justify-center gap-2">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full"
+                          style={{ backgroundColor: component.color }}
+                        />
+                        <span className="min-w-0 space-y-1">
+                          <span className="block text-sm font-medium leading-tight">
+                            {component.label}
+                          </span>
+                          <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
                             Planned
                           </span>
-                        </span>
-                        <span className="line-clamp-2 text-xs text-muted-foreground">
-                          {component.description}
+                          <span className="line-clamp-2 text-xs leading-tight text-muted-foreground">
+                            {component.description}
+                          </span>
                         </span>
                       </span>
-                    </span>
-                  </div>
-                ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -2355,7 +2357,7 @@ export function ActionFlowCanvas({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <CanvasToolbar
         actionId={actionId}
         branchRuleCount={activeBranchRuleCount}
@@ -2385,7 +2387,7 @@ export function ActionFlowCanvas({
         </p>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_380px]">
+      <div className="grid min-h-[760px] grid-cols-[260px_minmax(760px,1fr)_380px] gap-3 overflow-x-auto">
         <FlowComponentPalette
           onSelectStepType={(stepType) => {
             setPaletteStepType(stepType);
@@ -2394,7 +2396,7 @@ export function ActionFlowCanvas({
           selectedStepType={paletteStepType}
         />
 
-        <div className="relative h-[720px] overflow-hidden rounded-md border bg-white">
+        <div className="relative h-[760px] min-w-[760px] overflow-hidden rounded-md border bg-white">
           <ReactFlow
             edges={edges}
             fitView
@@ -2431,7 +2433,7 @@ export function ActionFlowCanvas({
           )}
         </div>
 
-        <div className="max-h-[720px] overflow-y-auto rounded-md border bg-white p-4">
+        <div className="h-[760px] overflow-y-auto rounded-md border bg-white p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium">Inspector</p>

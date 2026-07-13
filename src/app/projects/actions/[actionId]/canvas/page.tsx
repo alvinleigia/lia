@@ -92,8 +92,8 @@ export default async function ActionCanvasPage({
     }));
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-12">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-screen bg-gray-50 px-3 py-4">
+      <div className="mx-auto max-w-none space-y-4">
         <Link
           href={`/projects/actions/${action.id}`}
           className="inline-flex items-center text-sm underline underline-offset-4"
