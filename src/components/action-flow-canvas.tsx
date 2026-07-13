@@ -427,9 +427,10 @@ function buildNodes(input: {
 
     return {
       id: String(step.id),
+      className: "action-flow-step-node",
       data: {
         label: (
-          <div className="w-full text-left">
+          <div className="w-full space-y-3 text-left">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-[11px] font-medium uppercase leading-none text-muted-foreground">
@@ -443,24 +444,26 @@ function buildNodes(input: {
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               )}
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-              <span
-                className="max-w-full truncate rounded-full px-2.5 py-1 font-medium leading-none text-white"
-                style={{ backgroundColor: stepColor }}
-              >
-                {formatLabel(step.stepType)}
-              </span>
-              <span className="rounded-full bg-gray-100 px-2.5 py-1 leading-none text-gray-700">
-                {step.isEnabled ? "Enabled" : "Disabled"}
-              </span>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span
+                  className="max-w-full truncate rounded-full px-2.5 py-1 font-medium leading-none text-white"
+                  style={{ backgroundColor: stepColor }}
+                >
+                  {formatLabel(step.stepType)}
+                </span>
+                <span className="rounded-full bg-gray-100 px-2.5 py-1 leading-none text-gray-700">
+                  {step.isEnabled ? "Enabled" : "Disabled"}
+                </span>
+              </div>
               {step.fieldKey && (
-                <span className="max-w-[240px] truncate rounded-full bg-gray-100 px-2.5 py-1 leading-none text-gray-700">
+                <span className="inline-flex max-w-full truncate rounded-full bg-gray-100 px-2.5 py-1 text-xs leading-none text-gray-700">
                   {step.fieldKey}
                 </span>
               )}
             </div>
             {step.prompt && (
-              <p className="mt-3 line-clamp-2 break-words text-xs leading-snug text-muted-foreground">
+              <p className="line-clamp-2 break-words rounded-md bg-gray-50 px-2.5 py-2 text-xs leading-snug text-muted-foreground">
                 {step.prompt}
               </p>
             )}
@@ -479,10 +482,10 @@ function buildNodes(input: {
         borderWidth: 1.5,
         boxSizing: "border-box",
         boxShadow: "0 12px 24px rgba(15, 23, 42, 0.07)",
-        minHeight: 152,
+        minHeight: 168,
         opacity: step.isEnabled ? 1 : 0.68,
         padding: 18,
-        width: 320,
+        width: 328,
       },
       targetPosition: Position.Left,
       type: "default",

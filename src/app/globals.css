@@ -132,6 +132,25 @@
   }
 }
 
+.action-flow-step-node {
+  overflow: visible;
+}
+
+.action-flow-step-node .react-flow__handle {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ffffff;
+  background: #111827;
+}
+
+.action-flow-step-node .react-flow__handle-left {
+  left: -6px;
+}
+
+.action-flow-step-node .react-flow__handle-right {
+  right: -6px;
+}
+
 @keyframes loading-progress {
   0% {
     transform: translateX(-100%);
