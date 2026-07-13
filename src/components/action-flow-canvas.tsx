@@ -14,7 +14,10 @@ import {
 } from "@xyflow/react";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   CheckCircle2,
+  Copy,
   FileDown,
   GitBranch,
   ImageIcon,
@@ -2122,6 +2125,46 @@ function createFlowContentBlock(input: {
   };
 }
 
+function duplicateFlowContentBlock(block: FlowContentBlock): FlowContentBlock {
+  const id = `content-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  if (block.type === "choice") {
+    return { ...block, id, options: [...block.options] };
+  }
+
+  if (block.type === "catalog") {
+    return {
+      ...block,
+      id,
+      productIds: [...block.productIds],
+      products: [...block.products],
+    };
+  }
+
+  return { ...block, id };
+}
+
+function moveFlowContentBlock(
+  blocks: FlowContentBlock[],
+  fromIndex: number,
+  toIndex: number,
+) {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= blocks.length ||
+    toIndex >= blocks.length
+  ) {
+    return blocks;
+  }
+
+  const nextBlocks = [...blocks];
+  const [movedBlock] = nextBlocks.splice(fromIndex, 1);
+  nextBlocks.splice(toIndex, 0, movedBlock);
+  return nextBlocks;
+}
+
 function FlowContentBlocksEditor({
   allowsChoice,
   blocks,
@@ -2157,360 +2200,457 @@ function FlowContentBlocksEditor({
   };
 
   return (
-    <div className="space-y-3 rounded-md border p-4">
-      <div>
-        <p className="text-sm font-medium">Additional content</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Add messages, choices, media, or products after the main message.
-        </p>
+    <div className="space-y-4 rounded-md border bg-gray-50/50 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium">Continue the message</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Add content below the first message. Visitors receive it from top to
+            bottom.
+          </p>
+        </div>
+        {blocks.length > 0 && (
+          <span className="shrink-0 rounded-full border bg-white px-2.5 py-1 text-xs text-muted-foreground">
+            {blocks.length} {blocks.length === 1 ? "block" : "blocks"}
+          </span>
+        )}
       </div>
+
+      {blocks.length === 0 && (
+        <div className="rounded-md border border-dashed bg-white px-4 py-5 text-center">
+          <p className="text-sm font-medium">No additional content</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The step will send only its first message.
+          </p>
+        </div>
+      )}
 
       {blocks.length > 0 && (
         <div className="space-y-3">
           {blocks.map((block, blockIndex) => (
-            <div key={block.id} className="rounded-md border bg-gray-50 p-3">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="flex items-center gap-2 text-sm font-medium">
-                  {block.type === "choice" && (
-                    <ListChecks className="h-4 w-4" />
-                  )}
-                  {block.type === "text" && (
-                    <MessageSquareText className="h-4 w-4" />
-                  )}
-                  {block.type === "media" && <ImageIcon className="h-4 w-4" />}
-                  {block.type === "catalog" && (
-                    <ShoppingBag className="h-4 w-4" />
-                  )}
-                  {block.type === "choice" && "Choice buttons"}
-                  {block.type === "text" && "Text message"}
-                  {block.type === "media" && "Media"}
-                  {block.type === "catalog" &&
-                    (block.displayMode === "single_product"
-                      ? "Single product"
-                      : block.displayMode === "multiple_products"
-                        ? "Multiple products"
-                        : "Product catalog")}
-                </p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  title={`Remove content block ${blockIndex + 1}`}
-                  onClick={() =>
-                    onChange(blocks.filter((item) => item.id !== block.id))
-                  }
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span className="sr-only">Remove content block</span>
-                </Button>
-              </div>
+            <div
+              key={block.id}
+              className="rounded-md border bg-white shadow-xs"
+            >
+              <div className="flex min-h-12 items-center justify-between gap-3 border-b px-3 py-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-700">
+                    {block.type === "choice" && (
+                      <ListChecks className="h-4 w-4" />
+                    )}
+                    {block.type === "text" && (
+                      <MessageSquareText className="h-4 w-4" />
+                    )}
+                    {block.type === "media" && (
+                      <ImageIcon className="h-4 w-4" />
+                    )}
+                    {block.type === "catalog" && (
+                      <ShoppingBag className="h-4 w-4" />
+                    )}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {block.type === "choice" && "Choice buttons"}
+                      {block.type === "text" && "Text message"}
+                      {block.type === "media" && "Media"}
+                      {block.type === "catalog" &&
+                        (block.displayMode === "single_product"
+                          ? "Single product"
+                          : block.displayMode === "multiple_products"
+                            ? "Multiple products"
+                            : "Product catalog")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Content {blockIndex + 1}
+                    </p>
+                  </div>
+                </div>
 
-              <textarea
-                aria-label={
-                  block.type === "choice"
-                    ? "Choice introduction"
-                    : block.type === "media"
-                      ? "Media caption"
-                      : block.type === "catalog"
-                        ? "Product introduction"
-                        : "Additional message"
-                }
-                value={block.text}
-                rows={block.type === "text" ? 3 : 2}
-                placeholder={
-                  block.type === "media"
-                    ? "Optional caption"
-                    : block.type === "catalog"
-                      ? "Introduce these products"
-                      : undefined
-                }
-                onChange={(event) =>
-                  onChange(
-                    blocks.map((item) =>
-                      item.id === block.id
-                        ? { ...item, text: event.target.value }
-                        : item,
-                    ),
-                  )
-                }
-                className="flex min-h-20 w-full resize-y rounded-md border border-input bg-white px-3 py-2 text-sm leading-5 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              />
-
-              {block.type === "media" && (
-                <div className="mt-3 space-y-2">
-                  <label
-                    className="text-xs font-medium text-muted-foreground"
-                    htmlFor={`content-media-${block.id}`}
-                  >
-                    Choose media
-                  </label>
-                  <select
-                    id={`content-media-${block.id}`}
-                    value={block.mediaAssetId}
-                    onChange={(event) =>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={blockIndex === 0}
+                    title={`Move content ${blockIndex + 1} up`}
+                    onClick={() =>
                       onChange(
-                        blocks.map((item) =>
-                          item.id === block.id && item.type === "media"
-                            ? {
-                                ...item,
-                                media: null,
-                                mediaAssetId: Number(event.target.value),
-                              }
-                            : item,
+                        moveFlowContentBlock(
+                          blocks,
+                          blockIndex,
+                          blockIndex - 1,
                         ),
                       )
                     }
-                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   >
-                    {mediaAssets.map((asset) => (
-                      <option key={asset.id} value={asset.id}>
-                        {asset.label} ({asset.mediaType})
-                      </option>
-                    ))}
-                  </select>
+                    <ArrowUp className="h-4 w-4" />
+                    <span className="sr-only">Move content up</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={blockIndex === blocks.length - 1}
+                    title={`Move content ${blockIndex + 1} down`}
+                    onClick={() =>
+                      onChange(
+                        moveFlowContentBlock(
+                          blocks,
+                          blockIndex,
+                          blockIndex + 1,
+                        ),
+                      )
+                    }
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                    <span className="sr-only">Move content down</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={blocks.length >= 10}
+                    title={`Duplicate content ${blockIndex + 1}`}
+                    onClick={() => {
+                      const nextBlocks = [...blocks];
+                      nextBlocks.splice(
+                        blockIndex + 1,
+                        0,
+                        duplicateFlowContentBlock(block),
+                      );
+                      onChange(nextBlocks);
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                    <span className="sr-only">Duplicate content</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title={`Remove content ${blockIndex + 1}`}
+                    onClick={() =>
+                      onChange(blocks.filter((item) => item.id !== block.id))
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Remove content</span>
+                  </Button>
                 </div>
-              )}
+              </div>
 
-              {block.type === "catalog" && (
-                <div className="mt-3 space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <label
-                        className="text-xs font-medium text-muted-foreground"
-                        htmlFor={`content-catalog-${block.id}`}
-                      >
-                        Product catalog
-                      </label>
-                      <select
-                        id={`content-catalog-${block.id}`}
-                        value={block.catalogId}
-                        onChange={(event) => {
-                          const catalogId = Number(event.target.value);
-                          const availableProductIds = catalogProducts
-                            .filter(
-                              (product) => product.catalogId === catalogId,
-                            )
-                            .map((product) => product.id);
+              <div className="space-y-3 p-3">
+                <textarea
+                  aria-label={
+                    block.type === "choice"
+                      ? "Choice introduction"
+                      : block.type === "media"
+                        ? "Media caption"
+                        : block.type === "catalog"
+                          ? "Product introduction"
+                          : "Additional message"
+                  }
+                  value={block.text}
+                  rows={block.type === "text" ? 3 : 2}
+                  placeholder={
+                    block.type === "media"
+                      ? "Optional caption"
+                      : block.type === "catalog"
+                        ? "Introduce these products"
+                        : undefined
+                  }
+                  onChange={(event) =>
+                    onChange(
+                      blocks.map((item) =>
+                        item.id === block.id
+                          ? { ...item, text: event.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                  className="flex min-h-20 w-full resize-y rounded-md border border-input bg-white px-3 py-2 text-sm leading-5 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                />
 
-                          onChange(
-                            blocks.map((item) =>
-                              item.id === block.id && item.type === "catalog"
-                                ? {
-                                    ...item,
-                                    catalog: null,
-                                    catalogId,
-                                    productIds:
-                                      item.displayMode === "catalog"
-                                        ? []
-                                        : item.displayMode === "single_product"
-                                          ? availableProductIds.slice(0, 1)
-                                          : availableProductIds.slice(0, 3),
-                                    products: [],
-                                  }
-                                : item,
-                            ),
-                          );
-                        }}
-                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                      >
-                        {productCatalogs.map((catalog) => (
-                          <option key={catalog.id} value={catalog.id}>
-                            {catalog.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label
-                        className="text-xs font-medium text-muted-foreground"
-                        htmlFor={`content-layout-${block.id}`}
-                      >
-                        Card layout
-                      </label>
-                      <select
-                        id={`content-layout-${block.id}`}
-                        value={block.layout}
-                        onChange={(event) =>
-                          onChange(
-                            blocks.map((item) =>
-                              item.id === block.id && item.type === "catalog"
-                                ? {
-                                    ...item,
-                                    layout: event.target.value as
-                                      | "featured"
-                                      | "grid"
-                                      | "list",
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                      >
-                        <option value="grid">Grid</option>
-                        <option value="list">List</option>
-                        <option value="featured">Featured</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {block.displayMode !== "catalog" && (
-                    <div className="space-y-2">
-                      <label
-                        className="text-xs font-medium text-muted-foreground"
-                        htmlFor={`content-products-${block.id}`}
-                      >
-                        {block.displayMode === "single_product"
-                          ? "Choose product"
-                          : "Choose products"}
-                      </label>
-                      <select
-                        id={`content-products-${block.id}`}
-                        multiple={block.displayMode === "multiple_products"}
-                        size={block.displayMode === "multiple_products" ? 4 : 1}
-                        value={
-                          block.displayMode === "multiple_products"
-                            ? block.productIds.map(String)
-                            : String(block.productIds[0] ?? "")
-                        }
-                        onChange={(event) => {
-                          const productIds = Array.from(
-                            event.target.selectedOptions,
-                          ).map((option) => Number(option.value));
-
-                          onChange(
-                            blocks.map((item) =>
-                              item.id === block.id && item.type === "catalog"
-                                ? { ...item, productIds, products: [] }
-                                : item,
-                            ),
-                          );
-                        }}
-                        className="flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                      >
-                        {catalogProducts
-                          .filter(
-                            (product) => product.catalogId === block.catalogId,
-                          )
-                          .map((product) => (
-                            <option key={product.id} value={product.id}>
-                              {product.name}
-                              {product.sku ? ` (${product.sku})` : ""}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {block.type === "choice" && (
-                <div className="mt-3 space-y-3">
-                  <div className="space-y-2">
-                    {block.options.map((option, optionIndex) => (
-                      <div
-                        key={`${block.id}-option-${optionIndex}`}
-                        className="flex gap-2"
-                      >
-                        <input
-                          aria-label={`Choice ${optionIndex + 1}`}
-                          value={option}
-                          onChange={(event) =>
-                            onChange(
-                              blocks.map((item) => {
-                                if (
-                                  item.id !== block.id ||
-                                  item.type !== "choice"
-                                ) {
-                                  return item;
+                {block.type === "media" && (
+                  <div className="mt-3 space-y-2">
+                    <label
+                      className="text-xs font-medium text-muted-foreground"
+                      htmlFor={`content-media-${block.id}`}
+                    >
+                      Choose media
+                    </label>
+                    <select
+                      id={`content-media-${block.id}`}
+                      value={block.mediaAssetId}
+                      onChange={(event) =>
+                        onChange(
+                          blocks.map((item) =>
+                            item.id === block.id && item.type === "media"
+                              ? {
+                                  ...item,
+                                  media: null,
+                                  mediaAssetId: Number(event.target.value),
                                 }
+                              : item,
+                          ),
+                        )
+                      }
+                      className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    >
+                      {mediaAssets.map((asset) => (
+                        <option key={asset.id} value={asset.id}>
+                          {asset.label} ({asset.mediaType})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-                                const nextOptions = [...item.options];
-                                nextOptions[optionIndex] = event.target.value;
-                                return { ...item, options: nextOptions };
-                              }),
-                            )
-                          }
-                          placeholder={`Choice ${optionIndex + 1}`}
-                          className="flex h-9 min-w-0 flex-1 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          disabled={block.options.length === 1}
-                          title={`Remove choice ${optionIndex + 1}`}
-                          onClick={() =>
+                {block.type === "catalog" && (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <label
+                          className="text-xs font-medium text-muted-foreground"
+                          htmlFor={`content-catalog-${block.id}`}
+                        >
+                          Product catalog
+                        </label>
+                        <select
+                          id={`content-catalog-${block.id}`}
+                          value={block.catalogId}
+                          onChange={(event) => {
+                            const catalogId = Number(event.target.value);
+                            const availableProductIds = catalogProducts
+                              .filter(
+                                (product) => product.catalogId === catalogId,
+                              )
+                              .map((product) => product.id);
+
                             onChange(
                               blocks.map((item) =>
-                                item.id === block.id && item.type === "choice"
+                                item.id === block.id && item.type === "catalog"
                                   ? {
                                       ...item,
-                                      options: item.options.filter(
-                                        (_, index) => index !== optionIndex,
-                                      ),
+                                      catalog: null,
+                                      catalogId,
+                                      productIds:
+                                        item.displayMode === "catalog"
+                                          ? []
+                                          : item.displayMode ===
+                                              "single_product"
+                                            ? availableProductIds.slice(0, 1)
+                                            : availableProductIds.slice(0, 3),
+                                      products: [],
+                                    }
+                                  : item,
+                              ),
+                            );
+                          }}
+                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        >
+                          {productCatalogs.map((catalog) => (
+                            <option key={catalog.id} value={catalog.id}>
+                              {catalog.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label
+                          className="text-xs font-medium text-muted-foreground"
+                          htmlFor={`content-layout-${block.id}`}
+                        >
+                          Card layout
+                        </label>
+                        <select
+                          id={`content-layout-${block.id}`}
+                          value={block.layout}
+                          onChange={(event) =>
+                            onChange(
+                              blocks.map((item) =>
+                                item.id === block.id && item.type === "catalog"
+                                  ? {
+                                      ...item,
+                                      layout: event.target.value as
+                                        | "featured"
+                                        | "grid"
+                                        | "list",
                                     }
                                   : item,
                               ),
                             )
                           }
+                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                         >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Remove choice</span>
-                        </Button>
+                          <option value="grid">Grid</option>
+                          <option value="list">List</option>
+                          <option value="featured">Featured</option>
+                        </select>
                       </div>
-                    ))}
-                  </div>
+                    </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        onChange(
-                          blocks.map((item) =>
-                            item.id === block.id && item.type === "choice"
-                              ? {
-                                  ...item,
-                                  options: [...item.options, "New choice"],
-                                }
-                              : item,
-                          ),
-                        )
-                      }
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add choice
-                    </Button>
-                    <select
-                      aria-label="Choice display"
-                      value={block.displayMode}
-                      onChange={(event) =>
-                        onChange(
-                          blocks.map((item) =>
-                            item.id === block.id && item.type === "choice"
-                              ? {
-                                  ...item,
-                                  displayMode: event.target.value as
-                                    | "buttons"
-                                    | "list"
-                                    | "text",
-                                }
-                              : item,
-                          ),
-                        )
-                      }
-                      className="flex h-8 rounded-md border border-input bg-white px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    >
-                      <option value="buttons">Buttons</option>
-                      <option value="list">List</option>
-                      <option value="text">Typed response</option>
-                    </select>
+                    {block.displayMode !== "catalog" && (
+                      <div className="space-y-2">
+                        <label
+                          className="text-xs font-medium text-muted-foreground"
+                          htmlFor={`content-products-${block.id}`}
+                        >
+                          {block.displayMode === "single_product"
+                            ? "Choose product"
+                            : "Choose products"}
+                        </label>
+                        <select
+                          id={`content-products-${block.id}`}
+                          multiple={block.displayMode === "multiple_products"}
+                          size={
+                            block.displayMode === "multiple_products" ? 4 : 1
+                          }
+                          value={
+                            block.displayMode === "multiple_products"
+                              ? block.productIds.map(String)
+                              : String(block.productIds[0] ?? "")
+                          }
+                          onChange={(event) => {
+                            const productIds = Array.from(
+                              event.target.selectedOptions,
+                            ).map((option) => Number(option.value));
+
+                            onChange(
+                              blocks.map((item) =>
+                                item.id === block.id && item.type === "catalog"
+                                  ? { ...item, productIds, products: [] }
+                                  : item,
+                              ),
+                            );
+                          }}
+                          className="flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        >
+                          {catalogProducts
+                            .filter(
+                              (product) =>
+                                product.catalogId === block.catalogId,
+                            )
+                            .map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.name}
+                                {product.sku ? ` (${product.sku})` : ""}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                )}
+
+                {block.type === "choice" && (
+                  <div className="mt-3 space-y-3">
+                    <div className="space-y-2">
+                      {block.options.map((option, optionIndex) => (
+                        <div
+                          key={`${block.id}-option-${optionIndex}`}
+                          className="flex gap-2"
+                        >
+                          <input
+                            aria-label={`Choice ${optionIndex + 1}`}
+                            value={option}
+                            onChange={(event) =>
+                              onChange(
+                                blocks.map((item) => {
+                                  if (
+                                    item.id !== block.id ||
+                                    item.type !== "choice"
+                                  ) {
+                                    return item;
+                                  }
+
+                                  const nextOptions = [...item.options];
+                                  nextOptions[optionIndex] = event.target.value;
+                                  return { ...item, options: nextOptions };
+                                }),
+                              )
+                            }
+                            placeholder={`Choice ${optionIndex + 1}`}
+                            className="flex h-9 min-w-0 flex-1 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            disabled={block.options.length === 1}
+                            title={`Remove choice ${optionIndex + 1}`}
+                            onClick={() =>
+                              onChange(
+                                blocks.map((item) =>
+                                  item.id === block.id && item.type === "choice"
+                                    ? {
+                                        ...item,
+                                        options: item.options.filter(
+                                          (_, index) => index !== optionIndex,
+                                        ),
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Remove choice</span>
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          onChange(
+                            blocks.map((item) =>
+                              item.id === block.id && item.type === "choice"
+                                ? {
+                                    ...item,
+                                    options: [...item.options, "New choice"],
+                                  }
+                                : item,
+                            ),
+                          )
+                        }
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add choice
+                      </Button>
+                      <select
+                        aria-label="Choice display"
+                        value={block.displayMode}
+                        onChange={(event) =>
+                          onChange(
+                            blocks.map((item) =>
+                              item.id === block.id && item.type === "choice"
+                                ? {
+                                    ...item,
+                                    displayMode: event.target.value as
+                                      | "buttons"
+                                      | "list"
+                                      | "text",
+                                  }
+                                : item,
+                            ),
+                          )
+                        }
+                        className="flex h-8 rounded-md border border-input bg-white px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      >
+                        <option value="buttons">Buttons</option>
+                        <option value="list">List</option>
+                        <option value="text">Typed response</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -2519,7 +2659,7 @@ function FlowContentBlocksEditor({
       {blocks.length < 10 && (
         <Popover open={isAddMenuOpen} onOpenChange={setIsAddMenuOpen}>
           <PopoverTrigger asChild>
-            <Button type="button" variant="outline">
+            <Button type="button" variant="outline" className="bg-white">
               <Plus className="h-4 w-4" />
               Add content
             </Button>
