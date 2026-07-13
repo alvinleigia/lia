@@ -512,6 +512,272 @@ function CanvasContentBlockPreview({ block }: { block: FlowContentBlock }) {
   );
 }
 
+function getContentBlockName(block: FlowContentBlock) {
+  if (block.type === "choice") {
+    return "Choice buttons";
+  }
+
+  if (block.type === "media") {
+    return "Media";
+  }
+
+  if (block.type === "catalog") {
+    return block.displayMode === "single_product"
+      ? "Single product"
+      : block.displayMode === "multiple_products"
+        ? "Multiple products"
+        : "Product catalog";
+  }
+
+  return "Text message";
+}
+
+function CanvasContentBlockEditor({
+  block,
+  catalogProducts,
+  isSaving,
+  mediaAssets,
+  onCancel,
+  onRemove,
+  onSave,
+  productCatalogs,
+}: {
+  block: FlowContentBlock;
+  catalogProducts: CatalogProductOption[];
+  isSaving: boolean;
+  mediaAssets: MediaAssetOption[];
+  onCancel: () => void;
+  onRemove: () => void;
+  onSave: (block: FlowContentBlock) => void;
+  productCatalogs: ProductCatalogOption[];
+}) {
+  const [draft, setDraft] = useState<FlowContentBlock>(block);
+
+  return (
+    <div className="space-y-3 rounded-md border bg-gray-50 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold">{getContentBlockName(draft)}</p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          title="Cancel content edit"
+          disabled={isSaving}
+          onClick={onCancel}
+        >
+          <X className="h-3.5 w-3.5" />
+          <span className="sr-only">Cancel content edit</span>
+        </Button>
+      </div>
+
+      <textarea
+        aria-label={draft.type === "media" ? "Media caption" : "Message"}
+        value={draft.text}
+        rows={3}
+        placeholder={draft.type === "media" ? "Optional caption" : "Message"}
+        onChange={(event) =>
+          setDraft((current) => ({ ...current, text: event.target.value }))
+        }
+        className="flex min-h-20 w-full resize-y rounded-md border border-input bg-white px-3 py-2 text-xs leading-5 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      />
+
+      {draft.type === "choice" && (
+        <div className="space-y-2">
+          {draft.options.map((option, index) => (
+            <div
+              key={`${draft.id}-inline-option-${index}`}
+              className="flex gap-1.5"
+            >
+              <input
+                aria-label={`Choice ${index + 1}`}
+                value={option}
+                onChange={(event) => {
+                  const options = [...draft.options];
+                  options[index] = event.target.value;
+                  setDraft({ ...draft, options });
+                }}
+                className="flex h-8 min-w-0 flex-1 rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                disabled={draft.options.length === 1}
+                title={`Remove choice ${index + 1}`}
+                onClick={() =>
+                  setDraft({
+                    ...draft,
+                    options: draft.options.filter(
+                      (_, optionIndex) => optionIndex !== index,
+                    ),
+                  })
+                }
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="sr-only">Remove choice</span>
+              </Button>
+            </div>
+          ))}
+          {draft.options.length < 20 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full bg-white"
+              onClick={() =>
+                setDraft({
+                  ...draft,
+                  options: [...draft.options, "New choice"],
+                })
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Add choice
+            </Button>
+          )}
+        </div>
+      )}
+
+      {draft.type === "media" && (
+        <select
+          aria-label="Choose media"
+          value={draft.mediaAssetId}
+          onChange={(event) =>
+            setDraft({
+              ...draft,
+              media: null,
+              mediaAssetId: Number(event.target.value),
+            })
+          }
+          className="flex h-9 w-full rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          {mediaAssets.map((asset) => (
+            <option key={asset.id} value={asset.id}>
+              {asset.label}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {draft.type === "catalog" && (
+        <div className="space-y-2">
+          <select
+            aria-label="Product catalog"
+            value={draft.catalogId}
+            onChange={(event) => {
+              const catalogId = Number(event.target.value);
+              const availableProductIds = catalogProducts
+                .filter((product) => product.catalogId === catalogId)
+                .map((product) => product.id);
+
+              setDraft({
+                ...draft,
+                catalog: null,
+                catalogId,
+                productIds:
+                  draft.displayMode === "catalog"
+                    ? []
+                    : draft.displayMode === "single_product"
+                      ? availableProductIds.slice(0, 1)
+                      : availableProductIds.slice(0, 3),
+                products: [],
+              });
+            }}
+            className="flex h-9 w-full rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            {productCatalogs.map((catalog) => (
+              <option key={catalog.id} value={catalog.id}>
+                {catalog.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            aria-label="Product card layout"
+            value={draft.layout}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                layout: event.target.value as "featured" | "grid" | "list",
+              })
+            }
+            className="flex h-9 w-full rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <option value="grid">Grid cards</option>
+            <option value="list">List</option>
+            <option value="featured">Featured card</option>
+          </select>
+
+          {draft.displayMode !== "catalog" && (
+            <select
+              aria-label={
+                draft.displayMode === "single_product"
+                  ? "Choose product"
+                  : "Choose products"
+              }
+              multiple={draft.displayMode === "multiple_products"}
+              size={draft.displayMode === "multiple_products" ? 4 : 1}
+              value={
+                draft.displayMode === "multiple_products"
+                  ? draft.productIds.map(String)
+                  : String(draft.productIds[0] ?? "")
+              }
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  productIds: Array.from(event.target.selectedOptions).map(
+                    (option) => Number(option.value),
+                  ),
+                  products: [],
+                })
+              }
+              className="flex w-full rounded-md border border-input bg-white px-2 py-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              {catalogProducts
+                .filter((product) => product.catalogId === draft.catalogId)
+                .map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name}
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          disabled={isSaving}
+          className="flex-1"
+          onClick={() => onSave(draft)}
+        >
+          {isSaving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          Save
+        </Button>
+        <Button
+          type="button"
+          variant="destructive"
+          size="icon"
+          disabled={isSaving}
+          title="Remove content"
+          onClick={onRemove}
+        >
+          <Trash2 className="h-4 w-4" />
+          <span className="sr-only">Remove content</span>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function CanvasStepNodeContent({
   catalogProducts,
   issueCount,
@@ -528,7 +794,6 @@ function CanvasStepNodeContent({
   step: FlowStep;
 }) {
   const contentBlocks = getFlowContentBlocks(step.settings);
-  const visibleContentBlocks = contentBlocks.slice(0, 2);
   const choiceBlock = contentBlocks.find((block) => block.type === "choice");
   const sourceType =
     typeof step.settings.sourceType === "string"
@@ -553,6 +818,9 @@ function CanvasStepNodeContent({
   const [label, setLabel] = useState(step.label ?? "");
   const [prompt, setPrompt] = useState(step.prompt ?? "");
   const [choices, setChoices] = useState(storedChoices);
+  const [editingContentBlockId, setEditingContentBlockId] = useState<
+    string | null
+  >(null);
   const [isAddContentOpen, setIsAddContentOpen] = useState(false);
   const [localFeedback, setLocalFeedback] = useState("");
   const [isSaving, startSaving] = useTransition();
@@ -570,6 +838,32 @@ function CanvasStepNodeContent({
 
   const stopCanvasInteraction = (event: { stopPropagation: () => void }) => {
     event.stopPropagation();
+  };
+
+  const persistContentBlocks = (
+    nextContentBlocks: FlowContentBlock[],
+    onSuccess: () => void,
+  ) => {
+    setLocalFeedback("");
+    startSaving(async () => {
+      const result = await onQuickSave(step.id, {
+        choiceDisplayMode: getStepChoiceDisplayMode(step),
+        contentBlocks: JSON.stringify(nextContentBlocks),
+        contentBlocksChanged: true,
+        inputType: step.inputType ?? "text",
+        isEnabled: step.isEnabled,
+        isRequired: step.isRequired,
+        label: step.label ?? "",
+        options: storedManualChoices.join("\n"),
+        optionsChanged: false,
+        prompt: step.prompt ?? "",
+      });
+
+      setLocalFeedback(result.message);
+      if (result.ok) {
+        onSuccess();
+      }
+    });
   };
 
   const saveInlineChanges = () => {
@@ -628,25 +922,9 @@ function CanvasStepNodeContent({
       return;
     }
 
-    setLocalFeedback("");
-    startSaving(async () => {
-      const result = await onQuickSave(step.id, {
-        choiceDisplayMode: getStepChoiceDisplayMode(step),
-        contentBlocks: JSON.stringify([...contentBlocks, block]),
-        contentBlocksChanged: true,
-        inputType: step.inputType ?? "text",
-        isEnabled: step.isEnabled,
-        isRequired: step.isRequired,
-        label: step.label ?? "",
-        options: storedManualChoices.join("\n"),
-        optionsChanged: false,
-        prompt: step.prompt ?? "",
-      });
-
-      setLocalFeedback(result.message);
-      if (result.ok) {
-        setIsAddContentOpen(false);
-      }
+    persistContentBlocks([...contentBlocks, block], () => {
+      setIsAddContentOpen(false);
+      setEditingContentBlockId(block.id);
     });
   };
 
@@ -842,15 +1120,66 @@ function CanvasStepNodeContent({
           {step.prompt}
         </p>
       )}
-      {visibleContentBlocks.map((block) => (
-        <CanvasContentBlockPreview block={block} key={block.id} />
-      ))}
-      {contentBlocks.length > visibleContentBlocks.length && (
-        <p className="text-[11px] font-medium text-muted-foreground">
-          +{contentBlocks.length - visibleContentBlocks.length} more content
-          block
-          {contentBlocks.length - visibleContentBlocks.length === 1 ? "" : "s"}
-        </p>
+      {contentBlocks.length > 0 && (
+        <div className="nodrag nopan nowheel max-h-64 space-y-2 overflow-y-auto pr-1">
+          {contentBlocks.map((block) =>
+            editingContentBlockId === block.id ? (
+              <fieldset
+                key={block.id}
+                aria-label={`Edit ${getContentBlockName(block).toLowerCase()}`}
+                className="min-w-0 border-0 p-0"
+                onClick={stopCanvasInteraction}
+                onKeyDown={stopCanvasInteraction}
+                onPointerDown={stopCanvasInteraction}
+              >
+                <CanvasContentBlockEditor
+                  block={block}
+                  catalogProducts={catalogProducts}
+                  isSaving={isSaving}
+                  mediaAssets={mediaAssets}
+                  onCancel={() => setEditingContentBlockId(null)}
+                  onRemove={() =>
+                    persistContentBlocks(
+                      contentBlocks.filter((item) => item.id !== block.id),
+                      () => setEditingContentBlockId(null),
+                    )
+                  }
+                  onSave={(updatedBlock) =>
+                    persistContentBlocks(
+                      contentBlocks.map((item) =>
+                        item.id === updatedBlock.id ? updatedBlock : item,
+                      ),
+                      () => setEditingContentBlockId(null),
+                    )
+                  }
+                  productCatalogs={productCatalogs}
+                />
+              </fieldset>
+            ) : (
+              <div className="flex items-start gap-1.5" key={block.id}>
+                <div className="min-w-0 flex-1">
+                  <CanvasContentBlockPreview block={block} />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  title={`Edit ${getContentBlockName(block).toLowerCase()}`}
+                  className="nodrag nopan h-7 w-7 shrink-0 bg-white shadow-sm"
+                  disabled={isSaving}
+                  onClick={(event) => {
+                    stopCanvasInteraction(event);
+                    setEditingContentBlockId(block.id);
+                  }}
+                  onPointerDown={stopCanvasInteraction}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  <span className="sr-only">Edit content</span>
+                </Button>
+              </div>
+            ),
+          )}
+        </div>
       )}
       {contentBlocks.length < 10 && (
         <Popover open={isAddContentOpen} onOpenChange={setIsAddContentOpen}>
