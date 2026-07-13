@@ -173,6 +173,7 @@ export async function POST(req: Request) {
         : undefined,
       system: buildKnowledgeChatSystemPrompt({
         channel: "widget_chat",
+        projectAiSettings: widgetAccess.projectAiSettings,
         companyName: widgetAccess.companyName,
         hasDocuments,
         projectName: widgetAccess.projectName,

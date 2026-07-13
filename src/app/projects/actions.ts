@@ -16,11 +16,21 @@ import {
   deleteSourceDocumentFromProject,
 } from "@/lib/documents";
 import {
+  AI_ANSWER_LENGTHS,
+  AI_ASSISTANT_ROLES,
+  AI_EXTRA_HELP_POLICIES,
+  AI_FOLLOW_UP_POLICIES,
+  AI_TONES,
+  compactProjectAiSettings,
+  normalizeProjectAiSettings,
+} from "@/lib/project-ai-settings";
+import {
   createProjectForWorkspace,
   getProjectForWorkspaceById,
   listActiveProjectsForWorkspace,
   setProjectArchivedForWorkspace,
   setProjectUnarchivedForWorkspace,
+  updateProjectAiSettingsForWorkspace,
   updateProjectNameForWorkspace,
 } from "@/lib/projects";
 import { updateProjectWidgetTokenStatus } from "@/lib/widget-keys";
@@ -31,6 +41,23 @@ const createProjectSchema = z.object({
 const renameProjectSchema = z.object({
   projectId: z.coerce.number().int().positive(),
   name: z.string().trim().min(1).max(120),
+});
+const updateProjectAiSettingsSchema = z.object({
+  projectId: z.coerce.number().int().positive(),
+  assistantName: z.string().trim().max(80),
+  businessName: z.string().trim().max(120),
+  role: z.enum(AI_ASSISTANT_ROLES),
+  tone: z.enum(AI_TONES),
+  answerLength: z.enum(AI_ANSWER_LENGTHS),
+  followUpPolicy: z.enum(AI_FOLLOW_UP_POLICIES),
+  extraHelpPolicy: z.enum(AI_EXTRA_HELP_POLICIES),
+  fallbackPhone: z.string().trim().max(80),
+  fallbackEmail: z
+    .string()
+    .trim()
+    .max(160)
+    .refine((value) => !value || z.string().email().safeParse(value).success),
+  fallbackMessage: z.string().trim().max(240),
 });
 
 const projectIdSchema = z.coerce.number().int().positive();
@@ -139,6 +166,72 @@ export async function renameProjectAction(formData: FormData) {
   revalidatePath(`/projects/${project.id}/settings`);
   revalidatePath("/", "layout");
   redirect(`/projects/${project.id}/settings?renamed=1`);
+}
+
+export async function updateProjectAiSettingsAction(formData: FormData) {
+  const parsed = updateProjectAiSettingsSchema.safeParse({
+    projectId: formData.get("projectId"),
+    assistantName: formData.get("assistantName"),
+    businessName: formData.get("businessName"),
+    role: formData.get("role"),
+    tone: formData.get("tone"),
+    answerLength: formData.get("answerLength"),
+    followUpPolicy: formData.get("followUpPolicy"),
+    extraHelpPolicy: formData.get("extraHelpPolicy"),
+    fallbackPhone: formData.get("fallbackPhone"),
+    fallbackEmail: formData.get("fallbackEmail"),
+    fallbackMessage: formData.get("fallbackMessage"),
+  });
+
+  const fallbackProjectId = projectIdSchema.safeParse(
+    formData.get("projectId"),
+  );
+  const errorPath = fallbackProjectId.success
+    ? `/projects/${fallbackProjectId.data}/settings`
+    : "/projects";
+
+  if (!parsed.success) {
+    redirect(`${errorPath}?error=Please%20check%20the%20AI%20settings.`);
+  }
+
+  const context = await resolveUserAndWorkspace();
+  assertPermission(context.membership, "company.project.manage");
+
+  const project = await updateProjectAiSettingsForWorkspace(
+    parsed.data.projectId,
+    context.workspace.id,
+    compactProjectAiSettings(
+      normalizeProjectAiSettings({
+        answerLength: parsed.data.answerLength,
+        assistantName: parsed.data.assistantName,
+        businessName: parsed.data.businessName,
+        extraHelpPolicy: parsed.data.extraHelpPolicy,
+        fallbackEmail: parsed.data.fallbackEmail,
+        fallbackMessage: parsed.data.fallbackMessage,
+        fallbackPhone: parsed.data.fallbackPhone,
+        followUpPolicy: parsed.data.followUpPolicy,
+        role: parsed.data.role,
+        tone: parsed.data.tone,
+      }),
+    ),
+  );
+
+  if (!project) {
+    redirect(`${errorPath}?error=Project%20not%20found.`);
+  }
+
+  await writeAuditLog({
+    ...context,
+    project,
+    action: "project.ai_settings_updated",
+    targetType: "project",
+    targetId: project.id,
+    metadata: { name: project.name },
+  });
+
+  revalidatePath(`/projects/${project.id}/settings`);
+  revalidatePath("/", "layout");
+  redirect(`/projects/${project.id}/settings?aiSettings=1`);
 }
 
 export async function setActiveProjectAction(formData: FormData) {

@@ -145,6 +145,7 @@ export async function resolveWidgetTokenAccess(token: string) {
   const [project] = await db
     .select({
       isArchived: projects.isArchived,
+      projectAiSettings: projects.aiSettings,
       projectName: projects.name,
       companyName: companies.name,
       companyStatus: companies.status,
@@ -162,6 +163,7 @@ export async function resolveWidgetTokenAccess(token: string) {
     isActive: key.isActive,
     isArchived: Boolean(project?.isArchived),
     isTenantActive: project?.companyStatus === "active",
+    projectAiSettings: project?.projectAiSettings ?? {},
     projectName: project?.projectName ?? null,
   };
 }

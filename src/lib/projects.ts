@@ -146,6 +146,22 @@ export async function updateProjectNameForWorkspace(
   return project ?? null;
 }
 
+export async function updateProjectAiSettingsForWorkspace(
+  projectId: number,
+  workspaceId: number,
+  aiSettings: Record<string, unknown>,
+) {
+  const [project] = await db
+    .update(projects)
+    .set({ aiSettings })
+    .where(
+      and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId)),
+    )
+    .returning();
+
+  return project ?? null;
+}
+
 export async function setProjectArchived(projectId: number, userId: number) {
   const workspace = await resolveWorkspaceForUser(userId);
   return setProjectArchivedForWorkspace(projectId, workspace.id);

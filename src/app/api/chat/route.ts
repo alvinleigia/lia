@@ -76,6 +76,7 @@ export async function POST(req: Request) {
         channel: "project_chat",
         companyName: company.name,
         hasDocuments,
+        projectAiSettings: project.aiSettings,
         projectName: project.name,
       }),
       stopWhen: stepCountIs(2),

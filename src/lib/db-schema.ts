@@ -146,6 +146,10 @@ export const projects = pgTable(
       .notNull()
       .references(() => users.id),
     name: text("name").notNull(),
+    aiSettings: jsonb("ai_settings")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
     isArchived: boolean("is_archived").notNull().default(false),
     archivedAt: timestamp("archived_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
