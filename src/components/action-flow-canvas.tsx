@@ -49,6 +49,13 @@ import {
   updateCanvasStepAction,
 } from "@/app/projects/actions/canvas-actions";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type {
   ActionFlowRouteValidationIssue,
   listActionFlowBranchRules,
@@ -381,7 +388,6 @@ function buildOrderedFallbackEdges(steps: FlowStep[]) {
 }
 
 function buildNodes(input: {
-  actionId: number;
   routeIssues: ActionFlowRouteValidationIssue[];
   steps: FlowStep[];
 }): CanvasNode[] {
@@ -442,13 +448,6 @@ function buildNodes(input: {
                 {step.prompt}
               </p>
             )}
-            <Link
-              className="inline-flex items-center gap-1 text-xs font-medium underline underline-offset-4"
-              href={`/projects/actions/${input.actionId}/steps/${step.id}?from=canvas`}
-            >
-              <Pencil className="h-3 w-3" />
-              Edit step
-            </Link>
           </div>
         ),
       },
@@ -2134,12 +2133,13 @@ export function ActionFlowCanvas({
   const router = useRouter();
   const [feedback, setFeedback] = useState("");
   const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
+  const [isCreateStepDialogOpen, setIsCreateStepDialogOpen] = useState(false);
   const [paletteStepType, setPaletteStepType] = useState("collect_input");
   const [selection, setSelection] = useState<InspectorSelection>(null);
   const [isPending, startTransition] = useTransition();
   const initialNodes = useMemo(
-    () => buildNodes({ actionId, routeIssues, steps }),
-    [actionId, routeIssues, steps],
+    () => buildNodes({ routeIssues, steps }),
+    [routeIssues, steps],
   );
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const edges = useMemo(
@@ -2387,11 +2387,12 @@ export function ActionFlowCanvas({
         </p>
       )}
 
-      <div className="grid min-h-[760px] grid-cols-[260px_minmax(760px,1fr)_380px] gap-3 overflow-x-auto">
+      <div className="grid min-h-[760px] grid-cols-[260px_minmax(760px,1fr)] gap-3 overflow-x-auto">
         <FlowComponentPalette
           onSelectStepType={(stepType) => {
             setPaletteStepType(stepType);
             setSelection(null);
+            setIsCreateStepDialogOpen(true);
           }}
           selectedStepType={paletteStepType}
         />
@@ -2404,12 +2405,14 @@ export function ActionFlowCanvas({
             minZoom={0.25}
             nodes={nodes}
             onConnect={handleConnect}
-            onEdgeClick={(_, edge) =>
-              setSelection({ id: edge.id, type: "edge" })
-            }
-            onNodeClick={(_, node) =>
-              setSelection({ id: node.id, type: "node" })
-            }
+            onEdgeClick={(_, edge) => {
+              setIsCreateStepDialogOpen(false);
+              setSelection({ id: edge.id, type: "edge" });
+            }}
+            onNodeClick={(_, node) => {
+              setIsCreateStepDialogOpen(false);
+              setSelection({ id: node.id, type: "node" });
+            }}
             onNodeDragStop={() => setHasUnsavedLayout(true)}
             onNodesChange={onNodesChange}
             onPaneClick={() => setSelection(null)}
@@ -2426,47 +2429,85 @@ export function ActionFlowCanvas({
               <div className="rounded-md border bg-white px-4 py-3 text-center shadow-sm">
                 <p className="text-sm font-medium">No Steps Yet</p>
                 <p className="text-xs text-muted-foreground">
-                  Create the first block from the inspector.
+                  Choose a block from the left panel to create the first step.
                 </p>
               </div>
             </div>
           )}
         </div>
+      </div>
 
-        <div className="h-[760px] overflow-y-auto rounded-md border bg-white p-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium">Inspector</p>
-              <p className="text-xs text-muted-foreground">
-                {selection ? "Selection" : "Create"}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            </div>
-          </div>
+      <Dialog
+        open={isCreateStepDialogOpen}
+        onOpenChange={setIsCreateStepDialogOpen}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Create Step
+            </DialogTitle>
+            <DialogDescription>
+              Configure the selected block and add it to this flow.
+            </DialogDescription>
+          </DialogHeader>
+          <StepCreateForm
+            branchRules={branchRules}
+            catalogProducts={catalogProducts}
+            defaultStepType={paletteStepType}
+            isPending={isPending}
+            mediaAssets={mediaAssets}
+            onSubmit={createStep}
+            operations={operations}
+            productCatalogs={productCatalogs}
+            projectActions={projectActions}
+            steps={steps}
+          />
+        </DialogContent>
+      </Dialog>
 
-          {!selection && (
-            <div className="space-y-5">
-              <div>
-                <p className="mb-3 flex items-center gap-2 text-sm font-medium">
-                  <Plus className="h-4 w-4" />
-                  Create Step
-                </p>
-                <StepCreateForm
-                  branchRules={branchRules}
-                  catalogProducts={catalogProducts}
-                  defaultStepType={paletteStepType}
-                  isPending={isPending}
-                  mediaAssets={mediaAssets}
-                  onSubmit={createStep}
-                  operations={operations}
-                  productCatalogs={productCatalogs}
-                  projectActions={projectActions}
-                  steps={steps}
-                />
-              </div>
-            </div>
+      <Dialog
+        open={selection !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelection(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedStep ? (
+                <>
+                  <Pencil className="h-5 w-5" />
+                  Edit Step
+                </>
+              ) : selectedBranchRule ? (
+                <>
+                  <GitBranch className="h-5 w-5" />
+                  Edit Branch
+                </>
+              ) : (
+                <>
+                  <Route className="h-5 w-5" />
+                  Route Details
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedStep
+                ? "Update this step or create a branch from it."
+                : selectedBranchRule
+                  ? "Update this conditional route."
+                  : "Review or clear this route."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {isPending && (
+            <p className="flex items-center gap-2 rounded-md bg-gray-50 px-3 py-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving changes
+            </p>
           )}
 
           {selectedStep && (
@@ -2492,27 +2533,21 @@ export function ActionFlowCanvas({
                 </Button>
               </div>
 
-              <div>
-                <p className="mb-3 flex items-center gap-2 text-sm font-medium">
-                  <Pencil className="h-4 w-4" />
-                  Edit Step
-                </p>
-                <StepCreateForm
-                  branchRules={branchRules}
-                  catalogProducts={catalogProducts}
-                  isPending={isPending}
-                  mediaAssets={mediaAssets}
-                  onSubmit={(input) => updateStep(selectedStep.id, input)}
-                  operations={operations}
-                  productCatalogs={productCatalogs}
-                  projectActions={projectActions}
-                  step={selectedStep}
-                  steps={steps}
-                  submitLabel="Save Step"
-                />
-              </div>
+              <StepCreateForm
+                branchRules={branchRules}
+                catalogProducts={catalogProducts}
+                isPending={isPending}
+                mediaAssets={mediaAssets}
+                onSubmit={(input) => updateStep(selectedStep.id, input)}
+                operations={operations}
+                productCatalogs={productCatalogs}
+                projectActions={projectActions}
+                step={selectedStep}
+                steps={steps}
+                submitLabel="Save Step"
+              />
 
-              <div>
+              <div className="border-t pt-5">
                 <p className="mb-3 flex items-center gap-2 text-sm font-medium">
                   <GitBranch className="h-4 w-4" />
                   Create Branch
@@ -2610,8 +2645,8 @@ export function ActionFlowCanvas({
               </p>
             </div>
           )}
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
 
       <RouteValidationPanel routeIssues={routeIssues} />
 
