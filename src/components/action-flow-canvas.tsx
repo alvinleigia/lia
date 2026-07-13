@@ -513,12 +513,18 @@ function CanvasContentBlockPreview({ block }: { block: FlowContentBlock }) {
 }
 
 function CanvasStepNodeContent({
+  catalogProducts,
   issueCount,
+  mediaAssets,
   onQuickSave,
+  productCatalogs,
   step,
 }: {
+  catalogProducts: CatalogProductOption[];
   issueCount: number;
+  mediaAssets: MediaAssetOption[];
   onQuickSave: CanvasStepQuickSave;
+  productCatalogs: ProductCatalogOption[];
   step: FlowStep;
 }) {
   const contentBlocks = getFlowContentBlocks(step.settings);
@@ -547,6 +553,7 @@ function CanvasStepNodeContent({
   const [label, setLabel] = useState(step.label ?? "");
   const [prompt, setPrompt] = useState(step.prompt ?? "");
   const [choices, setChoices] = useState(storedChoices);
+  const [isAddContentOpen, setIsAddContentOpen] = useState(false);
   const [localFeedback, setLocalFeedback] = useState("");
   const [isSaving, startSaving] = useTransition();
   const stepColor = getStepColor(step);
@@ -603,6 +610,52 @@ function CanvasStepNodeContent({
       }
     });
   };
+
+  const addContentBlock = (type: NewFlowContentBlockType) => {
+    const block = createFlowContentBlock({
+      catalogProducts,
+      mediaAssets,
+      productCatalogs,
+      type,
+    });
+
+    if (!block) {
+      setLocalFeedback(
+        type === "media"
+          ? "Upload media before adding this content."
+          : "Add products to a catalog before using this content.",
+      );
+      return;
+    }
+
+    setLocalFeedback("");
+    startSaving(async () => {
+      const result = await onQuickSave(step.id, {
+        choiceDisplayMode: getStepChoiceDisplayMode(step),
+        contentBlocks: JSON.stringify([...contentBlocks, block]),
+        contentBlocksChanged: true,
+        inputType: step.inputType ?? "text",
+        isEnabled: step.isEnabled,
+        isRequired: step.isRequired,
+        label: step.label ?? "",
+        options: storedManualChoices.join("\n"),
+        optionsChanged: false,
+        prompt: step.prompt ?? "",
+      });
+
+      setLocalFeedback(result.message);
+      if (result.ok) {
+        setIsAddContentOpen(false);
+      }
+    });
+  };
+
+  const allowsChoiceContent =
+    step.inputType !== null &&
+    !hasDynamicChoices &&
+    step.stepType !== "choice" &&
+    !choiceBlock &&
+    storedManualChoices.length === 0;
 
   if (isEditing) {
     return (
@@ -799,12 +852,111 @@ function CanvasStepNodeContent({
           {contentBlocks.length - visibleContentBlocks.length === 1 ? "" : "s"}
         </p>
       )}
+      {contentBlocks.length < 10 && (
+        <Popover open={isAddContentOpen} onOpenChange={setIsAddContentOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="nodrag nopan w-full bg-white"
+              disabled={isSaving}
+              onClick={stopCanvasInteraction}
+              onPointerDown={stopCanvasInteraction}
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              Add content
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            side="right"
+            className="nodrag nopan nowheel max-h-80 w-64 overflow-y-auto p-2"
+            onClick={stopCanvasInteraction}
+            onKeyDown={stopCanvasInteraction}
+            onPointerDown={stopCanvasInteraction}
+          >
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => addContentBlock("text")}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
+              >
+                <MessageSquareText className="h-4 w-4" />
+                Text message
+              </button>
+              {allowsChoiceContent && (
+                <button
+                  type="button"
+                  onClick={() => addContentBlock("choice")}
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
+                >
+                  <ListChecks className="h-4 w-4" />
+                  Choice buttons
+                </button>
+              )}
+              {mediaAssets.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => addContentBlock("media")}
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  Media
+                </button>
+              )}
+              {productCatalogs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => addContentBlock("catalog")}
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
+                >
+                  <ShoppingBag className="h-4 w-4" />
+                  Product catalog
+                </button>
+              )}
+              {catalogProducts.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => addContentBlock("single_product")}
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
+                  >
+                    <Package className="h-4 w-4" />
+                    Single product
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addContentBlock("multiple_products")}
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
+                  >
+                    <ShoppingBag className="h-4 w-4" />
+                    Multiple products
+                  </button>
+                </>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+      {localFeedback &&
+        !localFeedback.toLowerCase().includes("updated") &&
+        !isEditing && (
+          <p className="text-xs leading-5 text-red-700">{localFeedback}</p>
+        )}
     </div>
   );
 }
 
 function buildNodes(input: {
+  catalogProducts: CatalogProductOption[];
+  mediaAssets: MediaAssetOption[];
   onQuickSave: CanvasStepQuickSave;
+  productCatalogs: ProductCatalogOption[];
   routeIssues: ActionFlowRouteValidationIssue[];
   steps: FlowStep[];
 }): CanvasNode[] {
@@ -832,8 +984,11 @@ function buildNodes(input: {
       data: {
         label: (
           <CanvasStepNodeContent
+            catalogProducts={input.catalogProducts}
             issueCount={issueCount}
+            mediaAssets={input.mediaAssets}
             onQuickSave={input.onQuickSave}
+            productCatalogs={input.productCatalogs}
             step={step}
           />
         ),
@@ -3589,8 +3744,23 @@ export function ActionFlowCanvas({
     [actionId, router],
   );
   const initialNodes = useMemo(
-    () => buildNodes({ onQuickSave: quickSaveStep, routeIssues, steps }),
-    [quickSaveStep, routeIssues, steps],
+    () =>
+      buildNodes({
+        catalogProducts,
+        mediaAssets,
+        onQuickSave: quickSaveStep,
+        productCatalogs,
+        routeIssues,
+        steps,
+      }),
+    [
+      catalogProducts,
+      mediaAssets,
+      productCatalogs,
+      quickSaveStep,
+      routeIssues,
+      steps,
+    ],
   );
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const edges = useMemo(
