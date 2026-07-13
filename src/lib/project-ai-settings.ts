@@ -82,16 +82,6 @@ export const AI_RESPONSE_PRESET_LABELS: Record<
   sales_enquiry: "Sales Enquiry",
 };
 
-const legacyResponsePresetAliases: Record<
-  string,
-  (typeof AI_RESPONSE_PRESETS)[number]
-> = {
-  booking_enquiry: "booking_appointment",
-  real_estate_enquiry: "sales_enquiry",
-  sales_lead_capture: "lead_capture",
-  support_faq: "customer_support",
-};
-
 function readOptionalText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -104,21 +94,6 @@ function readEnumValue<T extends string>(
   return typeof value === "string" && allowed.has(value)
     ? (value as T)
     : fallback;
-}
-
-function readResponsePreset(value: unknown) {
-  if (typeof value !== "string") {
-    return DEFAULT_PROJECT_AI_SETTINGS.responsePreset;
-  }
-
-  if (responsePresetSet.has(value)) {
-    return value as ProjectAiSettings["responsePreset"];
-  }
-
-  return (
-    legacyResponsePresetAliases[value] ??
-    DEFAULT_PROJECT_AI_SETTINGS.responsePreset
-  );
 }
 
 export function normalizeProjectAiSettings(value: unknown): ProjectAiSettings {
@@ -149,7 +124,11 @@ export function normalizeProjectAiSettings(value: unknown): ProjectAiSettings {
       followUpPolicySet,
       DEFAULT_PROJECT_AI_SETTINGS.followUpPolicy,
     ),
-    responsePreset: readResponsePreset(settings.responsePreset),
+    responsePreset: readEnumValue(
+      settings.responsePreset,
+      responsePresetSet,
+      DEFAULT_PROJECT_AI_SETTINGS.responsePreset,
+    ),
     role: readEnumValue(
       settings.role,
       roleSet,
