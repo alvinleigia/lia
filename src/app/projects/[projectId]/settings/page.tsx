@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { canAccess } from "@/lib/access-control";
 import {
   AI_ANSWER_LENGTHS,
@@ -301,6 +302,17 @@ export default async function ProjectSettingsPage({
                   name="fallbackMessage"
                   defaultValue={aiSettings.fallbackMessage ?? ""}
                   placeholder="Please contact our team for the latest details."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="answerGuidance">Answer Guidance</Label>
+                <Textarea
+                  id="answerGuidance"
+                  name="answerGuidance"
+                  defaultValue={aiSettings.answerGuidance ?? ""}
+                  placeholder="e.g. Keep project answers under 4 lines. For price questions, say current prices are not published and share the sales phone. Do not offer email drafts."
+                  rows={5}
                 />
               </div>
 

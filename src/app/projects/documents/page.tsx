@@ -1,4 +1,4 @@
-import { Files, RefreshCw, Trash2 } from "lucide-react";
+import { Files, ListChecks, RefreshCw, Trash2 } from "lucide-react";
 import {
   deleteAllDocumentsFromUploadAction,
   deleteSourceDocumentFromUploadAction,
@@ -194,6 +194,40 @@ export default async function ProjectDocumentsPage({
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <ListChecks className="h-5 w-5" />
+              Source Quality
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-md border bg-white px-4 py-3">
+                <p className="font-medium">Precise Facts</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Q&A, pricing, contacts, locations, policies, and project facts
+                  work best.
+                </p>
+              </div>
+              <div className="rounded-md border bg-white px-4 py-3">
+                <p className="font-medium">Current Details</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Keep phone numbers, availability, payment plans, and status
+                  notes updated.
+                </p>
+              </div>
+              <div className="rounded-md border bg-white px-4 py-3">
+                <p className="font-medium">Clear Boundaries</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Add restrictions in Project Settings when answers must stay
+                  short or avoid advice.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

@@ -36,6 +36,7 @@ export const AI_RESPONSE_PRESETS = [
 
 export type ProjectAiSettings = {
   answerLength: (typeof AI_ANSWER_LENGTHS)[number];
+  answerGuidance: string | null;
   assistantName: string | null;
   businessName: string | null;
   extraHelpPolicy: (typeof AI_EXTRA_HELP_POLICIES)[number];
@@ -50,6 +51,7 @@ export type ProjectAiSettings = {
 
 export const DEFAULT_PROJECT_AI_SETTINGS: ProjectAiSettings = {
   answerLength: "short",
+  answerGuidance: null,
   assistantName: null,
   businessName: null,
   extraHelpPolicy: "only_when_asked",
@@ -95,6 +97,7 @@ export function normalizeProjectAiSettings(value: unknown): ProjectAiSettings {
       answerLengthSet,
       DEFAULT_PROJECT_AI_SETTINGS.answerLength,
     ),
+    answerGuidance: readOptionalText(settings.answerGuidance),
     assistantName: readOptionalText(settings.assistantName),
     businessName: readOptionalText(settings.businessName),
     extraHelpPolicy: readEnumValue(

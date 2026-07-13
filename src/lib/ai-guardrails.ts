@@ -123,6 +123,12 @@ function getFallbackContactInstruction(settings: ProjectAiSettings) {
   return "Fallback: if verified information is unavailable, say that directly in one short sentence and give the relevant contact only if it is available in source content.";
 }
 
+function formatAnswerGuidanceInstruction(settings: ProjectAiSettings) {
+  return settings.answerGuidance
+    ? `Project answer guidance: ${settings.answerGuidance}`
+    : "Project answer guidance: follow the source content exactly and keep answers scoped to the user's question.";
+}
+
 export function buildKnowledgeChatSystemPrompt({
   channel,
   companyName,
@@ -163,6 +169,7 @@ Answer style:
 - ${getFollowUpInstruction(settings.followUpPolicy)}
 - ${getExtraHelpInstruction(settings.extraHelpPolicy)}
 - ${getFallbackContactInstruction(settings)}
+- ${formatAnswerGuidanceInstruction(settings)}
 - Be precise, direct, and brief by default.
 - Answer the exact question first. Do not provide broad overviews, checklists, investment advice, comparisons, or extra background unless the user asks.
 - Do not offer to draft emails, messages, checklists, comparisons, or follow-up tasks unless the user asks for that.

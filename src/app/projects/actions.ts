@@ -44,6 +44,7 @@ const renameProjectSchema = z.object({
   name: z.string().trim().min(1).max(120),
 });
 const updateProjectAiSettingsSchema = z.object({
+  answerGuidance: z.string().trim().max(800),
   projectId: z.coerce.number().int().positive(),
   assistantName: z.string().trim().max(80),
   businessName: z.string().trim().max(120),
@@ -172,6 +173,7 @@ export async function renameProjectAction(formData: FormData) {
 
 export async function updateProjectAiSettingsAction(formData: FormData) {
   const parsed = updateProjectAiSettingsSchema.safeParse({
+    answerGuidance: formData.get("answerGuidance"),
     projectId: formData.get("projectId"),
     assistantName: formData.get("assistantName"),
     businessName: formData.get("businessName"),
@@ -206,6 +208,7 @@ export async function updateProjectAiSettingsAction(formData: FormData) {
     compactProjectAiSettings(
       normalizeProjectAiSettings({
         answerLength: parsed.data.answerLength,
+        answerGuidance: parsed.data.answerGuidance,
         assistantName: parsed.data.assistantName,
         businessName: parsed.data.businessName,
         extraHelpPolicy: parsed.data.extraHelpPolicy,
