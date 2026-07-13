@@ -28,6 +28,11 @@ import type {
   SelectMediaAsset,
   SelectProductCatalog,
 } from "@/lib/db-schema";
+import {
+  getFlowChoiceContentBlock,
+  getFlowContentBlocks,
+  parseFlowContentBlocks,
+} from "@/lib/flow-content-blocks";
 import { getProjectMediaAsset } from "@/lib/media-assets";
 import { getProjectOperation } from "@/lib/operations";
 import {
@@ -360,6 +365,8 @@ const canvasStepSchema = z
 const canvasStepBasicsSchema = z.object({
   actionId: z.coerce.number().int().positive(),
   choiceDisplayMode: z.enum(["buttons", "list", "text"]),
+  contentBlocks: z.string().max(24000),
+  contentBlocksChanged: z.coerce.boolean(),
   inputType: z.enum(ACTION_STEP_INPUT_TYPES).optional(),
   stepId: z.coerce.number().int().positive(),
   isEnabled: z.coerce.boolean(),
@@ -1325,6 +1332,36 @@ export async function updateCanvasStepBasicsAction(
   }
 
   const isInputStep = isInputStepType(existingStep.stepType);
+  const existingContentBlocks = getFlowContentBlocks(existingStep.settings);
+  let contentBlocks = existingContentBlocks;
+
+  if (parsed.data.contentBlocksChanged) {
+    try {
+      const rawContentBlocks = JSON.parse(parsed.data.contentBlocks) as unknown;
+      const parsedContentBlocks = parseFlowContentBlocks(rawContentBlocks);
+
+      if (
+        !Array.isArray(rawContentBlocks) ||
+        parsedContentBlocks.length !== rawContentBlocks.length
+      ) {
+        return { ok: false, message: "Please check the added content." };
+      }
+
+      contentBlocks = parsedContentBlocks;
+    } catch {
+      return { ok: false, message: "Please check the added content." };
+    }
+  }
+
+  const existingChoiceContent = getFlowChoiceContentBlock(
+    existingStep.settings,
+  );
+  const choiceContent =
+    contentBlocks.find((block) => block.type === "choice") ?? null;
+  if (contentBlocks.filter((block) => block.type === "choice").length > 1) {
+    return { ok: false, message: "A step can contain one choice block." };
+  }
+
   const dynamicSourceType =
     typeof existingStep.settings.sourceType === "string"
       ? existingStep.settings.sourceType
@@ -1335,10 +1372,26 @@ export async function updateCanvasStepBasicsAction(
   const requiresPrompt =
     isInputStep ||
     ["display_result", "handoff", "message"].includes(existingStep.stepType);
-  const options =
-    isInputStep && parsed.data.optionsChanged && !hasDynamicOptions
-      ? parseOptions(parsed.data.options)
-      : existingStep.options;
+  let options = existingStep.options;
+
+  if (choiceContent && (!isInputStep || hasDynamicOptions)) {
+    return {
+      ok: false,
+      message: "Choice content can only be added to a manual answer step.",
+    };
+  }
+
+  if (choiceContent && parsed.data.contentBlocksChanged) {
+    options = parseOptions(choiceContent.options.join("\n"));
+  } else if (
+    existingChoiceContent &&
+    !choiceContent &&
+    parsed.data.contentBlocksChanged
+  ) {
+    options = [];
+  } else if (isInputStep && parsed.data.optionsChanged && !hasDynamicOptions) {
+    options = parseOptions(parsed.data.options);
+  }
 
   if (isInputStep && !parsed.data.label) {
     return { ok: false, message: "Add a step name before saving." };
@@ -1357,10 +1410,23 @@ export async function updateCanvasStepBasicsAction(
   }
 
   const settings = { ...existingStep.settings };
+  if (parsed.data.contentBlocksChanged) {
+    if (contentBlocks.length > 0) {
+      settings.contentBlocks = contentBlocks;
+    } else {
+      delete settings.contentBlocks;
+    }
+  }
+
+  if (choiceContent) {
+    settings.choiceDisplayMode = choiceContent.displayMode;
+  }
+
   if (
-    existingStep.stepType === "choice" ||
-    hasDynamicOptions ||
-    options.length > 0
+    !choiceContent &&
+    (existingStep.stepType === "choice" ||
+      hasDynamicOptions ||
+      options.length > 0)
   ) {
     settings.choiceDisplayMode = parsed.data.choiceDisplayMode;
   }

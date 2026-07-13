@@ -24,7 +24,6 @@ import {
   getActionStepOptions,
   getActionStepProductDisplayLayout,
   getActionStepProducts,
-  getActionStepPrompt,
   getNextActionStepDecision,
   getRunnableActionSteps,
   isActionConfirmationStep,
@@ -66,7 +65,7 @@ function makeFlowMessage(
 function makeStepFlowMessage(step: RuntimeAction["steps"][number]) {
   const isProductMessage = isProductMessageStep(step);
 
-  return makeFlowMessage("assistant", getActionStepPrompt(step), {
+  return makeFlowMessage("assistant", buildActionStepMessage(step), {
     productMode: isProductMessage
       ? step.stepType === "single_product"
         ? "single_product"

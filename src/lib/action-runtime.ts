@@ -3,6 +3,10 @@ import {
   resolveActionDataSourceOptions,
 } from "@/lib/action-data-sources";
 import {
+  formatFlowContentBlockText,
+  getFlowChoiceContentBlock,
+} from "@/lib/flow-content-blocks";
+import {
   formatFlowMediaUploadValue,
   isFlowMediaUploadValue,
 } from "@/lib/flow-media-values";
@@ -448,7 +452,7 @@ export function getActionStepInputType(step: RuntimeActionStep) {
 export function getActionStepOptions(
   step: RuntimeActionStep,
   fields: Record<string, unknown> = {},
-) {
+): RuntimeActionOption[] {
   if (step.stepType === "product_selection") {
     return getProductSelectionOptions(step);
   }
@@ -460,6 +464,14 @@ export function getActionStepOptions(
 
   if (dataSourceOptions.length > 0) {
     return dataSourceOptions;
+  }
+
+  const contentChoice = getFlowChoiceContentBlock(step.settings);
+  if (contentChoice) {
+    return contentChoice.options.map((option) => ({
+      label: option,
+      value: option,
+    }));
   }
 
   if (!Array.isArray(step.options)) {
@@ -542,6 +554,11 @@ function doesProductSelectionOptionMatch(
 }
 
 export function getActionStepChoiceDisplayMode(step: RuntimeActionStep) {
+  const contentChoice = getFlowChoiceContentBlock(step.settings);
+  if (contentChoice) {
+    return contentChoice.displayMode;
+  }
+
   if (step.settings.choiceDisplayMode === "list") {
     return "list";
   }
@@ -643,14 +660,20 @@ export function buildActionStepMessage(step: RuntimeActionStep) {
     return buildActionStepTextFallbackMessage(step);
   }
 
-  return getActionStepPrompt(step);
+  return appendFlowContentBlockText(step, getActionStepPrompt(step));
+}
+
+function appendFlowContentBlockText(step: RuntimeActionStep, text: string) {
+  const additionalText = formatFlowContentBlockText(step.settings);
+
+  return additionalText ? [text, additionalText].join("\n\n") : text;
 }
 
 export function buildActionStepTextFallbackMessage(
   step: RuntimeActionStep,
   fields: Record<string, unknown> = {},
 ) {
-  const prompt = getActionStepPrompt(step);
+  const prompt = appendFlowContentBlockText(step, getActionStepPrompt(step));
   const mediaAsset = step.settings.mediaAsset;
 
   if (step.stepType === "media" && mediaAsset) {

@@ -18,7 +18,9 @@ import {
   FileDown,
   GitBranch,
   Link2,
+  ListChecks,
   Loader2,
+  MessageSquareText,
   Pencil,
   Plus,
   Route,
@@ -57,6 +59,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type {
   ActionFlowRouteValidationIssue,
   listActionFlowBranchRules,
@@ -71,6 +78,10 @@ import {
   listEnabledStepFlowComponents,
   listPlannedFlowComponents,
 } from "@/lib/flow-components";
+import {
+  type FlowContentBlock,
+  getFlowContentBlocks,
+} from "@/lib/flow-content-blocks";
 
 type FlowStep = Awaited<ReturnType<typeof listActionFlowSteps>>[number];
 type BranchRule = Awaited<ReturnType<typeof listActionFlowBranchRules>>[number];
@@ -188,6 +199,8 @@ type CanvasStepInput = {
 
 type CanvasStepBasicsInput = {
   choiceDisplayMode: string;
+  contentBlocks: string;
+  contentBlocksChanged: boolean;
   inputType: string;
   isEnabled: boolean;
   isRequired: boolean;
@@ -686,6 +699,8 @@ function readStepBasicsForm(form: HTMLFormElement): CanvasStepBasicsInput {
 
   return {
     choiceDisplayMode: String(formData.get("choiceDisplayMode") ?? "buttons"),
+    contentBlocks: String(formData.get("contentBlocks") ?? "[]"),
+    contentBlocksChanged: formData.get("contentBlocksChanged") === "true",
     inputType: String(formData.get("inputType") ?? "text"),
     isEnabled: formData.get("isEnabled") === "on",
     isRequired: formData.get("isRequired") === "on",
@@ -1939,6 +1954,258 @@ function StepCreateForm({
   );
 }
 
+function createFlowContentBlock(type: "choice" | "text"): FlowContentBlock {
+  const id = `content-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  return type === "choice"
+    ? {
+        displayMode: "buttons",
+        id,
+        options: ["Option 1"],
+        text: "Choose an option",
+        type: "choice",
+      }
+    : {
+        id,
+        text: "New message",
+        type: "text",
+      };
+}
+
+function FlowContentBlocksEditor({
+  allowsChoice,
+  blocks,
+  onChange,
+}: {
+  allowsChoice: boolean;
+  blocks: FlowContentBlock[];
+  onChange: (blocks: FlowContentBlock[]) => void;
+}) {
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const hasChoiceBlock = blocks.some((block) => block.type === "choice");
+
+  const addBlock = (type: "choice" | "text") => {
+    onChange([...blocks, createFlowContentBlock(type)]);
+    setIsAddMenuOpen(false);
+  };
+
+  return (
+    <div className="space-y-3 rounded-md border p-4">
+      <div>
+        <p className="text-sm font-medium">Additional content</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Add messages or response choices that appear after the main message.
+        </p>
+      </div>
+
+      {blocks.length > 0 && (
+        <div className="space-y-3">
+          {blocks.map((block, blockIndex) => (
+            <div key={block.id} className="rounded-md border bg-gray-50 p-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  {block.type === "choice" ? (
+                    <ListChecks className="h-4 w-4" />
+                  ) : (
+                    <MessageSquareText className="h-4 w-4" />
+                  )}
+                  {block.type === "choice" ? "Choice buttons" : "Text message"}
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  title={`Remove content block ${blockIndex + 1}`}
+                  onClick={() =>
+                    onChange(blocks.filter((item) => item.id !== block.id))
+                  }
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Remove content block</span>
+                </Button>
+              </div>
+
+              <textarea
+                aria-label={
+                  block.type === "choice"
+                    ? "Choice introduction"
+                    : "Additional message"
+                }
+                value={block.text}
+                rows={block.type === "choice" ? 2 : 3}
+                onChange={(event) =>
+                  onChange(
+                    blocks.map((item) =>
+                      item.id === block.id
+                        ? { ...item, text: event.target.value }
+                        : item,
+                    ),
+                  )
+                }
+                className="flex min-h-20 w-full resize-y rounded-md border border-input bg-white px-3 py-2 text-sm leading-5 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              />
+
+              {block.type === "choice" && (
+                <div className="mt-3 space-y-3">
+                  <div className="space-y-2">
+                    {block.options.map((option, optionIndex) => (
+                      <div
+                        key={`${block.id}-option-${optionIndex}`}
+                        className="flex gap-2"
+                      >
+                        <input
+                          aria-label={`Choice ${optionIndex + 1}`}
+                          value={option}
+                          onChange={(event) =>
+                            onChange(
+                              blocks.map((item) => {
+                                if (
+                                  item.id !== block.id ||
+                                  item.type !== "choice"
+                                ) {
+                                  return item;
+                                }
+
+                                const nextOptions = [...item.options];
+                                nextOptions[optionIndex] = event.target.value;
+                                return { ...item, options: nextOptions };
+                              }),
+                            )
+                          }
+                          placeholder={`Choice ${optionIndex + 1}`}
+                          className="flex h-9 min-w-0 flex-1 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={block.options.length === 1}
+                          title={`Remove choice ${optionIndex + 1}`}
+                          onClick={() =>
+                            onChange(
+                              blocks.map((item) =>
+                                item.id === block.id && item.type === "choice"
+                                  ? {
+                                      ...item,
+                                      options: item.options.filter(
+                                        (_, index) => index !== optionIndex,
+                                      ),
+                                    }
+                                  : item,
+                              ),
+                            )
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Remove choice</span>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        onChange(
+                          blocks.map((item) =>
+                            item.id === block.id && item.type === "choice"
+                              ? {
+                                  ...item,
+                                  options: [...item.options, "New choice"],
+                                }
+                              : item,
+                          ),
+                        )
+                      }
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add choice
+                    </Button>
+                    <select
+                      aria-label="Choice display"
+                      value={block.displayMode}
+                      onChange={(event) =>
+                        onChange(
+                          blocks.map((item) =>
+                            item.id === block.id && item.type === "choice"
+                              ? {
+                                  ...item,
+                                  displayMode: event.target.value as
+                                    | "buttons"
+                                    | "list"
+                                    | "text",
+                                }
+                              : item,
+                          ),
+                        )
+                      }
+                      className="flex h-8 rounded-md border border-input bg-white px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    >
+                      <option value="buttons">Buttons</option>
+                      <option value="list">List</option>
+                      <option value="text">Typed response</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {blocks.length < 10 && (
+        <Popover open={isAddMenuOpen} onOpenChange={setIsAddMenuOpen}>
+          <PopoverTrigger asChild>
+            <Button type="button" variant="outline">
+              <Plus className="h-4 w-4" />
+              Add content
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-2">
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => addBlock("text")}
+                className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
+              >
+                <MessageSquareText className="mt-0.5 h-4 w-4" />
+                <span>
+                  <span className="block text-sm font-medium">
+                    Text message
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Add another message to this step.
+                  </span>
+                </span>
+              </button>
+              {allowsChoice && !hasChoiceBlock && (
+                <button
+                  type="button"
+                  onClick={() => addBlock("choice")}
+                  className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
+                >
+                  <ListChecks className="mt-0.5 h-4 w-4" />
+                  <span>
+                    <span className="block text-sm font-medium">
+                      Choice buttons
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      Let the visitor select one response.
+                    </span>
+                  </span>
+                </button>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+    </div>
+  );
+}
+
 function StepBasicsForm({
   isPending,
   onSubmit,
@@ -1957,14 +2224,27 @@ function StepBasicsForm({
     .split("\n")
     .filter((option) => option.trim());
   const [options, setOptions] = useState(storedOptions);
+  const storedContentBlocks = getFlowContentBlocks(step.settings);
+  const [contentBlocks, setContentBlocks] = useState(storedContentBlocks);
+  const hasContentChoice = contentBlocks.some(
+    (block) => block.type === "choice",
+  );
   const showsManualOptions =
-    step.stepType === "choice" || (!hasDynamicOptions && options.length > 0);
+    !hasContentChoice &&
+    (step.stepType === "choice" || (!hasDynamicOptions && options.length > 0));
   const showsChoiceDisplay = hasDynamicOptions || showsManualOptions;
   const allowsAnswerFormat =
     step.stepType === "collect_input" && !hasDynamicOptions;
+  const allowsChoiceContent =
+    collectsAnswer &&
+    !hasDynamicOptions &&
+    step.stepType !== "choice" &&
+    storedOptions.length === 0;
   const optionsChanged =
     options.length !== storedOptions.length ||
     options.some((option, index) => option !== storedOptions[index]);
+  const contentBlocksChanged =
+    JSON.stringify(contentBlocks) !== JSON.stringify(storedContentBlocks);
 
   return (
     <form
@@ -1980,6 +2260,18 @@ function StepBasicsForm({
         type="hidden"
         name="optionsChanged"
         value={String(optionsChanged)}
+        readOnly
+      />
+      <input
+        type="hidden"
+        name="contentBlocks"
+        value={JSON.stringify(contentBlocks)}
+        readOnly
+      />
+      <input
+        type="hidden"
+        name="contentBlocksChanged"
+        value={String(contentBlocksChanged)}
         readOnly
       />
       {!allowsAnswerFormat && (
@@ -2028,6 +2320,12 @@ function StepBasicsForm({
           className="flex min-h-28 w-full resize-y rounded-md border border-input bg-transparent px-3 py-3 text-sm leading-6 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
       </div>
+
+      <FlowContentBlocksEditor
+        allowsChoice={allowsChoiceContent}
+        blocks={contentBlocks}
+        onChange={setContentBlocks}
+      />
 
       {allowsAnswerFormat && (
         <div className="space-y-2">
