@@ -2523,14 +2523,6 @@ export function ActionFlowCanvas({
                   {getFlowComponentLabel(selectedStep.stepType)}
                   {selectedStep.fieldKey ? ` - ${selectedStep.fieldKey}` : ""}
                 </p>
-                <Button asChild className="mt-3" variant="outline">
-                  <Link
-                    href={`/projects/actions/${actionId}/steps/${selectedStep.id}?from=canvas`}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Detailed Editor
-                  </Link>
-                </Button>
               </div>
 
               <StepCreateForm
