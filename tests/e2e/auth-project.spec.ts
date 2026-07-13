@@ -463,6 +463,53 @@ test("company owner can apply a bundled action template", async ({ page }) => {
   await expect(page.getByText("Create Support Ticket").first()).toBeVisible();
 });
 
+test("message step creation keeps technical fields in advanced options", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-message-step-${runId}@example.test`;
+  const projectName = `E2E Message Step Project ${runId}`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Message Step User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  await createProjectFromProjectsPage(page, projectName);
+
+  await page.goto("/projects/actions/new");
+  await page.getByLabel("Action Name").fill(`E2E Message Flow ${runId}`);
+  await page
+    .getByLabel("Description")
+    .fill("Checks the progressive step creation form.");
+  await page.getByLabel("Trigger Phrases").fill("start message test");
+  await page.getByRole("button", { name: "Create Action" }).click();
+
+  await expect(page).toHaveURL(/\/projects\/actions\/\d+\?created=1/);
+  await page.getByRole("link", { name: "Canvas", exact: true }).click();
+  await expect(page).toHaveURL(/\/projects\/actions\/\d+\/canvas/);
+
+  const palette = page.locator("aside").filter({ hasText: "Blocks" });
+  await palette
+    .getByRole("button", { name: /Message/ })
+    .first()
+    .click();
+
+  const dialog = page.getByRole("dialog", { name: "Create Step" });
+  await expect(dialog.getByLabel("Label")).toBeVisible();
+  await expect(
+    dialog.getByRole("textbox", { name: "Message", exact: true }),
+  ).toBeVisible();
+  await expect(dialog.getByLabel("Enabled")).toBeVisible();
+  await expect(dialog.getByPlaceholder("customerName")).not.toBeVisible();
+
+  await dialog.getByRole("button", { name: /Advanced options/ }).click();
+  await expect(dialog.getByPlaceholder("customerName")).toBeVisible();
+  await expect(dialog.getByLabel("Input Type")).toBeVisible();
+  await expect(dialog.getByText("Validation", { exact: true })).toBeVisible();
+});
+
 test("platform admin email lands on the platform dashboard", async ({
   page,
 }) => {
