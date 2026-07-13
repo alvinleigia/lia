@@ -429,7 +429,7 @@ function buildNodes(input: {
       id: String(step.id),
       data: {
         label: (
-          <div className="w-[280px] overflow-hidden rounded-md bg-white p-3 text-left">
+          <div className="w-full text-left">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-[11px] font-medium uppercase leading-none text-muted-foreground">
@@ -473,12 +473,16 @@ function buildNodes(input: {
       },
       sourcePosition: Position.Right,
       style: {
+        backgroundColor: "#ffffff",
         borderColor: issueCount > 0 ? "#d97706" : stepColor,
         borderRadius: 8,
         borderWidth: 1.5,
+        boxSizing: "border-box",
         boxShadow: "0 12px 24px rgba(15, 23, 42, 0.07)",
+        minHeight: 152,
         opacity: step.isEnabled ? 1 : 0.68,
-        padding: 0,
+        padding: 18,
+        width: 320,
       },
       targetPosition: Position.Left,
       type: "default",
