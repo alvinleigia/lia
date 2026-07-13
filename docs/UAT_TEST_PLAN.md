@@ -220,10 +220,15 @@ Exit gate: one company account can manage users and multiple projects.
 
 ## Phase 4 - Documents And Project Chat
 
-Goal: confirm knowledge-base upload, indexing, and RAG chat.
+Goal: confirm knowledge-base upload, indexing, source quality guidance, and RAG chat.
 
 - [ ] Open `/projects/documents`.
   Expected result: Document page loads for selected project.
+  Status:
+  Notes:
+
+- [ ] Review the Source Quality panel.
+  Expected result: Tester sees guidance for precise facts, current details, and clear answer boundaries.
   Status:
   Notes:
 
@@ -271,7 +276,78 @@ What is the price of the Gold Facial package?
 
 Exit gate: selected project can upload knowledge and chat can retrieve it.
 
-## Phase 5 - Flow Builder Basics
+## Phase 5 - AI Answer Controls And Answer Tests
+
+Goal: confirm project-level AI behavior settings produce short, precise, business-safe answers.
+
+- [ ] Open a project settings page.
+  Expected result: AI Behavior section is visible.
+  Status:
+  Notes:
+
+- [ ] Select a Use Case.
+  Expected result: Use case saves and remains selected after reload.
+  Status:
+  Notes:
+
+- [ ] Set answer length to `short`.
+  Expected result: Saved chat answers are concise by default.
+  Status:
+  Notes:
+
+- [ ] Set follow-up policy to `only when required`.
+  Expected result: Assistant does not ask unnecessary follow-up questions.
+  Status:
+  Notes:
+
+- [ ] Set extra help policy to `only when asked` or `never`.
+  Expected result: Assistant does not offer email drafts, checklists, or extra tasks unless allowed.
+  Status:
+  Notes:
+
+- [ ] Add fallback phone/email/message.
+  Expected result: Assistant uses configured fallback details only when verified information is unavailable.
+  Status:
+  Notes:
+
+- [ ] Add Answer Guidance.
+  Expected result: Guidance saves and influences chat answers.
+  Status:
+  Notes:
+
+- [ ] Open `/projects/answer-tests`.
+  Expected result: Answer Tests page loads for selected project.
+  Status:
+  Notes:
+
+- [ ] Review test prompt list.
+  Expected result: Prompts include baseline tests and use-case-specific tests.
+  Status:
+  Notes:
+
+- [ ] Run at least five Answer Test prompts in `/projects/chat`.
+  Expected result: Responses match the expected behavior shown on the Answer Tests page.
+  Status:
+  Notes:
+
+- [ ] Complete the Evaluation Checklist manually.
+  Expected result: Each response is checked for directness, brevity, grounding, no internal terms, no unasked extras, and safe boundaries.
+  Status:
+  Notes:
+
+Suggested Ewissen-style checks:
+
+```text
+Where is the company based?
+Tell me about Bliss Aqua plots.
+What is the price of Bliss Aqua plots?
+Can you guarantee this is a good investment?
+How can I contact your sales team?
+```
+
+Exit gate: answer tests pass for the selected project without long, generic, or unsafe responses.
+
+## Phase 6 - Flow Builder Basics
 
 Goal: confirm actions and visual flow setup are usable.
 
@@ -327,7 +403,7 @@ Goal: confirm actions and visual flow setup are usable.
 
 Exit gate: tester can create or modify a basic flow without developer help.
 
-## Phase 6 - Flow Runtime And Submissions
+## Phase 7 - Flow Runtime And Submissions
 
 Goal: confirm flows run in project chat and save submissions.
 
@@ -383,7 +459,7 @@ Goal: confirm flows run in project chat and save submissions.
 
 Exit gate: project chat can complete an action flow and create a submission.
 
-## Phase 7 - Website Widget
+## Phase 8 - Website Widget
 
 Goal: confirm embeddable widget setup and runtime.
 
@@ -439,7 +515,7 @@ Goal: confirm embeddable widget setup and runtime.
 
 Exit gate: widget works as a customer-facing channel for the selected project.
 
-## Phase 8 - Media And Product Catalog
+## Phase 9 - Media And Product Catalog
 
 Goal: confirm reusable media and catalog blocks are ready for flows.
 
@@ -490,7 +566,7 @@ Goal: confirm reusable media and catalog blocks are ready for flows.
 
 Exit gate: project-scoped media and catalog data can be used in flows.
 
-## Phase 9 - Operations And Handoff
+## Phase 10 - Operations And Handoff
 
 Goal: confirm integrations and manual review workflows.
 
@@ -546,7 +622,7 @@ Goal: confirm integrations and manual review workflows.
 
 Exit gate: operations and handoff queues are usable for internal follow-up.
 
-## Phase 10 - WhatsApp Channel Readiness
+## Phase 11 - WhatsApp Channel Readiness
 
 Goal: confirm WhatsApp setup screens and shared-flow readiness. Skip live sends
 if Meta test credentials are not available.
@@ -583,7 +659,7 @@ if Meta test credentials are not available.
 
 Exit gate: WhatsApp can be configured later without changing the flow builder model.
 
-## Phase 11 - Analytics, Audit, And Tenant Safety
+## Phase 12 - Analytics, Audit, And Tenant Safety
 
 Goal: confirm admin visibility and tenant boundaries.
 
@@ -631,11 +707,11 @@ npm run test:e2e
 
 Exit gate: testers cannot see or mutate another tenant's data.
 
-## Phase 12 - Final Regression And Sign-Off
+## Phase 13 - Final Regression And Sign-Off
 
 Goal: confirm the UAT build is acceptable for the next release decision.
 
-- [ ] Run smoke test across phases 1-7.
+- [ ] Run smoke test across phases 1-8.
   Expected result: No critical workflow is blocked.
   Status:
   Notes:
