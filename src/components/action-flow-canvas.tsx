@@ -17,14 +17,17 @@ import {
   CheckCircle2,
   FileDown,
   GitBranch,
+  ImageIcon,
   Link2,
   ListChecks,
   Loader2,
   MessageSquareText,
+  Package,
   Pencil,
   Plus,
   Route,
   Save,
+  ShoppingBag,
   Trash2,
   Unlink,
   Wand2,
@@ -428,6 +431,78 @@ function buildOrderedFallbackEdges(steps: FlowStep[]) {
   return edges;
 }
 
+function CanvasContentBlockPreview({ block }: { block: FlowContentBlock }) {
+  if (block.type === "choice") {
+    return (
+      <div className="space-y-2 rounded-md border bg-gray-50 p-2.5">
+        <p className="line-clamp-2 break-words text-xs leading-snug text-gray-700">
+          {block.text}
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {block.options.slice(0, 3).map((option, optionIndex) => (
+            <span
+              key={`${block.id}-${option}-${optionIndex}`}
+              className="max-w-full truncate rounded-md border bg-white px-2 py-1 text-[11px] leading-none text-gray-700"
+            >
+              {option}
+            </span>
+          ))}
+          {block.options.length > 3 && (
+            <span className="rounded-md bg-gray-200 px-2 py-1 text-[11px] leading-none text-gray-600">
+              +{block.options.length - 3}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (block.type === "media") {
+    return (
+      <div className="flex items-center gap-2.5 rounded-md border bg-gray-50 p-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-gray-600">
+          <ImageIcon className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-xs font-medium text-gray-800">
+            {block.media?.originalName ?? "Media"}
+          </p>
+          {block.text && (
+            <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+              {block.text}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (block.type === "catalog") {
+    return (
+      <div className="flex items-center gap-2.5 rounded-md border bg-gray-50 p-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-gray-600">
+          <ShoppingBag className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-xs font-medium text-gray-800">
+            {block.catalog?.name ?? "Product catalog"}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {block.products.length} product
+            {block.products.length === 1 ? "" : "s"}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <p className="line-clamp-2 break-words rounded-md border bg-gray-50 p-2.5 text-xs leading-snug text-gray-700">
+      {block.text}
+    </p>
+  );
+}
+
 function buildNodes(input: {
   routeIssues: ActionFlowRouteValidationIssue[];
   steps: FlowStep[];
@@ -449,6 +524,8 @@ function buildNodes(input: {
     const column = index % 2;
     const stepColor = getStepColor(step);
     const savedPosition = getCanvasPosition(step.settings);
+    const contentBlocks = getFlowContentBlocks(step.settings);
+    const visibleContentBlocks = contentBlocks.slice(0, 2);
 
     return {
       id: String(step.id),
@@ -469,35 +546,40 @@ function buildNodes(input: {
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               )}
             </div>
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <span
-                  className="max-w-full truncate rounded-full px-2.5 py-1 font-medium leading-none text-white"
-                  style={{ backgroundColor: stepColor }}
-                >
-                  {formatLabel(step.stepType)}
-                </span>
-                <span className="rounded-full bg-gray-100 px-2.5 py-1 leading-none text-gray-700">
-                  {step.isEnabled ? "Enabled" : "Disabled"}
-                </span>
-              </div>
-              {step.fieldKey && (
-                <span className="inline-flex max-w-full truncate rounded-full bg-gray-100 px-2.5 py-1 text-xs leading-none text-gray-700">
-                  {step.fieldKey}
-                </span>
-              )}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span
+                className="max-w-full truncate rounded-full px-2.5 py-1 font-medium leading-none text-white"
+                style={{ backgroundColor: stepColor }}
+              >
+                {formatLabel(step.stepType)}
+              </span>
+              <span className="rounded-full bg-gray-100 px-2.5 py-1 leading-none text-gray-700">
+                {step.isEnabled ? "Enabled" : "Disabled"}
+              </span>
             </div>
             {step.prompt && (
-              <p className="line-clamp-2 break-words rounded-md bg-gray-50 px-2.5 py-2 text-xs leading-snug text-muted-foreground">
+              <p className="line-clamp-3 break-words rounded-md border bg-white p-2.5 text-xs leading-snug text-gray-700">
                 {step.prompt}
+              </p>
+            )}
+            {visibleContentBlocks.map((block) => (
+              <CanvasContentBlockPreview block={block} key={block.id} />
+            ))}
+            {contentBlocks.length > visibleContentBlocks.length && (
+              <p className="text-[11px] font-medium text-muted-foreground">
+                +{contentBlocks.length - visibleContentBlocks.length} more
+                content block
+                {contentBlocks.length - visibleContentBlocks.length === 1
+                  ? ""
+                  : "s"}
               </p>
             )}
           </div>
         ),
       },
       position: savedPosition ?? {
-        x: column * 460,
-        y: row * 230,
+        x: column * 500,
+        y: row * 340,
       },
       sourcePosition: Position.Right,
       style: {
@@ -507,10 +589,10 @@ function buildNodes(input: {
         borderWidth: 1.5,
         boxSizing: "border-box",
         boxShadow: "0 12px 24px rgba(15, 23, 42, 0.07)",
-        minHeight: 168,
+        minHeight: 160,
         opacity: step.isEnabled ? 1 : 0.68,
         padding: 18,
-        width: 328,
+        width: 344,
       },
       targetPosition: Position.Left,
       type: "default",
@@ -1954,38 +2036,123 @@ function StepCreateForm({
   );
 }
 
-function createFlowContentBlock(type: "choice" | "text"): FlowContentBlock {
+type NewFlowContentBlockType =
+  | "catalog"
+  | "choice"
+  | "media"
+  | "multiple_products"
+  | "single_product"
+  | "text";
+
+function createFlowContentBlock(input: {
+  catalogProducts: CatalogProductOption[];
+  mediaAssets: MediaAssetOption[];
+  productCatalogs: ProductCatalogOption[];
+  type: NewFlowContentBlockType;
+}): FlowContentBlock | null {
   const id = `content-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-  return type === "choice"
-    ? {
-        displayMode: "buttons",
-        id,
-        options: ["Option 1"],
-        text: "Choose an option",
-        type: "choice",
-      }
-    : {
-        id,
-        text: "New message",
-        type: "text",
-      };
+  if (input.type === "choice") {
+    return {
+      displayMode: "buttons",
+      id,
+      options: ["Option 1"],
+      text: "Choose an option",
+      type: "choice",
+    };
+  }
+
+  if (input.type === "text") {
+    return {
+      id,
+      text: "New message",
+      type: "text",
+    };
+  }
+
+  if (input.type === "media") {
+    const mediaAsset = input.mediaAssets[0];
+    return mediaAsset
+      ? {
+          id,
+          media: null,
+          mediaAssetId: mediaAsset.id,
+          text: "",
+          type: "media",
+        }
+      : null;
+  }
+
+  const defaultCatalogId =
+    input.type === "catalog"
+      ? input.productCatalogs[0]?.id
+      : input.catalogProducts[0]?.catalogId;
+  const catalog = input.productCatalogs.find(
+    (item) => item.id === defaultCatalogId,
+  );
+  if (!catalog) {
+    return null;
+  }
+
+  const catalogProductIds = input.catalogProducts
+    .filter((product) => product.catalogId === catalog.id)
+    .map((product) => product.id);
+  const displayMode =
+    input.type === "single_product"
+      ? "single_product"
+      : input.type === "multiple_products"
+        ? "multiple_products"
+        : "catalog";
+
+  return {
+    catalog: null,
+    catalogId: catalog.id,
+    displayMode,
+    id,
+    layout: "grid",
+    productIds:
+      displayMode === "catalog"
+        ? []
+        : displayMode === "single_product"
+          ? catalogProductIds.slice(0, 1)
+          : catalogProductIds.slice(0, 3),
+    products: [],
+    text: "Here are some products you may like.",
+    type: "catalog",
+  };
 }
 
 function FlowContentBlocksEditor({
   allowsChoice,
   blocks,
+  catalogProducts,
+  mediaAssets,
   onChange,
+  productCatalogs,
 }: {
   allowsChoice: boolean;
   blocks: FlowContentBlock[];
+  catalogProducts: CatalogProductOption[];
+  mediaAssets: MediaAssetOption[];
   onChange: (blocks: FlowContentBlock[]) => void;
+  productCatalogs: ProductCatalogOption[];
 }) {
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const hasChoiceBlock = blocks.some((block) => block.type === "choice");
 
-  const addBlock = (type: "choice" | "text") => {
-    onChange([...blocks, createFlowContentBlock(type)]);
+  const addBlock = (type: NewFlowContentBlockType) => {
+    const block = createFlowContentBlock({
+      catalogProducts,
+      mediaAssets,
+      productCatalogs,
+      type,
+    });
+
+    if (!block) {
+      return;
+    }
+
+    onChange([...blocks, block]);
     setIsAddMenuOpen(false);
   };
 
@@ -1994,7 +2161,7 @@ function FlowContentBlocksEditor({
       <div>
         <p className="text-sm font-medium">Additional content</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Add messages or response choices that appear after the main message.
+          Add messages, choices, media, or products after the main message.
         </p>
       </div>
 
@@ -2004,12 +2171,25 @@ function FlowContentBlocksEditor({
             <div key={block.id} className="rounded-md border bg-gray-50 p-3">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="flex items-center gap-2 text-sm font-medium">
-                  {block.type === "choice" ? (
+                  {block.type === "choice" && (
                     <ListChecks className="h-4 w-4" />
-                  ) : (
+                  )}
+                  {block.type === "text" && (
                     <MessageSquareText className="h-4 w-4" />
                   )}
-                  {block.type === "choice" ? "Choice buttons" : "Text message"}
+                  {block.type === "media" && <ImageIcon className="h-4 w-4" />}
+                  {block.type === "catalog" && (
+                    <ShoppingBag className="h-4 w-4" />
+                  )}
+                  {block.type === "choice" && "Choice buttons"}
+                  {block.type === "text" && "Text message"}
+                  {block.type === "media" && "Media"}
+                  {block.type === "catalog" &&
+                    (block.displayMode === "single_product"
+                      ? "Single product"
+                      : block.displayMode === "multiple_products"
+                        ? "Multiple products"
+                        : "Product catalog")}
                 </p>
                 <Button
                   type="button"
@@ -2029,10 +2209,21 @@ function FlowContentBlocksEditor({
                 aria-label={
                   block.type === "choice"
                     ? "Choice introduction"
-                    : "Additional message"
+                    : block.type === "media"
+                      ? "Media caption"
+                      : block.type === "catalog"
+                        ? "Product introduction"
+                        : "Additional message"
                 }
                 value={block.text}
-                rows={block.type === "choice" ? 2 : 3}
+                rows={block.type === "text" ? 3 : 2}
+                placeholder={
+                  block.type === "media"
+                    ? "Optional caption"
+                    : block.type === "catalog"
+                      ? "Introduce these products"
+                      : undefined
+                }
                 onChange={(event) =>
                   onChange(
                     blocks.map((item) =>
@@ -2044,6 +2235,175 @@ function FlowContentBlocksEditor({
                 }
                 className="flex min-h-20 w-full resize-y rounded-md border border-input bg-white px-3 py-2 text-sm leading-5 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               />
+
+              {block.type === "media" && (
+                <div className="mt-3 space-y-2">
+                  <label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor={`content-media-${block.id}`}
+                  >
+                    Choose media
+                  </label>
+                  <select
+                    id={`content-media-${block.id}`}
+                    value={block.mediaAssetId}
+                    onChange={(event) =>
+                      onChange(
+                        blocks.map((item) =>
+                          item.id === block.id && item.type === "media"
+                            ? {
+                                ...item,
+                                media: null,
+                                mediaAssetId: Number(event.target.value),
+                              }
+                            : item,
+                        ),
+                      )
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    {mediaAssets.map((asset) => (
+                      <option key={asset.id} value={asset.id}>
+                        {asset.label} ({asset.mediaType})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {block.type === "catalog" && (
+                <div className="mt-3 space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label
+                        className="text-xs font-medium text-muted-foreground"
+                        htmlFor={`content-catalog-${block.id}`}
+                      >
+                        Product catalog
+                      </label>
+                      <select
+                        id={`content-catalog-${block.id}`}
+                        value={block.catalogId}
+                        onChange={(event) => {
+                          const catalogId = Number(event.target.value);
+                          const availableProductIds = catalogProducts
+                            .filter(
+                              (product) => product.catalogId === catalogId,
+                            )
+                            .map((product) => product.id);
+
+                          onChange(
+                            blocks.map((item) =>
+                              item.id === block.id && item.type === "catalog"
+                                ? {
+                                    ...item,
+                                    catalog: null,
+                                    catalogId,
+                                    productIds:
+                                      item.displayMode === "catalog"
+                                        ? []
+                                        : item.displayMode === "single_product"
+                                          ? availableProductIds.slice(0, 1)
+                                          : availableProductIds.slice(0, 3),
+                                    products: [],
+                                  }
+                                : item,
+                            ),
+                          );
+                        }}
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      >
+                        {productCatalogs.map((catalog) => (
+                          <option key={catalog.id} value={catalog.id}>
+                            {catalog.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label
+                        className="text-xs font-medium text-muted-foreground"
+                        htmlFor={`content-layout-${block.id}`}
+                      >
+                        Card layout
+                      </label>
+                      <select
+                        id={`content-layout-${block.id}`}
+                        value={block.layout}
+                        onChange={(event) =>
+                          onChange(
+                            blocks.map((item) =>
+                              item.id === block.id && item.type === "catalog"
+                                ? {
+                                    ...item,
+                                    layout: event.target.value as
+                                      | "featured"
+                                      | "grid"
+                                      | "list",
+                                  }
+                                : item,
+                            ),
+                          )
+                        }
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      >
+                        <option value="grid">Grid</option>
+                        <option value="list">List</option>
+                        <option value="featured">Featured</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {block.displayMode !== "catalog" && (
+                    <div className="space-y-2">
+                      <label
+                        className="text-xs font-medium text-muted-foreground"
+                        htmlFor={`content-products-${block.id}`}
+                      >
+                        {block.displayMode === "single_product"
+                          ? "Choose product"
+                          : "Choose products"}
+                      </label>
+                      <select
+                        id={`content-products-${block.id}`}
+                        multiple={block.displayMode === "multiple_products"}
+                        size={block.displayMode === "multiple_products" ? 4 : 1}
+                        value={
+                          block.displayMode === "multiple_products"
+                            ? block.productIds.map(String)
+                            : String(block.productIds[0] ?? "")
+                        }
+                        onChange={(event) => {
+                          const productIds = Array.from(
+                            event.target.selectedOptions,
+                          ).map((option) => Number(option.value));
+
+                          onChange(
+                            blocks.map((item) =>
+                              item.id === block.id && item.type === "catalog"
+                                ? { ...item, productIds, products: [] }
+                                : item,
+                            ),
+                          );
+                        }}
+                        className="flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      >
+                        {catalogProducts
+                          .filter(
+                            (product) => product.catalogId === block.catalogId,
+                          )
+                          .map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name}
+                              {product.sku ? ` (${product.sku})` : ""}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {block.type === "choice" && (
                 <div className="mt-3 space-y-3">
@@ -2164,7 +2524,10 @@ function FlowContentBlocksEditor({
               Add content
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-64 p-2">
+          <PopoverContent
+            align="start"
+            className="max-h-96 w-72 overflow-y-auto p-2"
+          >
             <div className="space-y-1">
               <button
                 type="button"
@@ -2198,6 +2561,72 @@ function FlowContentBlocksEditor({
                   </span>
                 </button>
               )}
+              {mediaAssets.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => addBlock("media")}
+                  className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
+                >
+                  <ImageIcon className="mt-0.5 h-4 w-4" />
+                  <span>
+                    <span className="block text-sm font-medium">Media</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Add an image, video, audio clip, or file.
+                    </span>
+                  </span>
+                </button>
+              )}
+              {productCatalogs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => addBlock("catalog")}
+                  className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
+                >
+                  <ShoppingBag className="mt-0.5 h-4 w-4" />
+                  <span>
+                    <span className="block text-sm font-medium">
+                      Product catalog
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      Show all active products from a catalog.
+                    </span>
+                  </span>
+                </button>
+              )}
+              {catalogProducts.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => addBlock("single_product")}
+                    className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
+                  >
+                    <Package className="mt-0.5 h-4 w-4" />
+                    <span>
+                      <span className="block text-sm font-medium">
+                        Single product
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Highlight one product.
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addBlock("multiple_products")}
+                    className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
+                  >
+                    <ShoppingBag className="mt-0.5 h-4 w-4" />
+                    <span>
+                      <span className="block text-sm font-medium">
+                        Multiple products
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Show a selected group of products.
+                      </span>
+                    </span>
+                  </button>
+                </>
+              )}
             </div>
           </PopoverContent>
         </Popover>
@@ -2207,12 +2636,18 @@ function FlowContentBlocksEditor({
 }
 
 function StepBasicsForm({
+  catalogProducts,
   isPending,
+  mediaAssets,
   onSubmit,
+  productCatalogs,
   step,
 }: {
+  catalogProducts: CatalogProductOption[];
   isPending: boolean;
+  mediaAssets: MediaAssetOption[];
   onSubmit: (input: CanvasStepBasicsInput) => void;
+  productCatalogs: ProductCatalogOption[];
   step: FlowStep;
 }) {
   const collectsAnswer = step.inputType !== null;
@@ -2324,7 +2759,10 @@ function StepBasicsForm({
       <FlowContentBlocksEditor
         allowsChoice={allowsChoiceContent}
         blocks={contentBlocks}
+        catalogProducts={catalogProducts}
+        mediaAssets={mediaAssets}
         onChange={setContentBlocks}
+        productCatalogs={productCatalogs}
       />
 
       {allowsAnswerFormat && (
@@ -3144,8 +3582,11 @@ export function ActionFlowCanvas({
               </div>
 
               <StepBasicsForm
+                catalogProducts={catalogProducts}
                 isPending={isPending}
+                mediaAssets={mediaAssets}
                 onSubmit={(input) => updateStepBasics(selectedStep.id, input)}
+                productCatalogs={productCatalogs}
                 step={selectedStep}
               />
 

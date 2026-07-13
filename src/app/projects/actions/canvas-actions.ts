@@ -29,6 +29,7 @@ import type {
   SelectProductCatalog,
 } from "@/lib/db-schema";
 import {
+  type FlowContentBlock,
   getFlowChoiceContentBlock,
   getFlowContentBlocks,
   parseFlowContentBlocks,
@@ -365,7 +366,7 @@ const canvasStepSchema = z
 const canvasStepBasicsSchema = z.object({
   actionId: z.coerce.number().int().positive(),
   choiceDisplayMode: z.enum(["buttons", "list", "text"]),
-  contentBlocks: z.string().max(24000),
+  contentBlocks: z.string().max(100000),
   contentBlocksChanged: z.coerce.boolean(),
   inputType: z.enum(ACTION_STEP_INPUT_TYPES).optional(),
   stepId: z.coerce.number().int().positive(),
@@ -930,6 +931,101 @@ async function requireCanvasProductConfig(input: {
   };
 }
 
+async function hydrateCanvasContentBlocks(input: {
+  blocks: FlowContentBlock[];
+  projectId: number;
+}) {
+  return Promise.all(
+    input.blocks.map(async (block): Promise<FlowContentBlock> => {
+      if (block.type === "media") {
+        const mediaAsset = await getProjectMediaAsset(
+          input.projectId,
+          block.mediaAssetId,
+        );
+
+        if (!mediaAsset) {
+          throw new Error("Selected media is no longer available.");
+        }
+
+        return {
+          ...block,
+          media: {
+            id: mediaAsset.id,
+            mediaType: mediaAsset.mediaType,
+            mimeType: mediaAsset.mimeType,
+            originalName: mediaAsset.originalName,
+            publicPath: mediaAsset.publicPath,
+          },
+        };
+      }
+
+      if (block.type !== "catalog") {
+        return block;
+      }
+
+      const catalog = await getProjectCatalog(input.projectId, block.catalogId);
+      if (!catalog) {
+        throw new Error("Selected product catalog is no longer available.");
+      }
+
+      const requestedProductIds = Array.from(new Set(block.productIds));
+      const selectedProducts =
+        requestedProductIds.length > 0
+          ? await listProjectCatalogProductsByIds(
+              input.projectId,
+              requestedProductIds,
+            )
+          : await listProjectCatalogProductsForCatalog(
+              input.projectId,
+              catalog.id,
+            );
+      const products = selectedProducts
+        .filter((product) => product.catalogId === catalog.id)
+        .slice(0, 50);
+
+      if (
+        requestedProductIds.length > 0 &&
+        products.length !== requestedProductIds.length
+      ) {
+        throw new Error("One or more selected products are unavailable.");
+      }
+
+      if (block.displayMode === "single_product" && products.length !== 1) {
+        throw new Error("Choose one product for the single product block.");
+      }
+
+      if (block.displayMode === "multiple_products" && products.length === 0) {
+        throw new Error("Choose at least one product for this block.");
+      }
+
+      return {
+        ...block,
+        catalog: {
+          externalId: catalog.externalId,
+          id: catalog.id,
+          name: catalog.name,
+          providerType: catalog.providerType,
+        },
+        productIds: products.map((product) => product.id),
+        products: products.map((product) => ({
+          currency: product.currency,
+          description: product.description,
+          id: product.id,
+          imageUrl: product.imageUrl,
+          name: product.name,
+          priceAmount: product.priceAmount,
+          productUrl: product.productUrl,
+          sku: product.sku,
+          whatsappRetailerId:
+            typeof product.metadata.whatsappRetailerId === "string"
+              ? product.metadata.whatsappRetailerId
+              : null,
+        })),
+      };
+    }),
+  );
+}
+
 export async function createCanvasStepAction(
   input: unknown,
 ): Promise<CanvasRouteActionResult> {
@@ -1347,9 +1443,18 @@ export async function updateCanvasStepBasicsAction(
         return { ok: false, message: "Please check the added content." };
       }
 
-      contentBlocks = parsedContentBlocks;
-    } catch {
-      return { ok: false, message: "Please check the added content." };
+      contentBlocks = await hydrateCanvasContentBlocks({
+        blocks: parsedContentBlocks,
+        projectId: project.id,
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Please check the added content.",
+      };
     }
   }
 

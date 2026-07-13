@@ -11,7 +11,7 @@ import {
 } from "@/lib/action-flows";
 import {
   buildActionReviewSummary,
-  buildActionStepMessage,
+  buildActionStepChannelMessage,
   buildActionStepTextFallbackMessage,
   buildInvalidStepAnswerMessage,
   buildStepAnswerResult,
@@ -46,6 +46,10 @@ import {
 import { executeContactMutationStep } from "@/lib/contact-flow-mutations";
 import { setContactAttribute } from "@/lib/contacts";
 import type { SelectActionSubmission } from "@/lib/db-schema";
+import {
+  getFlowCatalogContentBlocks,
+  getFlowMediaContentBlocks,
+} from "@/lib/flow-content-blocks";
 import {
   type FlowMediaUploadValue,
   formatFlowMediaUploadValue,
@@ -145,7 +149,7 @@ function buildRuntimeReplyForStep(
   step: RuntimeActionStep,
   fields: Record<string, unknown>,
 ) {
-  const prompt = buildActionStepMessage(step);
+  const prompt = buildActionStepChannelMessage(step);
   const options = isActionInputStep(step)
     ? getActionStepOptions(step, fields)
     : [];
@@ -187,8 +191,8 @@ function buildRuntimeReplyForStep(
     });
   }
 
-  if (step.stepType !== "choice" || options.length === 0) {
-    return createTextReply(formatStepPrompt(step, fields));
+  if (!isActionInputStep(step) || options.length === 0) {
+    return createTextReply(prompt);
   }
 
   const replyOptions: RuntimeReplyOption[] = options.map((option, index) => ({
@@ -203,6 +207,40 @@ function buildRuntimeReplyForStep(
     options: replyOptions,
     text: prompt,
   });
+}
+
+function buildRuntimeRepliesForStep(
+  step: RuntimeActionStep,
+  fields: Record<string, unknown>,
+) {
+  const primaryReply = buildRuntimeReplyForStep(step, fields);
+  const contentReplies: RuntimeReply[] = [];
+
+  for (const block of getFlowMediaContentBlocks(step.settings)) {
+    if (block.media) {
+      contentReplies.push(
+        createMediaReply({ media: block.media, text: block.text }),
+      );
+    }
+  }
+
+  for (const block of getFlowCatalogContentBlocks(step.settings)) {
+    if (block.products.length > 0) {
+      contentReplies.push(
+        createProductReply({
+          catalog: block.catalog,
+          mode: block.displayMode,
+          products: block.products,
+          text: block.text || "View products",
+        }),
+      );
+    }
+  }
+
+  return isActionInputStep(step) &&
+    getActionStepOptions(step, fields).length > 0
+    ? [...contentReplies, primaryReply]
+    : [primaryReply, ...contentReplies];
 }
 
 async function submitFlow(input: {
@@ -572,7 +610,7 @@ async function connectFlow(input: {
 
   return {
     replies: [
-      buildRuntimeReplyForStep(input.step, input.submission.fields),
+      ...buildRuntimeRepliesForStep(input.step, input.submission.fields),
       ...nextResult.replies,
     ],
   };
@@ -612,7 +650,7 @@ async function advanceFlowToNextStep(input: {
     visitedStepIds.add(step.id);
 
     if (step.stepType === "handoff") {
-      replies.push(buildRuntimeReplyForStep(step, submission.fields));
+      replies.push(...buildRuntimeRepliesForStep(step, submission.fields));
       await requestHumanHandoff({
         action: input.action,
         projectId: input.projectId,
@@ -634,7 +672,7 @@ async function advanceFlowToNextStep(input: {
     }
 
     if (isActionMessageStep(step)) {
-      replies.push(buildRuntimeReplyForStep(step, submission.fields));
+      replies.push(...buildRuntimeRepliesForStep(step, submission.fields));
       const decision = getNextActionStepDecision(
         input.action,
         step,
@@ -753,7 +791,7 @@ async function advanceFlowToNextStep(input: {
     }
 
     if (isActionSubmitStep(step)) {
-      replies.push(buildRuntimeReplyForStep(step, submission.fields));
+      replies.push(...buildRuntimeRepliesForStep(step, submission.fields));
       const result = await submitFlow({
         contactId: input.contactId ?? getSubmissionContactId(submission),
         projectId: input.projectId,
@@ -792,7 +830,7 @@ async function advanceFlowToNextStep(input: {
         fields: submission.fields,
       });
       submission = updatedSubmission ?? submission;
-      replies.push(buildRuntimeReplyForStep(step, submission.fields));
+      replies.push(...buildRuntimeRepliesForStep(step, submission.fields));
       return { replies };
     }
 

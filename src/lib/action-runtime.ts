@@ -4,7 +4,10 @@ import {
 } from "@/lib/action-data-sources";
 import {
   formatFlowContentBlockText,
+  formatFlowInteractiveContentBlockText,
+  getFlowCatalogContentBlocks,
   getFlowChoiceContentBlock,
+  getFlowMediaContentBlocks,
 } from "@/lib/flow-content-blocks";
 import {
   formatFlowMediaUploadValue,
@@ -16,7 +19,10 @@ import {
   normalizeFlowAddressValue,
   normalizeFlowLocationValue,
 } from "@/lib/flow-structured-values";
-import type { RuntimeReplyProduct } from "@/lib/runtime-replies";
+import type {
+  RuntimeReplyMedia,
+  RuntimeReplyProduct,
+} from "@/lib/runtime-replies";
 
 export type ProductDisplayLayout = "featured" | "grid" | "list";
 
@@ -76,11 +82,20 @@ export type RuntimeAction = {
 
 export type FlowChatMessage = {
   id: string;
+  media?: RuntimeReplyMedia[];
   productLayout?: ProductDisplayLayout;
+  productGroups?: FlowChatProductGroup[];
   products?: RuntimeReplyProduct[];
   productMode?: "catalog" | "multiple_products" | "single_product";
   role: "assistant" | "user";
   text: string;
+};
+
+export type FlowChatProductGroup = {
+  id: string;
+  layout: ProductDisplayLayout;
+  mode: "catalog" | "multiple_products" | "single_product";
+  products: RuntimeReplyProduct[];
 };
 
 export type ActiveActionFlow = {
@@ -580,6 +595,25 @@ export function getActionStepProductDisplayLayout(
     : "grid";
 }
 
+export function getActionStepContentMedia(step: RuntimeActionStep) {
+  return getFlowMediaContentBlocks(step.settings)
+    .map((block) => block.media)
+    .filter((media): media is RuntimeReplyMedia => media !== null);
+}
+
+export function getActionStepContentProductGroups(
+  step: RuntimeActionStep,
+): FlowChatProductGroup[] {
+  return getFlowCatalogContentBlocks(step.settings)
+    .filter((block) => block.products.length > 0)
+    .map((block) => ({
+      id: block.id,
+      layout: block.layout,
+      mode: block.displayMode,
+      products: block.products,
+    }));
+}
+
 export function getActionStepProductSelectionAllowQuantity(
   step: RuntimeActionStep,
 ) {
@@ -663,44 +697,81 @@ export function buildActionStepMessage(step: RuntimeActionStep) {
   return appendFlowContentBlockText(step, getActionStepPrompt(step));
 }
 
+export function buildActionStepChannelMessage(step: RuntimeActionStep) {
+  const additionalText = formatFlowInteractiveContentBlockText(step.settings);
+  const prompt = getActionStepPrompt(step);
+
+  return additionalText ? [prompt, additionalText].join("\n\n") : prompt;
+}
+
 function appendFlowContentBlockText(step: RuntimeActionStep, text: string) {
   const additionalText = formatFlowContentBlockText(step.settings);
 
   return additionalText ? [text, additionalText].join("\n\n") : text;
 }
 
+function appendFlowRichContentFallbackText(
+  step: RuntimeActionStep,
+  text: string,
+) {
+  const lines = [text];
+
+  for (const block of getFlowMediaContentBlocks(step.settings)) {
+    if (!block.media) {
+      continue;
+    }
+
+    lines.push("", `${block.media.originalName}: ${block.media.publicPath}`);
+  }
+
+  for (const block of getFlowCatalogContentBlocks(step.settings)) {
+    lines.push("", ...block.products.map((product) => product.name));
+  }
+
+  return lines.join("\n");
+}
+
 export function buildActionStepTextFallbackMessage(
   step: RuntimeActionStep,
   fields: Record<string, unknown> = {},
+  renderOptions: { includeRichContent?: boolean } = {},
 ) {
+  const withRichContent = (text: string) =>
+    renderOptions.includeRichContent === false
+      ? text
+      : appendFlowRichContentFallbackText(step, text);
   const prompt = appendFlowContentBlockText(step, getActionStepPrompt(step));
   const mediaAsset = step.settings.mediaAsset;
 
   if (step.stepType === "media" && mediaAsset) {
-    return [
-      prompt,
-      "",
-      `${mediaAsset.originalName}: ${mediaAsset.publicPath}`,
-    ].join("\n");
+    return withRichContent(
+      [prompt, "", `${mediaAsset.originalName}: ${mediaAsset.publicPath}`].join(
+        "\n",
+      ),
+    );
   }
 
   if (step.stepType === "template_message") {
     const template = getActionStepWhatsAppTemplate(step);
 
     if (template) {
-      return [
-        prompt,
-        "",
-        `Template: ${template.name} (${template.language})`,
-        ...template.variables.map(
-          (variable, index) => `${index + 1}. ${variable}`,
-        ),
-      ].join("\n");
+      return withRichContent(
+        [
+          prompt,
+          "",
+          `Template: ${template.name} (${template.language})`,
+          ...template.variables.map(
+            (variable, index) => `${index + 1}. ${variable}`,
+          ),
+        ].join("\n"),
+      );
     }
   }
 
   if (isProductMessageStep(step)) {
-    return buildProductTextFallbackMessage(step);
+    return withRichContent(
+      appendFlowContentBlockText(step, buildProductTextFallbackMessage(step)),
+    );
   }
 
   const options = isActionInputStep(step)
@@ -708,7 +779,7 @@ export function buildActionStepTextFallbackMessage(
     : [];
 
   if (options.length === 0) {
-    return prompt;
+    return withRichContent(prompt);
   }
 
   const lines = [
@@ -732,7 +803,7 @@ export function buildActionStepTextFallbackMessage(
     lines.push("", "Reply with item and quantity, for example: 1 x 2");
   }
 
-  return lines.join("\n");
+  return withRichContent(lines.join("\n"));
 }
 
 function isRuntimeReplyProduct(value: unknown): value is RuntimeReplyProduct {

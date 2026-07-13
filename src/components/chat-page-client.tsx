@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Bot, MessageSquare } from "lucide-react";
 import { Fragment, useState } from "react";
+import { ActionFlowContentMedia } from "@/components/action-flow-content-media";
 import { ActionFlowProductCards } from "@/components/action-flow-product-cards";
 import {
   ActionFlowStepInput,
@@ -37,6 +38,8 @@ import {
   type FlowEditSection,
   findTriggeredAction,
   getActionStepChoiceDisplayMode,
+  getActionStepContentMedia,
+  getActionStepContentProductGroups,
   getActionStepInputType,
   getActionStepOptions,
   getActionStepProductDisplayLayout,
@@ -79,10 +82,14 @@ function makeFlowMessage(
   };
 }
 
-function makeStepFlowMessage(step: RuntimeAction["steps"][number]) {
+function makeStepFlowMessage(
+  step: RuntimeAction["steps"][number],
+  text = buildActionStepMessage(step),
+) {
   const isProductMessage = isProductMessageStep(step);
 
-  return makeFlowMessage("assistant", buildActionStepMessage(step), {
+  return makeFlowMessage("assistant", text, {
+    media: getActionStepContentMedia(step),
     productMode: isProductMessage
       ? step.stepType === "single_product"
         ? "single_product"
@@ -93,6 +100,7 @@ function makeStepFlowMessage(step: RuntimeAction["steps"][number]) {
     productLayout: isProductMessage
       ? getActionStepProductDisplayLayout(step)
       : undefined,
+    productGroups: getActionStepContentProductGroups(step),
     products: isProductMessage ? getActionStepProducts(step) : undefined,
   });
 }
@@ -291,9 +299,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       visitedStepIds.add(step.id);
 
       if (step.stepType === "handoff") {
-        nextMessages.push(
-          makeFlowMessage("assistant", buildActionStepMessage(step)),
-        );
+        nextMessages.push(makeStepFlowMessage(step));
 
         try {
           await persistFlowHandoff({
@@ -316,11 +322,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       }
 
       if (isActionMessageStep(step)) {
-        nextMessages.push(
-          isProductMessageStep(step)
-            ? makeStepFlowMessage(step)
-            : makeFlowMessage("assistant", buildActionStepMessage(step)),
-        );
+        nextMessages.push(makeStepFlowMessage(step));
         const decision = getNextActionStepDecision(
           action,
           step,
@@ -373,9 +375,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       }
 
       if (isActionSubmitStep(step)) {
-        nextMessages.push(
-          makeFlowMessage("assistant", buildActionStepMessage(step)),
-        );
+        nextMessages.push(makeStepFlowMessage(step));
         setFlowMessages((current) => [...current, ...nextMessages]);
         await submitActionFlow({ ...flow, stepIndex });
         return;
@@ -383,8 +383,8 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
 
       if (isActionConfirmationStep(step)) {
         nextMessages.push(
-          makeFlowMessage(
-            "assistant",
+          makeStepFlowMessage(
+            step,
             [
               buildActionStepMessage(step),
               "",
@@ -399,9 +399,11 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
 
       if (isActionInputStep(step)) {
         nextMessages.push(
-          makeFlowMessage(
-            "assistant",
-            buildActionStepTextFallbackMessage(step, flow.fields),
+          makeStepFlowMessage(
+            step,
+            buildActionStepTextFallbackMessage(step, flow.fields, {
+              includeRichContent: false,
+            }),
           ),
         );
         setFlowMessages((current) => [...current, ...nextMessages]);
@@ -908,12 +910,23 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
               <Message from={message.role} key={message.id}>
                 <MessageContent>
                   <Response>{message.text}</Response>
+                  {message.role === "assistant" && message.media && (
+                    <ActionFlowContentMedia media={message.media} />
+                  )}
                   {message.role === "assistant" && message.products && (
                     <ActionFlowProductCards
                       layout={message.productLayout}
                       products={message.products}
                     />
                   )}
+                  {message.role === "assistant" &&
+                    message.productGroups?.map((group) => (
+                      <ActionFlowProductCards
+                        key={`${message.id}-${group.id}`}
+                        layout={group.layout}
+                        products={group.products}
+                      />
+                    ))}
                 </MessageContent>
               </Message>
             ))}
