@@ -444,7 +444,7 @@ function buildNodes(input: {
             )}
             <Link
               className="inline-flex items-center gap-1 text-xs font-medium underline underline-offset-4"
-              href={`/projects/actions/${input.actionId}/steps/${step.id}`}
+              href={`/projects/actions/${input.actionId}/steps/${step.id}?from=canvas`}
             >
               <Pencil className="h-3 w-3" />
               Edit step
@@ -2484,10 +2484,10 @@ export function ActionFlowCanvas({
                 </p>
                 <Button asChild className="mt-3" variant="outline">
                   <Link
-                    href={`/projects/actions/${actionId}/steps/${selectedStep.id}`}
+                    href={`/projects/actions/${actionId}/steps/${selectedStep.id}?from=canvas`}
                   >
                     <Pencil className="h-4 w-4" />
-                    Full Editor
+                    Detailed Editor
                   </Link>
                 </Button>
               </div>

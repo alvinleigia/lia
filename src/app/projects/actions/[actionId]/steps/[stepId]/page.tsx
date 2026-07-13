@@ -33,6 +33,7 @@ type EditActionStepPageProps = {
     branchDeleted?: string;
     branchUpdated?: string;
     error?: string;
+    from?: string;
   }>;
 };
 
@@ -127,16 +128,22 @@ export default async function EditActionStepPage({
       id: projectAction.id,
       name: projectAction.name,
     }));
+  const backHref =
+    query.from === "canvas"
+      ? `/projects/actions/${action.id}/canvas`
+      : `/projects/actions/${action.id}`;
+  const backLabel =
+    query.from === "canvas" ? "Back to canvas" : "Back to action";
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-4xl mx-auto space-y-6">
         <Link
-          href={`/projects/actions/${action.id}`}
+          href={backHref}
           className="inline-flex items-center text-sm underline underline-offset-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to action
+          {backLabel}
         </Link>
 
         <Card>
