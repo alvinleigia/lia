@@ -28,10 +28,10 @@ export const AI_EXTRA_HELP_POLICIES = [
 
 export const AI_RESPONSE_PRESETS = [
   "general_business",
-  "sales_lead_capture",
-  "support_faq",
-  "real_estate_enquiry",
-  "booking_enquiry",
+  "sales_enquiry",
+  "lead_capture",
+  "customer_support",
+  "booking_appointment",
 ] as const;
 
 export type ProjectAiSettings = {
@@ -71,6 +71,27 @@ const followUpPolicySet = new Set<string>(AI_FOLLOW_UP_POLICIES);
 const extraHelpPolicySet = new Set<string>(AI_EXTRA_HELP_POLICIES);
 const responsePresetSet = new Set<string>(AI_RESPONSE_PRESETS);
 
+export const AI_RESPONSE_PRESET_LABELS: Record<
+  (typeof AI_RESPONSE_PRESETS)[number],
+  string
+> = {
+  booking_appointment: "Booking or Appointment",
+  customer_support: "Customer Support",
+  general_business: "General Business",
+  lead_capture: "Lead Capture",
+  sales_enquiry: "Sales Enquiry",
+};
+
+const legacyResponsePresetAliases: Record<
+  string,
+  (typeof AI_RESPONSE_PRESETS)[number]
+> = {
+  booking_enquiry: "booking_appointment",
+  real_estate_enquiry: "sales_enquiry",
+  sales_lead_capture: "lead_capture",
+  support_faq: "customer_support",
+};
+
 function readOptionalText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -83,6 +104,21 @@ function readEnumValue<T extends string>(
   return typeof value === "string" && allowed.has(value)
     ? (value as T)
     : fallback;
+}
+
+function readResponsePreset(value: unknown) {
+  if (typeof value !== "string") {
+    return DEFAULT_PROJECT_AI_SETTINGS.responsePreset;
+  }
+
+  if (responsePresetSet.has(value)) {
+    return value as ProjectAiSettings["responsePreset"];
+  }
+
+  return (
+    legacyResponsePresetAliases[value] ??
+    DEFAULT_PROJECT_AI_SETTINGS.responsePreset
+  );
 }
 
 export function normalizeProjectAiSettings(value: unknown): ProjectAiSettings {
@@ -113,11 +149,7 @@ export function normalizeProjectAiSettings(value: unknown): ProjectAiSettings {
       followUpPolicySet,
       DEFAULT_PROJECT_AI_SETTINGS.followUpPolicy,
     ),
-    responsePreset: readEnumValue(
-      settings.responsePreset,
-      responsePresetSet,
-      DEFAULT_PROJECT_AI_SETTINGS.responsePreset,
-    ),
+    responsePreset: readResponsePreset(settings.responsePreset),
     role: readEnumValue(
       settings.role,
       roleSet,

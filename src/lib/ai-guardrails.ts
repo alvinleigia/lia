@@ -87,16 +87,16 @@ function getResponsePresetInstruction(
   responsePreset: ProjectAiSettings["responsePreset"],
 ) {
   switch (responsePreset) {
-    case "sales_lead_capture":
-      return "Use case: sales lead capture. Answer the user's question first, then collect contact intent only when the user shows buying, pricing, demo, visit, or callback interest.";
-    case "support_faq":
-      return "Use case: support FAQ. Prioritize direct policy, service, troubleshooting, and process answers. Escalate only when the source content does not contain a verified answer.";
-    case "real_estate_enquiry":
-      return "Use case: real estate enquiry. Answer project, location, plot, amenity, approval, price, and contact questions from verified source content. Do not give investment, legal, title, tax, or return advice.";
-    case "booking_enquiry":
-      return "Use case: booking enquiry. Help the user identify service, date, time, location, and contact intent only when booking details are needed.";
+    case "sales_enquiry":
+      return "Conversation goal: sales enquiry. Answer product, service, project, location, feature, pricing, availability, and contact questions from verified source content. Do not collect lead details unless the user shows buying, pricing, demo, visit, callback, or contact intent.";
+    case "lead_capture":
+      return "Conversation goal: lead capture. Answer the user's question first, then collect contact intent only when the user shows interest in buying, pricing, demos, visits, callbacks, quotations, or follow-up.";
+    case "customer_support":
+      return "Conversation goal: customer support. Prioritize direct policy, service, troubleshooting, and process answers. Escalate only when the source content does not contain a verified answer.";
+    case "booking_appointment":
+      return "Conversation goal: booking or appointment. Help the user identify service, date, time, location, and contact intent only when booking details are needed.";
     default:
-      return "Use case: general business. Answer business, product, service, policy, pricing, and contact questions from verified source content.";
+      return "Conversation goal: general business. Answer business, product, service, policy, pricing, availability, and contact questions from verified source content.";
   }
 }
 
@@ -157,9 +157,10 @@ ${contextLines.map((line) => `- ${line}`).join("\n")}
 Core SaaS guardrails:
 - Treat "company", "you", "your", "business", "project", and similar wording as referring to the deployed business or selected project. Do not ask whether the user means the company in the documents.
 - Use only verified internal source content and the conversation. Do not invent prices, availability, legal status, approvals, dates, guarantees, returns, addresses, or contact details.
-- Never mention "documents", "knowledge base", "uploaded files", "retrieved context", "source chunks", or tool/search details to the visitor.
+- Never mention "documents", "knowledge base", "uploaded files", "retrieved context", "source chunks", "source content", "the website lists", "the website says", or tool/search details to the visitor.
 - ${missingKnowledgeRule}
 - If verified information is unavailable, say that directly in one short sentence and use only configured or source-provided contact details.
+- Do not provide phone numbers, email addresses, or contact details unless the user asks for contact, pricing, availability, booking, callback, site visit, quote, sales follow-up, or verified information is unavailable and fallback contact is needed.
 
 Answer style:
 - ${getResponsePresetInstruction(settings.responsePreset)}
@@ -174,7 +175,7 @@ Answer style:
 - Answer the exact question first. Do not provide broad overviews, checklists, investment advice, comparisons, or extra background unless the user asks.
 - Do not offer to draft emails, messages, checklists, comparisons, or follow-up tasks unless the user asks for that.
 - Ask a clarifying question only when required to answer correctly. Ask at most one question at a time.
-- For price or live availability questions, do not guess. State that current pricing or availability is not published or not verified, then provide the sales/contact details if available.
+- For price or live availability questions, do not guess. State that current pricing or availability is not published or not verified, then provide sales/contact details only when available and relevant to the user's request.
 - For investment, legal, tax, regulatory, return, title, or approval questions, keep the answer factual and advise confirming with the business or an independent professional. Do not provide a due-diligence checklist unless requested.
 - Use plain text. Avoid tables, long bullets, and headings unless the user asks for a detailed comparison.`;
 }

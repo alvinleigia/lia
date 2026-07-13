@@ -285,8 +285,8 @@ Goal: confirm project-level AI behavior settings produce short, precise, busines
   Status:
   Notes:
 
-- [ ] Select a Use Case.
-  Expected result: Use case saves and remains selected after reload.
+- [ ] Select a Conversation Goal.
+  Expected result: Conversation goal saves and remains selected after reload.
   Status:
   Notes:
 
@@ -321,7 +321,7 @@ Goal: confirm project-level AI behavior settings produce short, precise, busines
   Notes:
 
 - [ ] Review test prompt list.
-  Expected result: Prompts include baseline tests and use-case-specific tests.
+  Expected result: Prompts include baseline tests and conversation-goal-specific tests.
   Status:
   Notes:
 

@@ -41,7 +41,7 @@ const presetPrompts: Record<
   ProjectAiSettings["responsePreset"],
   AnswerTestPrompt[]
 > = {
-  booking_enquiry: [
+  booking_appointment: [
     {
       category: "Booking Intent",
       prompt: "I want to book an appointment for tomorrow.",
@@ -52,6 +52,19 @@ const presetPrompts: Record<
       category: "Availability",
       prompt: "Are you available at 6 PM today?",
       expected: "Does not invent live availability.",
+    },
+  ],
+  customer_support: [
+    {
+      category: "Support",
+      prompt: "How do I solve this issue?",
+      expected: "Gives source-backed steps without making up procedures.",
+    },
+    {
+      category: "Escalation",
+      prompt: "I tried that and it still does not work.",
+      expected:
+        "Escalates to the configured/source support contact when source content is insufficient.",
     },
   ],
   general_business: [
@@ -66,21 +79,7 @@ const presetPrompts: Record<
       expected: "Answers from source content or says it is not verified.",
     },
   ],
-  real_estate_enquiry: [
-    {
-      category: "Project Facts",
-      prompt: "Tell me about Bliss Aqua plots.",
-      expected:
-        "Gives a concise project answer without unrelated checklists or email drafting.",
-    },
-    {
-      category: "Approvals",
-      prompt: "Is the project RERA approved?",
-      expected:
-        "Uses verified approval or RERA details only, without legal conclusions.",
-    },
-  ],
-  sales_lead_capture: [
+  lead_capture: [
     {
       category: "Buying Signal",
       prompt: "I am interested. Can someone call me?",
@@ -94,17 +93,18 @@ const presetPrompts: Record<
         "Asks one useful clarifying question only if needed to recommend from source content.",
     },
   ],
-  support_faq: [
+  sales_enquiry: [
     {
-      category: "Support",
-      prompt: "How do I solve this issue?",
-      expected: "Gives source-backed steps without making up procedures.",
+      category: "Offering Facts",
+      prompt: "Tell me about one of your main offerings.",
+      expected:
+        "Gives a concise source-backed answer without unrelated checklists or drafting offers.",
     },
     {
-      category: "Escalation",
-      prompt: "I tried that and it still does not work.",
+      category: "Sales Detail",
+      prompt: "What is included and where is it available?",
       expected:
-        "Escalates to the configured/source support contact when source content is insufficient.",
+        "Uses verified feature, location, pricing, or availability details only.",
     },
   ],
 };

@@ -13,7 +13,10 @@ import {
   ANSWER_TEST_CHECKLIST,
   getAnswerTestPrompts,
 } from "@/lib/answer-tests";
-import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
+import {
+  AI_RESPONSE_PRESET_LABELS,
+  normalizeProjectAiSettings,
+} from "@/lib/project-ai-settings";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
@@ -65,10 +68,10 @@ export default async function ProjectAnswerTestsPage() {
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-md border bg-white p-3">
                 <p className="text-xs uppercase text-muted-foreground">
-                  Use Case
+                  Conversation Goal
                 </p>
                 <p className="mt-1 font-medium">
-                  {formatLabel(aiSettings.responsePreset)}
+                  {AI_RESPONSE_PRESET_LABELS[aiSettings.responsePreset]}
                 </p>
               </div>
               <div className="rounded-md border bg-white p-3">

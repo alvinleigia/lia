@@ -20,6 +20,7 @@ import {
   AI_ASSISTANT_ROLES,
   AI_EXTRA_HELP_POLICIES,
   AI_FOLLOW_UP_POLICIES,
+  AI_RESPONSE_PRESET_LABELS,
   AI_RESPONSE_PRESETS,
   AI_TONES,
   normalizeProjectAiSettings,
@@ -156,7 +157,7 @@ export default async function ProjectSettingsPage({
               <input type="hidden" name="projectId" value={project.id} />
 
               <div className="space-y-2">
-                <Label htmlFor="responsePreset">Use Case</Label>
+                <Label htmlFor="responsePreset">Conversation Goal</Label>
                 <select
                   id="responsePreset"
                   name="responsePreset"
@@ -165,7 +166,7 @@ export default async function ProjectSettingsPage({
                 >
                   {AI_RESPONSE_PRESETS.map((preset) => (
                     <option key={preset} value={preset}>
-                      {preset.replaceAll("_", " ")}
+                      {AI_RESPONSE_PRESET_LABELS[preset]}
                     </option>
                   ))}
                 </select>
