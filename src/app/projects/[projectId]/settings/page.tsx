@@ -19,6 +19,7 @@ import {
   AI_ASSISTANT_ROLES,
   AI_EXTRA_HELP_POLICIES,
   AI_FOLLOW_UP_POLICIES,
+  AI_RESPONSE_PRESETS,
   AI_TONES,
   normalizeProjectAiSettings,
 } from "@/lib/project-ai-settings";
@@ -152,6 +153,22 @@ export default async function ProjectSettingsPage({
           <CardContent>
             <form action={updateProjectAiSettingsAction} className="space-y-4">
               <input type="hidden" name="projectId" value={project.id} />
+
+              <div className="space-y-2">
+                <Label htmlFor="responsePreset">Use Case</Label>
+                <select
+                  id="responsePreset"
+                  name="responsePreset"
+                  defaultValue={aiSettings.responsePreset}
+                  className="h-9 w-full rounded-md border bg-white px-3 text-sm"
+                >
+                  {AI_RESPONSE_PRESETS.map((preset) => (
+                    <option key={preset} value={preset}>
+                      {preset.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">

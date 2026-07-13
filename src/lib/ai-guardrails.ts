@@ -83,6 +83,23 @@ function getExtraHelpInstruction(
   }
 }
 
+function getResponsePresetInstruction(
+  responsePreset: ProjectAiSettings["responsePreset"],
+) {
+  switch (responsePreset) {
+    case "sales_lead_capture":
+      return "Use case: sales lead capture. Answer the user's question first, then collect contact intent only when the user shows buying, pricing, demo, visit, or callback interest.";
+    case "support_faq":
+      return "Use case: support FAQ. Prioritize direct policy, service, troubleshooting, and process answers. Escalate only when the source content does not contain a verified answer.";
+    case "real_estate_enquiry":
+      return "Use case: real estate enquiry. Answer project, location, plot, amenity, approval, price, and contact questions from verified source content. Do not give investment, legal, title, tax, or return advice.";
+    case "booking_enquiry":
+      return "Use case: booking enquiry. Help the user identify service, date, time, location, and contact intent only when booking details are needed.";
+    default:
+      return "Use case: general business. Answer business, product, service, policy, pricing, and contact questions from verified source content.";
+  }
+}
+
 function getFallbackContactInstruction(settings: ProjectAiSettings) {
   const contact = [
     settings.fallbackPhone ? `phone ${settings.fallbackPhone}` : null,
@@ -139,6 +156,7 @@ Core SaaS guardrails:
 - If verified information is unavailable, say that directly in one short sentence and use only configured or source-provided contact details.
 
 Answer style:
+- ${getResponsePresetInstruction(settings.responsePreset)}
 - ${getRoleInstruction(settings.role)}
 - ${getToneInstruction(settings.tone)}
 - ${getAnswerLengthInstruction(settings.answerLength)}

@@ -20,6 +20,7 @@ import {
   AI_ASSISTANT_ROLES,
   AI_EXTRA_HELP_POLICIES,
   AI_FOLLOW_UP_POLICIES,
+  AI_RESPONSE_PRESETS,
   AI_TONES,
   compactProjectAiSettings,
   normalizeProjectAiSettings,
@@ -58,6 +59,7 @@ const updateProjectAiSettingsSchema = z.object({
     .max(160)
     .refine((value) => !value || z.string().email().safeParse(value).success),
   fallbackMessage: z.string().trim().max(240),
+  responsePreset: z.enum(AI_RESPONSE_PRESETS),
 });
 
 const projectIdSchema = z.coerce.number().int().positive();
@@ -181,6 +183,7 @@ export async function updateProjectAiSettingsAction(formData: FormData) {
     fallbackPhone: formData.get("fallbackPhone"),
     fallbackEmail: formData.get("fallbackEmail"),
     fallbackMessage: formData.get("fallbackMessage"),
+    responsePreset: formData.get("responsePreset"),
   });
 
   const fallbackProjectId = projectIdSchema.safeParse(
@@ -210,6 +213,7 @@ export async function updateProjectAiSettingsAction(formData: FormData) {
         fallbackMessage: parsed.data.fallbackMessage,
         fallbackPhone: parsed.data.fallbackPhone,
         followUpPolicy: parsed.data.followUpPolicy,
+        responsePreset: parsed.data.responsePreset,
         role: parsed.data.role,
         tone: parsed.data.tone,
       }),

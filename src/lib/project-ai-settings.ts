@@ -26,6 +26,14 @@ export const AI_EXTRA_HELP_POLICIES = [
   "never",
 ] as const;
 
+export const AI_RESPONSE_PRESETS = [
+  "general_business",
+  "sales_lead_capture",
+  "support_faq",
+  "real_estate_enquiry",
+  "booking_enquiry",
+] as const;
+
 export type ProjectAiSettings = {
   answerLength: (typeof AI_ANSWER_LENGTHS)[number];
   assistantName: string | null;
@@ -35,6 +43,7 @@ export type ProjectAiSettings = {
   fallbackMessage: string | null;
   fallbackPhone: string | null;
   followUpPolicy: (typeof AI_FOLLOW_UP_POLICIES)[number];
+  responsePreset: (typeof AI_RESPONSE_PRESETS)[number];
   role: (typeof AI_ASSISTANT_ROLES)[number];
   tone: (typeof AI_TONES)[number];
 };
@@ -48,6 +57,7 @@ export const DEFAULT_PROJECT_AI_SETTINGS: ProjectAiSettings = {
   fallbackMessage: null,
   fallbackPhone: null,
   followUpPolicy: "only_when_required",
+  responsePreset: "general_business",
   role: "general",
   tone: "professional",
 };
@@ -57,6 +67,7 @@ const toneSet = new Set<string>(AI_TONES);
 const answerLengthSet = new Set<string>(AI_ANSWER_LENGTHS);
 const followUpPolicySet = new Set<string>(AI_FOLLOW_UP_POLICIES);
 const extraHelpPolicySet = new Set<string>(AI_EXTRA_HELP_POLICIES);
+const responsePresetSet = new Set<string>(AI_RESPONSE_PRESETS);
 
 function readOptionalText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -98,6 +109,11 @@ export function normalizeProjectAiSettings(value: unknown): ProjectAiSettings {
       settings.followUpPolicy,
       followUpPolicySet,
       DEFAULT_PROJECT_AI_SETTINGS.followUpPolicy,
+    ),
+    responsePreset: readEnumValue(
+      settings.responsePreset,
+      responsePresetSet,
+      DEFAULT_PROJECT_AI_SETTINGS.responsePreset,
     ),
     role: readEnumValue(
       settings.role,
