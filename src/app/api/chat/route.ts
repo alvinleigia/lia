@@ -9,6 +9,7 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod";
+import { buildKnowledgeChatSystemPrompt } from "@/lib/ai-guardrails";
 import {
   isInactiveAccountError,
   resolveUserAndProject,
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
       messages,
       projectId,
     }: { messages: ChatMessage[]; projectId?: number } = await req.json();
-    const { project } = await resolveUserAndProject(projectId);
+    const { company, project } = await resolveUserAndProject(projectId);
     const contextMessages = limitContextMessages(messages);
     const hasDocuments = await projectHasIndexedDocuments(project.id);
 
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
                   const results = await searchDocuments(project.id, query);
 
                   if (results.length === 0) {
-                    return "No relevant information found in the knowledge base.";
+                    return "No relevant verified internal information found for this question.";
                   }
 
                   return results
@@ -65,17 +66,18 @@ export async function POST(req: Request) {
                     .join("\n\n");
                 } catch (error) {
                   console.error("Search error:", error);
-                  return "Error searching the knowledge base.";
+                  return "Error searching internal source content.";
                 }
               },
             }),
           }
         : undefined,
-      system: `You are a helpful assistant with access to a knowledge base. 
-          When users ask questions, search the knowledge base for relevant information.
-          Always search before answering if the question might relate to uploaded documents.
-          Base your answers on the search results when available. Give concise answers that correctly answer what the user is asking for. Do not flood them with all the information from the search results.
-          ${hasDocuments ? "" : "This project currently has no indexed documents. If asked about project data, clearly mention that documents need to be uploaded first."}`,
+      system: buildKnowledgeChatSystemPrompt({
+        channel: "project_chat",
+        companyName: company.name,
+        hasDocuments,
+        projectName: project.name,
+      }),
       stopWhen: stepCountIs(2),
       onFinish: async ({ usage }) => {
         const promptTokens =

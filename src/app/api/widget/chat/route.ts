@@ -7,6 +7,7 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod";
+import { buildKnowledgeChatSystemPrompt } from "@/lib/ai-guardrails";
 import { logChatRequest } from "@/lib/chat-logs";
 import { projectHasIndexedDocuments } from "@/lib/documents";
 import { searchDocuments } from "@/lib/search";
@@ -161,7 +162,7 @@ export async function POST(req: Request) {
                   query,
                 );
                 if (results.length === 0) {
-                  return "No relevant information found in the knowledge base.";
+                  return "No relevant verified internal information found for this question.";
                 }
                 return results
                   .map((r, i) => `[${i + 1}] ${r.content}`)
@@ -170,9 +171,12 @@ export async function POST(req: Request) {
             }),
           }
         : undefined,
-      system: `You are a helpful assistant with access to a project-scoped knowledge base.
-          Search the knowledge base when relevant and answer concisely based on retrieved context.
-          ${hasDocuments ? "" : "This project currently has no indexed documents. If asked about project data, clearly mention that documents need to be uploaded first."}`,
+      system: buildKnowledgeChatSystemPrompt({
+        channel: "widget_chat",
+        companyName: widgetAccess.companyName,
+        hasDocuments,
+        projectName: widgetAccess.projectName,
+      }),
       stopWhen: stepCountIs(2),
       onFinish: async ({ usage }) => {
         const promptTokens =
