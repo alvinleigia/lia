@@ -360,6 +360,20 @@ function getStepRouteLabel(steps: FlowStep[], stepId: number) {
   return step ? `${step.sortOrder}. ${getStepLabel(step)}` : `Step #${stepId}`;
 }
 
+const CANVAS_EDGE_LABEL_PROPS = {
+  labelBgBorderRadius: 8,
+  labelBgPadding: [8, 4] as [number, number],
+  labelBgStyle: {
+    fill: "#ffffff",
+    fillOpacity: 0.94,
+  },
+  labelStyle: {
+    fill: "#64748b",
+    fontSize: 11,
+    fontWeight: 500,
+  },
+};
+
 function buildOrderedFallbackEdges(steps: FlowStep[]) {
   const enabledSteps = steps.filter((step) => step.isEnabled);
   const edges: Edge[] = [];
@@ -374,13 +388,15 @@ function buildOrderedFallbackEdges(steps: FlowStep[]) {
       id: `ordered-${step.id}-${nextStep.id}`,
       source: String(step.id),
       target: String(nextStep.id),
-      label: "ordered fallback",
+      label: "fallback",
       markerEnd: { type: MarkerType.ArrowClosed },
       style: {
         stroke: "#94a3b8",
         strokeDasharray: "5 5",
+        strokeWidth: 1.4,
       },
       type: "smoothstep",
+      ...CANVAS_EDGE_LABEL_PROPS,
     });
   }
 
@@ -413,13 +429,13 @@ function buildNodes(input: {
       id: String(step.id),
       data: {
         label: (
-          <div className="w-60 space-y-2 text-left">
+          <div className="w-[280px] overflow-hidden rounded-md bg-white p-3 text-left">
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-xs uppercase text-muted-foreground">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase leading-none text-muted-foreground">
                   Step {step.sortOrder}
                 </p>
-                <p className="line-clamp-2 font-medium leading-snug">
+                <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-gray-950">
                   {getStepLabel(step)}
                 </p>
               </div>
@@ -427,24 +443,24 @@ function buildNodes(input: {
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               )}
             </div>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
               <span
-                className="rounded-full px-2 py-0.5 text-white"
+                className="max-w-full truncate rounded-full px-2.5 py-1 font-medium leading-none text-white"
                 style={{ backgroundColor: stepColor }}
               >
                 {formatLabel(step.stepType)}
               </span>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
+              <span className="rounded-full bg-gray-100 px-2.5 py-1 leading-none text-gray-700">
                 {step.isEnabled ? "Enabled" : "Disabled"}
               </span>
               {step.fieldKey && (
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
+                <span className="max-w-[240px] truncate rounded-full bg-gray-100 px-2.5 py-1 leading-none text-gray-700">
                   {step.fieldKey}
                 </span>
               )}
             </div>
             {step.prompt && (
-              <p className="line-clamp-2 text-xs text-muted-foreground">
+              <p className="mt-3 line-clamp-2 break-words text-xs leading-snug text-muted-foreground">
                 {step.prompt}
               </p>
             )}
@@ -452,15 +468,15 @@ function buildNodes(input: {
         ),
       },
       position: savedPosition ?? {
-        x: column * 390,
-        y: row * 210,
+        x: column * 460,
+        y: row * 230,
       },
       sourcePosition: Position.Right,
       style: {
         borderColor: issueCount > 0 ? "#d97706" : stepColor,
         borderRadius: 8,
-        borderWidth: 2,
-        boxShadow: "0 10px 25px rgba(15, 23, 42, 0.08)",
+        borderWidth: 1.5,
+        boxShadow: "0 12px 24px rgba(15, 23, 42, 0.07)",
         opacity: step.isEnabled ? 1 : 0.68,
         padding: 0,
       },
@@ -491,8 +507,10 @@ function buildEdges(input: {
       markerEnd: { type: MarkerType.ArrowClosed },
       style: {
         stroke: step.isEnabled ? "#111827" : "#9ca3af",
+        strokeWidth: 1.6,
       },
       type: "smoothstep",
+      ...CANVAS_EDGE_LABEL_PROPS,
     }));
 
   const branchEdges = input.branchRules.map<Edge>((rule) => ({
@@ -510,8 +528,10 @@ function buildEdges(input: {
           ? "#2563eb"
           : "#9ca3af",
       strokeDasharray: rule.isEnabled ? undefined : "5 5",
+      strokeWidth: 1.6,
     },
     type: "smoothstep",
+    ...CANVAS_EDGE_LABEL_PROPS,
   }));
 
   return [
