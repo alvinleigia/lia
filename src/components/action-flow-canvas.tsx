@@ -187,9 +187,13 @@ type CanvasStepInput = {
 };
 
 type CanvasStepBasicsInput = {
+  choiceDisplayMode: string;
+  inputType: string;
   isEnabled: boolean;
   isRequired: boolean;
   label: string;
+  options: string;
+  optionsChanged: boolean;
   prompt: string;
 };
 
@@ -681,9 +685,13 @@ function readStepBasicsForm(form: HTMLFormElement): CanvasStepBasicsInput {
   const formData = new FormData(form);
 
   return {
+    choiceDisplayMode: String(formData.get("choiceDisplayMode") ?? "buttons"),
+    inputType: String(formData.get("inputType") ?? "text"),
     isEnabled: formData.get("isEnabled") === "on",
     isRequired: formData.get("isRequired") === "on",
     label: String(formData.get("label") ?? ""),
+    options: String(formData.get("options") ?? ""),
+    optionsChanged: formData.get("optionsChanged") === "true",
     prompt: String(formData.get("prompt") ?? ""),
   };
 }
@@ -1941,6 +1949,22 @@ function StepBasicsForm({
   step: FlowStep;
 }) {
   const collectsAnswer = step.inputType !== null;
+  const dynamicSourceType = getStepSettingText(step, "sourceType");
+  const hasDynamicOptions = ["catalog_categories", "catalog_items"].includes(
+    dynamicSourceType,
+  );
+  const storedOptions = formatStepOptions(step.options)
+    .split("\n")
+    .filter((option) => option.trim());
+  const [options, setOptions] = useState(storedOptions);
+  const showsManualOptions =
+    step.stepType === "choice" || (!hasDynamicOptions && options.length > 0);
+  const showsChoiceDisplay = hasDynamicOptions || showsManualOptions;
+  const allowsAnswerFormat =
+    step.stepType === "collect_input" && !hasDynamicOptions;
+  const optionsChanged =
+    options.length !== storedOptions.length ||
+    options.some((option, index) => option !== storedOptions[index]);
 
   return (
     <form
@@ -1951,6 +1975,30 @@ function StepBasicsForm({
         onSubmit(readStepBasicsForm(event.currentTarget));
       }}
     >
+      <input type="hidden" name="options" value={options.join("\n")} readOnly />
+      <input
+        type="hidden"
+        name="optionsChanged"
+        value={String(optionsChanged)}
+        readOnly
+      />
+      {!allowsAnswerFormat && (
+        <input
+          type="hidden"
+          name="inputType"
+          value={step.inputType ?? "text"}
+          readOnly
+        />
+      )}
+      {!showsChoiceDisplay && (
+        <input
+          type="hidden"
+          name="choiceDisplayMode"
+          value={getStepChoiceDisplayMode(step)}
+          readOnly
+        />
+      )}
+
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor="quick-step-label">
           Step name
@@ -1980,6 +2028,115 @@ function StepBasicsForm({
           className="flex min-h-28 w-full resize-y rounded-md border border-input bg-transparent px-3 py-3 text-sm leading-6 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
       </div>
+
+      {allowsAnswerFormat && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium" htmlFor="quick-input-type">
+            Answer format
+          </label>
+          <select
+            id="quick-input-type"
+            name="inputType"
+            defaultValue={step.inputType ?? "text"}
+            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <option value="text">Text</option>
+            <option value="email">Email address</option>
+            <option value="phone">Phone number</option>
+            <option value="date">Date</option>
+            <option value="time">Time</option>
+            <option value="int">Whole number</option>
+            <option value="float">Number</option>
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Lia will validate the visitor&apos;s answer using this format.
+          </p>
+        </div>
+      )}
+
+      {hasDynamicOptions && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm font-medium text-blue-950">
+            Choices are connected to your catalog
+          </p>
+          <p className="mt-1 text-xs leading-5 text-blue-800">
+            {dynamicSourceType === "catalog_categories"
+              ? "Visitors will see the current catalog categories."
+              : "Visitors will see catalog items filtered by their earlier answer."}{" "}
+            This live connection is protected from quick edits.
+          </p>
+        </div>
+      )}
+
+      {showsManualOptions && (
+        <div className="space-y-3 rounded-md border p-4">
+          <div>
+            <p className="text-sm font-medium">Choices shown to visitors</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Each choice can be displayed as a button or list item.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {options.map((option, index) => (
+              <div key={`${step.id}-option-${index}`} className="flex gap-2">
+                <input
+                  aria-label={`Choice ${index + 1}`}
+                  value={option}
+                  onChange={(event) => {
+                    const nextOptions = [...options];
+                    nextOptions[index] = event.target.value;
+                    setOptions(nextOptions);
+                  }}
+                  placeholder={`Choice ${index + 1}`}
+                  className="flex h-10 min-w-0 flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title={`Remove choice ${index + 1}`}
+                  onClick={() =>
+                    setOptions(
+                      options.filter((_, itemIndex) => itemIndex !== index),
+                    )
+                  }
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Remove choice</span>
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setOptions([...options, ""])}
+          >
+            <Plus className="h-4 w-4" />
+            Add choice
+          </Button>
+        </div>
+      )}
+
+      {showsChoiceDisplay && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium" htmlFor="quick-choice-display">
+            Display choices as
+          </label>
+          <select
+            id="quick-choice-display"
+            name="choiceDisplayMode"
+            defaultValue={getStepChoiceDisplayMode(step)}
+            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <option value="buttons">Buttons</option>
+            <option value="list">List</option>
+            <option value="text">Typed response</option>
+          </select>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         {collectsAnswer && (

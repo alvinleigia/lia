@@ -359,10 +359,14 @@ const canvasStepSchema = z
   });
 const canvasStepBasicsSchema = z.object({
   actionId: z.coerce.number().int().positive(),
+  choiceDisplayMode: z.enum(["buttons", "list", "text"]),
+  inputType: z.enum(ACTION_STEP_INPUT_TYPES).optional(),
   stepId: z.coerce.number().int().positive(),
   isEnabled: z.coerce.boolean(),
   isRequired: z.coerce.boolean(),
   label: z.string().trim().max(160),
+  options: z.string().max(4000),
+  optionsChanged: z.coerce.boolean(),
   prompt: z.string().trim().max(1000),
 });
 const canvasBranchRuleSchema = z
@@ -1321,9 +1325,20 @@ export async function updateCanvasStepBasicsAction(
   }
 
   const isInputStep = isInputStepType(existingStep.stepType);
+  const dynamicSourceType =
+    typeof existingStep.settings.sourceType === "string"
+      ? existingStep.settings.sourceType
+      : "";
+  const hasDynamicOptions = ["catalog_categories", "catalog_items"].includes(
+    dynamicSourceType,
+  );
   const requiresPrompt =
     isInputStep ||
     ["display_result", "handoff", "message"].includes(existingStep.stepType);
+  const options =
+    isInputStep && parsed.data.optionsChanged && !hasDynamicOptions
+      ? parseOptions(parsed.data.options)
+      : existingStep.options;
 
   if (isInputStep && !parsed.data.label) {
     return { ok: false, message: "Add a step name before saving." };
@@ -1331,6 +1346,23 @@ export async function updateCanvasStepBasicsAction(
 
   if (requiresPrompt && !parsed.data.prompt) {
     return { ok: false, message: "Add the message shown to visitors." };
+  }
+
+  if (
+    existingStep.stepType === "choice" &&
+    !hasDynamicOptions &&
+    options.length === 0
+  ) {
+    return { ok: false, message: "Add at least one choice before saving." };
+  }
+
+  const settings = { ...existingStep.settings };
+  if (
+    existingStep.stepType === "choice" ||
+    hasDynamicOptions ||
+    options.length > 0
+  ) {
+    settings.choiceDisplayMode = parsed.data.choiceDisplayMode;
   }
 
   try {
@@ -1343,13 +1375,18 @@ export async function updateCanvasStepBasicsAction(
       fieldKey: existingStep.fieldKey,
       label: parsed.data.label || null,
       prompt: parsed.data.prompt || null,
-      inputType: existingStep.inputType,
+      inputType: isInputStep
+        ? getInputTypeForStepType(
+            existingStep.stepType,
+            parsed.data.inputType ?? existingStep.inputType ?? undefined,
+          )
+        : existingStep.inputType,
       operationId: existingStep.operationId,
       nextStepId: existingStep.nextStepId,
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled,
-      options: existingStep.options,
-      settings: existingStep.settings,
+      options,
+      settings,
     });
 
     if (!step) {
