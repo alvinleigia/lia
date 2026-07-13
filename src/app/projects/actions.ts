@@ -39,6 +39,31 @@ const deleteDocumentSchema = z.object({
   sourceDocumentId: z.coerce.number().int().positive(),
 });
 
+function getProjectMutationReturnPath(formData: FormData, projectId: number) {
+  const redirectTo = formData.get("redirectTo");
+  const settingsPath = `/projects/${projectId}/settings`;
+
+  return redirectTo === settingsPath ? settingsPath : "/projects";
+}
+
+function redirectWithProjectMutationError(
+  formData: FormData,
+  projectId: number,
+  message: string,
+): never {
+  const returnPath = getProjectMutationReturnPath(formData, projectId);
+  redirect(`${returnPath}?error=${encodeURIComponent(message)}`);
+}
+
+function redirectWithProjectMutationSuccess(
+  formData: FormData,
+  projectId: number,
+  key: "archived" | "unarchived",
+): never {
+  const returnPath = getProjectMutationReturnPath(formData, projectId);
+  redirect(`${returnPath}?${key}=1`);
+}
+
 export async function createProjectAction(formData: FormData) {
   const parsed = createProjectSchema.safeParse({
     name: formData.get("name"),
@@ -213,10 +238,18 @@ export async function archiveProjectAction(formData: FormData) {
     true,
   );
   if (!project) {
-    redirect("/projects?error=Project%20not%20found.");
+    redirectWithProjectMutationError(
+      formData,
+      parsed.data,
+      "Project not found.",
+    );
   }
   if (project.isArchived) {
-    redirect("/projects?error=Project%20is%20already%20archived.");
+    redirectWithProjectMutationError(
+      formData,
+      parsed.data,
+      "Project is already archived.",
+    );
   }
 
   const selectedProjectId = await getActiveProjectIdCookie();
@@ -229,8 +262,10 @@ export async function archiveProjectAction(formData: FormData) {
   const willHaveAlternative = Boolean(fallbackProject);
 
   if (willArchiveSelected && !willHaveAlternative) {
-    redirect(
-      "/projects?error=Create%20or%20unarchive%20another%20project%20before%20archiving%20this%20one.",
+    redirectWithProjectMutationError(
+      formData,
+      parsed.data,
+      "Create or unarchive another project before archiving this one.",
     );
   }
 
@@ -239,7 +274,11 @@ export async function archiveProjectAction(formData: FormData) {
     context.workspace.id,
   );
   if (!archived) {
-    redirect("/projects?error=Failed%20to%20archive%20project.");
+    redirectWithProjectMutationError(
+      formData,
+      parsed.data,
+      "Failed to archive project.",
+    );
   }
 
   await updateProjectWidgetTokenStatus(project.id, false);
@@ -257,8 +296,9 @@ export async function archiveProjectAction(formData: FormData) {
   }
 
   revalidatePath("/projects");
+  revalidatePath(`/projects/${project.id}/settings`);
   revalidatePath("/", "layout");
-  redirect("/projects?archived=1");
+  redirectWithProjectMutationSuccess(formData, project.id, "archived");
 }
 
 export async function unarchiveProjectAction(formData: FormData) {
@@ -275,10 +315,18 @@ export async function unarchiveProjectAction(formData: FormData) {
     true,
   );
   if (!project) {
-    redirect("/projects?error=Project%20not%20found.");
+    redirectWithProjectMutationError(
+      formData,
+      parsed.data,
+      "Project not found.",
+    );
   }
   if (!project.isArchived) {
-    redirect("/projects?error=Project%20is%20already%20available.");
+    redirectWithProjectMutationError(
+      formData,
+      parsed.data,
+      "Project is already available.",
+    );
   }
 
   const unarchived = await setProjectUnarchivedForWorkspace(
@@ -286,7 +334,11 @@ export async function unarchiveProjectAction(formData: FormData) {
     context.workspace.id,
   );
   if (!unarchived) {
-    redirect("/projects?error=Failed%20to%20unarchive%20project.");
+    redirectWithProjectMutationError(
+      formData,
+      parsed.data,
+      "Failed to unarchive project.",
+    );
   }
 
   // Restore widget availability on unarchive without rotating token,
@@ -302,8 +354,9 @@ export async function unarchiveProjectAction(formData: FormData) {
   });
 
   revalidatePath("/projects");
+  revalidatePath(`/projects/${project.id}/settings`);
   revalidatePath("/", "layout");
-  redirect("/projects?unarchived=1");
+  redirectWithProjectMutationSuccess(formData, project.id, "unarchived");
 }
 
 export async function deleteSourceDocumentAction(formData: FormData) {
