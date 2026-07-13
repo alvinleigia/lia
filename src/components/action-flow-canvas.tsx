@@ -1122,7 +1122,7 @@ function CanvasStepNodeContent({
       )}
       {contentBlocks.length > 0 && (
         <div className="nodrag nopan nowheel max-h-64 space-y-2 overflow-y-auto pr-1">
-          {contentBlocks.map((block) =>
+          {contentBlocks.map((block, blockIndex) =>
             editingContentBlockId === block.id ? (
               <fieldset
                 key={block.id}
@@ -1160,22 +1160,97 @@ function CanvasStepNodeContent({
                 <div className="min-w-0 flex-1">
                   <CanvasContentBlockPreview block={block} />
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  title={`Edit ${getContentBlockName(block).toLowerCase()}`}
-                  className="nodrag nopan h-7 w-7 shrink-0 bg-white shadow-sm"
-                  disabled={isSaving}
-                  onClick={(event) => {
-                    stopCanvasInteraction(event);
-                    setEditingContentBlockId(block.id);
-                  }}
-                  onPointerDown={stopCanvasInteraction}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  <span className="sr-only">Edit content</span>
-                </Button>
+                <div className="grid shrink-0 grid-cols-2 gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title="Move content up"
+                    className="nodrag nopan h-7 w-7 bg-white shadow-sm"
+                    disabled={isSaving || blockIndex === 0}
+                    onClick={(event) => {
+                      stopCanvasInteraction(event);
+                      persistContentBlocks(
+                        moveFlowContentBlock(
+                          contentBlocks,
+                          blockIndex,
+                          blockIndex - 1,
+                        ),
+                        () => {},
+                      );
+                    }}
+                    onPointerDown={stopCanvasInteraction}
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                    <span className="sr-only">Move content up</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title="Move content down"
+                    className="nodrag nopan h-7 w-7 bg-white shadow-sm"
+                    disabled={
+                      isSaving || blockIndex === contentBlocks.length - 1
+                    }
+                    onClick={(event) => {
+                      stopCanvasInteraction(event);
+                      persistContentBlocks(
+                        moveFlowContentBlock(
+                          contentBlocks,
+                          blockIndex,
+                          blockIndex + 1,
+                        ),
+                        () => {},
+                      );
+                    }}
+                    onPointerDown={stopCanvasInteraction}
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                    <span className="sr-only">Move content down</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title="Duplicate content"
+                    className="nodrag nopan h-7 w-7 bg-white shadow-sm"
+                    disabled={
+                      isSaving ||
+                      contentBlocks.length >= 10 ||
+                      block.type === "choice"
+                    }
+                    onClick={(event) => {
+                      stopCanvasInteraction(event);
+                      const duplicate = duplicateFlowContentBlock(block);
+                      const nextContentBlocks = [...contentBlocks];
+                      nextContentBlocks.splice(blockIndex + 1, 0, duplicate);
+                      persistContentBlocks(nextContentBlocks, () =>
+                        setEditingContentBlockId(duplicate.id),
+                      );
+                    }}
+                    onPointerDown={stopCanvasInteraction}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    <span className="sr-only">Duplicate content</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title={`Edit ${getContentBlockName(block).toLowerCase()}`}
+                    className="nodrag nopan h-7 w-7 bg-white shadow-sm"
+                    disabled={isSaving}
+                    onClick={(event) => {
+                      stopCanvasInteraction(event);
+                      setEditingContentBlockId(block.id);
+                    }}
+                    onPointerDown={stopCanvasInteraction}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    <span className="sr-only">Edit content</span>
+                  </Button>
+                </div>
               </div>
             ),
           )}
