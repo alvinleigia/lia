@@ -15,6 +15,7 @@ import {
   buildActionStepTextFallbackMessage,
   buildInvalidStepAnswerMessage,
   buildStepAnswerResult,
+  type FlowEditSection,
   findTriggeredAction,
   getActionStepChoiceDisplayMode,
   getActionStepConnectedActionId,
@@ -34,6 +35,7 @@ import {
   isInlineOperationStep,
   isProductMessageStep,
   normalizeActionText,
+  prepareFlowSectionEdit,
   type RuntimeAction,
   type RuntimeActionStep,
   resolveTemplateVariableValue,
@@ -75,6 +77,8 @@ import {
 const CONFIRM_WORDS = new Set(["confirm", "yes", "y", "submit", "ok", "okay"]);
 const CANCEL_WORDS = new Set(["cancel", "stop", "no", "exit"]);
 const MAX_CONNECTED_FLOW_DEPTH = 5;
+const FLOW_EDIT_POSITION_KEY = "flowEditPosition";
+const FLOW_EDIT_STEP_IDS_KEY = "flowEditStepIds";
 
 type ChannelRuntimeResult = {
   replies: RuntimeReply[];
@@ -88,6 +92,52 @@ type ReturnFlowFrame = {
 function getSubmissionContactId(submission: SelectActionSubmission) {
   const contactId = submission.metadata.contactId;
   return typeof contactId === "number" ? contactId : null;
+}
+
+function getFlowEditState(
+  action: RuntimeAction,
+  submission: SelectActionSubmission,
+) {
+  const stepIds = submission.metadata[FLOW_EDIT_STEP_IDS_KEY];
+  const position = submission.metadata[FLOW_EDIT_POSITION_KEY];
+
+  if (
+    !Array.isArray(stepIds) ||
+    !stepIds.every((stepId) => typeof stepId === "number") ||
+    typeof position !== "number" ||
+    !Number.isInteger(position) ||
+    position < 0 ||
+    position >= stepIds.length
+  ) {
+    return null;
+  }
+
+  const steps = getRunnableActionSteps(action);
+  const stepIndexes = stepIds
+    .map((stepId) => steps.findIndex((step) => step.id === stepId))
+    .filter((stepIndex) => stepIndex >= 0);
+
+  if (stepIndexes.length !== stepIds.length) {
+    return null;
+  }
+
+  return { position, stepIds, stepIndexes };
+}
+
+function updateFlowEditMetadata(
+  metadata: Record<string, unknown>,
+  nextPosition: number | null,
+) {
+  const nextMetadata = { ...metadata };
+
+  if (nextPosition === null) {
+    delete nextMetadata[FLOW_EDIT_POSITION_KEY];
+    delete nextMetadata[FLOW_EDIT_STEP_IDS_KEY];
+  } else {
+    nextMetadata[FLOW_EDIT_POSITION_KEY] = nextPosition;
+  }
+
+  return nextMetadata;
 }
 
 function getConnectedActionPath(submission: SelectActionSubmission) {
@@ -929,6 +979,98 @@ export async function startChannelFlow(input: {
   };
 }
 
+export async function startChannelFlowEdit(input: {
+  action: RuntimeAction;
+  contactId?: number | null;
+  projectId: number;
+  section: FlowEditSection;
+  submission: SelectActionSubmission;
+}) {
+  const steps = getRunnableActionSteps(input.action);
+  const currentStep = steps.find(
+    (step) => step.id === input.submission.currentStepId,
+  );
+
+  if (
+    input.submission.currentStepId !== null &&
+    (!currentStep || !isActionConfirmationStep(currentStep))
+  ) {
+    return {
+      replies: [
+        createTextReply(
+          "Finish the current question before editing the review details.",
+        ),
+      ],
+    };
+  }
+
+  const editFlow = prepareFlowSectionEdit(
+    input.action,
+    {
+      actionId: input.action.id,
+      actionName: input.action.name,
+      fields: input.submission.fields,
+      mode: "confirming",
+      stepIndex: getRunnableActionSteps(input.action).length,
+      submissionId: input.submission.id,
+    },
+    input.section,
+  );
+  const editStepIndexes = editFlow.editStepIndexes ?? [];
+  const editStepIds = editStepIndexes
+    .map((stepIndex) => steps[stepIndex]?.id)
+    .filter((stepId): stepId is number => typeof stepId === "number");
+
+  if (editStepIds.length === 0) {
+    return {
+      replies: [
+        createTextReply("This request does not have those details to edit."),
+      ],
+    };
+  }
+
+  const metadata = {
+    ...input.submission.metadata,
+    [FLOW_EDIT_POSITION_KEY]: 0,
+    [FLOW_EDIT_STEP_IDS_KEY]: editStepIds,
+  };
+  const updatedSubmission = await recordActionFlowProgress({
+    projectId: input.projectId,
+    submissionId: input.submission.id,
+    currentStepId: editStepIds[0],
+    fields: editFlow.fields,
+    metadata,
+    event: {
+      eventType: "flow.edit_started",
+      message: `Started editing ${input.section} details.`,
+      payload: { section: input.section, stepIds: editStepIds },
+    },
+  });
+
+  if (!updatedSubmission) {
+    return {
+      replies: [
+        createTextReply("I could not start editing. Please try again."),
+      ],
+    };
+  }
+
+  const result = await advanceFlowToNextStep({
+    action: input.action,
+    contactId: input.contactId ?? getSubmissionContactId(updatedSubmission),
+    projectId: input.projectId,
+    submission: updatedSubmission,
+    stepIndex: editStepIndexes[0],
+  });
+
+  return {
+    replies: [
+      createTextReply("No problem. Let's update that."),
+      ...result.replies,
+    ],
+  };
+}
+
 async function continueChannelFlow(input: {
   action: RuntimeAction;
   answer: string;
@@ -1049,19 +1191,30 @@ async function continueChannelFlow(input: {
     ...input.submission.fields,
     ...answerResult.fields,
   };
-  const branchDecision = getNextActionStepDecision(
-    input.action,
-    step,
-    stepIndex,
-    nextFields,
-  );
-  const nextStep =
-    branchDecision.stepIndex === null ? null : steps[branchDecision.stepIndex];
+  const editState = getFlowEditState(input.action, input.submission);
+  const nextEditPosition = editState ? editState.position + 1 : 0;
+  const nextEditStepIndex =
+    editState && nextEditPosition < editState.stepIndexes.length
+      ? editState.stepIndexes[nextEditPosition]
+      : null;
+  const branchDecision = editState
+    ? null
+    : getNextActionStepDecision(input.action, step, stepIndex, nextFields);
+  const nextStepIndex = editState
+    ? nextEditStepIndex
+    : (branchDecision?.stepIndex ?? null);
+  const nextStep = nextStepIndex === null ? null : steps[nextStepIndex];
   const updatedSubmission = await recordActionFlowProgress({
     projectId: input.projectId,
     submissionId: input.submission.id,
     currentStepId: nextStep?.id ?? null,
     fields: nextFields,
+    metadata: editState
+      ? updateFlowEditMetadata(
+          input.submission.metadata,
+          nextEditStepIndex === null ? null : nextEditPosition,
+        )
+      : input.submission.metadata,
     event: {
       eventType: "field.collected",
       message: fieldKey ? `Collected ${fieldKey}.` : "Collected flow field.",
@@ -1081,21 +1234,22 @@ async function continueChannelFlow(input: {
     };
   }
 
-  await addActionSubmissionEvent({
-    projectId: input.projectId,
-    submissionId: updatedSubmission.id,
-    eventType: "flow.branch_decision",
-    message: "Flow route selected.",
-    payload: branchDecision,
-  });
+  if (branchDecision) {
+    await addActionSubmissionEvent({
+      projectId: input.projectId,
+      submissionId: updatedSubmission.id,
+      eventType: "flow.branch_decision",
+      message: "Flow route selected.",
+      payload: branchDecision,
+    });
+  }
 
-  const nextStepIndex = branchDecision.stepIndex ?? steps.length;
   return advanceFlowToNextStep({
     action: input.action,
     contactId: input.contactId ?? getSubmissionContactId(updatedSubmission),
     projectId: input.projectId,
     submission: updatedSubmission,
-    stepIndex: nextStepIndex,
+    stepIndex: nextStepIndex ?? steps.length,
   });
 }
 
@@ -1188,19 +1342,30 @@ async function continueChannelFlowMedia(input: {
     ...input.submission.fields,
     ...answerResult.fields,
   };
-  const branchDecision = getNextActionStepDecision(
-    input.action,
-    step,
-    stepIndex,
-    nextFields,
-  );
-  const nextStep =
-    branchDecision.stepIndex === null ? null : steps[branchDecision.stepIndex];
+  const editState = getFlowEditState(input.action, input.submission);
+  const nextEditPosition = editState ? editState.position + 1 : 0;
+  const nextEditStepIndex =
+    editState && nextEditPosition < editState.stepIndexes.length
+      ? editState.stepIndexes[nextEditPosition]
+      : null;
+  const branchDecision = editState
+    ? null
+    : getNextActionStepDecision(input.action, step, stepIndex, nextFields);
+  const nextStepIndex = editState
+    ? nextEditStepIndex
+    : (branchDecision?.stepIndex ?? null);
+  const nextStep = nextStepIndex === null ? null : steps[nextStepIndex];
   const updatedSubmission = await recordActionFlowProgress({
     projectId: input.projectId,
     submissionId: input.submission.id,
     currentStepId: nextStep?.id ?? null,
     fields: nextFields,
+    metadata: editState
+      ? updateFlowEditMetadata(
+          input.submission.metadata,
+          nextEditStepIndex === null ? null : nextEditPosition,
+        )
+      : input.submission.metadata,
     event: {
       eventType: "field.collected",
       message: fieldKey ? `Collected ${fieldKey}.` : "Collected flow field.",
@@ -1232,21 +1397,22 @@ async function continueChannelFlowMedia(input: {
     },
   });
 
-  await addActionSubmissionEvent({
-    projectId: input.projectId,
-    submissionId: updatedSubmission.id,
-    eventType: "flow.branch_decision",
-    message: "Flow route selected.",
-    payload: branchDecision,
-  });
+  if (branchDecision) {
+    await addActionSubmissionEvent({
+      projectId: input.projectId,
+      submissionId: updatedSubmission.id,
+      eventType: "flow.branch_decision",
+      message: "Flow route selected.",
+      payload: branchDecision,
+    });
+  }
 
-  const nextStepIndex = branchDecision.stepIndex ?? steps.length;
   return advanceFlowToNextStep({
     action: input.action,
     contactId: input.contactId ?? getSubmissionContactId(updatedSubmission),
     projectId: input.projectId,
     submission: updatedSubmission,
-    stepIndex: nextStepIndex,
+    stepIndex: nextStepIndex ?? steps.length,
   });
 }
 

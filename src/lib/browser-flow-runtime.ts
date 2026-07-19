@@ -1,6 +1,10 @@
-import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
+import {
+  getActionSubmission,
+  getActiveActionSubmissionForConversation,
+} from "@/lib/action-flows";
 import type { ActiveActionFlow } from "@/lib/action-runtime";
 import {
+  type FlowEditSection,
   findTriggeredAction,
   getRunnableActionSteps,
   isActionConfirmationStep,
@@ -8,8 +12,10 @@ import {
 } from "@/lib/action-runtime";
 import type { BrowserFlowRuntimeResult } from "@/lib/browser-flow-contract";
 import {
+  processChannelFlowMedia,
   processChannelFlowText,
   startChannelFlow,
+  startChannelFlowEdit,
 } from "@/lib/channel-flow-runtime";
 import {
   type ChannelType,
@@ -17,6 +23,7 @@ import {
   recordChannelInboundMessage,
   recordChannelOutboundMessage,
 } from "@/lib/channels";
+import type { FlowMediaUploadValue } from "@/lib/flow-media-values";
 import {
   getRuntimeProjectAction,
   getRuntimeProjectActionForSubmission,
@@ -28,9 +35,18 @@ type RunBrowserFlowTextInput = {
   channelType: ChannelType;
   conversationId: string;
   externalUserId?: string | null;
+  editSection?: FlowEditSection;
   projectId: number;
   source: string;
   text?: string;
+};
+
+type RunBrowserFlowMediaInput = {
+  channelType: ChannelType;
+  media: FlowMediaUploadValue;
+  projectId: number;
+  source: string;
+  submissionId: number;
 };
 
 function toActiveActionFlow(input: {
@@ -60,6 +76,24 @@ function toActiveActionFlow(input: {
     stepIndex: stepIndex >= 0 ? stepIndex : steps.length,
     submissionId: input.submission.id,
   };
+}
+
+async function recordBrowserFlowReplies(input: {
+  channelType: ChannelType;
+  conversationId: string;
+  projectId: number;
+  replies: BrowserFlowRuntimeResult["replies"];
+}) {
+  for (const reply of input.replies) {
+    await recordChannelOutboundMessage({
+      channelType: input.channelType,
+      externalConversationId: input.conversationId,
+      messageType: reply.type,
+      payload: reply.payload,
+      projectId: input.projectId,
+      text: reply.fallbackText,
+    });
+  }
 }
 
 async function getBrowserFlowState(input: {
@@ -102,6 +136,47 @@ export async function runBrowserFlowText(
   });
   const text = input.text?.trim() ?? "";
   let action: RuntimeAction | null = null;
+
+  if (input.editSection) {
+    if (!activeSubmission) {
+      return { action: null, activeFlow: null, handled: true, replies: [] };
+    }
+
+    action = await getRuntimeProjectActionForSubmission(
+      input.projectId,
+      activeSubmission,
+    );
+    if (!action) {
+      return { action: null, activeFlow: null, handled: true, replies: [] };
+    }
+
+    const conversation = await getOrCreateChannelConversation({
+      channelType: input.channelType,
+      externalConversationId: input.conversationId,
+      externalUserId: input.externalUserId,
+      projectId: input.projectId,
+    });
+    const editResult = await startChannelFlowEdit({
+      action,
+      contactId: conversation.contactId,
+      projectId: input.projectId,
+      section: input.editSection,
+      submission: activeSubmission,
+    });
+    await recordBrowserFlowReplies({
+      channelType: input.channelType,
+      conversationId: input.conversationId,
+      projectId: input.projectId,
+      replies: editResult.replies,
+    });
+    const state = await getBrowserFlowState({
+      conversationId: input.conversationId,
+      projectId: input.projectId,
+      source: input.source,
+    });
+
+    return { ...state, handled: true, replies: editResult.replies };
+  }
 
   if (!activeSubmission) {
     if (input.actionId) {
@@ -153,16 +228,12 @@ export async function runBrowserFlowText(
         })
       : { replies: [] };
 
-  for (const reply of result.replies) {
-    await recordChannelOutboundMessage({
-      channelType: input.channelType,
-      externalConversationId: input.conversationId,
-      messageType: reply.type,
-      payload: reply.payload,
-      projectId: input.projectId,
-      text: reply.fallbackText,
-    });
-  }
+  await recordBrowserFlowReplies({
+    channelType: input.channelType,
+    conversationId: input.conversationId,
+    projectId: input.projectId,
+    replies: result.replies,
+  });
 
   const state = await getBrowserFlowState({
     conversationId: input.conversationId,
@@ -175,4 +246,41 @@ export async function runBrowserFlowText(
     handled: true,
     replies: result.replies,
   };
+}
+
+export async function runBrowserFlowMedia(
+  input: RunBrowserFlowMediaInput,
+): Promise<BrowserFlowRuntimeResult> {
+  const submission = await getActionSubmission(
+    input.projectId,
+    input.submissionId,
+  );
+
+  if (
+    !submission ||
+    submission.status !== "in_progress" ||
+    submission.source !== input.source ||
+    !submission.conversationId
+  ) {
+    return { action: null, activeFlow: null, handled: true, replies: [] };
+  }
+
+  const result = await processChannelFlowMedia({
+    activeSubmission: submission,
+    media: input.media,
+    projectId: input.projectId,
+  });
+  await recordBrowserFlowReplies({
+    channelType: input.channelType,
+    conversationId: submission.conversationId,
+    projectId: input.projectId,
+    replies: result.replies,
+  });
+  const state = await getBrowserFlowState({
+    conversationId: submission.conversationId,
+    projectId: input.projectId,
+    source: input.source,
+  });
+
+  return { ...state, handled: true, replies: result.replies };
 }

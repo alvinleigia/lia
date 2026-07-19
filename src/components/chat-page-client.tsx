@@ -51,7 +51,6 @@ import {
   isActionMutationStep,
   isActionSubmitStep,
   isProductMessageStep,
-  prepareFlowSectionEdit,
   type RuntimeAction,
   type RuntimeRouteDecision,
   summarizeActionFields,
@@ -67,7 +66,7 @@ type ChatPageClientProps = {
   projectId: number;
 };
 
-type FlowMediaUploadResponse = {
+type FlowMediaUploadResponse = BrowserFlowRuntimeResult & {
   label: string;
   value: unknown;
 };
@@ -152,6 +151,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
   const runCanonicalFlow = async (input: {
     actionId?: number;
     displayUserText?: boolean;
+    editSection?: FlowEditSection;
     text?: string;
   }) => {
     setIsSavingSubmission(true);
@@ -163,6 +163,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
         body: JSON.stringify({
           actionId: input.actionId,
           conversationId,
+          editSection: input.editSection,
           projectId,
           text: input.text,
         }),
@@ -698,47 +699,13 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       }
 
       const upload = (await response.json()) as FlowMediaUploadResponse;
-      const fieldKey = step.fieldKey ?? `step_${step.id}`;
-      const answerResult = buildStepAnswerResult(
-        step,
-        fieldKey,
-        upload.value,
-        flow.fields,
-      );
-      const nextFields = {
-        ...flow.fields,
-        ...answerResult.fields,
-      };
-      const branchDecision = getNextActionStepDecision(
-        action,
-        step,
-        flow.stepIndex,
-        nextFields,
-      );
-      const nextStepIndex = branchDecision.stepIndex ?? steps.length;
-      const nextStep =
-        typeof nextStepIndex === "number" ? steps[nextStepIndex] : null;
-
-      await persistFlowProgress({
-        fieldKey,
-        fields: nextFields,
-        flow,
-        branchDecision,
-        nextStepId: nextStep?.id ?? null,
-        stepId: step.id,
-        value: upload.value,
-      });
-
-      await advanceFlowToNextStep(
-        action,
-        {
-          ...flow,
-          stepIndex: nextStepIndex,
-          fields: nextFields,
-          mode: "collecting",
-        },
-        [makeFlowMessage("user", upload.label || answerResult.label)],
-      );
+      setFlowMessages((current) => [
+        ...current,
+        makeFlowMessage("user", upload.label),
+        ...runtimeRepliesToFlowMessages(upload.replies),
+      ]);
+      setActiveFlow(upload.activeFlow);
+      setServerActiveAction(upload.activeFlow ? upload.action : null);
     } catch (error) {
       setFlowMessages((current) => [
         ...current,
@@ -811,27 +778,12 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     await runCanonicalFlow({ text: "confirm" });
   };
 
-  const editActiveFlowSection = (section: FlowEditSection) => {
+  const editActiveFlowSection = async (section: FlowEditSection) => {
     if (!activeFlow || !activeAction) {
       return;
     }
 
-    const nextFlow = prepareFlowSectionEdit(activeAction, activeFlow, section);
-    const nextStep = getRunnableActionSteps(activeAction)[nextFlow.stepIndex];
-
-    setActiveFlow(nextFlow);
-    setFlowMessages((current) => [
-      ...current,
-      makeFlowMessage(
-        "assistant",
-        nextStep
-          ? `No problem. ${buildActionStepTextFallbackMessage(
-              nextStep,
-              nextFlow.fields,
-            )}`
-          : "No problem. Let's update the details.",
-      ),
-    ]);
+    await runCanonicalFlow({ editSection: section });
   };
 
   const cancelActiveFlow = async () => {

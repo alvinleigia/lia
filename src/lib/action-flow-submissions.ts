@@ -24,6 +24,7 @@ type RecordActionFlowProgressInput = {
   submissionId: number;
   currentStepId?: number | null;
   fields: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   event?: {
     eventType: string;
     message: string;
@@ -128,7 +129,7 @@ export async function recordActionFlowProgress(
     currentStepId: input.currentStepId ?? null,
     status: "in_progress",
     fields: input.fields,
-    metadata: submission.metadata,
+    metadata: input.metadata ?? submission.metadata,
   });
 
   if (input.event) {

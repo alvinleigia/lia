@@ -1,8 +1,4 @@
-import {
-  addActionSubmissionEvent,
-  getActionFlowStep,
-  getActionSubmission,
-} from "@/lib/action-flows";
+import { getActionSubmission } from "@/lib/action-flows";
 import { type ChannelType, recordChannelInboundMessage } from "@/lib/channels";
 import {
   doesFileMatchAllowedFileTypes,
@@ -13,6 +9,7 @@ import {
   MAX_MEDIA_UPLOAD_BYTES,
   saveProjectMediaFileUpload,
 } from "@/lib/media-assets";
+import { getRuntimeProjectActionForSubmission } from "@/lib/runtime-actions";
 
 export class FlowMediaUploadError extends Error {
   status: number;
@@ -50,6 +47,7 @@ function getChannelTypeForSubmissionSource(source: string): ChannelType | null {
 export async function uploadActionFlowMedia(input: {
   formData: FormData;
   projectId: number;
+  source: "project_chat" | "widget_chat";
 }) {
   const submissionId = readPositiveInteger(
     input.formData.get("submissionId"),
@@ -71,7 +69,11 @@ export async function uploadActionFlowMedia(input: {
   }
 
   const submission = await getActionSubmission(input.projectId, submissionId);
-  if (!submission || submission.status !== "in_progress") {
+  if (
+    !submission ||
+    submission.status !== "in_progress" ||
+    submission.source !== input.source
+  ) {
     throw new FlowMediaUploadError("Flow submission not found.", 404);
   }
 
@@ -79,12 +81,17 @@ export async function uploadActionFlowMedia(input: {
     throw new FlowMediaUploadError("Flow action is unavailable.", 404);
   }
 
-  const step = await getActionFlowStep(
+  const action = await getRuntimeProjectActionForSubmission(
     input.projectId,
-    submission.actionId,
-    stepId,
+    submission,
   );
-  if (!step || step.stepType !== "file_upload" || !step.isEnabled) {
+  const step = action?.steps.find((item) => item.id === stepId);
+  if (
+    !step ||
+    step.id !== submission.currentStepId ||
+    step.stepType !== "file_upload" ||
+    !step.isEnabled
+  ) {
     throw new FlowMediaUploadError("Flow media step is unavailable.", 404);
   }
 
@@ -134,19 +141,6 @@ export async function uploadActionFlowMedia(input: {
     sizeBytes: asset.sizeBytes,
   };
 
-  await addActionSubmissionEvent({
-    projectId: input.projectId,
-    submissionId: submission.id,
-    eventType: "flow.media_uploaded",
-    message: "Media uploaded for flow step.",
-    payload: {
-      actionId: submission.actionId,
-      mediaAssetId: asset.id,
-      stepId,
-      value,
-    },
-  });
-
   const channelType = getChannelTypeForSubmissionSource(submission.source);
   if (channelType && submission.conversationId) {
     await recordChannelInboundMessage({
@@ -166,6 +160,7 @@ export async function uploadActionFlowMedia(input: {
 
   return {
     label: `Uploaded ${asset.originalName}`,
+    submissionId: submission.id,
     value,
   };
 }

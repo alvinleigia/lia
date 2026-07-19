@@ -4,12 +4,17 @@ import {
   createActionFlowStep,
   createProjectAction as createChatbotAction,
   createPublishedActionFlowVersion,
+  getActionSubmission,
   getActiveActionSubmissionForConversation,
   listActionSubmissionEvents,
   listActionSubmissions,
   updateActionFlowStep,
 } from "../../src/lib/action-flows";
 import { writeAuditLog } from "../../src/lib/audit";
+import {
+  runBrowserFlowMedia,
+  runBrowserFlowText,
+} from "../../src/lib/browser-flow-runtime";
 import { processChannelFlowText } from "../../src/lib/channel-flow-runtime";
 import {
   recordChannelInboundMessage,
@@ -19,6 +24,7 @@ import { logChatRequest } from "../../src/lib/chat-logs";
 import { getOrCreateDefaultCompanyForUser } from "../../src/lib/companies";
 import { addContactTag, setContactAttribute } from "../../src/lib/contacts";
 import { getProjectSourceDocuments } from "../../src/lib/documents";
+import { uploadActionFlowMedia } from "../../src/lib/flow-media-upload";
 import { listProjectMediaAssets } from "../../src/lib/media-assets";
 import {
   createIntegrationProvider,
@@ -1327,6 +1333,259 @@ test("project chat action flow follows a branch route", async ({ page }) => {
   await expect(page.getByText("urgent", { exact: true })).toBeVisible();
   await expect(page.getByText("flow.branch_decision")).toBeVisible();
   await expect(page.getByText("submission.submitted")).toBeVisible();
+});
+
+test("browser runtime edits collected fields on the pinned submission", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-runtime-edit-${runId}@example.test`;
+  const projectName = `E2E Runtime Edit Project ${runId}`;
+  const conversationId = `runtime-edit-${runId}`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Runtime Edit User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(page, projectName);
+  const user = await getUserByEmail(email);
+  if (!user) {
+    throw new Error("Expected the runtime-edit test user to exist.");
+  }
+
+  const action = await createChatbotAction({
+    description: "Verifies server-owned answer editing.",
+    name: `E2E Runtime Edit ${runId}`,
+    projectId,
+    status: "active",
+    triggerPhrases: [`runtime edit ${runId}`],
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "guestName",
+    inputType: "text",
+    isRequired: true,
+    label: "Guest Name",
+    projectId,
+    prompt: "What name should we use?",
+    sortOrder: 1,
+    stepType: "collect_input",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "guestEmail",
+    inputType: "email",
+    isRequired: true,
+    label: "Guest Email",
+    projectId,
+    prompt: "What email should we use?",
+    sortOrder: 2,
+    stepType: "email",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Confirm Request",
+    projectId,
+    prompt: "Please review your request.",
+    sortOrder: 3,
+    stepType: "confirmation",
+  });
+  await createPublishedActionFlowVersion({
+    actionId: action.id,
+    projectId,
+    publishedByUserId: user.id,
+  });
+
+  await runBrowserFlowText({
+    actionId: action.id,
+    channelType: "project_chat",
+    conversationId,
+    projectId,
+    source: "project_chat",
+  });
+  await runBrowserFlowText({
+    channelType: "project_chat",
+    conversationId,
+    projectId,
+    source: "project_chat",
+    text: "Original Name",
+  });
+  const reviewResult = await runBrowserFlowText({
+    channelType: "project_chat",
+    conversationId,
+    projectId,
+    source: "project_chat",
+    text: `original-${runId}@example.test`,
+  });
+  expect(reviewResult.activeFlow?.mode).toBe("confirming");
+
+  const editResult = await runBrowserFlowText({
+    channelType: "project_chat",
+    conversationId,
+    editSection: "name",
+    projectId,
+    source: "project_chat",
+  });
+  expect(
+    editResult.replies.map((reply) => reply.fallbackText).join("\n"),
+  ).toContain("What name should we use?");
+  expect(editResult.activeFlow?.fields).toEqual(
+    expect.objectContaining({ guestEmail: `original-${runId}@example.test` }),
+  );
+  expect(editResult.activeFlow?.fields).not.toHaveProperty("guestName");
+
+  const editedReview = await runBrowserFlowText({
+    channelType: "project_chat",
+    conversationId,
+    projectId,
+    source: "project_chat",
+    text: "Updated Name",
+  });
+  expect(editedReview.activeFlow).toEqual(
+    expect.objectContaining({
+      fields: expect.objectContaining({
+        guestEmail: `original-${runId}@example.test`,
+        guestName: "Updated Name",
+      }),
+      mode: "confirming",
+    }),
+  );
+
+  const submittedResult = await runBrowserFlowText({
+    channelType: "project_chat",
+    conversationId,
+    projectId,
+    source: "project_chat",
+    text: "confirm",
+  });
+  expect(submittedResult.activeFlow).toBeNull();
+
+  const [submission] = await listActionSubmissions(projectId, action.id);
+  expect(submission).toEqual(
+    expect.objectContaining({
+      fields: expect.objectContaining({ guestName: "Updated Name" }),
+      status: "submitted",
+    }),
+  );
+  const events = await listActionSubmissionEvents(projectId, submission.id);
+  expect(events.map((event) => event.eventType)).toContain("flow.edit_started");
+});
+
+test("browser media upload advances the canonical pinned flow", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-runtime-media-${runId}@example.test`;
+  const projectName = `E2E Runtime Media Project ${runId}`;
+  const conversationId = `runtime-media-${runId}`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Runtime Media User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(page, projectName);
+  const user = await getUserByEmail(email);
+  if (!user) {
+    throw new Error("Expected the runtime-media test user to exist.");
+  }
+
+  const action = await createChatbotAction({
+    description: "Verifies canonical browser media progression.",
+    name: `E2E Runtime Media ${runId}`,
+    projectId,
+    status: "active",
+    triggerPhrases: [`runtime media ${runId}`],
+  });
+  const uploadStep = await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "attachment",
+    isRequired: true,
+    label: "Attachment",
+    projectId,
+    prompt: "Please upload the supporting file.",
+    sortOrder: 1,
+    stepType: "file_upload",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Submit Upload",
+    projectId,
+    prompt: "Saving the uploaded request.",
+    sortOrder: 2,
+    stepType: "submit",
+  });
+  await createPublishedActionFlowVersion({
+    actionId: action.id,
+    projectId,
+    publishedByUserId: user.id,
+  });
+
+  await runBrowserFlowText({
+    actionId: action.id,
+    channelType: "widget",
+    conversationId,
+    projectId,
+    source: "widget_chat",
+  });
+  const activeSubmission = await getActiveActionSubmissionForConversation({
+    conversationId,
+    projectId,
+    source: "widget_chat",
+  });
+  if (!activeSubmission) {
+    throw new Error("Expected an active runtime-media submission.");
+  }
+
+  const formData = new FormData();
+  formData.append(
+    "file",
+    new File([`runtime media ${runId}`], `runtime-media-${runId}.txt`, {
+      type: "text/plain",
+    }),
+  );
+  formData.append("stepId", String(uploadStep.id));
+  formData.append("submissionId", String(activeSubmission.id));
+  const upload = await uploadActionFlowMedia({
+    formData,
+    projectId,
+    source: "widget_chat",
+  });
+  const mediaResult = await runBrowserFlowMedia({
+    channelType: "widget",
+    media: upload.value,
+    projectId,
+    source: "widget_chat",
+    submissionId: upload.submissionId,
+  });
+  expect(mediaResult.activeFlow).toBeNull();
+  expect(
+    mediaResult.replies.map((reply) => reply.fallbackText).join("\n"),
+  ).toContain("Thanks. I saved this request.");
+
+  const submission = await getActionSubmission(projectId, activeSubmission.id);
+  expect(submission).toEqual(
+    expect.objectContaining({
+      fields: expect.objectContaining({
+        attachment: expect.objectContaining({
+          originalName: `runtime-media-${runId}.txt`,
+        }),
+      }),
+      status: "submitted",
+    }),
+  );
+  const events = await listActionSubmissionEvents(
+    projectId,
+    activeSubmission.id,
+  );
+  expect(
+    events.filter((event) => event.eventType === "flow.media_uploaded"),
+  ).toHaveLength(1);
 });
 
 test("channel action flow follows inline operation success and failure routes", async ({

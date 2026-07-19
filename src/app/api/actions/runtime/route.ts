@@ -9,6 +9,9 @@ import { runBrowserFlowText } from "@/lib/browser-flow-runtime";
 const requestSchema = z.object({
   actionId: z.number().int().positive().optional(),
   conversationId: z.string().trim().min(1).max(120),
+  editSection: z
+    .enum(["all", "email", "name", "phone", "schedule", "service"])
+    .optional(),
   projectId: z.number().int().positive().optional(),
   text: z.string().max(4000).optional(),
 });
@@ -19,7 +22,9 @@ export async function POST(req: Request) {
 
     if (
       !parsed.success ||
-      (!parsed.data.actionId && !parsed.data.text?.trim())
+      (!parsed.data.actionId &&
+        !parsed.data.editSection &&
+        !parsed.data.text?.trim())
     ) {
       return NextResponse.json(
         { message: "A flow action or message is required." },
@@ -32,6 +37,7 @@ export async function POST(req: Request) {
       actionId: parsed.data.actionId,
       channelType: "project_chat",
       conversationId: parsed.data.conversationId,
+      editSection: parsed.data.editSection,
       projectId: project.id,
       source: "project_chat",
       text: parsed.data.text,
