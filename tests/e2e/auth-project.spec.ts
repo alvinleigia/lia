@@ -3,8 +3,11 @@ import {
   createActionFlowBranchRule,
   createActionFlowStep,
   createProjectAction as createChatbotAction,
+  createPublishedActionFlowVersion,
+  getActiveActionSubmissionForConversation,
   listActionSubmissionEvents,
   listActionSubmissions,
+  updateActionFlowStep,
 } from "../../src/lib/action-flows";
 import { writeAuditLog } from "../../src/lib/audit";
 import { processChannelFlowText } from "../../src/lib/channel-flow-runtime";
@@ -1452,6 +1455,142 @@ test("channel action flow follows inline operation success and failure routes", 
       "operation.failed",
       "submission.submitted",
     ]),
+  );
+});
+
+test("active flow stays pinned to the published version it started with", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-version-pin-${runId}@example.test`;
+  const projectName = `E2E Version Pin Project ${runId}`;
+  const triggerPhrase = `version pin ${runId}`;
+  const conversationId = `version-pin-conversation-${runId}`;
+  const inputPrompt = `What should version one collect ${runId}?`;
+  const versionOnePrompt = `Version one completion ${runId}.`;
+  const versionTwoPrompt = `Version two completion ${runId}.`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Version Pin User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(page, projectName);
+  const user = await getUserByEmail(email);
+  if (!user) {
+    throw new Error("Expected the version-pin test user to exist.");
+  }
+
+  const action = await createChatbotAction({
+    description: "Verifies immutable runtime version pinning.",
+    name: `E2E Version Pin Action ${runId}`,
+    projectId,
+    status: "active",
+    triggerPhrases: [triggerPhrase],
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "versionPinAnswer",
+    inputType: "text",
+    isRequired: true,
+    label: "Version Pin Answer",
+    projectId,
+    prompt: inputPrompt,
+    sortOrder: 1,
+    stepType: "collect_input",
+  });
+  const submitStep = await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Submit Version Pin Request",
+    projectId,
+    prompt: versionOnePrompt,
+    sortOrder: 2,
+    stepType: "submit",
+  });
+  const versionOne = await createPublishedActionFlowVersion({
+    actionId: action.id,
+    projectId,
+    publishedByUserId: user.id,
+  });
+  if (!versionOne) {
+    throw new Error("Expected version one to be published.");
+  }
+
+  const startResult = await processChannelFlowText({
+    activeSubmission: null,
+    conversationId,
+    projectId,
+    source: "widget_chat",
+    text: triggerPhrase,
+  });
+  expect(
+    startResult.replies.map((reply) => reply.fallbackText).join("\n"),
+  ).toContain(inputPrompt);
+
+  const activeSubmission = await getActiveActionSubmissionForConversation({
+    conversationId,
+    projectId,
+    source: "widget_chat",
+  });
+  if (!activeSubmission) {
+    throw new Error("Expected an active version-pin submission.");
+  }
+  expect(activeSubmission).toEqual(
+    expect.objectContaining({
+      actionId: action.id,
+      actionVersionId: versionOne.id,
+      status: "in_progress",
+    }),
+  );
+
+  await updateActionFlowStep({
+    actionId: action.id,
+    fieldKey: submitStep.fieldKey,
+    inputType: submitStep.inputType,
+    isEnabled: submitStep.isEnabled,
+    isRequired: submitStep.isRequired,
+    label: submitStep.label,
+    nextStepId: submitStep.nextStepId,
+    operationId: submitStep.operationId,
+    options: submitStep.options,
+    projectId,
+    prompt: versionTwoPrompt,
+    settings: submitStep.settings,
+    sortOrder: submitStep.sortOrder,
+    stepId: submitStep.id,
+    stepType: submitStep.stepType,
+  });
+  const versionTwo = await createPublishedActionFlowVersion({
+    actionId: action.id,
+    projectId,
+    publishedByUserId: user.id,
+  });
+  expect(versionTwo?.id).not.toBe(versionOne.id);
+
+  const completionResult = await processChannelFlowText({
+    activeSubmission,
+    conversationId,
+    projectId,
+    source: "widget_chat",
+    text: `Pinned answer ${runId}`,
+  });
+  const completionText = completionResult.replies
+    .map((reply) => reply.fallbackText)
+    .join("\n");
+  expect(completionText).toContain(versionOnePrompt);
+  expect(completionText).not.toContain(versionTwoPrompt);
+
+  const [completedSubmission] = await listActionSubmissions(
+    projectId,
+    action.id,
+  );
+  expect(completedSubmission).toEqual(
+    expect.objectContaining({
+      actionVersionId: versionOne.id,
+      status: "submitted",
+    }),
   );
 });
 

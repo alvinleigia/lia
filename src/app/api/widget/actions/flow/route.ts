@@ -22,7 +22,7 @@ import {
 } from "@/lib/channels";
 import { executeContactMutationStep } from "@/lib/contact-flow-mutations";
 import { buildHandoffMetadata, runHandoffNotification } from "@/lib/handoff";
-import { getRuntimeProjectAction } from "@/lib/runtime-actions";
+import { getRuntimeProjectActionForSubmission } from "@/lib/runtime-actions";
 import { resolveWidgetTokenAccessForRequest } from "@/lib/widget-keys";
 
 const branchDecisionSchema = z.object({
@@ -212,9 +212,9 @@ export async function POST(req: Request) {
         );
       }
 
-      const action = await getRuntimeProjectAction(
+      const action = await getRuntimeProjectActionForSubmission(
         projectId,
-        existingSubmission.actionId,
+        existingSubmission,
       );
       const step = action?.steps.find((item) => item.id === mutation.stepId);
 
@@ -276,9 +276,9 @@ export async function POST(req: Request) {
         );
       }
 
-      const action = await getRuntimeProjectAction(
+      const action = await getRuntimeProjectActionForSubmission(
         projectId,
-        existingSubmission.actionId,
+        existingSubmission,
       );
       const step = action?.steps.find(
         (item) => item.id === handoffRequest.stepId,
@@ -375,6 +375,7 @@ export async function POST(req: Request) {
       const validation = await validateActionFlowProgress({
         projectId,
         actionId: existingSubmission.actionId,
+        actionVersionId: existingSubmission.actionVersionId,
         stepId: parsed.data.stepId,
         value: parsed.data.value,
         fields: parsed.data.fields,
@@ -469,6 +470,7 @@ export async function POST(req: Request) {
       const validation = await validateActionSubmissionFields({
         projectId,
         actionId: existingSubmission.actionId,
+        actionVersionId: existingSubmission.actionVersionId,
         fields: parsed.data.fields,
       });
 

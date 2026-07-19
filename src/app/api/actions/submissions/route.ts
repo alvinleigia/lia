@@ -4,13 +4,13 @@ import { validateActionSubmissionFields } from "@/lib/action-flow-validation";
 import {
   addActionSubmissionEvent,
   createActionSubmission,
-  getProjectAction,
 } from "@/lib/action-flows";
 import {
   isInactiveAccountError,
   resolveUserAndProject,
 } from "@/lib/auth-project";
 import { runSubmissionOperations } from "@/lib/operations";
+import { getRuntimeProjectAction } from "@/lib/runtime-actions";
 
 const submissionSchema = z.object({
   actionId: z.number().int().positive(),
@@ -31,9 +31,12 @@ export async function POST(req: Request) {
     }
 
     const { project } = await resolveUserAndProject();
-    const action = await getProjectAction(project.id, parsed.data.actionId);
+    const action = await getRuntimeProjectAction(
+      project.id,
+      parsed.data.actionId,
+    );
 
-    if (!action || action.status !== "active") {
+    if (!action) {
       return NextResponse.json(
         { message: "Action is unavailable." },
         { status: 404 },
@@ -43,6 +46,7 @@ export async function POST(req: Request) {
     const validation = await validateActionSubmissionFields({
       projectId: project.id,
       actionId: action.id,
+      actionVersionId: action.versionId,
       fields: parsed.data.fields,
     });
 
@@ -59,12 +63,14 @@ export async function POST(req: Request) {
     const submission = await createActionSubmission({
       projectId: project.id,
       actionId: action.id,
+      actionVersionId: action.versionId,
       status: "submitted",
       source: parsed.data.source ?? "project_chat",
       conversationId: parsed.data.conversationId ?? null,
       fields: parsed.data.fields,
       metadata: {
         actionName: action.name,
+        actionVersionNumber: action.versionNumber,
       },
     });
 

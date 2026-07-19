@@ -212,7 +212,7 @@ assertIncludes(
 );
 assertIncludes(
   "src/app/api/widget/actions/submissions/route.ts",
-  "getProjectAction(\n      widgetAccess.projectId,",
+  "getRuntimeProjectAction(\n      widgetAccess.projectId,",
   "Widget submission action access",
 );
 assertIncludes(

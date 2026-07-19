@@ -73,6 +73,8 @@ export type RuntimeActionBranchRule = {
 
 export type RuntimeAction = {
   id: number;
+  versionId: number | null;
+  versionNumber: number | null;
   name: string;
   description: string | null;
   triggerPhrases: string[];

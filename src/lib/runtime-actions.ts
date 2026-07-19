@@ -10,6 +10,7 @@ import type { RuntimeAction } from "@/lib/action-runtime";
 import type {
   SelectActionFlowBranchRule,
   SelectActionFlowStep,
+  SelectActionSubmission,
   SelectProjectAction,
 } from "@/lib/db-schema";
 
@@ -20,6 +21,8 @@ export function toRuntimeAction(input: {
 }): RuntimeAction {
   return {
     id: input.action.id,
+    versionId: null,
+    versionNumber: null,
     name: input.action.name,
     description: input.action.description,
     triggerPhrases: input.action.triggerPhrases,
@@ -69,9 +72,12 @@ function isActionFlowVersionSnapshot(
 
 function toRuntimeActionFromSnapshot(
   snapshot: ActionFlowVersionSnapshot,
+  version: { id: number; versionNumber: number },
 ): RuntimeAction {
   return {
     id: snapshot.action.id,
+    versionId: version.id,
+    versionNumber: version.versionNumber,
     name: snapshot.action.name,
     description: snapshot.action.description,
     triggerPhrases: snapshot.action.triggerPhrases,
@@ -103,26 +109,28 @@ function toRuntimeActionFromSnapshot(
   };
 }
 
-async function getPublishedRuntimeAction(
+async function getVersionedRuntimeAction(
   projectId: number,
   action: SelectProjectAction,
+  versionId: number,
 ) {
-  if (!action.publishedVersionId) {
-    return null;
-  }
-
-  const version = await getActionFlowVersion(
-    projectId,
-    action.id,
-    action.publishedVersionId,
-  );
+  const version = await getActionFlowVersion(projectId, action.id, versionId);
 
   if (!version || version.status !== "published") {
     return null;
   }
 
   return isActionFlowVersionSnapshot(version.snapshot)
-    ? toRuntimeActionFromSnapshot(version.snapshot)
+    ? toRuntimeActionFromSnapshot(version.snapshot, version)
+    : null;
+}
+
+async function getPublishedRuntimeAction(
+  projectId: number,
+  action: SelectProjectAction,
+) {
+  return action.publishedVersionId
+    ? getVersionedRuntimeAction(projectId, action, action.publishedVersionId)
     : null;
 }
 
@@ -153,11 +161,16 @@ export async function listRuntimeProjectActions(projectId: number) {
 export async function getRuntimeProjectAction(
   projectId: number,
   actionId: number,
+  options: { versionId?: number | null } = {},
 ) {
   const action = await getProjectAction(projectId, actionId);
 
   if (!action || action.status !== "active") {
     return null;
+  }
+
+  if (options.versionId !== undefined && options.versionId !== null) {
+    return getVersionedRuntimeAction(projectId, action, options.versionId);
   }
 
   const publishedAction = await getPublishedRuntimeAction(projectId, action);
@@ -172,4 +185,13 @@ export async function getRuntimeProjectAction(
   ]);
 
   return toRuntimeAction({ action, branchRules, steps });
+}
+
+export function getRuntimeProjectActionForSubmission(
+  projectId: number,
+  submission: Pick<SelectActionSubmission, "actionId" | "actionVersionId">,
+) {
+  return getRuntimeProjectAction(projectId, submission.actionId, {
+    versionId: submission.actionVersionId,
+  });
 }

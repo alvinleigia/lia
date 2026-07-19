@@ -676,6 +676,7 @@ function getOperationRoutePreset(
 export type CreateActionSubmissionInput = {
   projectId: number;
   actionId: number;
+  actionVersionId?: number | null;
   currentStepId?: number | null;
   conversationId?: string | null;
   source?: string;
@@ -1782,6 +1783,7 @@ export async function createActionSubmission(
     .values({
       projectId: input.projectId,
       actionId: input.actionId,
+      actionVersionId: input.actionVersionId ?? null,
       currentStepId: input.currentStepId ?? null,
       conversationId: input.conversationId ?? null,
       source: input.source ?? "chat_widget",

@@ -2,19 +2,16 @@ import {
   addActionSubmissionEvent,
   createActionSubmission,
   getActionSubmission,
-  getProjectAction,
-  listActionFlowSteps,
   updateActionSubmission,
 } from "@/lib/action-flows";
-import {
-  isRunnableActionStep,
-  type RuntimeActionStep,
-} from "@/lib/action-runtime";
+import { isRunnableActionStep } from "@/lib/action-runtime";
 import { runSubmissionOperations } from "@/lib/operations";
+import { getRuntimeProjectAction } from "@/lib/runtime-actions";
 
 type StartActionFlowSubmissionInput = {
   projectId: number;
   actionId: number;
+  actionVersionId?: number | null;
   contactId?: number | null;
   conversationId?: string | null;
   fields?: Record<string, unknown>;
@@ -46,28 +43,29 @@ type CancelActionFlowSubmissionInput = {
 };
 
 function getFirstRuntimeStepId(
-  steps: Awaited<ReturnType<typeof listActionFlowSteps>>,
+  action: Awaited<ReturnType<typeof getRuntimeProjectAction>>,
 ) {
-  return (
-    steps.find((step) => isRunnableActionStep(step as RuntimeActionStep))?.id ??
-    null
-  );
+  return action?.steps.find(isRunnableActionStep)?.id ?? null;
 }
 
 export async function startActionFlowSubmission(
   input: StartActionFlowSubmissionInput,
 ) {
-  const action = await getProjectAction(input.projectId, input.actionId);
+  const action = await getRuntimeProjectAction(
+    input.projectId,
+    input.actionId,
+    { versionId: input.actionVersionId },
+  );
 
-  if (!action || action.status !== "active") {
+  if (!action) {
     return null;
   }
 
-  const steps = await listActionFlowSteps(input.projectId, action.id);
   const submission = await createActionSubmission({
     projectId: input.projectId,
     actionId: action.id,
-    currentStepId: getFirstRuntimeStepId(steps),
+    actionVersionId: action.versionId,
+    currentStepId: getFirstRuntimeStepId(action),
     conversationId: input.conversationId ?? null,
     source: input.source,
     status: "in_progress",
@@ -75,6 +73,7 @@ export async function startActionFlowSubmission(
     metadata: {
       ...(input.metadata ?? {}),
       actionName: action.name,
+      actionVersionNumber: action.versionNumber,
       contactId: input.contactId ?? null,
     },
   });
@@ -86,6 +85,8 @@ export async function startActionFlowSubmission(
     message: "Flow submission created.",
     payload: {
       actionId: action.id,
+      actionVersionId: action.versionId,
+      actionVersionNumber: action.versionNumber,
       conversationId: input.conversationId ?? null,
       contactId: input.contactId ?? null,
       source: input.source,
@@ -100,6 +101,8 @@ export async function startActionFlowSubmission(
     payload: {
       actionId: action.id,
       actionName: action.name,
+      actionVersionId: action.versionId,
+      actionVersionNumber: action.versionNumber,
       firstStepId: submission.currentStepId,
     },
   });

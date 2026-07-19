@@ -1,4 +1,3 @@
-import { getActionFlowStep, listActionFlowSteps } from "@/lib/action-flows";
 import {
   buildInvalidStepAnswerMessage,
   getActionStepOptions,
@@ -8,12 +7,12 @@ import {
   type RuntimeActionStep,
   validateStepAnswer,
 } from "@/lib/action-runtime";
-import type { SelectActionFlowStep } from "@/lib/db-schema";
 import { isFlowMediaUploadValue } from "@/lib/flow-media-values";
 import {
   normalizeFlowAddressValue,
   normalizeFlowLocationValue,
 } from "@/lib/flow-structured-values";
+import { getRuntimeProjectAction } from "@/lib/runtime-actions";
 
 export type ActionFlowValidationIssue = {
   stepId: number;
@@ -26,25 +25,7 @@ type ActionFlowValidationResult = {
   issues: ActionFlowValidationIssue[];
 };
 
-function toRuntimeStep(step: SelectActionFlowStep): RuntimeActionStep {
-  return {
-    id: step.id,
-    sortOrder: step.sortOrder,
-    stepType: step.stepType,
-    fieldKey: step.fieldKey,
-    label: step.label,
-    prompt: step.prompt,
-    inputType: step.inputType,
-    isRequired: step.isRequired,
-    isEnabled: step.isEnabled,
-    operationId: step.operationId,
-    nextStepId: step.nextStepId,
-    options: step.options,
-    settings: step.settings,
-  };
-}
-
-function getStepFieldKey(step: SelectActionFlowStep) {
+function getStepFieldKey(step: RuntimeActionStep) {
   return normalizeSubmissionFieldKey(step.fieldKey ?? `step_${step.id}`);
 }
 
@@ -52,7 +33,7 @@ function isBlankValue(value: unknown) {
   return value === undefined || value === null || String(value).trim() === "";
 }
 
-function getRequiredMessage(step: SelectActionFlowStep, fieldKey: string) {
+function getRequiredMessage(step: RuntimeActionStep, fieldKey: string) {
   const requiredMessage = step.settings.requiredMessage;
 
   if (typeof requiredMessage === "string" && requiredMessage.trim()) {
@@ -98,6 +79,7 @@ function validateStoredStepValue(
 export async function validateActionFlowProgress(input: {
   projectId: number;
   actionId: number;
+  actionVersionId?: number | null;
   stepId?: number;
   value?: unknown;
   fields: Record<string, unknown>;
@@ -115,11 +97,12 @@ export async function validateActionFlowProgress(input: {
     };
   }
 
-  const step = await getActionFlowStep(
+  const action = await getRuntimeProjectAction(
     input.projectId,
     input.actionId,
-    input.stepId,
+    { versionId: input.actionVersionId },
   );
+  const step = action?.steps.find((item) => item.id === input.stepId);
 
   if (!step || !step.isEnabled || step.stepType === "operation") {
     return {
@@ -134,8 +117,7 @@ export async function validateActionFlowProgress(input: {
     };
   }
 
-  const runtimeStep = toRuntimeStep(step);
-  if (!isActionInputStep(runtimeStep)) {
+  if (!isActionInputStep(step)) {
     return { isValid: true, issues: [] };
   }
 
@@ -158,14 +140,14 @@ export async function validateActionFlowProgress(input: {
       : { isValid: true, issues: [] };
   }
 
-  if (!validateStoredStepValue(runtimeStep, value, input.fields)) {
+  if (!validateStoredStepValue(step, value, input.fields)) {
     return {
       isValid: false,
       issues: [
         {
           stepId: step.id,
           fieldKey,
-          message: buildInvalidStepAnswerMessage(runtimeStep, input.fields),
+          message: buildInvalidStepAnswerMessage(step, input.fields),
         },
       ],
     };
@@ -177,15 +159,32 @@ export async function validateActionFlowProgress(input: {
 export async function validateActionSubmissionFields(input: {
   projectId: number;
   actionId: number;
+  actionVersionId?: number | null;
   fields: Record<string, unknown>;
 }): Promise<ActionFlowValidationResult> {
-  const steps = await listActionFlowSteps(input.projectId, input.actionId);
+  const action = await getRuntimeProjectAction(
+    input.projectId,
+    input.actionId,
+    { versionId: input.actionVersionId },
+  );
+
+  if (!action) {
+    return {
+      isValid: false,
+      issues: [
+        {
+          stepId: 0,
+          fieldKey: "actionId",
+          message: "Flow action is unavailable.",
+        },
+      ],
+    };
+  }
+
   const issues: ActionFlowValidationIssue[] = [];
 
-  for (const step of steps) {
-    const runtimeStep = toRuntimeStep(step);
-
-    if (!runtimeStep.isEnabled || !isActionInputStep(runtimeStep)) {
+  for (const step of action.steps) {
+    if (!step.isEnabled || !isActionInputStep(step)) {
       continue;
     }
 
@@ -204,11 +203,11 @@ export async function validateActionSubmissionFields(input: {
       continue;
     }
 
-    if (!validateStoredStepValue(runtimeStep, value, input.fields)) {
+    if (!validateStoredStepValue(step, value, input.fields)) {
       issues.push({
         stepId: step.id,
         fieldKey,
-        message: buildInvalidStepAnswerMessage(runtimeStep, input.fields),
+        message: buildInvalidStepAnswerMessage(step, input.fields),
       });
     }
   }

@@ -394,6 +394,9 @@ export const actionSubmissions = pgTable(
     actionId: integer("action_id")
       .notNull()
       .references(() => projectActions.id),
+    actionVersionId: integer("action_version_id").references(
+      () => actionFlowVersions.id,
+    ),
     currentStepId: integer("current_step_id"),
     conversationId: text("conversation_id"),
     source: text("source").notNull().default("chat_widget"),
@@ -413,6 +416,7 @@ export const actionSubmissions = pgTable(
   (table) => [
     index("action_submissions_project_idx").on(table.projectId),
     index("action_submissions_action_idx").on(table.actionId),
+    index("action_submissions_action_version_idx").on(table.actionVersionId),
     index("action_submissions_status_idx").on(table.status),
     index("action_submissions_created_at_idx").on(table.createdAt),
   ],

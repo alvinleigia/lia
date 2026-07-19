@@ -59,6 +59,7 @@ import { buildHandoffMetadata, runHandoffNotification } from "@/lib/handoff";
 import { runOperationForSubmission } from "@/lib/operations";
 import {
   getRuntimeProjectAction,
+  getRuntimeProjectActionForSubmission,
   listRuntimeProjectActions,
 } from "@/lib/runtime-actions";
 import {
@@ -333,10 +334,16 @@ async function resumeParentFlowAfterSubmit(input: {
     return null;
   }
 
-  const [parentSubmission, parentAction] = await Promise.all([
-    getActionSubmission(input.projectId, frame.parentSubmissionId),
-    getRuntimeProjectAction(input.projectId, frame.returnToActionId),
-  ]);
+  const parentSubmission = await getActionSubmission(
+    input.projectId,
+    frame.parentSubmissionId,
+  );
+  const parentAction = parentSubmission
+    ? await getRuntimeProjectActionForSubmission(
+        input.projectId,
+        parentSubmission,
+      )
+    : null;
 
   if (
     !parentSubmission ||
@@ -573,6 +580,7 @@ async function connectFlow(input: {
 
   const nextSubmission = await startActionFlowSubmission({
     actionId: targetAction.id,
+    actionVersionId: targetAction.versionId,
     contactId: input.contactId ?? getSubmissionContactId(input.submission),
     conversationId: input.submission.conversationId,
     fields: input.submission.fields,
@@ -891,6 +899,7 @@ async function startChannelFlow(input: {
   const submission = await startActionFlowSubmission({
     projectId: input.projectId,
     actionId: input.action.id,
+    actionVersionId: input.action.versionId,
     contactId: input.contactId ?? null,
     conversationId: input.conversationId,
     source: input.source,
@@ -1250,9 +1259,9 @@ export async function processChannelFlowText(input: {
   text: string;
 }): Promise<ChannelRuntimeResult> {
   if (input.activeSubmission) {
-    const action = await getRuntimeProjectAction(
+    const action = await getRuntimeProjectActionForSubmission(
       input.projectId,
-      input.activeSubmission.actionId,
+      input.activeSubmission,
     );
 
     if (!action) {
@@ -1317,9 +1326,9 @@ export async function processChannelFlowMedia(input: {
     };
   }
 
-  const action = await getRuntimeProjectAction(
+  const action = await getRuntimeProjectActionForSubmission(
     input.projectId,
-    input.activeSubmission.actionId,
+    input.activeSubmission,
   );
 
   if (!action) {

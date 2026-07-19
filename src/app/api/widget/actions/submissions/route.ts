@@ -4,9 +4,9 @@ import { validateActionSubmissionFields } from "@/lib/action-flow-validation";
 import {
   addActionSubmissionEvent,
   createActionSubmission,
-  getProjectAction,
 } from "@/lib/action-flows";
 import { runSubmissionOperations } from "@/lib/operations";
+import { getRuntimeProjectAction } from "@/lib/runtime-actions";
 import { resolveWidgetTokenAccessForRequest } from "@/lib/widget-keys";
 
 const widgetSubmissionSchema = z.object({
@@ -40,12 +40,12 @@ export async function POST(req: Request) {
     }
     const { widgetAccess } = widgetAccessResult;
 
-    const action = await getProjectAction(
+    const action = await getRuntimeProjectAction(
       widgetAccess.projectId,
       parsed.data.actionId,
     );
 
-    if (!action || action.status !== "active") {
+    if (!action) {
       return NextResponse.json(
         { message: "Action is unavailable." },
         { status: 404 },
@@ -55,6 +55,7 @@ export async function POST(req: Request) {
     const validation = await validateActionSubmissionFields({
       projectId: widgetAccess.projectId,
       actionId: action.id,
+      actionVersionId: action.versionId,
       fields: parsed.data.fields,
     });
 
@@ -71,12 +72,14 @@ export async function POST(req: Request) {
     const submission = await createActionSubmission({
       projectId: widgetAccess.projectId,
       actionId: action.id,
+      actionVersionId: action.versionId,
       status: "submitted",
       source: "widget_chat",
       conversationId: parsed.data.conversationId ?? null,
       fields: parsed.data.fields,
       metadata: {
         actionName: action.name,
+        actionVersionNumber: action.versionNumber,
       },
     });
 
