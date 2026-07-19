@@ -1277,6 +1277,7 @@ test("project chat action flow follows a branch route", async ({ page }) => {
   const email = `e2e-branch-action-${runId}@example.test`;
   const projectName = `E2E Branch Action Project ${runId}`;
   const actionName = `E2E Branch Intake ${runId}`;
+  const triggerPhrase = `branch start ${runId}`;
   const urgentMessage = `Urgent branch path reached for ${runId}.`;
 
   await signUpOrUseExistingAccount(page, {
@@ -1290,7 +1291,7 @@ test("project chat action flow follows a branch route", async ({ page }) => {
   await seedBranchingProjectChatAction({
     actionName,
     projectId,
-    triggerPhrase: `branch start ${runId}`,
+    triggerPhrase,
     urgentMessage,
   });
 
@@ -1298,7 +1299,8 @@ test("project chat action flow follows a branch route", async ({ page }) => {
   await expect(page.getByText("Project Chat")).toBeVisible();
   await expect(page.getByRole("button", { name: actionName })).toBeVisible();
 
-  await page.getByRole("button", { name: actionName }).click();
+  await sendProjectChatMessage(page, triggerPhrase);
+  await expect(page.getByText(triggerPhrase, { exact: true })).toBeVisible();
   await expect(
     page.getByText(`Sure, I can help with ${actionName}.`),
   ).toBeVisible();

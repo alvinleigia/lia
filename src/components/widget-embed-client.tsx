@@ -19,7 +19,6 @@ import {
   buildStepAnswerResult,
   type FlowChatMessage,
   type FlowEditSection,
-  findTriggeredAction,
   getActionStepChoiceDisplayMode,
   getActionStepContentMedia,
   getActionStepContentProductGroups,
@@ -41,6 +40,10 @@ import {
   summarizeActionFields,
   validateStepAnswer,
 } from "@/lib/action-runtime";
+import {
+  type BrowserFlowRuntimeResult,
+  runtimeRepliesToFlowMessages,
+} from "@/lib/browser-flow-contract";
 
 type WidgetEmbedClientProps = {
   actions: RuntimeAction[];
@@ -99,6 +102,8 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
   );
   const [flowMessages, setFlowMessages] = useState<FlowChatMessage[]>([]);
   const [activeFlow, setActiveFlow] = useState<ActiveActionFlow | null>(null);
+  const [serverActiveAction, setServerActiveAction] =
+    useState<RuntimeAction | null>(null);
   const [isSavingSubmission, setIsSavingSubmission] = useState(false);
 
   const apiPath = useMemo(
@@ -120,7 +125,8 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
   const isLoading = status === "submitted" || status === "streaming";
   const isBusy = isLoading || isSavingSubmission;
   const activeAction = activeFlow
-    ? actions.find((action) => action.id === activeFlow.actionId)
+    ? (serverActiveAction ??
+      actions.find((action) => action.id === activeFlow.actionId))
     : null;
   const activeStep =
     activeAction && activeFlow?.mode === "collecting"
@@ -139,74 +145,70 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
         shouldRenderStepControl(getActionStepInputType(activeStep)))
     : false;
 
-  const startActionFlow = async (
-    action: RuntimeAction,
-    openingText?: string,
-  ) => {
-    const steps = getRunnableActionSteps(action);
-    if (steps.length === 0) {
-      setFlowMessages((current) => [
-        ...current,
-        ...(openingText ? [makeFlowMessage("user", openingText)] : []),
-        makeFlowMessage(
-          "assistant",
-          `${action.name} is available, but it does not have any flow steps configured yet.`,
-        ),
-      ]);
-      return;
-    }
-
+  const runCanonicalFlow = async (input: {
+    actionId?: number;
+    displayUserText?: boolean;
+    text?: string;
+  }) => {
     setIsSavingSubmission(true);
-    let submissionId: number;
 
     try {
-      const response = await fetch("/api/widget/actions/flow", {
+      const response = await fetch("/api/widget/actions/runtime", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          actionId: action.id,
+          actionId: input.actionId,
           conversationId,
-          event: "start",
+          text: input.text,
           token,
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to start flow.");
+        throw new Error("Failed to process flow message.");
       }
 
-      const result = (await response.json()) as { submissionId: number };
-      submissionId = result.submissionId;
+      const result = (await response.json()) as BrowserFlowRuntimeResult;
+      if (!result.handled) {
+        return false;
+      }
+
+      setFlowMessages((current) => [
+        ...current,
+        ...(input.displayUserText && input.text
+          ? [makeFlowMessage("user", input.text)]
+          : []),
+        ...runtimeRepliesToFlowMessages(result.replies),
+      ]);
+      setActiveFlow(result.activeFlow);
+      setServerActiveAction(result.activeFlow ? result.action : null);
+      return true;
     } catch {
       setFlowMessages((current) => [
         ...current,
-        ...(openingText ? [makeFlowMessage("user", openingText)] : []),
+        ...(input.displayUserText && input.text
+          ? [makeFlowMessage("user", input.text)]
+          : []),
         makeFlowMessage(
           "assistant",
-          "I could not start that request. Please try again.",
+          "I could not process that request. Please try again.",
         ),
       ]);
+      return true;
+    } finally {
       setIsSavingSubmission(false);
-      return;
     }
+  };
 
-    await advanceFlowToNextStep(
-      action,
-      {
-        actionId: action.id,
-        actionName: action.name,
-        conversationId,
-        stepIndex: 0,
-        fields: {},
-        mode: "collecting",
-        submissionId,
-      },
-      [
-        ...(openingText ? [makeFlowMessage("user", openingText)] : []),
-        makeFlowMessage("assistant", `Sure, I can help with ${action.name}.`),
-      ],
-    );
-    setIsSavingSubmission(false);
+  const startActionFlow = async (
+    action: RuntimeAction,
+    openingText?: string,
+  ) => {
+    await runCanonicalFlow({
+      actionId: action.id,
+      displayUserText: Boolean(openingText),
+      text: openingText,
+    });
   };
 
   const submitActionFlow = async (flow: ActiveActionFlow) => {
@@ -766,28 +768,17 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
       return;
     }
 
-    if (activeFlow) {
-      if (activeFlow.mode === "confirming") {
-        setFlowMessages((current) => [
-          ...current,
-          makeFlowMessage("user", text),
-          makeFlowMessage(
-            "assistant",
-            "Please use Confirm, Edit, or Cancel to finish this request.",
-          ),
-        ]);
-        setInput("");
-        return;
-      }
-
+    if (activeFlow?.editStepIndexes) {
       await handleFlowAnswer(text, activeFlow);
       setInput("");
       return;
     }
 
-    const triggeredAction = findTriggeredAction(actions, text);
-    if (triggeredAction) {
-      await startActionFlow(triggeredAction, text);
+    const handledByFlow = await runCanonicalFlow({
+      displayUserText: true,
+      text,
+    });
+    if (handledByFlow) {
       setInput("");
       return;
     }
@@ -801,7 +792,11 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
       return;
     }
 
-    await handleFlowAnswer(value, activeFlow);
+    if (activeFlow.editStepIndexes) {
+      await handleFlowAnswer(value, activeFlow);
+    } else {
+      await runCanonicalFlow({ displayUserText: true, text: value });
+    }
     setInput("");
   };
 
@@ -818,7 +813,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
       return;
     }
 
-    await submitActionFlow(activeFlow);
+    await runCanonicalFlow({ text: "confirm" });
   };
 
   const editActiveFlowSection = (section: FlowEditSection) => {
@@ -844,26 +839,9 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
     ]);
   };
 
-  const cancelActiveFlow = () => {
-    const submissionId = activeFlow?.submissionId;
-    if (submissionId) {
-      fetch("/api/widget/actions/flow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event: "cancel",
-          submissionId,
-          token,
-        }),
-      });
-    }
-
-    setActiveFlow(null);
+  const cancelActiveFlow = async () => {
+    await runCanonicalFlow({ text: "cancel" });
     setInput("");
-    setFlowMessages((current) => [
-      ...current,
-      makeFlowMessage("assistant", "Okay, I cancelled this request."),
-    ]);
   };
 
   return (

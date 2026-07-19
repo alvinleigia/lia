@@ -877,7 +877,7 @@ function findStepIndexById(action: RuntimeAction, stepId: number | null) {
   return getRunnableActionSteps(action).findIndex((step) => step.id === stepId);
 }
 
-async function startChannelFlow(input: {
+export async function startChannelFlow(input: {
   action: RuntimeAction;
   contactId?: number | null;
   conversationId: string;

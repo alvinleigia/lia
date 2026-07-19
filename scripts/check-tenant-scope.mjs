@@ -206,6 +206,16 @@ assertIncludes(
   "Admin submission API",
 );
 assertIncludes(
+  "src/app/api/actions/runtime/route.ts",
+  "resolveUserAndProject(parsed.data.projectId)",
+  "Project browser runtime API",
+);
+assertIncludes(
+  "src/app/api/widget/actions/runtime/route.ts",
+  "resolveWidgetTokenAccessForRequest",
+  "Widget browser runtime API",
+);
+assertIncludes(
   "src/app/api/widget/actions/submissions/route.ts",
   "resolveWidgetTokenAccessForRequest",
   "Widget submission API",
