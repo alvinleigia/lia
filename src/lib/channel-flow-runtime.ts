@@ -294,6 +294,47 @@ function buildRuntimeRepliesForStep(
     : [primaryReply, ...contentReplies];
 }
 
+export function buildChannelFlowResumeReplies(input: {
+  action: RuntimeAction;
+  submission: SelectActionSubmission;
+}): RuntimeReply[] {
+  const steps = getRunnableActionSteps(input.action);
+  const currentStep =
+    input.submission.currentStepId === null
+      ? null
+      : steps.find((step) => step.id === input.submission.currentStepId);
+
+  if (currentStep && isActionConfirmationStep(currentStep)) {
+    return [
+      createTextReply(
+        [
+          formatStepPrompt(currentStep, input.submission.fields),
+          "",
+          buildActionReviewSummary(input.submission.fields),
+          "",
+          "Reply Confirm to save, or Cancel to stop.",
+        ].join("\n"),
+      ),
+    ];
+  }
+
+  if (currentStep) {
+    return buildRuntimeRepliesForStep(currentStep, input.submission.fields);
+  }
+
+  return [
+    createTextReply(
+      [
+        "Please review your request before I save it.",
+        "",
+        buildActionReviewSummary(input.submission.fields),
+        "",
+        "Reply Confirm to save, or Cancel to stop.",
+      ].join("\n"),
+    ),
+  ];
+}
+
 async function submitFlow(input: {
   contactId?: number | null;
   projectId: number;

@@ -14,6 +14,7 @@ const requestSchema = z
       .enum(["all", "email", "name", "phone", "schedule", "service"])
       .optional(),
     projectId: z.number().int().positive().optional(),
+    resume: z.boolean().optional(),
     text: z.string().max(4000).optional(),
   })
   .strict();
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
       !parsed.success ||
       (!parsed.data.actionId &&
         !parsed.data.editSection &&
+        !parsed.data.resume &&
         !parsed.data.text?.trim())
     ) {
       return NextResponse.json(
@@ -51,6 +53,7 @@ export async function POST(req: Request) {
       conversationId: parsed.data.conversationId,
       editSection: parsed.data.editSection,
       projectId: project.id,
+      resume: parsed.data.resume,
       source: "project_chat",
       text: parsed.data.text,
     });

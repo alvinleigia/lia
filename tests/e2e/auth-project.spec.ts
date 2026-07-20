@@ -1570,6 +1570,124 @@ test("browser runtime edits collected fields on the pinned submission", async ({
   expect(events.map((event) => event.eventType)).toContain("flow.edit_started");
 });
 
+test("project chat resumes an active flow after refresh without duplicate writes", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-runtime-resume-${runId}@example.test`;
+  const projectName = `E2E Runtime Resume Project ${runId}`;
+  const actionName = `E2E Runtime Resume ${runId}`;
+  const firstPrompt = `What name should we use for ${runId}?`;
+  const secondPrompt = `What email should we use for ${runId}?`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Runtime Resume User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(page, projectName);
+  const user = await getUserByEmail(email);
+  if (!user) {
+    throw new Error("Expected the runtime-resume test user to exist.");
+  }
+
+  const action = await createChatbotAction({
+    description: "Verifies browser recovery without duplicate runtime writes.",
+    name: actionName,
+    projectId,
+    status: "active",
+    triggerPhrases: [`resume ${runId}`],
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "guestName",
+    inputType: "text",
+    isRequired: true,
+    label: "Guest Name",
+    projectId,
+    prompt: firstPrompt,
+    sortOrder: 1,
+    stepType: "collect_input",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "guestEmail",
+    inputType: "email",
+    isRequired: true,
+    label: "Guest Email",
+    projectId,
+    prompt: secondPrompt,
+    sortOrder: 2,
+    stepType: "email",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Submit Request",
+    projectId,
+    prompt: "Saving the resumed request.",
+    sortOrder: 3,
+    stepType: "submit",
+  });
+  await createPublishedActionFlowVersion({
+    actionId: action.id,
+    projectId,
+    publishedByUserId: user.id,
+  });
+
+  await page.goto("/projects/chat");
+  await page.getByRole("button", { name: actionName }).click();
+  await expect(page.getByText(firstPrompt)).toBeVisible();
+
+  await sendProjectChatMessage(page, "Recovery Guest");
+  await expect(page.getByText(secondPrompt)).toBeVisible();
+
+  const storageKey = `lia:project-chat:${projectId}`;
+  const conversationId = await page.evaluate(
+    (key) => window.sessionStorage.getItem(key),
+    storageKey,
+  );
+  expect(conversationId).toBeTruthy();
+
+  const [submissionBeforeRefresh] = await listActionSubmissions(
+    projectId,
+    action.id,
+  );
+  const eventsBeforeRefresh = await listActionSubmissionEvents(
+    projectId,
+    submissionBeforeRefresh.id,
+  );
+
+  await page.reload();
+  await expect(page.getByText(secondPrompt)).toBeVisible();
+  expect(
+    await page.evaluate(
+      (key) => window.sessionStorage.getItem(key),
+      storageKey,
+    ),
+  ).toBe(conversationId);
+
+  const submissionsAfterRefresh = await listActionSubmissions(
+    projectId,
+    action.id,
+  );
+  expect(submissionsAfterRefresh).toHaveLength(1);
+  expect(submissionsAfterRefresh[0]).toEqual(
+    expect.objectContaining({
+      fields: expect.objectContaining({ guestName: "Recovery Guest" }),
+      id: submissionBeforeRefresh.id,
+      status: "in_progress",
+    }),
+  );
+  expect(
+    await listActionSubmissionEvents(projectId, submissionBeforeRefresh.id),
+  ).toHaveLength(eventsBeforeRefresh.length);
+
+  await sendProjectChatMessage(page, `resume-${runId}@example.test`);
+  await expect(page.getByText("Thanks. I saved this request.")).toBeVisible();
+});
+
 test("browser media upload advances the canonical pinned flow", async ({
   page,
 }) => {

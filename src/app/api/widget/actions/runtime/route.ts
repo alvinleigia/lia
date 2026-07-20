@@ -10,6 +10,7 @@ const requestSchema = z
     editSection: z
       .enum(["all", "email", "name", "phone", "schedule", "service"])
       .optional(),
+    resume: z.boolean().optional(),
     text: z.string().max(4000).optional(),
     token: z.string().trim().min(1).max(256),
   })
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
       !parsed.success ||
       (!parsed.data.actionId &&
         !parsed.data.editSection &&
+        !parsed.data.resume &&
         !parsed.data.text?.trim())
     ) {
       return NextResponse.json(
@@ -59,6 +61,7 @@ export async function POST(req: Request) {
       conversationId: parsed.data.conversationId,
       editSection: parsed.data.editSection,
       projectId: accessResult.widgetAccess.projectId,
+      resume: parsed.data.resume,
       source: "widget_chat",
       text: parsed.data.text,
     });

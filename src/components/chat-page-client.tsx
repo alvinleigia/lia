@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Bot, MessageSquare } from "lucide-react";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ActionFlowContentMedia } from "@/components/action-flow-content-media";
 import { ActionFlowProductCards } from "@/components/action-flow-product-cards";
 import {
@@ -38,6 +38,7 @@ import {
   isActionInputStep,
   type RuntimeAction,
 } from "@/lib/action-runtime";
+import { getOrCreateSessionConversationId } from "@/lib/browser-conversation";
 import {
   type BrowserFlowRuntimeResult,
   runtimeRepliesToFlowMessages,
@@ -72,14 +73,61 @@ function shouldRenderStepControl(inputType: string | null) {
 
 export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
   const [input, setInput] = useState("");
-  const [conversationId] = useState(
-    () => `project-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [flowMessages, setFlowMessages] = useState<FlowChatMessage[]>([]);
   const [activeFlow, setActiveFlow] = useState<ActiveActionFlow | null>(null);
   const [serverActiveAction, setServerActiveAction] =
     useState<RuntimeAction | null>(null);
   const [isSavingSubmission, setIsSavingSubmission] = useState(false);
+
+  useEffect(() => {
+    const restoredConversationId = getOrCreateSessionConversationId({
+      key: `lia:project-chat:${projectId}`,
+      prefix: "project",
+      storage: window.sessionStorage,
+    });
+    let isCurrent = true;
+
+    setConversationId(restoredConversationId);
+    setIsSavingSubmission(true);
+
+    fetch("/api/actions/runtime", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversationId: restoredConversationId,
+        projectId,
+        resume: true,
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Failed to resume flow.");
+        }
+
+        return (await response.json()) as BrowserFlowRuntimeResult;
+      })
+      .then((result) => {
+        if (!isCurrent || !result.handled) {
+          return;
+        }
+
+        setFlowMessages(runtimeRepliesToFlowMessages(result.replies));
+        setActiveFlow(result.activeFlow);
+        setServerActiveAction(result.activeFlow ? result.action : null);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (isCurrent) {
+          setIsSavingSubmission(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [projectId]);
+
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
@@ -113,6 +161,10 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     editSection?: FlowEditSection;
     text?: string;
   }) => {
+    if (!conversationId) {
+      return true;
+    }
+
     setIsSavingSubmission(true);
 
     try {
@@ -321,7 +373,11 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
                     type="button"
                     onClick={() => startActionFlow(action)}
                     className="inline-flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
-                    disabled={Boolean(activeFlow) || isSavingSubmission}
+                    disabled={
+                      !conversationId ||
+                      Boolean(activeFlow) ||
+                      isSavingSubmission
+                    }
                   >
                     <Bot className="h-4 w-4" />
                     {action.name}
@@ -476,6 +532,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
                 !input.trim() ||
                 status === "submitted" ||
                 status === "streaming" ||
+                !conversationId ||
                 isSavingSubmission
               }
               status={status}

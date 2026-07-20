@@ -12,6 +12,7 @@ import {
 } from "@/lib/action-runtime";
 import type { BrowserFlowRuntimeResult } from "@/lib/browser-flow-contract";
 import {
+  buildChannelFlowResumeReplies,
   processChannelFlowMedia,
   processChannelFlowText,
   startChannelFlow,
@@ -37,6 +38,7 @@ type RunBrowserFlowTextInput = {
   externalUserId?: string | null;
   editSection?: FlowEditSection;
   projectId: number;
+  resume?: boolean;
   source: string;
   text?: string;
 };
@@ -136,6 +138,34 @@ export async function runBrowserFlowText(
   });
   const text = input.text?.trim() ?? "";
   let action: RuntimeAction | null = null;
+
+  if (input.resume) {
+    if (!activeSubmission) {
+      return { action: null, activeFlow: null, handled: false, replies: [] };
+    }
+
+    action = await getRuntimeProjectActionForSubmission(
+      input.projectId,
+      activeSubmission,
+    );
+    if (!action) {
+      return { action: null, activeFlow: null, handled: false, replies: [] };
+    }
+
+    return {
+      action,
+      activeFlow: toActiveActionFlow({
+        action,
+        conversationId: input.conversationId,
+        submission: activeSubmission,
+      }),
+      handled: true,
+      replies: buildChannelFlowResumeReplies({
+        action,
+        submission: activeSubmission,
+      }),
+    };
+  }
 
   if (input.editSection) {
     if (!activeSubmission) {

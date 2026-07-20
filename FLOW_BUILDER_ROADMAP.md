@@ -27,7 +27,7 @@ is not confused with the historical implementation phases later in this file.
 | Phase | Focus | Status |
 | --- | --- | --- |
 | 1 | Canonical server-owned browser flow runtime | Complete |
-| 2 | Flow state recovery and idempotent commands | Next |
+| 2 | Flow state recovery and idempotent commands | In progress (Step 1 of 6 complete) |
 | 3 | Shared channel adapter contracts and capability parity | Pending |
 | 4 | Graph integrity, routing diagnostics, and safe recovery | Pending |
 | 5 | Operation execution reliability and integration contracts | Pending |
@@ -36,6 +36,15 @@ is not confused with the historical implementation phases later in this file.
 | 8 | Tenant security, abuse controls, and public API hardening | Pending |
 | 9 | Runtime observability, analytics, and operational recovery | Pending |
 | 10 | Full UAT, deployment readiness, and release sign-off | Pending |
+
+### Phase 2 Delivery Steps
+
+1. Stable browser conversation identity and read-only active-flow resume.
+2. Command idempotency keys and duplicate-response replay.
+3. Submission-level optimistic concurrency and conflict detection.
+4. Idempotent media uploads and side-effecting steps.
+5. Recovery UX for stale, conflicting, and expired flows.
+6. Full regression verification and Phase 2 closeout.
 
 ### Phase 1 Closeout
 

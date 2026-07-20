@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Bot, Loader2, Send } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { ActionFlowContentMedia } from "@/components/action-flow-content-media";
 import { ActionFlowProductCards } from "@/components/action-flow-product-cards";
 import {
@@ -21,6 +21,7 @@ import {
   isActionInputStep,
   type RuntimeAction,
 } from "@/lib/action-runtime";
+import { getOrCreateSessionConversationId } from "@/lib/browser-conversation";
 import {
   type BrowserFlowRuntimeResult,
   runtimeRepliesToFlowMessages,
@@ -55,9 +56,7 @@ function shouldRenderStepControl(inputType: string | null) {
 
 export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
   const [input, setInput] = useState("");
-  const [conversationId] = useState(
-    () => `widget-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  );
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [flowMessages, setFlowMessages] = useState<FlowChatMessage[]>([]);
   const [activeFlow, setActiveFlow] = useState<ActiveActionFlow | null>(null);
   const [serverActiveAction, setServerActiveAction] =
@@ -81,7 +80,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
   });
 
   const isLoading = status === "submitted" || status === "streaming";
-  const isBusy = isLoading || isSavingSubmission;
+  const isBusy = !conversationId || isLoading || isSavingSubmission;
   const activeAction = activeFlow
     ? (serverActiveAction ??
       actions.find((action) => action.id === activeFlow.actionId))
@@ -103,12 +102,64 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
         shouldRenderStepControl(getActionStepInputType(activeStep)))
     : false;
 
+  useEffect(() => {
+    const restoredConversationId = getOrCreateSessionConversationId({
+      key: `lia:widget-chat:${token}`,
+      prefix: "widget",
+      storage: window.sessionStorage,
+    });
+    let isCurrent = true;
+
+    setConversationId(restoredConversationId);
+    setIsSavingSubmission(true);
+
+    fetch("/api/widget/actions/runtime", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversationId: restoredConversationId,
+        resume: true,
+        token,
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Failed to resume flow.");
+        }
+
+        return (await response.json()) as BrowserFlowRuntimeResult;
+      })
+      .then((result) => {
+        if (!isCurrent || !result.handled) {
+          return;
+        }
+
+        setFlowMessages(runtimeRepliesToFlowMessages(result.replies));
+        setActiveFlow(result.activeFlow);
+        setServerActiveAction(result.activeFlow ? result.action : null);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (isCurrent) {
+          setIsSavingSubmission(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [token]);
+
   const runCanonicalFlow = async (input: {
     actionId?: number;
     displayUserText?: boolean;
     editSection?: FlowEditSection;
     text?: string;
   }) => {
+    if (!conversationId) {
+      return true;
+    }
+
     setIsSavingSubmission(true);
 
     try {
