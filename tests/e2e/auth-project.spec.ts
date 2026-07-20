@@ -922,6 +922,102 @@ test("widget token access respects tenant and allowed domains", async ({
     ),
   ).toBeVisible();
 
+  const malformedProjectRuntimeResponse = await ownerPage.request.post(
+    "/api/actions/runtime",
+    {
+      data: "{",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+  expect(malformedProjectRuntimeResponse.status()).toBe(400);
+  await expect(malformedProjectRuntimeResponse.json()).resolves.toEqual({
+    message: "A flow action or message is required.",
+  });
+
+  const strictProjectRuntimeResponse = await ownerPage.request.post(
+    "/api/actions/runtime",
+    {
+      data: {
+        conversationId: `strict-project-${runId}`,
+        projectId,
+        text: "hello",
+        unexpected: true,
+      },
+    },
+  );
+  expect(strictProjectRuntimeResponse.status()).toBe(400);
+
+  const missingProjectActionResponse = await ownerPage.request.post(
+    "/api/actions/runtime",
+    {
+      data: {
+        actionId: 999_999_999,
+        conversationId: `missing-project-action-${runId}`,
+        projectId,
+      },
+    },
+  );
+  expect(missingProjectActionResponse.status()).toBe(404);
+  await expect(missingProjectActionResponse.json()).resolves.toEqual({
+    message: "Action is unavailable.",
+  });
+
+  const staleProjectEditResponse = await ownerPage.request.post(
+    "/api/actions/runtime",
+    {
+      data: {
+        conversationId: `stale-project-edit-${runId}`,
+        editSection: "name",
+        projectId,
+      },
+    },
+  );
+  expect(staleProjectEditResponse.status()).toBe(409);
+  await expect(staleProjectEditResponse.json()).resolves.toEqual({
+    message: "No active flow is available to edit.",
+  });
+
+  const malformedWidgetRuntimeResponse = await ownerPage.request.post(
+    "/api/widget/actions/runtime",
+    {
+      data: "{",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://allowed.example.com",
+      },
+    },
+  );
+  expect(malformedWidgetRuntimeResponse.status()).toBe(400);
+
+  const oversizedWidgetTokenResponse = await ownerPage.request.post(
+    "/api/widget/actions/runtime",
+    {
+      data: {
+        conversationId: `oversized-token-${runId}`,
+        text: "hello",
+        token: "x".repeat(257),
+      },
+      headers: { Origin: "https://allowed.example.com" },
+    },
+  );
+  expect(oversizedWidgetTokenResponse.status()).toBe(400);
+
+  const staleWidgetEditResponse = await ownerPage.request.post(
+    "/api/widget/actions/runtime",
+    {
+      data: {
+        conversationId: `stale-widget-edit-${runId}`,
+        editSection: "name",
+        token: widgetToken,
+      },
+      headers: { Origin: "https://allowed.example.com" },
+    },
+  );
+  expect(staleWidgetEditResponse.status()).toBe(409);
+  await expect(staleWidgetEditResponse.json()).resolves.toEqual({
+    message: "No active flow is available to edit.",
+  });
+
   const blockedResponse = await ownerPage.request.post(
     "/api/widget/actions/runtime",
     {
@@ -964,12 +1060,9 @@ test("widget token access respects tenant and allowed domains", async ({
       headers: { Origin: "https://allowed.example.com" },
     },
   );
-  expect(allowedResponse.status()).toBe(200);
-  await expect(allowedResponse.json()).resolves.toMatchObject({
-    action: null,
-    activeFlow: null,
-    handled: false,
-    replies: [],
+  expect(allowedResponse.status()).toBe(404);
+  await expect(allowedResponse.json()).resolves.toEqual({
+    message: "Action is unavailable.",
   });
 
   const wildcardAllowedResponse = await ownerPage.request.post(
@@ -983,12 +1076,9 @@ test("widget token access respects tenant and allowed domains", async ({
       headers: { Origin: "https://chat.trusted.example.com" },
     },
   );
-  expect(wildcardAllowedResponse.status()).toBe(200);
-  await expect(wildcardAllowedResponse.json()).resolves.toMatchObject({
-    action: null,
-    activeFlow: null,
-    handled: false,
-    replies: [],
+  expect(wildcardAllowedResponse.status()).toBe(404);
+  await expect(wildcardAllowedResponse.json()).resolves.toEqual({
+    message: "Action is unavailable.",
   });
   await ownerContext.close();
 
