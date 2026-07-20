@@ -31,7 +31,8 @@ Lia AI is a multi-project AI chatbot platform built with Next.js, Drizzle, Postg
   execution.
 - Action templates with marketplace filtering, version metadata, and bundled
   spa/salon/hotel/restaurant/support/lead examples.
-- Client-side action flow runtime with field validation and review/confirm.
+- Canonical server-owned action flow runtime shared by project chat and widget,
+  with field validation, branching, review/edit, and confirmation.
 - Server-side action flow validation, custom validation messages, and validation failure events.
 - Submission saving, detail view, status workflow, operation attempts, and event logs.
 - Generic operation/provider management with webhook and n8n webhook execution logs.
@@ -41,7 +42,7 @@ Lia AI is a multi-project AI chatbot platform built with Next.js, Drizzle, Postg
 
 ## Tech Stack
 
-- Next.js 15 App Router
+- Next.js 16 App Router
 - React 19
 - TypeScript
 - Drizzle ORM
@@ -378,7 +379,15 @@ Branching configuration:
 Channel behavior:
 
 - Project chat and widget action-flow sessions now share a normalized channel
-  foundation.
+  foundation and the same server-owned runtime engine.
+- Browser clients render replies and collect input through
+  `/api/actions/runtime` and `/api/widget/actions/runtime`; they do not execute
+  routing or trust client-submitted flow state.
+- Project chat and widget media uploads advance the same pinned runtime through
+  their `/flow/media` routes.
+- Canonical runtime requests reject malformed or unknown input with `400`, an
+  explicitly unavailable action with `404`, and an edit without an active flow
+  with `409`.
 - Action-flow start/progress/submit/cancel events record project-scoped channel
   conversations and messages using the existing conversation id.
 - WhatsApp uses the same flow builder/runtime for text, interactive choices,

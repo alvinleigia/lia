@@ -18,6 +18,47 @@ canvas can show these blocks today, but the product becomes robust only when
 each block has a clear config schema, runtime behavior, channel formatter,
 fallback behavior, validation, and tenant scoping.
 
+## Current Modernization Track
+
+The original 15-phase builder foundation is implemented. Ongoing hardening is
+tracked separately in the 10-phase modernization program below so current work
+is not confused with the historical implementation phases later in this file.
+
+| Phase | Focus | Status |
+| --- | --- | --- |
+| 1 | Canonical server-owned browser flow runtime | Complete |
+| 2 | Flow state recovery and idempotent commands | Next |
+| 3 | Shared channel adapter contracts and capability parity | Pending |
+| 4 | Graph integrity, routing diagnostics, and safe recovery | Pending |
+| 5 | Operation execution reliability and integration contracts | Pending |
+| 6 | Production media storage and delivery | Pending |
+| 7 | WhatsApp production readiness and provider lifecycle | Pending |
+| 8 | Tenant security, abuse controls, and public API hardening | Pending |
+| 9 | Runtime observability, analytics, and operational recovery | Pending |
+| 10 | Full UAT, deployment readiness, and release sign-off | Pending |
+
+### Phase 1 Closeout
+
+All 7 Phase 1 steps are complete:
+
+1. Pin active runs to immutable published action versions.
+2. Introduce one server-owned browser flow execution path.
+3. Move review edits and media progression onto that canonical runtime.
+4. Remove the duplicated project-chat and widget browser executors.
+5. Retire the generic client-driven flow mutation routes.
+6. Harden canonical request parsing and HTTP error contracts.
+7. Complete regression coverage and architecture/UAT documentation.
+
+Current browser runtime boundary:
+
+- Project text/input runtime: `/api/actions/runtime`
+- Widget text/input runtime: `/api/widget/actions/runtime`
+- Project media progression: `/api/actions/flow/media`
+- Widget media progression: `/api/widget/actions/flow/media`
+
+Clients render replies and submit user input. Routing, validation, mutations,
+handoff, editing, version selection, and submission state remain server-owned.
+
 ## Current Baseline
 
 Already implemented foundations:
@@ -87,7 +128,8 @@ Already implemented foundations:
 - Project-scoped product catalog and product records with a basic admin library
   at `/projects/catalog`.
 - Shared channel tables for project channels, conversations, and messages.
-- Website widget and project chat flow endpoints.
+- Canonical server-owned project chat and widget flow runtime endpoints, with
+  dedicated media progression routes.
 - WhatsApp Cloud API setup, webhook verification, inbound text handling,
   outbound text replies, and test send.
 - Operation provider model with manual review, internal save, email, webhook,
@@ -604,11 +646,15 @@ Acceptance criteria:
    step routes/branch rules copied; action settings can now manage whether a
    flow is exposed as a project template and which template version it uses]
 
-## Current Phase Boundary
+## Legacy Roadmap Implementation Status
 
-The product has started Phase 7. Phase 5 is complete enough for the current
-roadmap: contacts are persisted, channel conversations attach to contacts, Set
-Attribute and Add Tag execute across channels, and admins can inspect contacts
+All 15 historical roadmap phases have foundational implementations. The notes
+below describe capability maturity and remaining depth; they no longer identify
+the currently active development phase. Current work is tracked in the
+10-phase modernization program near the top of this document.
+
+Phase 5 persists contacts, attaches channel conversations to contacts, executes
+Set Attribute and Add Tag across channels, and lets admins inspect contacts
 from `/projects/contacts`.
 
 The current Phase 6 foundation lets operation steps opt into inline execution

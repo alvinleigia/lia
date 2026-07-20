@@ -535,6 +535,10 @@ basic disposable flow without developer help or damage to an existing action.
 
 Goal: confirm flows run in project chat and save submissions.
 
+Runtime boundary: project chat and widget use the same server-owned flow
+engine. Browser clients display structured replies and submit user input; they
+must not calculate routing or mutate submission fields directly.
+
 - [ ] Set trigger phrase for an active action.
   Expected result: Trigger phrase is saved.
   Status:
@@ -565,8 +569,20 @@ Goal: confirm flows run in project chat and save submissions.
   Status:
   Notes:
 
+- [ ] Refresh the browser during an in-progress flow and continue it.
+  Expected result: The same saved flow resumes without losing collected fields
+  or creating a second in-progress submission.
+  Status:
+  Notes:
+
+- [ ] At the review step, edit one collected answer.
+  Expected result: The selected question is asked again and the review returns
+  with the other answers preserved.
+  Status:
+  Notes:
+
 - [ ] Confirm final submission.
-  Expected result: Submission is saved.
+  Expected result: Submission is saved once, using the edited values.
   Status:
   Notes:
 
@@ -603,6 +619,18 @@ Goal: confirm embeddable widget setup and runtime.
 
 - [ ] Add allowed domain.
   Expected result: Allowed domain saves correctly.
+  Status:
+  Notes:
+
+- [ ] Open the widget from a domain that is not on the allowlist.
+  Expected result: Widget runtime access is blocked without exposing project
+  data.
+  Status:
+  Notes:
+
+- [ ] Open the widget from the exact allowed domain and an allowed wildcard
+  subdomain.
+  Expected result: Both allowed origins can use the widget runtime.
   Status:
   Notes:
 
