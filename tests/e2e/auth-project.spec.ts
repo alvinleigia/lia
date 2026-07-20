@@ -646,11 +646,11 @@ test("disabled tenant owner is blocked at sign in", async ({ browser }) => {
   );
 
   const disabledWidgetFlowResponse = await disabledPage.request.post(
-    "/api/widget/actions/flow",
+    "/api/widget/actions/runtime",
     {
       data: {
         actionId: 999_999_999,
-        event: "start",
+        conversationId: `disabled-widget-${runId}`,
         token: widgetToken,
       },
     },
@@ -923,11 +923,11 @@ test("widget token access respects tenant and allowed domains", async ({
   ).toBeVisible();
 
   const blockedResponse = await ownerPage.request.post(
-    "/api/widget/actions/flow",
+    "/api/widget/actions/runtime",
     {
       data: {
         actionId: 999_999_999,
-        event: "start",
+        conversationId: `blocked-widget-${runId}`,
         token: widgetToken,
       },
       headers: { Origin: "https://blocked.example.com" },
@@ -939,11 +939,11 @@ test("widget token access respects tenant and allowed domains", async ({
   });
 
   const missingOriginResponse = await ownerPage.request.post(
-    "/api/widget/actions/flow",
+    "/api/widget/actions/runtime",
     {
       data: {
         actionId: 999_999_999,
-        event: "start",
+        conversationId: `missing-origin-widget-${runId}`,
         token: widgetToken,
       },
     },
@@ -954,35 +954,41 @@ test("widget token access respects tenant and allowed domains", async ({
   });
 
   const allowedResponse = await ownerPage.request.post(
-    "/api/widget/actions/flow",
+    "/api/widget/actions/runtime",
     {
       data: {
         actionId: 999_999_999,
-        event: "start",
+        conversationId: `allowed-widget-${runId}`,
         token: widgetToken,
       },
       headers: { Origin: "https://allowed.example.com" },
     },
   );
-  expect(allowedResponse.status()).toBe(404);
-  await expect(allowedResponse.json()).resolves.toEqual({
-    message: "Action is unavailable.",
+  expect(allowedResponse.status()).toBe(200);
+  await expect(allowedResponse.json()).resolves.toMatchObject({
+    action: null,
+    activeFlow: null,
+    handled: false,
+    replies: [],
   });
 
   const wildcardAllowedResponse = await ownerPage.request.post(
-    "/api/widget/actions/flow",
+    "/api/widget/actions/runtime",
     {
       data: {
         actionId: 999_999_999,
-        event: "start",
+        conversationId: `wildcard-widget-${runId}`,
         token: widgetToken,
       },
       headers: { Origin: "https://chat.trusted.example.com" },
     },
   );
-  expect(wildcardAllowedResponse.status()).toBe(404);
-  await expect(wildcardAllowedResponse.json()).resolves.toEqual({
-    message: "Action is unavailable.",
+  expect(wildcardAllowedResponse.status()).toBe(200);
+  await expect(wildcardAllowedResponse.json()).resolves.toMatchObject({
+    action: null,
+    activeFlow: null,
+    handled: false,
+    replies: [],
   });
   await ownerContext.close();
 
