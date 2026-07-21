@@ -11,6 +11,7 @@ import {
   type SelectOperation,
   type SelectOperationAttempt,
 } from "@/lib/db-schema";
+import { resolveTraceId } from "@/lib/execution-trace";
 
 export const INTEGRATION_PROVIDER_TYPES = [
   "manual_review",
@@ -1070,11 +1071,13 @@ async function addOperationSubmissionEvent(input: {
   eventType: string;
   message: string;
   payload: Record<string, unknown>;
+  traceId?: string | null;
 }) {
   await db.insert(actionSubmissionEvents).values({
     projectId: input.projectId,
     submissionId: input.submissionId,
     eventType: input.eventType,
+    traceId: input.traceId ?? null,
     message: input.message,
     payload: input.payload,
   });
@@ -1087,6 +1090,7 @@ export async function runOperationForSubmission(input: {
   operationId: number;
   projectId: number;
   submissionId: number;
+  traceId?: string | null;
 }): Promise<OperationRunResult | null> {
   const operationContext = await getProjectOperation(
     input.projectId,
@@ -1109,6 +1113,7 @@ export async function runOperationForSubmission(input: {
     payload: buildInputPayload(input.fields, operation.inputMapping),
   };
   const startedAt = new Date();
+  const traceId = resolveTraceId(input.traceId);
   const [createdAttempt] = await db
     .insert(operationAttempts)
     .values({
@@ -1118,6 +1123,7 @@ export async function runOperationForSubmission(input: {
       actionId: input.actionId,
       submissionId: input.submissionId,
       idempotencyKey: input.idempotencyKey,
+      traceId,
       status: "pending",
       requestPayload,
       startedAt,
@@ -1224,6 +1230,7 @@ export async function runOperationForSubmission(input: {
       mappedContactAttributeKeys: Object.keys(output.contactAttributes),
       mappedFieldKeys: Object.keys(output.fields),
     },
+    traceId,
   });
 
   return {
@@ -1259,6 +1266,7 @@ export async function runOperationPreview(input: {
   };
   const startedAt = new Date();
   const idempotencyKey = `preview:${input.projectId}:${operation.id}:${startedAt.getTime()}`;
+  const traceId = resolveTraceId();
   const [attempt] = await db
     .insert(operationAttempts)
     .values({
@@ -1268,6 +1276,7 @@ export async function runOperationPreview(input: {
       actionId: null,
       submissionId: null,
       idempotencyKey,
+      traceId,
       status: "pending",
       requestPayload,
       startedAt,
@@ -1352,6 +1361,7 @@ export async function replayOperationAttempt(input: {
       actionId: sourceAttempt.actionId,
       submissionId: sourceAttempt.submissionId,
       idempotencyKey,
+      traceId: sourceAttempt.traceId,
       status: "pending",
       requestPayload,
       startedAt,
@@ -1414,6 +1424,7 @@ export async function replayOperationAttempt(input: {
         mappedContactAttributeKeys: Object.keys(output.contactAttributes),
         mappedFieldKeys: Object.keys(output.fields),
       },
+      traceId: sourceAttempt.traceId,
     });
   }
 
@@ -1606,6 +1617,7 @@ export async function runSubmissionOperations(
       idempotencyKey: `submission:${submission.id}:step:${row.step.id}`,
       operationId: row.operation.id,
       fields: submission.fields,
+      traceId: submission.traceId,
     });
 
     if (attempt) {

@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import { flowRuntimeCommands } from "@/lib/db-schema";
+import { resolveTraceId } from "@/lib/execution-trace";
 
 type ClaimFlowRuntimeCommandInput = {
   commandId: string;
@@ -8,6 +9,7 @@ type ClaimFlowRuntimeCommandInput = {
   projectId: number;
   requestHash: string;
   source: string;
+  traceId?: string | null;
 };
 
 export type FlowRuntimeCommandClaim<TResponse> =
@@ -29,7 +31,7 @@ export async function claimFlowRuntimeCommand<TResponse>(
 ): Promise<FlowRuntimeCommandClaim<TResponse>> {
   const [created] = await db
     .insert(flowRuntimeCommands)
-    .values(input)
+    .values({ ...input, traceId: resolveTraceId(input.traceId) })
     .onConflictDoNothing()
     .returning({ id: flowRuntimeCommands.id });
 

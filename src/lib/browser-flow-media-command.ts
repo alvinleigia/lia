@@ -120,6 +120,7 @@ export async function runBrowserFlowMediaCommand(input: {
       submissionId,
     }),
     source: input.source,
+    traceId: submission.traceId,
   });
 
   if (claim.state === "replay") {

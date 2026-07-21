@@ -19,6 +19,7 @@ import {
   operationAttempts,
   projectActions,
 } from "@/lib/db-schema";
+import { resolveTraceId } from "@/lib/execution-trace";
 import { getFlowStepChannelCapabilityIssues } from "@/lib/flow-channel-capabilities";
 import { getInvalidAllowedFileTypeTokens } from "@/lib/flow-file-validation";
 
@@ -501,6 +502,7 @@ export type CreateActionSubmissionInput = {
   status?: ActionSubmissionStatus;
   fields?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  traceId?: string | null;
 };
 
 export type UpdateActionSubmissionInput = {
@@ -1523,6 +1525,7 @@ export async function createActionSubmission(
       actionVersionId: input.actionVersionId ?? null,
       currentStepId: input.currentStepId ?? null,
       conversationId: input.conversationId ?? null,
+      traceId: resolveTraceId(input.traceId),
       source: input.source ?? "chat_widget",
       status: input.status ?? "in_progress",
       fields: input.fields ?? {},
@@ -1763,13 +1766,27 @@ export async function addActionSubmissionEvent(input: {
   eventType: string;
   message?: string | null;
   payload?: Record<string, unknown>;
+  traceId?: string | null;
 }) {
+  const [submission] = input.traceId
+    ? []
+    : await db
+        .select({ traceId: actionSubmissions.traceId })
+        .from(actionSubmissions)
+        .where(
+          and(
+            eq(actionSubmissions.projectId, input.projectId),
+            eq(actionSubmissions.id, input.submissionId),
+          ),
+        )
+        .limit(1);
   const [event] = await db
     .insert(actionSubmissionEvents)
     .values({
       projectId: input.projectId,
       submissionId: input.submissionId,
       eventType: input.eventType,
+      traceId: input.traceId ?? submission?.traceId ?? null,
       message: input.message ?? null,
       payload: input.payload ?? {},
     })

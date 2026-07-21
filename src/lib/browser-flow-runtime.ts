@@ -26,6 +26,7 @@ import {
   recordChannelInboundMessage,
   recordChannelOutboundMessage,
 } from "@/lib/channels";
+import { resolveTraceId } from "@/lib/execution-trace";
 import type { FlowMediaUploadValue } from "@/lib/flow-media-values";
 import {
   claimFlowRuntimeCommand,
@@ -50,6 +51,7 @@ type RunBrowserFlowTextInput = {
   resume?: boolean;
   source: string;
   text?: string;
+  traceId?: string | null;
 };
 
 export class BrowserFlowCommandError extends Error {
@@ -284,6 +286,7 @@ async function executeBrowserFlowText(
           conversationId: input.conversationId,
           projectId: input.projectId,
           source: input.source,
+          traceId: input.traceId,
         })
       : { replies: [] };
 
@@ -323,16 +326,19 @@ function hashBrowserFlowCommand(input: RunBrowserFlowTextInput) {
 export async function runBrowserFlowText(
   input: RunBrowserFlowTextInput,
 ): Promise<BrowserFlowRuntimeResult> {
-  if (!input.commandId || input.resume) {
-    return executeBrowserFlowText(input);
+  const tracedInput = { ...input, traceId: resolveTraceId(input.traceId) };
+
+  if (!tracedInput.commandId || tracedInput.resume) {
+    return executeBrowserFlowText(tracedInput);
   }
 
   const claim = await claimFlowRuntimeCommand<BrowserFlowRuntimeResult>({
-    commandId: input.commandId,
-    conversationId: input.conversationId,
-    projectId: input.projectId,
-    requestHash: hashBrowserFlowCommand(input),
-    source: input.source,
+    commandId: tracedInput.commandId,
+    conversationId: tracedInput.conversationId,
+    projectId: tracedInput.projectId,
+    requestHash: hashBrowserFlowCommand(tracedInput),
+    source: tracedInput.source,
+    traceId: tracedInput.traceId,
   });
 
   if (claim.state === "replay") {
@@ -349,10 +355,10 @@ export async function runBrowserFlowText(
   }
 
   try {
-    const result = await executeBrowserFlowText(input);
+    const result = await executeBrowserFlowText(tracedInput);
     await completeFlowRuntimeCommand({
       commandId: claim.commandId,
-      projectId: input.projectId,
+      projectId: tracedInput.projectId,
       result,
     });
     return result;
@@ -361,7 +367,7 @@ export async function runBrowserFlowText(
       commandId: claim.commandId,
       errorMessage:
         error instanceof Error ? error.message : "Unknown runtime failure.",
-      projectId: input.projectId,
+      projectId: tracedInput.projectId,
     });
     if (error instanceof ActionSubmissionConflictError) {
       throw new BrowserFlowCommandError(

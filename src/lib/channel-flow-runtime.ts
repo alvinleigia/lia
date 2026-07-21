@@ -700,6 +700,7 @@ async function connectFlow(input: {
     },
     projectId: input.projectId,
     source: input.submission.source,
+    traceId: input.submission.traceId,
   });
 
   if (!nextSubmission) {
@@ -838,6 +839,7 @@ async function advanceFlowToNextStep(input: {
               operationId: step.operationId,
               projectId: input.projectId,
               submissionId: submission.id,
+              traceId: submission.traceId,
             });
       const operationStatus = operationResult?.attempt.status ?? "failed";
       const nextFields = {
@@ -993,6 +995,7 @@ export async function startChannelFlow(input: {
   conversationId: string;
   projectId: number;
   source: string;
+  traceId?: string | null;
 }) {
   const steps = getRunnableActionSteps(input.action);
 
@@ -1013,6 +1016,7 @@ export async function startChannelFlow(input: {
     contactId: input.contactId ?? null,
     conversationId: input.conversationId,
     source: input.source,
+    traceId: input.traceId,
   });
 
   if (!submission) {

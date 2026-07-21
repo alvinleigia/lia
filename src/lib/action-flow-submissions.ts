@@ -17,6 +17,7 @@ type StartActionFlowSubmissionInput = {
   fields?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   source: string;
+  traceId?: string | null;
 };
 
 type RecordActionFlowProgressInput = {
@@ -79,6 +80,7 @@ export async function startActionFlowSubmission(
     currentStepId: getFirstRuntimeStepId(action),
     conversationId: input.conversationId ?? null,
     source: input.source,
+    traceId: input.traceId,
     status: "in_progress",
     fields: input.fields ?? {},
     metadata: {
@@ -102,6 +104,7 @@ export async function startActionFlowSubmission(
       contactId: input.contactId ?? null,
       source: input.source,
     },
+    traceId: submission.traceId,
   });
 
   await addActionSubmissionEvent({
@@ -116,6 +119,7 @@ export async function startActionFlowSubmission(
       actionVersionNumber: action.versionNumber,
       firstStepId: submission.currentStepId,
     },
+    traceId: submission.traceId,
   });
 
   return submission;
