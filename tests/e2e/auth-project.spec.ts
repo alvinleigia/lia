@@ -6,6 +6,7 @@ import {
   createPublishedActionFlowVersion,
   getActionSubmission,
   getActiveActionSubmissionForConversation,
+  listActionFlowBranchRules,
   listActionSubmissionEvents,
   listActionSubmissions,
   updateActionFlowStep,
@@ -759,6 +760,146 @@ test("action steps use friendly compact editors and preserve integration setting
   await expect(
     dialog.getByText("Advanced settings", { exact: true }),
   ).toHaveCount(0);
+});
+
+test("canvas saves and restores friendly grouped route conditions", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-grouped-route-${runId}@example.test`;
+  const projectName = `E2E Grouped Route Project ${runId}`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Grouped Route User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(page, projectName);
+  const action = await createChatbotAction({
+    description: "Checks grouped route editing and persistence.",
+    name: `E2E Grouped Route ${runId}`,
+    projectId,
+    status: "draft",
+    triggerPhrases: [],
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "customerType",
+    inputType: "text",
+    isRequired: true,
+    label: "Customer Type",
+    projectId,
+    prompt: "What type of customer are you?",
+    sortOrder: 1,
+    stepType: "collect_input",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "orderValue",
+    inputType: "float",
+    isRequired: true,
+    label: "Order Value",
+    projectId,
+    prompt: "What is the expected order value?",
+    sortOrder: 2,
+    stepType: "number",
+  });
+  const routingStep = await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Choose Customer Route",
+    projectId,
+    prompt: "Choosing the right service route.",
+    sortOrder: 3,
+    stepType: "message",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Standard Finish",
+    projectId,
+    prompt: "Standard route complete.",
+    sortOrder: 4,
+    stepType: "submit",
+  });
+  const priorityStep = await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Priority Finish",
+    projectId,
+    prompt: "Priority route complete.",
+    sortOrder: 5,
+    stepType: "submit",
+  });
+
+  await page.goto(`/projects/actions/${action.id}/canvas`);
+  const routingNode = page
+    .locator(".react-flow__node")
+    .filter({ hasText: "Choose Customer Route" });
+  await routingNode.getByText("Choose Customer Route", { exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit Step" });
+  await dialog.getByText("Branching", { exact: true }).click();
+  const routeForm = dialog
+    .getByRole("button", { name: "Add route" })
+    .locator("xpath=ancestor::form");
+  await routeForm.getByLabel("Route name").fill("Priority customers");
+  await routeForm.getByLabel("Answer").selectOption("customerType");
+  await routeForm.getByLabel("Comparison").selectOption("equals");
+  await routeForm.getByLabel("Value").fill("vip");
+  await routeForm.getByRole("button", { name: "Add condition" }).click();
+  await routeForm.getByLabel("Condition matching").selectOption("or");
+  await routeForm.getByLabel("Answer").nth(1).selectOption("orderValue");
+  await routeForm.getByLabel("Comparison").nth(1).selectOption("greater_than");
+  await routeForm.getByLabel("Value").nth(1).fill("500");
+  await routeForm.getByLabel("Go to").selectOption(String(priorityStep.id));
+  await routeForm.getByRole("button", { name: "Add route" }).click();
+
+  await expect
+    .poll(async () => {
+      const rules = await listActionFlowBranchRules(projectId, action.id);
+      return rules.find((rule) => rule.sourceStepId === routingStep.id)
+        ?.settings.conditionGroup;
+    })
+    .toEqual({
+      combinator: "or",
+      conditions: [
+        {
+          comparisonValue: "vip",
+          fieldKey: "customerType",
+          operator: "equals",
+        },
+        {
+          comparisonValue: "500",
+          fieldKey: "orderValue",
+          operator: "greater_than",
+        },
+      ],
+      schemaVersion: 1,
+    });
+
+  await page.reload();
+  const routeEdge = page
+    .locator(".react-flow__edge")
+    .filter({ hasText: "Priority customers" });
+  await expect(routeEdge).toBeVisible();
+  await routeEdge.click();
+
+  const branchDialog = page.getByRole("dialog", { name: "Edit Branch" });
+  const editRouteForm = branchDialog
+    .getByRole("button", { name: "Save route" })
+    .locator("xpath=ancestor::form");
+  await expect(editRouteForm.getByLabel("Condition matching")).toHaveValue(
+    "or",
+  );
+  await expect(editRouteForm.getByLabel("Answer").nth(0)).toHaveValue(
+    "customerType",
+  );
+  await expect(editRouteForm.getByLabel("Value").nth(0)).toHaveValue("vip");
+  await expect(editRouteForm.getByLabel("Answer").nth(1)).toHaveValue(
+    "orderValue",
+  );
+  await expect(editRouteForm.getByLabel("Value").nth(1)).toHaveValue("500");
 });
 
 test("universal Add Content menu explains availability in both canvas editors", async ({
