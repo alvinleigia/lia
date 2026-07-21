@@ -24,6 +24,7 @@ import {
   Link2,
   ListChecks,
   Loader2,
+  type LucideIcon,
   MessageSquareText,
   Package,
   Pencil,
@@ -95,6 +96,12 @@ import {
   type FlowContentBlock,
   getFlowContentBlocks,
 } from "@/lib/flow-content-blocks";
+import {
+  type FlowContentComponentKey,
+  type FlowContentEligibilityContext,
+  getFlowContentComponent,
+  resolveFlowContentMenu,
+} from "@/lib/flow-content-components";
 
 type FlowStep = Awaited<ReturnType<typeof listActionFlowSteps>>[number];
 type BranchRule = Awaited<ReturnType<typeof listActionFlowBranchRules>>[number];
@@ -150,6 +157,70 @@ type InspectorSelection =
   | { id: string; type: "edge" }
   | { id: string; type: "node" }
   | null;
+
+const FLOW_CONTENT_COMPONENT_ICONS = {
+  catalog: ShoppingBag,
+  choice_buttons: ListChecks,
+  handoff: Workflow,
+  list: ListChecks,
+  media: ImageIcon,
+  multiple_products: ShoppingBag,
+  single_product: Package,
+  template: Wand2,
+  text: MessageSquareText,
+} satisfies Record<FlowContentComponentKey, LucideIcon>;
+
+function FlowAddContentMenuItems({
+  context,
+  onAdd,
+}: {
+  context: FlowContentEligibilityContext;
+  onAdd: (key: FlowContentComponentKey) => void;
+}) {
+  const items = resolveFlowContentMenu(context);
+
+  return (
+    <div className="space-y-3">
+      {(["message", "action"] as const).map((group) => {
+        const groupItems = items.filter(
+          (item) => item.component.group === group,
+        );
+
+        return (
+          <div key={group} className="space-y-1">
+            <p className="px-3 py-1 text-[11px] font-medium uppercase text-muted-foreground">
+              {group === "message" ? "Message content" : "Actions"}
+            </p>
+            {groupItems.map(({ component, disabledReason, enabled }) => {
+              const Icon = FLOW_CONTENT_COMPONENT_ICONS[component.key];
+
+              return (
+                <button
+                  key={component.key}
+                  type="button"
+                  disabled={!enabled}
+                  title={disabledReason ?? component.description}
+                  onClick={() => onAdd(component.key)}
+                  className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left transition-colors enabled:hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-muted-foreground"
+                >
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">
+                      {component.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">
+                      {disabledReason ?? component.description}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 type CanvasBranchRuleInput = {
   branchLabel: string;
@@ -911,7 +982,7 @@ function CanvasStepNodeContent({
     });
   };
 
-  const addContentBlock = (type: NewFlowContentBlockType) => {
+  const addContentBlock = (type: FlowContentComponentKey) => {
     const block = createFlowContentBlock({
       catalogProducts,
       mediaAssets,
@@ -934,11 +1005,10 @@ function CanvasStepNodeContent({
     });
   };
 
-  const allowsChoiceContent =
+  const allowsAnswerCollection =
     step.inputType !== null &&
     !hasDynamicChoices &&
     step.stepType !== "choice" &&
-    !choiceBlock &&
     storedManualChoices.length === 0;
 
   if (isEditing) {
@@ -1262,97 +1332,46 @@ function CanvasStepNodeContent({
           )}
         </div>
       )}
-      {contentBlocks.length < 10 && (
-        <Popover open={isAddContentOpen} onOpenChange={setIsAddContentOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="nodrag nopan w-full bg-white"
-              disabled={isSaving}
-              onClick={stopCanvasInteraction}
-              onPointerDown={stopCanvasInteraction}
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Add content
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            side="right"
-            className="nodrag nopan nowheel max-h-80 w-64 overflow-y-auto p-2"
+      <Popover open={isAddContentOpen} onOpenChange={setIsAddContentOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="nodrag nopan w-full bg-white"
+            disabled={isSaving}
             onClick={stopCanvasInteraction}
-            onKeyDown={stopCanvasInteraction}
             onPointerDown={stopCanvasInteraction}
           >
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => addContentBlock("text")}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
-              >
-                <MessageSquareText className="h-4 w-4" />
-                Text message
-              </button>
-              {allowsChoiceContent && (
-                <button
-                  type="button"
-                  onClick={() => addContentBlock("choice")}
-                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
-                >
-                  <ListChecks className="h-4 w-4" />
-                  Choice buttons
-                </button>
-              )}
-              {mediaAssets.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => addContentBlock("media")}
-                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
-                >
-                  <ImageIcon className="h-4 w-4" />
-                  Media
-                </button>
-              )}
-              {productCatalogs.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => addContentBlock("catalog")}
-                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
-                >
-                  <ShoppingBag className="h-4 w-4" />
-                  Product catalog
-                </button>
-              )}
-              {catalogProducts.length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => addContentBlock("single_product")}
-                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
-                  >
-                    <Package className="h-4 w-4" />
-                    Single product
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => addContentBlock("multiple_products")}
-                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100"
-                  >
-                    <ShoppingBag className="h-4 w-4" />
-                    Multiple products
-                  </button>
-                </>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            Add content
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          side="right"
+          className="nodrag nopan nowheel max-h-96 w-80 overflow-y-auto p-2"
+          onClick={stopCanvasInteraction}
+          onKeyDown={stopCanvasInteraction}
+          onPointerDown={stopCanvasInteraction}
+        >
+          <FlowAddContentMenuItems
+            context={{
+              allowsAnswerCollection,
+              blockCount: contentBlocks.length,
+              catalogProductCount: catalogProducts.length,
+              hasChoiceBlock: Boolean(choiceBlock),
+              mediaAssetCount: mediaAssets.length,
+              productCatalogCount: productCatalogs.length,
+            }}
+            onAdd={addContentBlock}
+          />
+        </PopoverContent>
+      </Popover>
       {localFeedback &&
         !localFeedback.toLowerCase().includes("updated") &&
         !isEditing && (
@@ -2916,25 +2935,26 @@ function StepCreateForm({
   );
 }
 
-type NewFlowContentBlockType =
-  | "catalog"
-  | "choice"
-  | "media"
-  | "multiple_products"
-  | "single_product"
-  | "text";
-
 function createFlowContentBlock(input: {
   catalogProducts: CatalogProductOption[];
   mediaAssets: MediaAssetOption[];
   productCatalogs: ProductCatalogOption[];
-  type: NewFlowContentBlockType;
+  type: FlowContentComponentKey;
 }): FlowContentBlock | null {
   const id = `content-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const component = getFlowContentComponent(input.type);
 
-  if (input.type === "choice") {
+  if (
+    !component ||
+    component.target !== "content_block" ||
+    !component.blockType
+  ) {
+    return null;
+  }
+
+  if (component.blockType === "choice") {
     return {
-      displayMode: "buttons",
+      displayMode: component.defaultChoiceDisplayMode ?? "buttons",
       id,
       options: ["Option 1"],
       text: "Choose an option",
@@ -2942,7 +2962,7 @@ function createFlowContentBlock(input: {
     };
   }
 
-  if (input.type === "text") {
+  if (component.blockType === "text") {
     return {
       id,
       text: "New message",
@@ -2950,7 +2970,7 @@ function createFlowContentBlock(input: {
     };
   }
 
-  if (input.type === "media") {
+  if (component.blockType === "media") {
     const mediaAsset = input.mediaAssets[0];
     return mediaAsset
       ? {
@@ -2963,8 +2983,9 @@ function createFlowContentBlock(input: {
       : null;
   }
 
+  const displayMode = component.defaultProductDisplayMode ?? "catalog";
   const defaultCatalogId =
-    input.type === "catalog"
+    displayMode === "catalog"
       ? input.productCatalogs[0]?.id
       : input.catalogProducts[0]?.catalogId;
   const catalog = input.productCatalogs.find(
@@ -2977,13 +2998,6 @@ function createFlowContentBlock(input: {
   const catalogProductIds = input.catalogProducts
     .filter((product) => product.catalogId === catalog.id)
     .map((product) => product.id);
-  const displayMode =
-    input.type === "single_product"
-      ? "single_product"
-      : input.type === "multiple_products"
-        ? "multiple_products"
-        : "catalog";
-
   return {
     catalog: null,
     catalogId: catalog.id,
@@ -3043,14 +3057,14 @@ function moveFlowContentBlock(
 }
 
 function FlowContentBlocksEditor({
-  allowsChoice,
+  allowsAnswerCollection,
   blocks,
   catalogProducts,
   mediaAssets,
   onChange,
   productCatalogs,
 }: {
-  allowsChoice: boolean;
+  allowsAnswerCollection: boolean;
   blocks: FlowContentBlock[];
   catalogProducts: CatalogProductOption[];
   mediaAssets: MediaAssetOption[];
@@ -3060,7 +3074,7 @@ function FlowContentBlocksEditor({
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const hasChoiceBlock = blocks.some((block) => block.type === "choice");
 
-  const addBlock = (type: NewFlowContentBlockType) => {
+  const addBlock = (type: FlowContentComponentKey) => {
     const block = createFlowContentBlock({
       catalogProducts,
       mediaAssets,
@@ -3533,121 +3547,30 @@ function FlowContentBlocksEditor({
         </div>
       )}
 
-      {blocks.length < 10 && (
-        <Popover open={isAddMenuOpen} onOpenChange={setIsAddMenuOpen}>
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline" className="bg-white">
-              <Plus className="h-4 w-4" />
-              Add content
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            className="max-h-96 w-72 overflow-y-auto p-2"
-          >
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => addBlock("text")}
-                className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
-              >
-                <MessageSquareText className="mt-0.5 h-4 w-4" />
-                <span>
-                  <span className="block text-sm font-medium">
-                    Text message
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    Add another message to this step.
-                  </span>
-                </span>
-              </button>
-              {allowsChoice && !hasChoiceBlock && (
-                <button
-                  type="button"
-                  onClick={() => addBlock("choice")}
-                  className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
-                >
-                  <ListChecks className="mt-0.5 h-4 w-4" />
-                  <span>
-                    <span className="block text-sm font-medium">
-                      Choice buttons
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      Let the visitor select one response.
-                    </span>
-                  </span>
-                </button>
-              )}
-              {mediaAssets.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => addBlock("media")}
-                  className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
-                >
-                  <ImageIcon className="mt-0.5 h-4 w-4" />
-                  <span>
-                    <span className="block text-sm font-medium">Media</span>
-                    <span className="block text-xs text-muted-foreground">
-                      Add an image, video, audio clip, or file.
-                    </span>
-                  </span>
-                </button>
-              )}
-              {productCatalogs.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => addBlock("catalog")}
-                  className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
-                >
-                  <ShoppingBag className="mt-0.5 h-4 w-4" />
-                  <span>
-                    <span className="block text-sm font-medium">
-                      Product catalog
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      Show all active products from a catalog.
-                    </span>
-                  </span>
-                </button>
-              )}
-              {catalogProducts.length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => addBlock("single_product")}
-                    className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
-                  >
-                    <Package className="mt-0.5 h-4 w-4" />
-                    <span>
-                      <span className="block text-sm font-medium">
-                        Single product
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        Highlight one product.
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => addBlock("multiple_products")}
-                    className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-gray-100"
-                  >
-                    <ShoppingBag className="mt-0.5 h-4 w-4" />
-                    <span>
-                      <span className="block text-sm font-medium">
-                        Multiple products
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        Show a selected group of products.
-                      </span>
-                    </span>
-                  </button>
-                </>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
+      <Popover open={isAddMenuOpen} onOpenChange={setIsAddMenuOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" className="bg-white">
+            <Plus className="h-4 w-4" />
+            Add content
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="max-h-96 w-80 overflow-y-auto p-2"
+        >
+          <FlowAddContentMenuItems
+            context={{
+              allowsAnswerCollection,
+              blockCount: blocks.length,
+              catalogProductCount: catalogProducts.length,
+              hasChoiceBlock,
+              mediaAssetCount: mediaAssets.length,
+              productCatalogCount: productCatalogs.length,
+            }}
+            onAdd={addBlock}
+          />
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
@@ -3687,7 +3610,7 @@ function StepBasicsForm({
   const showsChoiceDisplay = hasDynamicOptions || showsManualOptions;
   const allowsAnswerFormat =
     step.stepType === "collect_input" && !hasDynamicOptions;
-  const allowsChoiceContent =
+  const allowsAnswerCollection =
     collectsAnswer &&
     !hasDynamicOptions &&
     step.stepType !== "choice" &&
@@ -3774,7 +3697,7 @@ function StepBasicsForm({
       </div>
 
       <FlowContentBlocksEditor
-        allowsChoice={allowsChoiceContent}
+        allowsAnswerCollection={allowsAnswerCollection}
         blocks={contentBlocks}
         catalogProducts={catalogProducts}
         mediaAssets={mediaAssets}
