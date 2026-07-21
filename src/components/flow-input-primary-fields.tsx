@@ -65,6 +65,7 @@ export function FlowInputPrimaryFields({
   defaultPrompt = "",
   defaultRequired = true,
   idPrefix,
+  onInputTypeChange,
   stepType,
 }: {
   defaultEnabled?: boolean;
@@ -73,6 +74,7 @@ export function FlowInputPrimaryFields({
   defaultPrompt?: string | null;
   defaultRequired?: boolean;
   idPrefix: string;
+  onInputTypeChange?: (inputType: string) => void;
   stepType: string;
 }) {
   const [answerFormat, setAnswerFormat] = useState(
@@ -150,9 +152,11 @@ export function FlowInputPrimaryFields({
             id={`${idPrefix}-input-type`}
             name="inputType"
             value={answerFormat}
-            onChange={(event) =>
-              setAnswerFormat(event.currentTarget.value as typeof answerFormat)
-            }
+            onChange={(event) => {
+              const nextFormat = event.currentTarget.value;
+              setAnswerFormat(nextFormat as typeof answerFormat);
+              onInputTypeChange?.(nextFormat);
+            }}
             className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             {FLOW_ANSWER_FORMATS.map((format) => (
