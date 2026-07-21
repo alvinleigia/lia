@@ -11,7 +11,11 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { FlowContentBlock } from "@/lib/flow-content-blocks";
+import type {
+  FlowCatalogContentBlock,
+  FlowContentBlock,
+  FlowMediaContentBlock,
+} from "@/lib/flow-content-blocks";
 import {
   getFlowMessageFamily,
   getFlowMessageFamilyDefinition,
@@ -70,12 +74,219 @@ function moveOption(options: string[], fromIndex: number, toIndex: number) {
   return nextOptions;
 }
 
+function FlowMediaMessageFields({
+  block,
+  mediaAssets,
+  onChange,
+}: {
+  block: FlowMediaContentBlock;
+  mediaAssets: FlowMessageMediaAssetOption[];
+  onChange: (block: FlowContentBlock) => void;
+}) {
+  const selectedAsset = mediaAssets.find(
+    (asset) => asset.id === block.mediaAssetId,
+  );
+
+  return (
+    <div className="space-y-2">
+      <label
+        className="text-sm font-medium"
+        htmlFor={`message-media-${block.id}`}
+      >
+        Media file
+      </label>
+      <select
+        id={`message-media-${block.id}`}
+        aria-label="Media file"
+        value={block.mediaAssetId}
+        onChange={(event) =>
+          onChange({
+            ...block,
+            media: null,
+            mediaAssetId: Number(event.target.value),
+          })
+        }
+        className="flex h-10 w-full rounded-md border border-input bg-white px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        {mediaAssets.map((asset) => (
+          <option key={asset.id} value={asset.id}>
+            {asset.label}
+          </option>
+        ))}
+      </select>
+      {selectedAsset && (
+        <p className="text-xs text-muted-foreground">
+          {selectedAsset.mediaType} selected
+        </p>
+      )}
+    </div>
+  );
+}
+
+function FlowCatalogMessageFields({
+  block,
+  catalogProducts,
+  onChange,
+  productCatalogs,
+}: {
+  block: FlowCatalogContentBlock;
+  catalogProducts: FlowMessageCatalogProductOption[];
+  onChange: (block: FlowContentBlock) => void;
+  productCatalogs: FlowMessageProductCatalogOption[];
+}) {
+  const availableProducts = catalogProducts.filter(
+    (product) => product.catalogId === block.catalogId,
+  );
+
+  const selectCatalog = (catalogId: number) => {
+    const availableProductIds = catalogProducts
+      .filter((product) => product.catalogId === catalogId)
+      .map((product) => product.id);
+
+    onChange({
+      ...block,
+      catalog: null,
+      catalogId,
+      productIds:
+        block.displayMode === "catalog"
+          ? []
+          : block.displayMode === "single_product"
+            ? availableProductIds.slice(0, 1)
+            : availableProductIds.slice(0, 3),
+      products: [],
+    });
+  };
+
+  const selectProduct = (productId: number, selected: boolean) => {
+    const productIds =
+      block.displayMode === "single_product"
+        ? [productId]
+        : selected
+          ? [...new Set([...block.productIds, productId])]
+          : block.productIds.filter((id) => id !== productId);
+
+    onChange({ ...block, productIds, products: [] });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <label
+          className="text-sm font-medium"
+          htmlFor={`message-catalog-${block.id}`}
+        >
+          Product catalog
+        </label>
+        <select
+          id={`message-catalog-${block.id}`}
+          aria-label="Product catalog"
+          value={block.catalogId}
+          onChange={(event) => selectCatalog(Number(event.target.value))}
+          className="flex h-10 w-full rounded-md border border-input bg-white px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          {productCatalogs.map((catalog) => (
+            <option key={catalog.id} value={catalog.id}>
+              {catalog.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Card layout</legend>
+        <div className="grid grid-cols-3 overflow-hidden rounded-md border bg-white">
+          {(
+            [
+              ["grid", "Grid"],
+              ["list", "List"],
+              ["featured", "Featured"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={block.layout === value}
+              onClick={() => onChange({ ...block, layout: value })}
+              className={`min-h-10 border-r px-2 text-sm last:border-r-0 ${
+                block.layout === value
+                  ? "bg-gray-900 font-medium text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      {block.displayMode !== "catalog" && (
+        <fieldset className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <legend className="text-sm font-medium">
+              {block.displayMode === "single_product"
+                ? "Choose one product"
+                : "Choose products"}
+            </legend>
+            {block.displayMode === "multiple_products" && (
+              <span className="text-xs text-muted-foreground">
+                {block.productIds.length} selected
+              </span>
+            )}
+          </div>
+          <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border bg-white p-2">
+            {availableProducts.map((product) => {
+              const selected = block.productIds.includes(product.id);
+
+              return (
+                <label
+                  key={product.id}
+                  className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-gray-50"
+                >
+                  <input
+                    type={
+                      block.displayMode === "single_product"
+                        ? "radio"
+                        : "checkbox"
+                    }
+                    name={
+                      block.displayMode === "single_product"
+                        ? `message-product-${block.id}`
+                        : undefined
+                    }
+                    checked={selected}
+                    onChange={(event) =>
+                      selectProduct(product.id, event.target.checked)
+                    }
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {product.name}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {product.sku || product.catalogName}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+            {availableProducts.length === 0 && (
+              <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+                This catalog has no active products.
+              </p>
+            )}
+          </div>
+        </fieldset>
+      )}
+    </div>
+  );
+}
+
 export function FlowMessageContentEditor({
   block,
-  catalogProducts: _catalogProducts,
-  mediaAssets: _mediaAssets,
+  catalogProducts,
+  mediaAssets,
   onChange,
-  productCatalogs: _productCatalogs,
+  productCatalogs,
 }: {
   block: FlowContentBlock;
   catalogProducts: FlowMessageCatalogProductOption[];
@@ -274,6 +485,23 @@ export function FlowMessageContentEditor({
             </p>
           )}
         </div>
+      )}
+
+      {block.type === "media" && (
+        <FlowMediaMessageFields
+          block={block}
+          mediaAssets={mediaAssets}
+          onChange={onChange}
+        />
+      )}
+
+      {block.type === "catalog" && (
+        <FlowCatalogMessageFields
+          block={block}
+          catalogProducts={catalogProducts}
+          onChange={onChange}
+          productCatalogs={productCatalogs}
+        />
       )}
     </div>
   );
