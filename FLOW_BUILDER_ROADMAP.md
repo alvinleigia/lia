@@ -28,7 +28,7 @@ is not confused with the historical implementation phases later in this file.
 | --- | --- | --- |
 | 1 | Canonical server-owned browser flow runtime | Complete |
 | 2 | Flow state recovery and idempotent commands | Complete |
-| 3 | Shared channel adapter contracts and capability parity | Pending |
+| 3 | Shared channel adapter contracts and capability parity | In progress (Step 1 of 7 complete) |
 | 4 | Graph integrity, routing diagnostics, and safe recovery | Pending |
 | 5 | Operation execution reliability and integration contracts | Pending |
 | 6 | Production media storage and delivery | Pending |
@@ -36,6 +36,16 @@ is not confused with the historical implementation phases later in this file.
 | 8 | Tenant security, abuse controls, and public API hardening | Pending |
 | 9 | Runtime observability, analytics, and operational recovery | Pending |
 | 10 | Full UAT, deployment readiness, and release sign-off | Pending |
+
+### Phase 3 Delivery Steps
+
+1. Define shared channel adapter and capability contracts.
+2. Migrate project chat rendering onto the shared adapter.
+3. Migrate widget rendering onto the shared adapter.
+4. Migrate WhatsApp delivery onto the shared adapter.
+5. Centralize channel capability diagnostics and fallbacks.
+6. Add cross-channel parity and tenant-isolation tests.
+7. Complete regression verification and Phase 3 closeout.
 
 ### Phase 2 Delivery Steps
 

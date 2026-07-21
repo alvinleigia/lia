@@ -13,6 +13,11 @@ import {
 import { writeAuditLog } from "../../src/lib/audit";
 import { runBrowserFlowMediaCommand } from "../../src/lib/browser-flow-media-command";
 import { runBrowserFlowText } from "../../src/lib/browser-flow-runtime";
+import {
+  getChannelAdapterProfile,
+  getChannelReplySupport,
+  getRuntimeReplyCapability,
+} from "../../src/lib/channel-adapter-contract";
 import { processChannelFlowText } from "../../src/lib/channel-flow-runtime";
 import {
   recordChannelInboundMessage,
@@ -39,6 +44,31 @@ import { createOrRotateProjectWidgetToken } from "../../src/lib/widget-keys";
 import { getOrCreateDefaultWorkspaceForCompany } from "../../src/lib/workspaces";
 
 const password = "TestPassword123!";
+
+test("shared channel adapter contract describes capability parity", () => {
+  const buttonReply = {
+    fallbackText: "Choose one\n\n1. First",
+    payload: { options: [{ id: "first", label: "First", value: "first" }] },
+    text: "Choose one",
+    type: "buttons" as const,
+  };
+  const singleProductReply = {
+    fallbackText: "Product",
+    payload: { mode: "single_product", products: [] },
+    text: "Product",
+    type: "catalog" as const,
+  };
+
+  expect(getRuntimeReplyCapability(singleProductReply)).toBe("single_product");
+  expect(getChannelReplySupport("project_chat", buttonReply)).toBe("native");
+  expect(getChannelReplySupport("widget", buttonReply)).toBe("native");
+  expect(getChannelReplySupport("whatsapp", buttonReply)).toBe("conditional");
+  expect(getChannelAdapterProfile("whatsapp").limits).toEqual({
+    buttonOptions: 3,
+    listOptions: 10,
+    productItems: 30,
+  });
+});
 const platformAdminEmail =
   process.env.E2E_PLATFORM_ADMIN_EMAIL ?? "e2e-platform-admin@example.test";
 
