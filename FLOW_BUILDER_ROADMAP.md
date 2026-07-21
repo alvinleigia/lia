@@ -32,7 +32,7 @@ is not confused with the historical implementation phases later in this file.
 | 4 | Universal Add Content menu with explicit disabled reasons | Complete |
 | 5 | Friendly message-family editors | Complete |
 | 6 | Friendly input-family editors | Complete |
-| 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Pending |
+| 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | In progress (Step 1 of 6) |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Pending |
 | 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Pending |
 | 10 | Cross-channel certification, UAT, and release sign-off | Pending |
@@ -135,6 +135,26 @@ All 6 Phase 6 steps are complete:
   while runtime validation and structured answer handling remain unchanged.
 - Model and browser regression coverage verifies relevance, persistence,
   compact-editor parity, automatic formats, and upload presets.
+
+### Phase 7 Delivery Steps
+
+1. Audit action blocks, branch rules, runtime behavior, and operation settings.
+2. Define one action-family registry with supported and planned capabilities.
+3. Build friendly primary editors for conditions, handoff, contact updates,
+   tags, submission, and connected flows.
+4. Build friendly primary editors for API operations while keeping AI/knowledge
+   and wait actions visible with honest disabled reasons until runtime support.
+5. Use the shared action editors across create, compact, and advanced canvas
+   editing, then add model and browser regression coverage.
+6. Run full verification, update UAT instructions, and close Phase 7.
+
+Phase 7 preserves the existing action-step, operation, branch-rule, published
+version, and channel-independent runtime contracts. Conditions remain routes
+between steps rather than artificial executable nodes. AI/knowledge requires a
+defined prompt, grounding, output, and failure contract; wait requires durable
+pause and resume execution. Both remain discoverable but disabled until those
+runtime contracts are implemented, avoiding flow definitions that can be saved
+but not executed.
 
 ### Phase 3 Delivery Steps
 
