@@ -3,6 +3,11 @@ import {
   resolveActionDataSourceOptions,
 } from "@/lib/action-data-sources";
 import {
+  type CompiledActionFlowGraph,
+  compileActionFlowGraph,
+  evaluateCompiledActionFlowConditionGroup,
+} from "@/lib/action-flow-compiler";
+import {
   formatFlowContentBlockText,
   formatFlowInteractiveContentBlockText,
   getFlowCatalogContentBlocks,
@@ -69,6 +74,7 @@ export type RuntimeActionBranchRule = {
   targetStepId: number;
   sortOrder: number;
   isEnabled: boolean;
+  settings?: Record<string, unknown>;
 };
 
 export type RuntimeAction = {
@@ -80,6 +86,7 @@ export type RuntimeAction = {
   triggerPhrases: string[];
   steps: RuntimeActionStep[];
   branchRules: RuntimeActionBranchRule[];
+  compiledGraph?: CompiledActionFlowGraph;
 };
 
 export type FlowChatMessage = {
@@ -328,67 +335,31 @@ function getRunnableStepIndexById(action: RuntimeAction, stepId: number) {
   return getRunnableActionSteps(action).findIndex((step) => step.id === stepId);
 }
 
-function isEmptyBranchValue(value: unknown) {
-  return value === undefined || value === null || String(value).trim() === "";
+export function compileRuntimeActionGraph(action: RuntimeAction) {
+  return compileActionFlowGraph({
+    branchRules: action.branchRules.map((rule) => ({
+      ...rule,
+      settings: rule.settings ?? {},
+    })),
+    steps: action.steps.map((step) => ({
+      ...step,
+      settings: step.settings as Record<string, unknown>,
+    })),
+  });
 }
 
-function compareBranchValues(leftValue: unknown, rightValue: string | null) {
-  const left = String(leftValue ?? "").trim();
-  const right = String(rightValue ?? "").trim();
-
-  return {
-    left,
-    right,
-    normalizedLeft: normalizeActionText(left),
-    normalizedRight: normalizeActionText(right),
-    numericLeft: Number(left),
-    numericRight: Number(right),
-  };
-}
-
-function doesBranchRuleMatch(
-  rule: RuntimeActionBranchRule,
+function getRuntimeBranchFields(
+  condition: CompiledActionFlowGraph["branchConditions"][number],
   fields: Record<string, unknown>,
 ) {
-  const fieldValue = fields[normalizeSubmissionFieldKey(rule.sourceFieldKey)];
+  const branchFields = { ...fields };
 
-  switch (rule.operator) {
-    case "is_empty":
-      return isEmptyBranchValue(fieldValue);
-    case "is_not_empty":
-      return !isEmptyBranchValue(fieldValue);
-    default:
-      break;
+  for (const item of condition.conditions) {
+    branchFields[item.fieldKey] =
+      fields[normalizeSubmissionFieldKey(item.fieldKey)];
   }
 
-  if (isEmptyBranchValue(fieldValue)) {
-    return false;
-  }
-
-  const comparison = compareBranchValues(fieldValue, rule.comparisonValue);
-
-  switch (rule.operator) {
-    case "contains":
-      return comparison.normalizedLeft.includes(comparison.normalizedRight);
-    case "equals":
-      return comparison.normalizedLeft === comparison.normalizedRight;
-    case "greater_than":
-      return (
-        Number.isFinite(comparison.numericLeft) &&
-        Number.isFinite(comparison.numericRight) &&
-        comparison.numericLeft > comparison.numericRight
-      );
-    case "less_than":
-      return (
-        Number.isFinite(comparison.numericLeft) &&
-        Number.isFinite(comparison.numericRight) &&
-        comparison.numericLeft < comparison.numericRight
-      );
-    case "not_equals":
-      return comparison.normalizedLeft !== comparison.normalizedRight;
-    default:
-      return false;
-  }
+  return branchFields;
 }
 
 export function getNextActionStepDecision(
@@ -397,10 +368,20 @@ export function getNextActionStepDecision(
   currentStepIndex: number,
   fields: Record<string, unknown>,
 ): RuntimeRouteDecision {
+  const compiledGraph =
+    action.compiledGraph ?? compileRuntimeActionGraph(action);
   const branchRule = action.branchRules
     .filter((rule) => rule.isEnabled && rule.sourceStepId === step.id)
     .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
-    .find((rule) => doesBranchRuleMatch(rule, fields));
+    .find((rule) => {
+      const condition = compiledGraph.branchConditions[rule.id];
+      return condition
+        ? evaluateCompiledActionFlowConditionGroup(
+            condition,
+            getRuntimeBranchFields(condition, fields),
+          )
+        : false;
+    });
 
   if (branchRule) {
     const stepIndex = getRunnableStepIndexById(action, branchRule.targetStepId);

@@ -6,6 +6,10 @@ import {
   evaluateCompiledActionFlowConditionGroup,
   type StoredActionFlowConditionGroup,
 } from "../../src/lib/action-flow-compiler";
+import {
+  getNextActionStepDecision,
+  type RuntimeAction,
+} from "../../src/lib/action-runtime";
 
 function createStep(
   id: number,
@@ -258,4 +262,182 @@ test("compiler blocks routes that start from terminal steps", () => {
       expect.objectContaining({ code: "default_source_step_terminal" }),
     ]),
   );
+});
+
+test("runtime evaluates compiled OR conditions before the ordered fallback", () => {
+  const conditionGroup: StoredActionFlowConditionGroup = {
+    combinator: "or",
+    conditions: [
+      {
+        comparisonValue: "vip",
+        fieldKey: "customerType",
+        operator: "equals",
+      },
+      {
+        comparisonValue: "500",
+        fieldKey: "orderValue",
+        operator: "greater_than",
+      },
+    ],
+    schemaVersion: 1,
+  };
+  const action: RuntimeAction = {
+    branchRules: [
+      {
+        comparisonValue: "vip",
+        id: 40,
+        isEnabled: true,
+        operator: "equals",
+        settings: { conditionGroup },
+        sortOrder: 1,
+        sourceFieldKey: "customerType",
+        sourceStepId: 1,
+        targetStepId: 3,
+      },
+    ],
+    description: null,
+    id: 1,
+    name: "Grouped routing",
+    steps: [
+      {
+        fieldKey: "customerType",
+        id: 1,
+        inputType: "text",
+        isEnabled: true,
+        isRequired: true,
+        label: "Customer type",
+        nextStepId: null,
+        operationId: null,
+        options: [],
+        prompt: null,
+        settings: {},
+        sortOrder: 1,
+        stepType: "collect_input",
+      },
+      {
+        fieldKey: "orderValue",
+        id: 2,
+        inputType: "float",
+        isEnabled: true,
+        isRequired: true,
+        label: "Order value",
+        nextStepId: null,
+        operationId: null,
+        options: [],
+        prompt: null,
+        settings: {},
+        sortOrder: 2,
+        stepType: "number",
+      },
+      {
+        fieldKey: null,
+        id: 3,
+        inputType: null,
+        isEnabled: true,
+        isRequired: false,
+        label: "Priority route",
+        nextStepId: null,
+        operationId: null,
+        options: [],
+        prompt: null,
+        settings: {},
+        sortOrder: 3,
+        stepType: "submit",
+      },
+    ],
+    triggerPhrases: [],
+    versionId: null,
+    versionNumber: null,
+  };
+
+  expect(
+    getNextActionStepDecision(action, action.steps[0], 0, {
+      customerType: "standard",
+      orderValue: 650,
+    }),
+  ).toMatchObject({
+    branchRuleId: 40,
+    routeType: "branch",
+    targetStepId: 3,
+  });
+});
+
+test("runtime preserves the legacy preferred time field alias", () => {
+  const action: RuntimeAction = {
+    branchRules: [
+      {
+        comparisonValue: "12:00",
+        id: 41,
+        isEnabled: true,
+        operator: "greater_than",
+        sortOrder: 1,
+        sourceFieldKey: "time",
+        sourceStepId: 1,
+        targetStepId: 3,
+      },
+    ],
+    description: null,
+    id: 2,
+    name: "Time alias routing",
+    steps: [
+      {
+        fieldKey: "time",
+        id: 1,
+        inputType: "time",
+        isEnabled: true,
+        isRequired: true,
+        label: "Time",
+        nextStepId: null,
+        operationId: null,
+        options: [],
+        prompt: null,
+        settings: {},
+        sortOrder: 1,
+        stepType: "time",
+      },
+      {
+        fieldKey: null,
+        id: 2,
+        inputType: null,
+        isEnabled: true,
+        isRequired: false,
+        label: "Morning",
+        nextStepId: null,
+        operationId: null,
+        options: [],
+        prompt: null,
+        settings: {},
+        sortOrder: 2,
+        stepType: "submit",
+      },
+      {
+        fieldKey: null,
+        id: 3,
+        inputType: null,
+        isEnabled: true,
+        isRequired: false,
+        label: "Afternoon",
+        nextStepId: null,
+        operationId: null,
+        options: [],
+        prompt: null,
+        settings: {},
+        sortOrder: 3,
+        stepType: "submit",
+      },
+    ],
+    triggerPhrases: [],
+    versionId: null,
+    versionNumber: null,
+  };
+
+  expect(
+    getNextActionStepDecision(action, action.steps[0], 0, {
+      preferredTime: "14:30",
+    }),
+  ).toMatchObject({
+    branchRuleId: 41,
+    routeType: "branch",
+    targetStepId: 3,
+  });
 });

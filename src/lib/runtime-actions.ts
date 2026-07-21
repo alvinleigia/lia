@@ -6,7 +6,10 @@ import {
   listActionFlowSteps,
   listActiveProjectActions,
 } from "@/lib/action-flows";
-import type { RuntimeAction } from "@/lib/action-runtime";
+import {
+  compileRuntimeActionGraph,
+  type RuntimeAction,
+} from "@/lib/action-runtime";
 import type {
   SelectActionFlowBranchRule,
   SelectActionFlowStep,
@@ -19,7 +22,7 @@ export function toRuntimeAction(input: {
   branchRules: SelectActionFlowBranchRule[];
   steps: SelectActionFlowStep[];
 }): RuntimeAction {
-  return {
+  const runtimeAction: RuntimeAction = {
     id: input.action.id,
     versionId: null,
     versionNumber: null,
@@ -35,6 +38,7 @@ export function toRuntimeAction(input: {
       targetStepId: rule.targetStepId,
       sortOrder: rule.sortOrder,
       isEnabled: rule.isEnabled,
+      settings: rule.settings,
     })),
     steps: input.steps.map((step) => ({
       id: step.id,
@@ -51,6 +55,11 @@ export function toRuntimeAction(input: {
       options: step.options,
       settings: step.settings,
     })),
+  };
+
+  return {
+    ...runtimeAction,
+    compiledGraph: compileRuntimeActionGraph(runtimeAction),
   };
 }
 
@@ -74,7 +83,7 @@ function toRuntimeActionFromSnapshot(
   snapshot: ActionFlowVersionSnapshot,
   version: { id: number; versionNumber: number },
 ): RuntimeAction {
-  return {
+  const runtimeAction: RuntimeAction = {
     id: snapshot.action.id,
     versionId: version.id,
     versionNumber: version.versionNumber,
@@ -90,6 +99,7 @@ function toRuntimeActionFromSnapshot(
       targetStepId: rule.targetStepId,
       sortOrder: rule.sortOrder,
       isEnabled: rule.isEnabled,
+      settings: rule.settings,
     })),
     steps: snapshot.steps.map((step) => ({
       id: step.id,
@@ -106,6 +116,11 @@ function toRuntimeActionFromSnapshot(
       options: step.options,
       settings: step.settings,
     })),
+  };
+
+  return {
+    ...runtimeAction,
+    compiledGraph: compileRuntimeActionGraph(runtimeAction),
   };
 }
 

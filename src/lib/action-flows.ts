@@ -1,9 +1,13 @@
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import {
-  ACTION_BRANCH_OPERATORS,
-  type ActionBranchOperator,
-  type ActionSubmissionStatus,
-  type ProjectActionStatus,
+  type ActionFlowCompilerIssueCode,
+  type ActionFlowCompilerIssueSource,
+  compileActionFlowGraph,
+} from "@/lib/action-flow-compiler";
+import type {
+  ActionBranchOperator,
+  ActionSubmissionStatus,
+  ProjectActionStatus,
 } from "@/lib/action-flow-constants";
 import { db } from "@/lib/db-config";
 import {
@@ -142,11 +146,8 @@ export type ActionFlowVersionSnapshot = {
 };
 
 export type ActionFlowRouteValidationIssue = {
-  source:
-    | "branch_rule"
-    | "channel_capability"
-    | "default_next_step"
-    | "step_config";
+  code?: ActionFlowCompilerIssueCode;
+  source: ActionFlowCompilerIssueSource | "channel_capability" | "step_config";
   stepId?: number;
   ruleId?: number;
   severity?: "error" | "warning";
@@ -474,13 +475,6 @@ function getStepConfigIssues(step: {
   issues.push(...getValidationSettingsIssuesForStep(step));
 
   return issues;
-}
-
-function getOperationStatusFieldKey(step: {
-  fieldKey: string | null;
-  id: number;
-}) {
-  return step.fieldKey || `operation_${step.id}_status`;
 }
 
 function getOperationRoutePreset(
@@ -1298,20 +1292,6 @@ export async function validateActionFlowRoutes(
     listActionFlowSteps(projectId, actionId),
     listActionFlowBranchRules(projectId, actionId),
   ]);
-  const stepIds = new Set(steps.map((step) => step.id));
-  const enabledStepIds = new Set(
-    steps.filter((step) => step.isEnabled).map((step) => step.id),
-  );
-  const inputFieldKeys = new Set(
-    steps.flatMap((step) => {
-      const keys = step.fieldKey ? [step.fieldKey] : [];
-      if (step.stepType === "operation") {
-        keys.push(getOperationStatusFieldKey(step));
-      }
-
-      return keys;
-    }),
-  );
   const issues: ActionFlowRouteValidationIssue[] = [];
 
   for (const step of steps) {
@@ -1401,78 +1381,10 @@ export async function validateActionFlowRoutes(
         });
       }
     }
-
-    if (step.nextStepId !== null && !stepIds.has(step.nextStepId)) {
-      issues.push({
-        source: "default_next_step",
-        stepId: step.id,
-        message: `Step ${step.sortOrder} points to a missing default next step.`,
-      });
-    }
-
-    if (
-      step.nextStepId !== null &&
-      stepIds.has(step.nextStepId) &&
-      !enabledStepIds.has(step.nextStepId)
-    ) {
-      issues.push({
-        source: "default_next_step",
-        stepId: step.id,
-        message: `Step ${step.sortOrder} points to a disabled default next step.`,
-      });
-    }
   }
 
-  for (const rule of branchRules) {
-    if (!rule.isEnabled) {
-      continue;
-    }
-
-    if (!stepIds.has(rule.sourceStepId)) {
-      issues.push({
-        source: "branch_rule",
-        ruleId: rule.id,
-        message: `Branch rule #${rule.id} has a missing source step.`,
-      });
-    }
-
-    if (!stepIds.has(rule.targetStepId)) {
-      issues.push({
-        source: "branch_rule",
-        ruleId: rule.id,
-        message: `Branch rule #${rule.id} points to a missing target step.`,
-      });
-    }
-
-    if (
-      stepIds.has(rule.targetStepId) &&
-      !enabledStepIds.has(rule.targetStepId)
-    ) {
-      issues.push({
-        source: "branch_rule",
-        ruleId: rule.id,
-        message: `Branch rule #${rule.id} points to a disabled target step.`,
-      });
-    }
-
-    if (!inputFieldKeys.has(rule.sourceFieldKey)) {
-      issues.push({
-        source: "branch_rule",
-        ruleId: rule.id,
-        message: `Branch rule #${rule.id} uses an unknown source field.`,
-      });
-    }
-
-    if (
-      !ACTION_BRANCH_OPERATORS.includes(rule.operator as ActionBranchOperator)
-    ) {
-      issues.push({
-        source: "branch_rule",
-        ruleId: rule.id,
-        message: `Branch rule #${rule.id} uses an unknown operator.`,
-      });
-    }
-  }
+  const graph = compileActionFlowGraph({ branchRules, steps });
+  issues.push(...graph.issues);
 
   return issues;
 }
