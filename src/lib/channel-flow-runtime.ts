@@ -981,6 +981,37 @@ async function advanceFlowToNextStep(input: {
   };
 }
 
+export function resumeChannelFlowExecution(input: {
+  action: RuntimeAction;
+  contactId?: number | null;
+  projectId: number;
+  submission: SelectActionSubmission;
+}) {
+  const steps = getRunnableActionSteps(input.action);
+  const stepIndex =
+    input.submission.currentStepId === null
+      ? steps.length
+      : steps.findIndex((step) => step.id === input.submission.currentStepId);
+
+  if (stepIndex < 0) {
+    return {
+      replies: [
+        createTextReply(
+          "This flow can no longer find its saved resume point. Please start again.",
+        ),
+      ],
+    };
+  }
+
+  return advanceFlowToNextStep({
+    action: input.action,
+    contactId: input.contactId,
+    projectId: input.projectId,
+    stepIndex,
+    submission: input.submission,
+  });
+}
+
 function findStepIndexById(action: RuntimeAction, stepId: number | null) {
   if (stepId === null) {
     return getRunnableActionSteps(action).length;

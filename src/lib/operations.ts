@@ -5,12 +5,18 @@ import {
   actionFlowSteps,
   actionSubmissionEvents,
   actionSubmissions,
+  durableJobs,
   integrationProviders,
   operationAttempts,
   operations,
   type SelectOperation,
   type SelectOperationAttempt,
 } from "@/lib/db-schema";
+import {
+  claimNextDurableJob,
+  completeDurableJob,
+  failDurableJob,
+} from "@/lib/durable-jobs";
 import { resolveTraceId } from "@/lib/execution-trace";
 
 export const INTEGRATION_PROVIDER_TYPES = [
@@ -164,6 +170,14 @@ export type OperationRetryQueueResult = {
   idle: boolean;
   processed: number;
   skipped: number;
+};
+
+export type DurableOperationQueueResult = {
+  completed: number;
+  failed: number;
+  idle: boolean;
+  processed: number;
+  rescheduled: number;
 };
 
 export function getOperationAttemptReplaySourceId(
@@ -1240,6 +1254,317 @@ export async function runOperationForSubmission(input: {
   };
 }
 
+export async function queueOperationForSubmission(input: {
+  actionId: number;
+  fields: Record<string, unknown>;
+  idempotencyKey: string;
+  operationId: number;
+  projectId: number;
+  submissionId: number;
+  traceId?: string | null;
+}) {
+  const operationContext = await getProjectOperation(
+    input.projectId,
+    input.operationId,
+  );
+
+  if (!operationContext) {
+    return null;
+  }
+
+  const { operation, provider } = operationContext;
+  if (operation.status !== "active" || provider.status !== "active") {
+    return null;
+  }
+
+  const traceId = resolveTraceId(input.traceId);
+  const requestPayload = {
+    idempotencyKey: input.idempotencyKey,
+    operationType: operation.operationType,
+    submissionId: input.submissionId,
+    payload: buildInputPayload(input.fields, operation.inputMapping),
+  };
+  const retryConfig = getRetryQueueConfig(provider.config);
+  const maxAttempts = retryConfig.enabled ? retryConfig.maxAttempts + 1 : 1;
+
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx
+      .insert(operationAttempts)
+      .values({
+        actionId: input.actionId,
+        idempotencyKey: input.idempotencyKey,
+        operationId: operation.id,
+        projectId: input.projectId,
+        providerId: provider.id,
+        requestPayload,
+        status: "pending",
+        submissionId: input.submissionId,
+        traceId,
+      })
+      .onConflictDoNothing()
+      .returning();
+    const reservedAttempt =
+      attempt ??
+      (
+        await tx
+          .select()
+          .from(operationAttempts)
+          .where(
+            and(
+              eq(operationAttempts.projectId, input.projectId),
+              eq(operationAttempts.idempotencyKey, input.idempotencyKey),
+            ),
+          )
+          .limit(1)
+      )[0];
+
+    if (!reservedAttempt) {
+      throw new Error("Could not reserve the queued operation attempt.");
+    }
+
+    const [job] = await tx
+      .insert(durableJobs)
+      .values({
+        dedupeKey: input.idempotencyKey,
+        jobType: "operation_delivery",
+        maxAttempts,
+        operationAttemptId: reservedAttempt.id,
+        payload: { operationAttemptId: reservedAttempt.id },
+        projectId: input.projectId,
+        submissionId: input.submissionId,
+        traceId: reservedAttempt.traceId ?? traceId,
+      })
+      .onConflictDoNothing()
+      .returning();
+    const reservedJob =
+      job ??
+      (
+        await tx
+          .select()
+          .from(durableJobs)
+          .where(
+            and(
+              eq(durableJobs.projectId, input.projectId),
+              eq(durableJobs.jobType, "operation_delivery"),
+              eq(durableJobs.dedupeKey, input.idempotencyKey),
+            ),
+          )
+          .limit(1)
+      )[0];
+
+    if (!reservedJob) {
+      throw new Error("Could not reserve the durable operation job.");
+    }
+
+    return {
+      attempt: reservedAttempt,
+      created: Boolean(attempt && job),
+      job: reservedJob,
+    };
+  });
+}
+
+async function recordDurableOperationResult(input: {
+  attempt: SelectOperationAttempt;
+  errorMessage?: string | null;
+  final: boolean;
+  operation: SelectOperation;
+  projectId: number;
+  providerType: string;
+  responsePayload: Record<string, unknown>;
+  status: "completed" | "failed";
+  traceId: string;
+}) {
+  const finishedAt = input.final ? new Date() : null;
+  const [attempt] = await db
+    .update(operationAttempts)
+    .set({
+      errorMessage: input.errorMessage ?? null,
+      finishedAt,
+      responsePayload: input.responsePayload,
+      status: input.final ? input.status : "pending",
+    })
+    .where(
+      and(
+        eq(operationAttempts.projectId, input.projectId),
+        eq(operationAttempts.id, input.attempt.id),
+      ),
+    )
+    .returning();
+
+  if (input.attempt.submissionId && input.final) {
+    await addOperationSubmissionEvent({
+      eventType:
+        input.status === "completed"
+          ? "operation.completed"
+          : "operation.failed",
+      message:
+        input.status === "completed"
+          ? `Operation "${input.operation.name}" completed.`
+          : `Operation "${input.operation.name}" failed after durable retries.`,
+      payload: {
+        attemptId: input.attempt.id,
+        operationId: input.operation.id,
+        operationType: input.operation.operationType,
+        providerId: input.attempt.providerId,
+        providerType: input.providerType,
+      },
+      projectId: input.projectId,
+      submissionId: input.attempt.submissionId,
+      traceId: input.traceId,
+    });
+  }
+
+  return attempt ?? input.attempt;
+}
+
+export async function processProjectDurableOperationQueue(input: {
+  maxJobs?: number;
+  projectId: number;
+  workerId: string;
+}): Promise<DurableOperationQueueResult> {
+  const maxJobs = clampInteger(input.maxJobs ?? 5, 1, 25);
+  let completed = 0;
+  let failed = 0;
+  let processed = 0;
+  let rescheduled = 0;
+
+  for (let index = 0; index < maxJobs; index += 1) {
+    const job = await claimNextDurableJob({
+      jobTypes: ["operation_delivery"],
+      projectId: input.projectId,
+      workerId: input.workerId,
+    });
+
+    if (!job) {
+      break;
+    }
+
+    processed += 1;
+
+    try {
+      if (!job.operationAttemptId) {
+        throw new Error("Durable operation job has no operation attempt.");
+      }
+
+      const context = await getProjectOperationAttemptWithDetails(
+        input.projectId,
+        job.operationAttemptId,
+      );
+      if (!context) {
+        throw new Error("Durable operation attempt was not found.");
+      }
+
+      const { attempt, operation, provider } = context;
+      if (attempt.status === "completed") {
+        await completeDurableJob({
+          jobId: job.id,
+          projectId: input.projectId,
+          result: { operationAttemptId: attempt.id, status: attempt.status },
+          workerId: input.workerId,
+        });
+        completed += 1;
+        continue;
+      }
+
+      if (operation.status !== "active" || provider.status !== "active") {
+        throw new Error("The operation or provider is no longer active.");
+      }
+
+      const result = await executeProvider({
+        config: provider.config,
+        idempotencyKey: attempt.idempotencyKey ?? job.dedupeKey,
+        operationType: operation.operationType,
+        payload: attempt.requestPayload,
+        providerType: provider.providerType,
+      });
+
+      if (result.status === "completed") {
+        await recordDurableOperationResult({
+          attempt,
+          final: true,
+          operation,
+          projectId: input.projectId,
+          providerType: provider.providerType,
+          responsePayload: result.responsePayload,
+          status: "completed",
+          traceId: job.traceId,
+        });
+        await completeDurableJob({
+          jobId: job.id,
+          projectId: input.projectId,
+          result: { operationAttemptId: attempt.id, status: "completed" },
+          workerId: input.workerId,
+        });
+        completed += 1;
+        continue;
+      }
+
+      const failedJob = await failDurableJob({
+        errorMessage: result.errorMessage ?? "Operation delivery failed.",
+        jobId: job.id,
+        projectId: input.projectId,
+        workerId: input.workerId,
+      });
+      const exhausted = failedJob?.status === "failed";
+      await recordDurableOperationResult({
+        attempt,
+        errorMessage: result.errorMessage,
+        final: exhausted,
+        operation,
+        projectId: input.projectId,
+        providerType: provider.providerType,
+        responsePayload: result.responsePayload,
+        status: "failed",
+        traceId: job.traceId,
+      });
+
+      if (exhausted) {
+        failed += 1;
+      } else {
+        rescheduled += 1;
+      }
+    } catch (error) {
+      const failedJob = await failDurableJob({
+        errorMessage:
+          error instanceof Error ? error.message : "Durable operation failed.",
+        jobId: job.id,
+        projectId: input.projectId,
+        workerId: input.workerId,
+      });
+
+      if (failedJob?.status === "failed") {
+        if (job.operationAttemptId) {
+          await db
+            .update(operationAttempts)
+            .set({
+              errorMessage: failedJob.lastError,
+              finishedAt: new Date(),
+              status: "failed",
+            })
+            .where(
+              and(
+                eq(operationAttempts.projectId, input.projectId),
+                eq(operationAttempts.id, job.operationAttemptId),
+              ),
+            );
+        }
+        failed += 1;
+      } else {
+        rescheduled += 1;
+      }
+    }
+  }
+
+  return {
+    completed,
+    failed,
+    idle: processed === 0,
+    processed,
+    rescheduled,
+  };
+}
+
 export async function runOperationPreview(input: {
   fields: Record<string, unknown>;
   operationId: number;
@@ -1610,7 +1935,7 @@ export async function runSubmissionOperations(
       continue;
     }
 
-    const attempt = await runOperationForSubmission({
+    const queued = await queueOperationForSubmission({
       projectId,
       actionId: submission.actionId,
       submissionId: submission.id,
@@ -1620,8 +1945,8 @@ export async function runSubmissionOperations(
       traceId: submission.traceId,
     });
 
-    if (attempt) {
-      attempts.push(attempt.attempt);
+    if (queued) {
+      attempts.push(queued.attempt);
     }
   }
 

@@ -252,6 +252,7 @@ export async function failDurableJob(input: {
   errorMessage: string;
   jobId: number;
   now?: Date;
+  permanent?: boolean;
   projectId: number;
   workerId: string;
 }) {
@@ -274,7 +275,7 @@ export async function failDurableJob(input: {
     return null;
   }
 
-  const exhausted = job.attempts >= job.maxAttempts;
+  const exhausted = input.permanent === true || job.attempts >= job.maxAttempts;
   const availableAt = exhausted
     ? job.availableAt
     : new Date(

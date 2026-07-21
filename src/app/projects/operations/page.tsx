@@ -49,6 +49,7 @@ type OperationsPageProps = {
     retryFailed?: string;
     retryProcessed?: string;
     retryQueueProcessed?: string;
+    retryRescheduled?: string;
     retrySkipped?: string;
   }>;
 };
@@ -239,8 +240,9 @@ export default async function OperationsPage({
               <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
                 Retry queue processed {params.retryProcessed ?? "0"} attempt(s)
                 ({params.retryCompleted ?? "0"} completed,{" "}
-                {params.retryFailed ?? "0"} failed, {params.retrySkipped ?? "0"}{" "}
-                skipped).
+                {params.retryFailed ?? "0"} failed,{" "}
+                {params.retryRescheduled ?? "0"} rescheduled,{" "}
+                {params.retrySkipped ?? "0"} skipped).
               </p>
             )}
 

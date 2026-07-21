@@ -12,6 +12,7 @@ import {
   INTEGRATION_PROVIDER_STATUSES,
   INTEGRATION_PROVIDER_TYPES,
   OPERATION_STATUSES,
+  processProjectDurableOperationQueue,
   processProjectOperationRetryQueue,
   replayOperationAttempt,
   runOperationPreview,
@@ -270,10 +271,22 @@ export async function processOperationRetryQueueAction() {
   const context = await resolveUserAndProject();
   assertPermission(context.membership, "company.operations.manage");
 
-  const result = await processProjectOperationRetryQueue({
+  const durableResult = await processProjectDurableOperationQueue({
+    maxJobs: 5,
+    projectId: context.project.id,
+    workerId: `operations-ui:${context.user.id}:${Date.now()}`,
+  });
+  const legacyResult = await processProjectOperationRetryQueue({
     maxAttempts: 5,
     projectId: context.project.id,
   });
+  const result = {
+    completed: durableResult.completed + legacyResult.completed,
+    failed: durableResult.failed + legacyResult.failed,
+    processed: durableResult.processed + legacyResult.processed,
+    rescheduled: durableResult.rescheduled,
+    skipped: legacyResult.skipped,
+  };
 
   await writeAuditLog({
     ...context,
@@ -285,7 +298,7 @@ export async function processOperationRetryQueueAction() {
 
   revalidatePath("/projects/operations");
   redirect(
-    `/projects/operations?retryQueueProcessed=1&retryProcessed=${result.processed}&retryCompleted=${result.completed}&retryFailed=${result.failed}&retrySkipped=${result.skipped}`,
+    `/projects/operations?retryQueueProcessed=1&retryProcessed=${result.processed}&retryCompleted=${result.completed}&retryFailed=${result.failed}&retryRescheduled=${result.rescheduled}&retrySkipped=${result.skipped}`,
   );
 }
 

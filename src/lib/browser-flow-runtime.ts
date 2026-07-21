@@ -17,6 +17,7 @@ import {
   buildChannelFlowResumeReplies,
   processChannelFlowMedia,
   processChannelFlowText,
+  resumeChannelFlowExecution,
   startChannelFlow,
   startChannelFlowEdit,
 } from "@/lib/channel-flow-runtime";
@@ -49,6 +50,7 @@ type RunBrowserFlowTextInput = {
   expectedRevision?: number;
   projectId: number;
   resume?: boolean;
+  resumeExecution?: boolean;
   source: string;
   text?: string;
   traceId?: string | null;
@@ -183,18 +185,39 @@ async function executeBrowserFlowText(
       return { action: null, activeFlow: null, handled: false, replies: [] };
     }
 
+    const resumeResult = input.resumeExecution
+      ? await resumeChannelFlowExecution({
+          action,
+          contactId: null,
+          projectId: input.projectId,
+          submission: activeSubmission,
+        })
+      : {
+          replies: buildChannelFlowResumeReplies({
+            action,
+            submission: activeSubmission,
+          }),
+        };
+
+    if (input.resumeExecution) {
+      await recordBrowserFlowReplies({
+        channelType: input.channelType,
+        conversationId: input.conversationId,
+        projectId: input.projectId,
+        replies: resumeResult.replies,
+      });
+    }
+    const state = await getBrowserFlowState({
+      conversationId: input.conversationId,
+      projectId: input.projectId,
+      source: input.source,
+    });
+
     return {
       action,
-      activeFlow: toActiveActionFlow({
-        action,
-        conversationId: input.conversationId,
-        submission: activeSubmission,
-      }),
+      activeFlow: state.activeFlow,
       handled: true,
-      replies: buildChannelFlowResumeReplies({
-        action,
-        submission: activeSubmission,
-      }),
+      replies: resumeResult.replies,
     };
   }
 
