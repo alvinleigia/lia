@@ -1264,13 +1264,121 @@ Goal: confirm the UAT build is acceptable for the next release decision.
 Suggested final commands:
 
 ```bash
-npm run lint
-npm run build
-npm run check:tenant-scope
-npm run check:cron-config
-npm run test:tenant-isolation
-npm run test:e2e
+npm run certify:release:fast
+npm run certify:release
 ```
+
+The fast command runs deterministic checks without starting the application or
+using the database. The full command also builds the application, runs the
+complete database-backed browser suite, and checks tenant isolation. A passing
+command does not replace the live channel checks below.
+
+## Phase 14 - Cross-Channel Certification
+
+Goal: confirm one published flow behaves safely across project chat, widget,
+WhatsApp, and the documented future-channel adapter contract.
+
+- [ ] Run `npm run certify:release:fast`.
+  Expected result: Lint, TypeScript, tenant scope, cron configuration, and all
+  channel contract tests pass.
+  Status:
+  Notes:
+
+- [ ] Run `npm run certify:release` from a machine that can reach the UAT
+  database and the internet.
+  Expected result: The production build, complete E2E suite, and database
+  tenant-isolation checks pass in addition to the fast gates.
+  Status:
+  Notes:
+
+- [ ] Publish a test flow containing a text message, choice, input,
+  confirmation, and submit step.
+  Expected result: Publishing succeeds and creates a new immutable version.
+  Status:
+  Notes:
+
+- [ ] Complete the published flow in Project Chat.
+  Expected result: Prompts, choices, validation, confirmation, and submission
+  render correctly with no duplicated replies.
+  Status:
+  Notes:
+
+- [ ] Complete the same published flow in the website widget.
+  Expected result: The widget follows the same step order and produces the
+  same submission fields as Project Chat.
+  Status:
+  Notes:
+
+- [ ] Embed the widget on an allowed UAT origin and reload the host page.
+  Expected result: The widget loads once, resumes its conversation, and the
+  browser console has no origin, token, or frame-policy error.
+  Status:
+  Notes:
+
+- [ ] Start a flow, publish a changed version while the first run is active,
+  and finish the active run.
+  Expected result: The active run finishes on its original published version;
+  a new run uses the new version.
+  Status:
+  Notes:
+
+- [ ] Run a flow with a short Wait step in Project Chat or the widget.
+  Expected result: The flow pauses once, resumes after the configured delay,
+  and does not duplicate the submission or outbound reply.
+  Status:
+  Notes:
+
+- [ ] Connect a UAT WhatsApp Business number with valid Meta credentials.
+  Expected result: Verification succeeds, the number is active, and an inbound
+  test message creates or resumes the correct project conversation.
+  Status:
+  Notes:
+
+- [ ] Send text, three reply buttons, and a list of ten rows inside the
+  WhatsApp customer-service window.
+  Expected result: Each message uses its native WhatsApp presentation.
+  Status:
+  Notes:
+
+- [ ] Test four reply buttons and a list of eleven rows in WhatsApp.
+  Expected result: Each safely becomes readable numbered text; the flow
+  remains usable and no reply is silently dropped.
+  Status:
+  Notes:
+
+- [ ] Send a public media asset and configured catalog products in WhatsApp.
+  Expected result: Valid provider resources render natively; incomplete
+  provider metadata produces a readable text fallback.
+  Status:
+  Notes:
+
+- [ ] Send an approved WhatsApp template outside the customer-service window.
+  Expected result: The approved template is delivered. A draft or rejected
+  template and ordinary text are blocked outside the window.
+  Status:
+  Notes:
+
+- [ ] Run a WhatsApp flow containing a short Wait step.
+  Expected result: The resumed reply is queued through the outbox and delivered
+  once to the same contact and conversation.
+  Status:
+  Notes:
+
+- [ ] Review the automated reference-future adapter result in the fast command.
+  Expected result: All enabled step types have a declared certification family,
+  all nine reply capabilities preserve their neutral versioned envelope, and
+  no database channel or production UI was created for the reference adapter.
+  Status:
+  Notes:
+
+- [ ] Record the production channel decision.
+  Expected result: Project Chat, widget, and WhatsApp each have an explicit
+  Pass, Pass with accepted limitations, or Fail result in the notes.
+  Status:
+  Notes:
+
+Exit gate: automated certification passes, each live production channel has a
+recorded result, and no critical or high cross-channel defect remains open.
 
 ## Issue Log
 
