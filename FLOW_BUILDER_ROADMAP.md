@@ -26,16 +26,29 @@ is not confused with the historical implementation phases later in this file.
 
 | Phase | Focus | Status |
 | --- | --- | --- |
-| 1 | Canonical server-owned browser flow runtime | Complete |
-| 2 | Flow state recovery and idempotent commands | Complete |
-| 3 | Shared channel adapter contracts and capability parity | Complete |
-| 4 | Graph integrity, routing diagnostics, and safe recovery | Pending |
-| 5 | Operation execution reliability and integration contracts | Pending |
-| 6 | Production media storage and delivery | Pending |
-| 7 | WhatsApp production readiness and provider lifecycle | Pending |
-| 8 | Tenant security, abuse controls, and public API hardening | Pending |
-| 9 | Runtime observability, analytics, and operational recovery | Pending |
-| 10 | Full UAT, deployment readiness, and release sign-off | Pending |
+| 1 | One server execution engine for project chat, widget, and channels | Complete |
+| 2 | Published-version pinning and recoverable flow runs | Complete |
+| 3 | Versioned block contracts and shared channel adapters | Complete |
+| 4 | Universal Add Content menu with explicit disabled reasons | In progress (Step 1 of 6) |
+| 5 | Friendly message-family editors | Pending |
+| 6 | Friendly input-family editors | Pending |
+| 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Pending |
+| 8 | Graph compiler with typed conditions and terminal-path validation | Pending |
+| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Pending |
+| 10 | Cross-channel certification, UAT, and release sign-off | Pending |
+
+### Phase 4 Delivery Steps
+
+1. Rebaseline this roadmap and audit the current Add Content implementation.
+2. Define one universal content-type registry and applicability contract.
+3. Centralize eligibility and disabled-reason resolution.
+4. Render every Add Content option with clear enabled or disabled states.
+5. Integrate the same menu into inline node editing and compact step editing.
+6. Add regression coverage, update UAT instructions, and close Phase 4.
+
+Phase 4 preserves the existing runtime and persisted `contentBlocks` contract.
+It improves discoverability and guidance without introducing a second flow
+model or pretending that action-only blocks are inline message content.
 
 ### Phase 3 Delivery Steps
 
