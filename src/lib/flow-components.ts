@@ -2,6 +2,7 @@ import {
   ACTION_STEP_TYPES,
   type ActionStepType,
 } from "@/lib/action-flow-constants";
+import { FLOW_ACTION_FAMILY_DEFINITIONS } from "@/lib/flow-action-editor";
 
 export const FLOW_COMPONENT_GROUPS = ["message", "action"] as const;
 export const FLOW_COMPONENT_STATUSES = ["enabled", "planned"] as const;
@@ -20,6 +21,7 @@ export type FlowComponentDefinition = {
   channels: readonly FlowComponentChannel[];
   color: string;
   description: string;
+  disabledReason?: string;
   group: FlowComponentGroup;
   key: string;
   label: string;
@@ -322,6 +324,7 @@ const PLANNED_COMPONENTS: readonly FlowComponentDefinition[] = [
     key: "ai_knowledge",
     label: "AI and Knowledge",
     status: "planned",
+    disabledReason: FLOW_ACTION_FAMILY_DEFINITIONS.ai_knowledge.plannedReason,
   },
   {
     channels: ["project_chat", "widget", "whatsapp", "future"],
@@ -332,6 +335,7 @@ const PLANNED_COMPONENTS: readonly FlowComponentDefinition[] = [
     key: "wait",
     label: "Wait",
     status: "planned",
+    disabledReason: FLOW_ACTION_FAMILY_DEFINITIONS.wait.plannedReason,
   },
 ] as const;
 

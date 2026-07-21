@@ -7,6 +7,7 @@ import {
   isFlowActionStepType,
   listPlannedFlowActionFamilies,
 } from "../../src/lib/flow-action-editor";
+import { listPlannedFlowComponents } from "../../src/lib/flow-components";
 
 test("every executable action step maps to one friendly family", () => {
   for (const stepType of FLOW_ACTION_STEP_TYPES) {
@@ -42,5 +43,12 @@ test("route and planned families describe honest availability", () => {
   for (const definition of planned) {
     expect(definition.plannedReason).toBeTruthy();
     expect(definition.stepType).toBeUndefined();
+  }
+
+  const plannedComponents = listPlannedFlowComponents();
+  for (const key of ["ai_knowledge", "wait"]) {
+    const component = plannedComponents.find((item) => item.key === key);
+    expect(component?.disabledReason).toBeTruthy();
+    expect(component?.stepType).toBeUndefined();
   }
 });

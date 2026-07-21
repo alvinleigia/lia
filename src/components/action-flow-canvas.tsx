@@ -1694,6 +1694,7 @@ function FlowComponentPalette({
                   {plannedGroups[group].map((component) => (
                     <div
                       key={component.key}
+                      title={component.disabledReason ?? component.description}
                       className="min-h-24 rounded-md border border-dashed px-2 py-2 text-center opacity-75"
                     >
                       <span className="flex h-full flex-col items-center justify-center gap-2">
@@ -1709,7 +1710,7 @@ function FlowComponentPalette({
                             Planned
                           </span>
                           <span className="line-clamp-2 text-xs leading-tight text-muted-foreground">
-                            {component.description}
+                            {component.disabledReason ?? component.description}
                           </span>
                         </span>
                       </span>

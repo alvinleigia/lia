@@ -8,6 +8,7 @@ import {
   UsersRound,
   Workflow,
 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import {
   type FlowActionStepType,
@@ -243,9 +244,15 @@ export function FlowActionPrimaryFields({
               ))}
             </select>
             {operations.length === 0 && (
-              <p className="text-xs text-amber-700">
-                Create a project operation before adding this action.
-              </p>
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <p>Create a project operation before adding this action.</p>
+                <Link
+                  href="/projects/operations"
+                  className="mt-2 inline-flex font-medium underline underline-offset-4"
+                >
+                  Open integrations
+                </Link>
+              </div>
             )}
           </div>
 
