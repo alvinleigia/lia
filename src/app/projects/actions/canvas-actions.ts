@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
+import { parseStoredActionFlowConditionGroup } from "@/lib/action-flow-compiler";
 import {
   ACTION_BRANCH_OPERATORS,
   ACTION_STEP_INPUT_TYPES,
@@ -417,6 +418,7 @@ const canvasBranchRuleSchema = z
     operator: z.enum(ACTION_BRANCH_OPERATORS),
     comparisonValue: z.string().trim().max(240).optional(),
     branchLabel: z.string().trim().max(80).optional(),
+    conditionGroup: z.string().max(8000).optional(),
     targetStepId: z.coerce.number().int().positive(),
     sortOrder: z.coerce.number().int().positive(),
     isEnabled: z.coerce.boolean().optional(),
@@ -440,6 +442,47 @@ const canvasBranchRuleSchema = z
         message: "Target step must be different from source step.",
         path: ["targetStepId"],
       });
+    }
+
+    if (data.conditionGroup) {
+      try {
+        const parsedGroup = parseStoredActionFlowConditionGroup(
+          JSON.parse(data.conditionGroup),
+        );
+        if (!parsedGroup.group) {
+          ctx.addIssue({
+            code: "custom",
+            message: parsedGroup.message,
+            path: ["conditionGroup"],
+          });
+        } else {
+          for (const [
+            index,
+            condition,
+          ] of parsedGroup.group.conditions.entries()) {
+            const conditionNeedsComparison = ![
+              "is_empty",
+              "is_not_empty",
+            ].includes(condition.operator);
+            if (
+              conditionNeedsComparison &&
+              !condition.comparisonValue?.trim()
+            ) {
+              ctx.addIssue({
+                code: "custom",
+                message: `Condition ${index + 1} needs a comparison value.`,
+                path: ["conditionGroup"],
+              });
+            }
+          }
+        }
+      } catch {
+        ctx.addIssue({
+          code: "custom",
+          message: "Condition group must be valid JSON.",
+          path: ["conditionGroup"],
+        });
+      }
     }
   });
 const deleteCanvasBranchRuleSchema = z.object({
@@ -467,18 +510,26 @@ function revalidateCanvasPaths(actionId: number) {
 function buildBranchRuleSettings(
   existingSettings: Record<string, unknown> | undefined,
   branchLabel: string | undefined,
+  conditionGroup: string | undefined,
 ) {
   const settings = { ...(existingSettings ?? {}) };
 
-  if (branchLabel === undefined) {
-    return settings;
+  if (branchLabel !== undefined) {
+    const label = branchLabel.trim();
+    if (label) {
+      settings.branchLabel = label;
+    } else {
+      delete settings.branchLabel;
+    }
   }
 
-  const label = branchLabel.trim();
-  if (label) {
-    settings.branchLabel = label;
-  } else {
-    delete settings.branchLabel;
+  if (conditionGroup !== undefined) {
+    const parsed = parseStoredActionFlowConditionGroup(
+      JSON.parse(conditionGroup),
+    );
+    if (parsed.group) {
+      settings.conditionGroup = parsed.group;
+    }
   }
 
   return settings;
@@ -1923,7 +1974,11 @@ export async function createCanvasBranchRuleAction(
       targetStepId: targetStep.id,
       sortOrder: parsed.data.sortOrder,
       isEnabled: parsed.data.isEnabled ?? true,
-      settings: buildBranchRuleSettings(undefined, parsed.data.branchLabel),
+      settings: buildBranchRuleSettings(
+        undefined,
+        parsed.data.branchLabel,
+        parsed.data.conditionGroup,
+      ),
     });
 
     await writeAuditLog({
@@ -2002,6 +2057,7 @@ export async function updateCanvasBranchRuleAction(
       settings: buildBranchRuleSettings(
         existingRule.settings,
         parsed.data.branchLabel,
+        parsed.data.conditionGroup,
       ),
     });
 

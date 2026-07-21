@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { getActionFlowAnalytics } from "@/lib/action-flow-analytics";
+import { getStoredActionFlowConditionGroup } from "@/lib/action-flow-compiler";
 import {
   formatVersionDate,
   getDraftRuntimeChangeSummary,
@@ -328,9 +329,20 @@ export default async function ActionDetailPage({
       (branchRulesByStepId.get(rule.sourceStepId) ?? 0) + 1,
     );
     const targetLabel = getRouteTargetLabel(rule.targetStepId, stepById);
-    const ruleLabel = `${rule.sourceFieldKey} ${formatOptionLabel(
-      rule.operator,
-    ).toLowerCase()}${rule.comparisonValue ? ` ${rule.comparisonValue}` : ""} -> ${targetLabel}`;
+    const parsedGroup = getStoredActionFlowConditionGroup(rule);
+    const conditionLabel = parsedGroup.group
+      ? parsedGroup.group.conditions
+          .map(
+            (condition) =>
+              `${condition.fieldKey} ${formatOptionLabel(
+                condition.operator,
+              ).toLowerCase()}${
+                condition.comparisonValue ? ` ${condition.comparisonValue}` : ""
+              }`,
+          )
+          .join(parsedGroup.group.combinator === "and" ? " and " : " or ")
+      : "Invalid route condition";
+    const ruleLabel = `${conditionLabel} -> ${targetLabel}`;
     branchTargetsByStepId.set(rule.sourceStepId, [
       ...(branchTargetsByStepId.get(rule.sourceStepId) ?? []),
       ruleLabel,

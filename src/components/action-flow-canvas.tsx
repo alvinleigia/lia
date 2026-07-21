@@ -87,7 +87,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  getStoredActionFlowConditionGroup,
+  type StoredActionFlowConditionGroup,
+} from "@/lib/action-flow-compiler";
 import type {
+  ActionBranchOperator,
   ActionFlowRouteValidationIssue,
   listActionFlowBranchRules,
   listActionFlowSteps,
@@ -241,12 +246,26 @@ function FlowAddContentMenuItems({
 type CanvasBranchRuleInput = {
   branchLabel: string;
   comparisonValue: string;
+  conditionGroup: string;
   isEnabled: boolean;
   operator: string;
   sortOrder: number;
   sourceFieldKey: string;
   sourceStepId: number;
   targetStepId: number;
+};
+
+type BranchConditionDraft = {
+  comparisonValue: string;
+  fieldKey: string;
+  id: string;
+  operator: string;
+};
+
+type BranchFieldOption = {
+  fieldKey: string;
+  inputType: "date" | "number" | "text" | "time";
+  label: string;
 };
 
 type CanvasStepInput = {
@@ -484,12 +503,20 @@ function getBranchConditionText(rule: BranchRule) {
     return "operation failure";
   }
 
-  const comparison = rule.comparisonValue?.trim();
-  const condition = comparison
-    ? `${formatBranchOperator(rule.operator)} ${comparison}`
-    : formatBranchOperator(rule.operator);
+  const parsed = getStoredActionFlowConditionGroup(rule);
+  if (!parsed.group) {
+    return "Invalid route condition";
+  }
 
-  return `${rule.sourceFieldKey}: ${condition}`;
+  const conditions = parsed.group.conditions.map((condition) => {
+    const comparison = condition.comparisonValue?.trim();
+    const description = comparison
+      ? `${formatBranchOperator(condition.operator).toLowerCase()} ${comparison}`
+      : formatBranchOperator(condition.operator).toLowerCase();
+    return `${condition.fieldKey} ${description}`;
+  });
+
+  return conditions.join(parsed.group.combinator === "and" ? " and " : " or ");
 }
 
 function getBranchLabel(rule: BranchRule) {
@@ -1377,12 +1404,59 @@ function getInputFieldKeys(steps: FlowStep[]) {
   );
 }
 
+function getBranchFieldOptions(steps: FlowStep[]): BranchFieldOption[] {
+  const options = new Map<string, BranchFieldOption>();
+
+  for (const step of steps) {
+    if (!step.isEnabled) {
+      continue;
+    }
+
+    if (
+      step.stepType === "operation" &&
+      step.settings.operationExecutionMode !== "inline"
+    ) {
+      continue;
+    }
+
+    const fieldKey =
+      step.stepType === "operation"
+        ? step.fieldKey || `operation_${step.id}_status`
+        : step.fieldKey;
+    if (!fieldKey) {
+      continue;
+    }
+
+    const inputType =
+      step.stepType === "date" || step.inputType === "date"
+        ? "date"
+        : step.stepType === "time" || step.inputType === "time"
+          ? "time"
+          : step.stepType === "number" ||
+              step.inputType === "int" ||
+              step.inputType === "float"
+            ? "number"
+            : "text";
+
+    if (!options.has(fieldKey)) {
+      options.set(fieldKey, {
+        fieldKey,
+        inputType,
+        label: getStepLabel(step),
+      });
+    }
+  }
+
+  return [...options.values()];
+}
+
 function readBranchRuleForm(form: HTMLFormElement): CanvasBranchRuleInput {
   const formData = new FormData(form);
 
   return {
     branchLabel: String(formData.get("branchLabel") ?? ""),
     comparisonValue: String(formData.get("comparisonValue") ?? ""),
+    conditionGroup: String(formData.get("conditionGroup") ?? ""),
     isEnabled: formData.get("isEnabled") === "on",
     operator: String(formData.get("operator") ?? "equals"),
     sortOrder: Number(formData.get("sortOrder")),
@@ -1867,22 +1941,65 @@ function RouteValidationPanel({
 }: {
   routeIssues: ActionFlowRouteValidationIssue[];
 }) {
+  const errorCount = countBlockingDiagnostics(routeIssues);
+  const warningCount = countWarningDiagnostics(routeIssues);
+
+  function getIssueLabel(issue: ActionFlowRouteValidationIssue) {
+    if (issue.source === "graph_cycle") {
+      return "Loop";
+    }
+    if (issue.source === "graph_reachability") {
+      return "Unreachable step";
+    }
+    if (issue.source === "graph_terminal") {
+      return "Finish path";
+    }
+    if (
+      issue.source === "branch_condition" ||
+      issue.source === "branch_rule" ||
+      issue.source === "default_next_step"
+    ) {
+      return "Route";
+    }
+    if (issue.source === "channel_capability") {
+      return "Channel";
+    }
+    return "Step setup";
+  }
+
   return (
     <div className="rounded-md border bg-white p-4">
-      <p className="mb-3 flex items-center gap-2 text-sm font-medium">
-        <AlertTriangle className="h-4 w-4" />
-        Diagnostics
-      </p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <AlertTriangle className="h-4 w-4" />
+            Flow checks
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Publishing uses these same route and finish-path checks.
+          </p>
+        </div>
+        {routeIssues.length > 0 && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="rounded-full bg-red-50 px-2.5 py-1 text-red-800">
+              {errorCount} error{errorCount === 1 ? "" : "s"}
+            </span>
+            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-800">
+              {warningCount} warning{warningCount === 1 ? "" : "s"}
+            </span>
+          </div>
+        )}
+      </div>
       {routeIssues.length === 0 ? (
         <p className="flex items-center gap-2 text-sm text-green-700">
           <CheckCircle2 className="h-4 w-4" />
-          Routes are valid and no capability warnings were found.
+          Flow compiled. Every reachable path can finish.
         </p>
       ) : (
         <div className="space-y-2">
           {routeIssues.map((issue, index) => (
             <div
-              key={`${issue.source}-${issue.stepId ?? issue.ruleId ?? index}`}
+              key={`${issue.code ?? issue.source}-${issue.stepId ?? issue.ruleId ?? index}`}
               className={`rounded-md border px-3 py-2 text-sm ${
                 isWarningDiagnostic(issue)
                   ? "border-amber-200 bg-amber-50 text-amber-900"
@@ -1891,7 +2008,7 @@ function RouteValidationPanel({
             >
               <p className="flex gap-2">
                 <span className="shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
-                  {isWarningDiagnostic(issue) ? "Warning" : "Error"}
+                  {getIssueLabel(issue)}
                 </span>
                 <span>{issue.message}</span>
               </p>
@@ -3638,37 +3755,125 @@ function BranchRuleForm({
   steps: FlowStep[];
 }) {
   const targetSteps = getStepOptions(steps, sourceStep.id);
-  const fieldKeys = getInputFieldKeys(steps);
+  const availableFieldOptions = getBranchFieldOptions(steps);
   const defaultSourceFieldKey =
-    rule?.sourceFieldKey ?? sourceStep.fieldKey ?? fieldKeys[0] ?? "";
-  const defaultOperator = rule?.operator ?? "equals";
-  const defaultComparisonValue = rule?.comparisonValue ?? "";
+    rule?.sourceFieldKey ??
+    sourceStep.fieldKey ??
+    availableFieldOptions[0]?.fieldKey ??
+    "";
+  const parsedGroup = rule ? getStoredActionFlowConditionGroup(rule) : null;
+  const initialGroup = parsedGroup?.group ?? {
+    combinator: "and" as const,
+    conditions: [
+      {
+        comparisonValue: rule?.comparisonValue ?? "",
+        fieldKey: defaultSourceFieldKey,
+        operator: (rule?.operator ?? "equals") as ActionBranchOperator,
+      },
+    ],
+    schemaVersion: 1 as const,
+  };
+  const fieldOptions = [...availableFieldOptions];
+  for (const condition of initialGroup.conditions) {
+    if (
+      condition.fieldKey &&
+      !fieldOptions.some((option) => option.fieldKey === condition.fieldKey)
+    ) {
+      fieldOptions.push({
+        fieldKey: condition.fieldKey,
+        inputType: "text",
+        label: condition.fieldKey,
+      });
+    }
+  }
   const [branchLabel, setBranchLabel] = useState(
     rule ? getBranchRuleSettingText(rule, "branchLabel") : "",
   );
-  const [sourceFieldKey, setSourceFieldKey] = useState(defaultSourceFieldKey);
-  const [operator, setOperator] = useState(defaultOperator);
-  const [comparisonValue, setComparisonValue] = useState(
-    defaultComparisonValue,
+  const [combinator, setCombinator] = useState<"and" | "or">(
+    initialGroup.combinator,
+  );
+  const [conditions, setConditions] = useState<BranchConditionDraft[]>(
+    initialGroup.conditions.map((condition, index) => ({
+      comparisonValue: condition.comparisonValue ?? "",
+      fieldKey: condition.fieldKey,
+      id: `condition-${rule?.id ?? sourceStep.id}-${index}`,
+      operator: condition.operator,
+    })),
   );
   const [targetStepId, setTargetStepId] = useState(
     rule?.targetStepId ? String(rule.targetStepId) : "",
   );
-  const fieldKeyOptions = Array.from(
-    new Set([defaultSourceFieldKey, ...fieldKeys].filter(Boolean)),
+  const firstCondition = conditions[0] ?? {
+    comparisonValue: "",
+    fieldKey: defaultSourceFieldKey,
+    id: "condition-fallback",
+    operator: "equals",
+  };
+  const storedConditionGroup: StoredActionFlowConditionGroup = {
+    combinator,
+    conditions: conditions.map((condition) => ({
+      comparisonValue: branchOperatorNeedsComparison(condition.operator)
+        ? condition.comparisonValue
+        : null,
+      fieldKey: condition.fieldKey,
+      operator: condition.operator as ActionBranchOperator,
+    })),
+    schemaVersion: 1,
+  };
+  const conditionDescriptions = conditions.map((condition) => {
+    const field = fieldOptions.find(
+      (option) => option.fieldKey === condition.fieldKey,
+    );
+    const comparison = branchOperatorNeedsComparison(condition.operator)
+      ? ` ${condition.comparisonValue || "value"}`
+      : "";
+    return `${field?.label || condition.fieldKey || "Answer"} ${formatBranchOperator(
+      condition.operator,
+    ).toLowerCase()}${comparison}`;
+  });
+  const conditionPreview = conditionDescriptions.join(
+    combinator === "and" ? " and " : " or ",
   );
-  const needsComparison = branchOperatorNeedsComparison(operator);
-  const conditionPreview = needsComparison
-    ? `${sourceFieldKey || "field"} ${formatBranchOperator(
-        operator,
-      ).toLowerCase()} ${comparisonValue || "value"}`
-    : `${sourceFieldKey || "field"} ${formatBranchOperator(
-        operator,
-      ).toLowerCase()}`;
   const routePreviewLabel = branchLabel.trim() || conditionPreview;
   const targetPreview = targetStepId
     ? getStepRouteLabel(steps, Number(targetStepId))
     : "Select target step";
+
+  function updateCondition(
+    conditionId: string,
+    updates: Partial<BranchConditionDraft>,
+  ) {
+    setConditions((current) =>
+      current.map((condition) =>
+        condition.id === conditionId ? { ...condition, ...updates } : condition,
+      ),
+    );
+  }
+
+  function getAvailableOperators(condition: BranchConditionDraft) {
+    const field = fieldOptions.find(
+      (option) => option.fieldKey === condition.fieldKey,
+    );
+    const inputType = field?.inputType ?? "text";
+    const compatible = CANVAS_BRANCH_OPERATORS.filter((candidate) => {
+      if (candidate === "contains") {
+        return inputType === "text";
+      }
+      if (candidate === "greater_than" || candidate === "less_than") {
+        return inputType !== "text";
+      }
+      return true;
+    });
+
+    return compatible.includes(
+      condition.operator as (typeof CANVAS_BRANCH_OPERATORS)[number],
+    )
+      ? compatible
+      : [
+          condition.operator as (typeof CANVAS_BRANCH_OPERATORS)[number],
+          ...compatible,
+        ];
+  }
 
   return (
     <form
@@ -3680,6 +3885,26 @@ function BranchRuleForm({
       }}
     >
       <input type="hidden" name="sourceStepId" value={sourceStep.id} />
+      <input
+        type="hidden"
+        name="sourceFieldKey"
+        value={firstCondition.fieldKey}
+      />
+      <input type="hidden" name="operator" value={firstCondition.operator} />
+      <input
+        type="hidden"
+        name="comparisonValue"
+        value={
+          branchOperatorNeedsComparison(firstCondition.operator)
+            ? firstCondition.comparisonValue
+            : ""
+        }
+      />
+      <input
+        type="hidden"
+        name="conditionGroup"
+        value={JSON.stringify(storedConditionGroup)}
+      />
 
       <div className="rounded-md border bg-gray-50 p-3 text-sm">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -3687,7 +3912,8 @@ function BranchRuleForm({
         </p>
         <p className="mt-1 font-medium">{routePreviewLabel}</p>
         <p className="mt-1 text-muted-foreground">
-          When {conditionPreview}, go to {targetPreview}.
+          When {conditionPreview || "the conditions match"}, go to{" "}
+          {targetPreview}.
         </p>
       </div>
 
@@ -3709,72 +3935,174 @@ function BranchRuleForm({
         </p>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor={`${mode}-field-key`}>
-          Answer to check
-        </label>
-        <select
-          id={`${mode}-field-key`}
-          name="sourceFieldKey"
-          required
-          value={sourceFieldKey}
-          onChange={(event) => setSourceFieldKey(event.currentTarget.value)}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        >
-          {fieldKeyOptions.length === 0 ? (
-            <option value="">Create a field first</option>
-          ) : (
-            fieldKeyOptions.map((fieldKey) => (
-              <option key={fieldKey} value={fieldKey}>
-                {fieldKey}
-              </option>
-            ))
+      <div className="space-y-3 rounded-md border p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Match</p>
+            <p className="text-xs text-muted-foreground">
+              Check an answer collected by this flow.
+            </p>
+          </div>
+          {conditions.length > 1 && (
+            <select
+              aria-label="Condition matching"
+              value={combinator}
+              onChange={(event) =>
+                setCombinator(event.currentTarget.value as "and" | "or")
+              }
+              className="flex h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="and">All conditions</option>
+              <option value="or">Any condition</option>
+            </select>
           )}
-        </select>
-      </div>
+        </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor={`${mode}-operator`}>
-          Comparison
-        </label>
-        <select
-          id={`${mode}-operator`}
-          name="operator"
-          required
-          value={operator}
-          onChange={(event) => setOperator(event.currentTarget.value)}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        {conditions.map((condition, index) => {
+          const field = fieldOptions.find(
+            (option) => option.fieldKey === condition.fieldKey,
+          );
+          const needsComparison = branchOperatorNeedsComparison(
+            condition.operator,
+          );
+
+          return (
+            <div
+              key={condition.id}
+              className="space-y-3 rounded-md border bg-gray-50/60 p-3"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium uppercase text-muted-foreground">
+                  Condition {index + 1}
+                </p>
+                {conditions.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title="Remove condition"
+                    onClick={() =>
+                      setConditions((current) =>
+                        current.filter((item) => item.id !== condition.id),
+                      )
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Remove condition</span>
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor={`${mode}-${condition.id}-field`}
+                  >
+                    Answer
+                  </label>
+                  <select
+                    id={`${mode}-${condition.id}-field`}
+                    required
+                    value={condition.fieldKey}
+                    onChange={(event) =>
+                      updateCondition(condition.id, {
+                        fieldKey: event.currentTarget.value,
+                        operator: "equals",
+                      })
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    {fieldOptions.length === 0 ? (
+                      <option value="">Create an answer field first</option>
+                    ) : (
+                      fieldOptions.map((option) => (
+                        <option key={option.fieldKey} value={option.fieldKey}>
+                          {option.label}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor={`${mode}-${condition.id}-operator`}
+                  >
+                    Comparison
+                  </label>
+                  <select
+                    id={`${mode}-${condition.id}-operator`}
+                    required
+                    value={condition.operator}
+                    onChange={(event) =>
+                      updateCondition(condition.id, {
+                        operator: event.currentTarget.value,
+                      })
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    {getAvailableOperators(condition).map((candidate) => (
+                      <option key={candidate} value={candidate}>
+                        {formatBranchOperator(candidate)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {needsComparison && (
+                <div className="space-y-2">
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor={`${mode}-${condition.id}-value`}
+                  >
+                    Value
+                  </label>
+                  <input
+                    id={`${mode}-${condition.id}-value`}
+                    type={field?.inputType ?? "text"}
+                    required
+                    value={condition.comparisonValue}
+                    onChange={(event) =>
+                      updateCondition(condition.id, {
+                        comparisonValue: event.currentTarget.value,
+                      })
+                    }
+                    placeholder="Value to match"
+                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  />
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                {getBranchOperatorHint(condition.operator)}
+              </p>
+            </div>
+          );
+        })}
+
+        <Button
+          type="button"
+          variant="outline"
+          disabled={fieldOptions.length === 0 || conditions.length >= 10}
+          onClick={() => {
+            const fieldKey = fieldOptions[0]?.fieldKey ?? "";
+            setConditions((current) => [
+              ...current,
+              {
+                comparisonValue: "",
+                fieldKey,
+                id: `condition-new-${Date.now()}`,
+                operator: "equals",
+              },
+            ]);
+          }}
         >
-          {CANVAS_BRANCH_OPERATORS.map((operator) => (
-            <option key={operator} value={operator}>
-              {formatBranchOperator(operator)}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-muted-foreground">
-          {getBranchOperatorHint(operator)}
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor={`${mode}-compare`}>
-          Value
-        </label>
-        <input
-          id={`${mode}-compare`}
-          name="comparisonValue"
-          value={needsComparison ? comparisonValue : ""}
-          onChange={(event) => setComparisonValue(event.currentTarget.value)}
-          placeholder="value"
-          required={needsComparison}
-          disabled={!needsComparison}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        />
-        {!needsComparison && (
-          <p className="text-xs text-muted-foreground">
-            This operator does not need a comparison value.
-          </p>
-        )}
+          <Plus className="h-4 w-4" />
+          Add condition
+        </Button>
       </div>
 
       <div className="space-y-2">
