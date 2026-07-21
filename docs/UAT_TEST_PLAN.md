@@ -575,6 +575,27 @@ must not calculate routing or mutate submission fields directly.
   Status:
   Notes:
 
+- [ ] Duplicate the browser tab while a flow is waiting for an answer.
+  Instructions: Submit the current answer in the first tab. In the duplicated
+  tab, submit an answer to the older question.
+  Expected result: The duplicated tab refreshes to the latest saved question,
+  explains that the request changed in another tab, and does not save the stale
+  answer.
+  Status:
+  Notes:
+
+- [ ] Retry the same media upload after a temporary connection interruption.
+  Expected result: The flow shows one uploaded file, records one media event,
+  and advances only once. The project Media Library contains one new asset.
+  Status:
+  Notes:
+
+- [ ] Rapidly click or submit the same flow control more than once.
+  Expected result: One answer is collected and one route is followed. No
+  duplicate submission, field event, or external operation is created.
+  Status:
+  Notes:
+
 - [ ] At the review step, edit one collected answer.
   Expected result: The selected question is asked again and the review returns
   with the other answers preserved.

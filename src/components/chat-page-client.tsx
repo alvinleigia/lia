@@ -584,6 +584,12 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
         <PromptInput onSubmit={handleSubmit} className="mt-4">
           <PromptInputBody>
             <PromptInputTextarea
+              disabled={
+                status === "submitted" ||
+                status === "streaming" ||
+                !conversationId ||
+                isSavingSubmission
+              }
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
