@@ -1,0 +1,82 @@
+import { expect, test } from "@playwright/test";
+import {
+  FLOW_CONTENT_COMPONENT_KEYS,
+  resolveFlowContentMenu,
+} from "../../src/lib/flow-content-components";
+
+const readyContext = {
+  allowsAnswerCollection: true,
+  blockCount: 0,
+  catalogProductCount: 2,
+  hasChoiceBlock: false,
+  mediaAssetCount: 1,
+  productCatalogCount: 1,
+};
+
+test("universal content menu always returns every registered option", () => {
+  const menu = resolveFlowContentMenu({
+    ...readyContext,
+    allowsAnswerCollection: false,
+    catalogProductCount: 0,
+    mediaAssetCount: 0,
+    productCatalogCount: 0,
+  });
+
+  expect(menu.map((item) => item.component.key)).toEqual(
+    FLOW_CONTENT_COMPONENT_KEYS,
+  );
+  expect(menu.find((item) => item.component.key === "text")?.enabled).toBe(
+    true,
+  );
+  expect(
+    menu.find((item) => item.component.key === "choice_buttons")
+      ?.disabledReason,
+  ).toContain("collect a compatible visitor answer");
+  expect(
+    menu.find((item) => item.component.key === "media")?.disabledReason,
+  ).toContain("Media Library");
+  expect(
+    menu.find((item) => item.component.key === "single_product")
+      ?.disabledReason,
+  ).toContain("Create a product catalog");
+});
+
+test("ready content data enables every inline content family", () => {
+  const menu = resolveFlowContentMenu(readyContext);
+  const inlineItems = menu.filter(
+    (item) => item.component.target === "content_block",
+  );
+  const standaloneItems = menu.filter(
+    (item) => item.component.target === "step",
+  );
+
+  expect(inlineItems.every((item) => item.enabled)).toBe(true);
+  expect(standaloneItems.every((item) => !item.enabled)).toBe(true);
+  expect(
+    standaloneItems.every((item) =>
+      item.disabledReason?.includes("Blocks panel"),
+    ),
+  ).toBe(true);
+});
+
+test("choice requirements disable both choice presentations consistently", () => {
+  const menu = resolveFlowContentMenu({
+    ...readyContext,
+    hasChoiceBlock: true,
+  });
+
+  for (const key of ["choice_buttons", "list"] as const) {
+    const item = menu.find((entry) => entry.component.key === key);
+    expect(item?.enabled).toBe(false);
+    expect(item?.disabledReason).toContain("already has a choice or list");
+  }
+});
+
+test("content limit disables every option with one clear reason", () => {
+  const menu = resolveFlowContentMenu({ ...readyContext, blockCount: 10 });
+
+  expect(menu.every((item) => !item.enabled)).toBe(true);
+  expect(
+    menu.every((item) => item.disabledReason?.includes("maximum of 10")),
+  ).toBe(true);
+});

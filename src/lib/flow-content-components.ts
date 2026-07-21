@@ -1,5 +1,8 @@
 import type { ActionStepType } from "@/lib/action-flow-constants";
-import type { FlowContentBlockType } from "@/lib/flow-content-blocks";
+import {
+  type FlowContentBlockType,
+  MAX_FLOW_CONTENT_BLOCKS,
+} from "@/lib/flow-content-blocks";
 
 export const FLOW_CONTENT_COMPONENT_KEYS = [
   "text",
@@ -38,6 +41,21 @@ export type FlowContentComponentDefinition = {
   requirements: readonly FlowContentRequirement[];
   stepType?: ActionStepType;
   target: FlowContentComponentTarget;
+};
+
+export type FlowContentEligibilityContext = {
+  allowsAnswerCollection: boolean;
+  blockCount: number;
+  catalogProductCount: number;
+  hasChoiceBlock: boolean;
+  mediaAssetCount: number;
+  productCatalogCount: number;
+};
+
+export type FlowContentMenuItem = {
+  component: FlowContentComponentDefinition;
+  disabledReason: string | null;
+  enabled: boolean;
 };
 
 export const FLOW_CONTENT_COMPONENTS = [
@@ -135,4 +153,67 @@ export function getFlowContentComponent(key: FlowContentComponentKey) {
   return (
     FLOW_CONTENT_COMPONENTS.find((component) => component.key === key) ?? null
   );
+}
+
+function getStandaloneStepReason(component: FlowContentComponentDefinition) {
+  return `${component.label} is a standalone ${component.group} block. Add it from the Blocks panel.`;
+}
+
+function getRequirementReason(
+  requirement: FlowContentRequirement,
+  context: FlowContentEligibilityContext,
+) {
+  switch (requirement) {
+    case "answer_collection":
+      return context.allowsAnswerCollection
+        ? null
+        : "Available on steps that collect a compatible visitor answer.";
+    case "single_choice_block":
+      return context.hasChoiceBlock
+        ? "This step already has a choice or list block."
+        : null;
+    case "media_asset":
+      return context.mediaAssetCount > 0
+        ? null
+        : "Upload an active asset in the Media Library first.";
+    case "product_catalog":
+      return context.productCatalogCount > 0
+        ? null
+        : "Create an active product catalog first.";
+    case "catalog_product":
+      if (context.catalogProductCount > 0) {
+        return null;
+      }
+
+      return context.productCatalogCount > 0
+        ? "Add an active product to a catalog first."
+        : "Create a product catalog and add an active product first.";
+  }
+}
+
+export function resolveFlowContentMenu(
+  context: FlowContentEligibilityContext,
+): FlowContentMenuItem[] {
+  return FLOW_CONTENT_COMPONENTS.map((component) => {
+    let disabledReason: string | null = null;
+
+    if (context.blockCount >= MAX_FLOW_CONTENT_BLOCKS) {
+      disabledReason = `This step already has the maximum of ${MAX_FLOW_CONTENT_BLOCKS} content blocks.`;
+    } else if (component.target === "step") {
+      disabledReason = getStandaloneStepReason(component);
+    } else {
+      for (const requirement of component.requirements) {
+        disabledReason = getRequirementReason(requirement, context);
+        if (disabledReason) {
+          break;
+        }
+      }
+    }
+
+    return {
+      component,
+      disabledReason,
+      enabled: disabledReason === null,
+    };
+  });
 }

@@ -57,7 +57,7 @@ export type FlowContentBlock =
   | FlowMediaContentBlock
   | FlowTextContentBlock;
 
-const MAX_CONTENT_BLOCKS = 10;
+export const MAX_FLOW_CONTENT_BLOCKS = 10;
 const MAX_OPTIONS_PER_BLOCK = 20;
 const MAX_PRODUCTS_PER_BLOCK = 50;
 
@@ -182,7 +182,7 @@ export function parseFlowContentBlocks(value: unknown): FlowContentBlock[] {
   }
 
   return value
-    .slice(0, MAX_CONTENT_BLOCKS)
+    .slice(0, MAX_FLOW_CONTENT_BLOCKS)
     .map((item, index): FlowContentBlock | null => {
       if (!item || typeof item !== "object" || Array.isArray(item)) {
         return null;
