@@ -466,6 +466,42 @@ Spa Service` action while learning the builder.
   Status:
   Notes:
 
+- [ ] Review the friendly choice editor.
+  Instructions: Edit the Contact Method list content. Confirm the editor shows
+  `Question or introduction`, the Buttons, List, and Typed reply presentation
+  choices, editable option labels, and controls to add, move, and remove
+  options. Move `Phone` above `Email`, add `Other`, and save.
+  Expected result: The editor uses visitor-facing labels, List remains selected,
+  and the reordered options persist without exposing raw configuration.
+  Status:
+  Notes:
+
+- [ ] Review text guidance and limits.
+  Instructions: Edit a Welcome text block and enter a short message.
+  Expected result: The editor identifies the field as `Message`, displays a
+  live character count, and prevents text longer than the supported limit.
+  Status:
+  Notes:
+
+- [ ] Review media content when an active asset exists.
+  Instructions: Upload an active test image in Media Library, return to the
+  canvas, add Media content to a message node, choose the file by name, add a
+  caption, and save.
+  Expected result: The editor shows a named file selector and caption field;
+  the saved node displays the selected media content without asking for an ID.
+  Status:
+  Notes:
+
+- [ ] Review catalog and product content when test products exist.
+  Instructions: With an active catalog and products available, add Catalogue
+  message, Single product, and Multiple products content in turn. Choose the
+  catalog by name, switch between Grid, List, and Featured layouts, and select
+  products using the visible product names.
+  Expected result: Catalogs and products are selected by name, single-product
+  content permits one product, and multiple-product content permits several.
+  Status:
+  Notes:
+
 - [ ] Edit content directly inside a node.
   Instructions: On the Welcome node, select the pencil icon beside its content.
   Change the message to `Welcome. How can we help today?` and save it.
@@ -513,6 +549,23 @@ Spa Service` action while learning the builder.
   settings.
   Expected result: A focused Edit Step dialog opens and the updated prompt is
   visible on the node.
+  Status:
+  Notes:
+
+- [ ] Confirm friendly editors are identical in both editing surfaces.
+  Instructions: Reopen the Contact Method node and edit its saved list content
+  from the compact Edit Step dialog.
+  Expected result: The same question field, presentation choices, option order,
+  character guidance, and save behavior appear as in inline canvas editing.
+  Status:
+  Notes:
+
+- [ ] Review template message progressive disclosure.
+  Instructions: Create or edit a Template message step. Confirm its visible
+  fields focus on template name and message preview, then expand `Delivery
+  details`.
+  Expected result: Language, category, approval status, and variables remain
+  available inside Delivery details instead of crowding the main editor.
   Status:
   Notes:
 
