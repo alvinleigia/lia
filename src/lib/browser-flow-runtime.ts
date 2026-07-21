@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   getActionSubmission,
   getActiveActionSubmissionForConversation,
@@ -26,6 +27,11 @@ import {
 } from "@/lib/channels";
 import type { FlowMediaUploadValue } from "@/lib/flow-media-values";
 import {
+  claimFlowRuntimeCommand,
+  completeFlowRuntimeCommand,
+  failFlowRuntimeCommand,
+} from "@/lib/flow-runtime-commands";
+import {
   getRuntimeProjectAction,
   getRuntimeProjectActionForSubmission,
   listRuntimeProjectActions,
@@ -34,6 +40,7 @@ import {
 type RunBrowserFlowTextInput = {
   actionId?: number;
   channelType: ChannelType;
+  commandId?: string;
   conversationId: string;
   externalUserId?: string | null;
   editSection?: FlowEditSection;
@@ -42,6 +49,16 @@ type RunBrowserFlowTextInput = {
   source: string;
   text?: string;
 };
+
+export class BrowserFlowCommandError extends Error {
+  constructor(
+    message: string,
+    public readonly code: "conflict" | "failed" | "processing",
+  ) {
+    super(message);
+    this.name = "BrowserFlowCommandError";
+  }
+}
 
 type RunBrowserFlowMediaInput = {
   channelType: ChannelType;
@@ -128,7 +145,7 @@ async function getBrowserFlowState(input: {
   };
 }
 
-export async function runBrowserFlowText(
+async function executeBrowserFlowText(
   input: RunBrowserFlowTextInput,
 ): Promise<BrowserFlowRuntimeResult> {
   const activeSubmission = await getActiveActionSubmissionForConversation({
@@ -276,6 +293,65 @@ export async function runBrowserFlowText(
     handled: true,
     replies: result.replies,
   };
+}
+
+function hashBrowserFlowCommand(input: RunBrowserFlowTextInput) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        actionId: input.actionId ?? null,
+        editSection: input.editSection ?? null,
+        text: input.text ?? null,
+      }),
+    )
+    .digest("hex");
+}
+
+export async function runBrowserFlowText(
+  input: RunBrowserFlowTextInput,
+): Promise<BrowserFlowRuntimeResult> {
+  if (!input.commandId || input.resume) {
+    return executeBrowserFlowText(input);
+  }
+
+  const claim = await claimFlowRuntimeCommand({
+    commandId: input.commandId,
+    conversationId: input.conversationId,
+    projectId: input.projectId,
+    requestHash: hashBrowserFlowCommand(input),
+    source: input.source,
+  });
+
+  if (claim.state === "replay") {
+    return claim.result;
+  }
+
+  if (claim.state !== "claimed") {
+    const messages = {
+      conflict: "This command ID was already used for another request.",
+      failed: "The previous attempt for this command failed.",
+      processing: "This command is already being processed.",
+    } as const;
+    throw new BrowserFlowCommandError(messages[claim.state], claim.state);
+  }
+
+  try {
+    const result = await executeBrowserFlowText(input);
+    await completeFlowRuntimeCommand({
+      commandId: claim.commandId,
+      projectId: input.projectId,
+      result,
+    });
+    return result;
+  } catch (error) {
+    await failFlowRuntimeCommand({
+      commandId: claim.commandId,
+      errorMessage:
+        error instanceof Error ? error.message : "Unknown runtime failure.",
+      projectId: input.projectId,
+    });
+    throw error;
+  }
 }
 
 export async function runBrowserFlowMedia(

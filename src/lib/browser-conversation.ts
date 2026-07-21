@@ -9,6 +9,28 @@ function createConversationId(prefix: string) {
   return `${prefix}-${randomId}`.slice(0, MAX_CONVERSATION_ID_LENGTH);
 }
 
+export function createBrowserCommandId() {
+  return createConversationId("command");
+}
+
+export async function postBrowserFlowCommand(
+  url: string,
+  body: Record<string, unknown>,
+) {
+  const send = () =>
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  try {
+    return await send();
+  } catch {
+    return send();
+  }
+}
+
 export function getOrCreateSessionConversationId(input: {
   key: string;
   prefix: string;

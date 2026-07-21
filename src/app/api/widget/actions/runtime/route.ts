@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { runBrowserFlowText } from "@/lib/browser-flow-runtime";
+import {
+  BrowserFlowCommandError,
+  runBrowserFlowText,
+} from "@/lib/browser-flow-runtime";
 import { resolveWidgetTokenAccessForRequest } from "@/lib/widget-keys";
 
 const requestSchema = z
   .object({
     actionId: z.number().int().positive().optional(),
+    commandId: z.string().trim().min(1).max(120).optional(),
     conversationId: z.string().trim().min(1).max(120),
     editSection: z
       .enum(["all", "email", "name", "phone", "schedule", "service"])
@@ -43,6 +47,13 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!parsed.data.resume && !parsed.data.commandId) {
+      return NextResponse.json(
+        { message: "A command ID is required." },
+        { status: 400 },
+      );
+    }
+
     const accessResult = await resolveWidgetTokenAccessForRequest({
       headers: req.headers,
       token: parsed.data.token,
@@ -58,6 +69,7 @@ export async function POST(req: Request) {
     const result = await runBrowserFlowText({
       actionId: parsed.data.actionId,
       channelType: "widget",
+      commandId: parsed.data.commandId,
       conversationId: parsed.data.conversationId,
       editSection: parsed.data.editSection,
       projectId: accessResult.widgetAccess.projectId,
@@ -86,6 +98,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof BrowserFlowCommandError) {
+      return NextResponse.json(
+        { code: error.code, message: error.message },
+        { status: 409 },
+      );
+    }
+
     console.error("Widget browser flow runtime error:", error);
     return NextResponse.json(
       { message: "Failed to process the flow message." },

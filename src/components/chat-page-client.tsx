@@ -38,7 +38,11 @@ import {
   isActionInputStep,
   type RuntimeAction,
 } from "@/lib/action-runtime";
-import { getOrCreateSessionConversationId } from "@/lib/browser-conversation";
+import {
+  createBrowserCommandId,
+  getOrCreateSessionConversationId,
+  postBrowserFlowCommand,
+} from "@/lib/browser-conversation";
 import {
   type BrowserFlowRuntimeResult,
   runtimeRepliesToFlowMessages,
@@ -168,16 +172,13 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     setIsSavingSubmission(true);
 
     try {
-      const response = await fetch("/api/actions/runtime", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          actionId: input.actionId,
-          conversationId,
-          editSection: input.editSection,
-          projectId,
-          text: input.text,
-        }),
+      const response = await postBrowserFlowCommand("/api/actions/runtime", {
+        actionId: input.actionId,
+        commandId: createBrowserCommandId(),
+        conversationId,
+        editSection: input.editSection,
+        projectId,
+        text: input.text,
       });
 
       if (!response.ok) {

@@ -650,6 +650,7 @@ test("disabled tenant owner is blocked at sign in", async ({ browser }) => {
     {
       data: {
         actionId: 999_999_999,
+        commandId: `disabled-widget-command-${runId}`,
         conversationId: `disabled-widget-${runId}`,
         token: widgetToken,
       },
@@ -952,6 +953,7 @@ test("widget token access respects tenant and allowed domains", async ({
     {
       data: {
         actionId: 999_999_999,
+        commandId: `missing-project-command-${runId}`,
         conversationId: `missing-project-action-${runId}`,
         projectId,
       },
@@ -966,6 +968,7 @@ test("widget token access respects tenant and allowed domains", async ({
     "/api/actions/runtime",
     {
       data: {
+        commandId: `stale-project-command-${runId}`,
         conversationId: `stale-project-edit-${runId}`,
         editSection: "name",
         projectId,
@@ -1006,6 +1009,7 @@ test("widget token access respects tenant and allowed domains", async ({
     "/api/widget/actions/runtime",
     {
       data: {
+        commandId: `stale-widget-command-${runId}`,
         conversationId: `stale-widget-edit-${runId}`,
         editSection: "name",
         token: widgetToken,
@@ -1023,6 +1027,7 @@ test("widget token access respects tenant and allowed domains", async ({
     {
       data: {
         actionId: 999_999_999,
+        commandId: `blocked-widget-command-${runId}`,
         conversationId: `blocked-widget-${runId}`,
         token: widgetToken,
       },
@@ -1039,6 +1044,7 @@ test("widget token access respects tenant and allowed domains", async ({
     {
       data: {
         actionId: 999_999_999,
+        commandId: `missing-origin-command-${runId}`,
         conversationId: `missing-origin-widget-${runId}`,
         token: widgetToken,
       },
@@ -1054,6 +1060,7 @@ test("widget token access respects tenant and allowed domains", async ({
     {
       data: {
         actionId: 999_999_999,
+        commandId: `allowed-widget-command-${runId}`,
         conversationId: `allowed-widget-${runId}`,
         token: widgetToken,
       },
@@ -1070,6 +1077,7 @@ test("widget token access respects tenant and allowed domains", async ({
     {
       data: {
         actionId: 999_999_999,
+        commandId: `wildcard-widget-command-${runId}`,
         conversationId: `wildcard-widget-${runId}`,
         token: widgetToken,
       },
@@ -1686,6 +1694,58 @@ test("project chat resumes an active flow after refresh without duplicate writes
 
   await sendProjectChatMessage(page, `resume-${runId}@example.test`);
   await expect(page.getByText("Thanks. I saved this request.")).toBeVisible();
+
+  const duplicateConversationId = `duplicate-${runId}`;
+  const duplicateCommandId = `duplicate-command-${runId}`;
+  const firstResult = await runBrowserFlowText({
+    actionId: action.id,
+    channelType: "project_chat",
+    commandId: duplicateCommandId,
+    conversationId: duplicateConversationId,
+    projectId,
+    source: "project_chat",
+  });
+  const duplicateSubmission = await getActiveActionSubmissionForConversation({
+    conversationId: duplicateConversationId,
+    projectId,
+    source: "project_chat",
+  });
+  expect(duplicateSubmission).not.toBeNull();
+  const duplicateEventsBeforeReplay = await listActionSubmissionEvents(
+    projectId,
+    duplicateSubmission?.id ?? 0,
+  );
+
+  const replayedResult = await runBrowserFlowText({
+    actionId: action.id,
+    channelType: "project_chat",
+    commandId: duplicateCommandId,
+    conversationId: duplicateConversationId,
+    projectId,
+    source: "project_chat",
+  });
+  expect(replayedResult).toEqual(firstResult);
+  expect(
+    await listActionSubmissionEvents(projectId, duplicateSubmission?.id ?? 0),
+  ).toHaveLength(duplicateEventsBeforeReplay.length);
+  expect(
+    (await listActionSubmissions(projectId, action.id)).filter(
+      (submission) =>
+        submission.conversationId === duplicateConversationId &&
+        submission.status === "in_progress",
+    ),
+  ).toHaveLength(1);
+
+  await expect(
+    runBrowserFlowText({
+      channelType: "project_chat",
+      commandId: duplicateCommandId,
+      conversationId: duplicateConversationId,
+      projectId,
+      source: "project_chat",
+      text: "different request",
+    }),
+  ).rejects.toThrow("already used for another request");
 });
 
 test("browser media upload advances the canonical pinned flow", async ({

@@ -447,6 +447,36 @@ export const actionSubmissionEvents = pgTable(
   ],
 );
 
+export const flowRuntimeCommands = pgTable(
+  "flow_runtime_commands",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    source: text("source").notNull(),
+    conversationId: text("conversation_id").notNull(),
+    commandId: text("command_id").notNull(),
+    requestHash: text("request_hash").notNull(),
+    status: text("status").notNull().default("processing"),
+    response: jsonb("response").$type<Record<string, unknown>>(),
+    errorMessage: text("error_message"),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("flow_runtime_commands_project_idx").on(table.projectId),
+    index("flow_runtime_commands_status_idx").on(table.status),
+    uniqueIndex("flow_runtime_commands_scope_unique").on(
+      table.projectId,
+      table.source,
+      table.conversationId,
+      table.commandId,
+    ),
+  ],
+);
+
 export const projectChannels = pgTable(
   "project_channels",
   {
@@ -966,6 +996,8 @@ export type InsertActionSubmissionEvent =
   typeof actionSubmissionEvents.$inferInsert;
 export type SelectActionSubmissionEvent =
   typeof actionSubmissionEvents.$inferSelect;
+export type InsertFlowRuntimeCommand = typeof flowRuntimeCommands.$inferInsert;
+export type SelectFlowRuntimeCommand = typeof flowRuntimeCommands.$inferSelect;
 export type InsertProjectChannel = typeof projectChannels.$inferInsert;
 export type SelectProjectChannel = typeof projectChannels.$inferSelect;
 export type InsertChannelConversation =

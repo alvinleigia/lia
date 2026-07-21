@@ -21,7 +21,11 @@ import {
   isActionInputStep,
   type RuntimeAction,
 } from "@/lib/action-runtime";
-import { getOrCreateSessionConversationId } from "@/lib/browser-conversation";
+import {
+  createBrowserCommandId,
+  getOrCreateSessionConversationId,
+  postBrowserFlowCommand,
+} from "@/lib/browser-conversation";
 import {
   type BrowserFlowRuntimeResult,
   runtimeRepliesToFlowMessages,
@@ -163,17 +167,17 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
     setIsSavingSubmission(true);
 
     try {
-      const response = await fetch("/api/widget/actions/runtime", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const response = await postBrowserFlowCommand(
+        "/api/widget/actions/runtime",
+        {
           actionId: input.actionId,
+          commandId: createBrowserCommandId(),
           conversationId,
           editSection: input.editSection,
           text: input.text,
           token,
-        }),
-      });
+        },
+      );
 
       if (!response.ok) {
         throw new Error("Failed to process flow message.");

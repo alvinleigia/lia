@@ -4,11 +4,15 @@ import {
   isInactiveAccountError,
   resolveUserAndProject,
 } from "@/lib/auth-project";
-import { runBrowserFlowText } from "@/lib/browser-flow-runtime";
+import {
+  BrowserFlowCommandError,
+  runBrowserFlowText,
+} from "@/lib/browser-flow-runtime";
 
 const requestSchema = z
   .object({
     actionId: z.number().int().positive().optional(),
+    commandId: z.string().trim().min(1).max(120).optional(),
     conversationId: z.string().trim().min(1).max(120),
     editSection: z
       .enum(["all", "email", "name", "phone", "schedule", "service"])
@@ -46,10 +50,18 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!parsed.data.resume && !parsed.data.commandId) {
+      return NextResponse.json(
+        { message: "A command ID is required." },
+        { status: 400 },
+      );
+    }
+
     const { project } = await resolveUserAndProject(parsed.data.projectId);
     const result = await runBrowserFlowText({
       actionId: parsed.data.actionId,
       channelType: "project_chat",
+      commandId: parsed.data.commandId,
       conversationId: parsed.data.conversationId,
       editSection: parsed.data.editSection,
       projectId: project.id,
@@ -78,6 +90,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof BrowserFlowCommandError) {
+      return NextResponse.json(
+        { code: error.code, message: error.message },
+        { status: 409 },
+      );
+    }
+
     if (isInactiveAccountError(error)) {
       return NextResponse.json(
         { message: "This account is currently disabled." },
