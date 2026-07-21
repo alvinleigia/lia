@@ -39,13 +39,16 @@ import {
   listProjectCatalogs,
 } from "../../src/lib/product-catalogs";
 import { getUserByEmail } from "../../src/lib/users";
-import { upsertProjectWhatsAppChannel } from "../../src/lib/whatsapp";
+import {
+  createWhatsAppChannelAdapter,
+  upsertProjectWhatsAppChannel,
+} from "../../src/lib/whatsapp";
 import { createOrRotateProjectWidgetToken } from "../../src/lib/widget-keys";
 import { getOrCreateDefaultWorkspaceForCompany } from "../../src/lib/workspaces";
 
 const password = "TestPassword123!";
 
-test("shared channel adapter contract describes capability parity", () => {
+test("shared channel adapter contract describes capability parity", async () => {
   const buttonReply = {
     fallbackText: "Choose one\n\n1. First",
     payload: { options: [{ id: "first", label: "First", value: "first" }] },
@@ -68,6 +71,30 @@ test("shared channel adapter contract describes capability parity", () => {
     listOptions: 10,
     productItems: 30,
   });
+
+  const whatsappAdapter = createWhatsAppChannelAdapter();
+  const nativeButtons = await whatsappAdapter.adaptReply({
+    context: { serviceWindowOpen: true, to: "15550001111" },
+    reply: buttonReply,
+  });
+  expect(nativeButtons.mode).toBe("native");
+  expect(nativeButtons.delivery.body.type).toBe("interactive");
+
+  const fallbackButtons = await whatsappAdapter.adaptReply({
+    context: { serviceWindowOpen: true, to: "15550001111" },
+    reply: {
+      ...buttonReply,
+      payload: {
+        options: Array.from({ length: 4 }, (_, index) => ({
+          id: `option-${index}`,
+          label: `Option ${index}`,
+          value: `option-${index}`,
+        })),
+      },
+    },
+  });
+  expect(fallbackButtons.mode).toBe("fallback");
+  expect(fallbackButtons.delivery.body.type).toBe("text");
 });
 const platformAdminEmail =
   process.env.E2E_PLATFORM_ADMIN_EMAIL ?? "e2e-platform-admin@example.test";

@@ -1,5 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
+import type { ChannelReplyAdapter } from "@/lib/channel-adapter-contract";
+import {
+  getChannelAdapterProfile,
+  getRuntimeReplyCapability,
+} from "@/lib/channel-adapter-contract";
 import { CHANNEL_METADATA_LAST_INBOUND_AT } from "@/lib/channels";
 import { db } from "@/lib/db-config";
 import {
@@ -124,11 +129,18 @@ type WhatsAppMessageRequestBody = {
   };
 };
 
-type WhatsAppReplySendResult = {
+export type WhatsAppReplySendResult = {
   deliveryMode: "interactive" | "media" | "template" | "text";
   messageType: string;
   result: unknown;
   text: string;
+};
+
+export type WhatsAppChannelDelivery = Omit<
+  WhatsAppReplySendResult,
+  "result"
+> & {
+  body: WhatsAppMessageRequestBody;
 };
 
 export const WHATSAPP_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -1194,129 +1206,143 @@ export async function sendWhatsAppTextMessage(input: {
   });
 }
 
+export function createWhatsAppChannelAdapter(): ChannelReplyAdapter<
+  { serviceWindowOpen: boolean; to: string },
+  WhatsAppChannelDelivery
+> {
+  return {
+    profile: getChannelAdapterProfile("whatsapp"),
+    async adaptReply({ context, reply }) {
+      const fallbackText = getRuntimeReplyText(reply);
+      const options = getRuntimeReplyOptions(reply);
+      const media = getRuntimeReplyMedia(reply);
+      const template = getRuntimeReplyTemplate(reply);
+      const productPayload = getRuntimeReplyProductPayload(reply);
+      const interactiveBody =
+        reply.type === "buttons"
+          ? buildWhatsAppButtonBody({
+              options,
+              text: reply.text,
+              to: context.to,
+            })
+          : reply.type === "list"
+            ? buildWhatsAppListBody({
+                options,
+                text: reply.text,
+                to: context.to,
+              })
+            : null;
+      const productBody = productPayload
+        ? buildWhatsAppProductBody({
+            payload: productPayload,
+            text: reply.text,
+            to: context.to,
+          })
+        : null;
+      const mediaBody =
+        reply.type === "media" && media
+          ? buildWhatsAppMediaBody({
+              media,
+              text: reply.text,
+              to: context.to,
+            })
+          : null;
+      const templateBody = template
+        ? buildWhatsAppTemplateBody({ template, to: context.to })
+        : null;
+      const capability = getRuntimeReplyCapability(reply);
+      const warnings: string[] = [];
+
+      let delivery: WhatsAppChannelDelivery | null = null;
+      if (templateBody) {
+        delivery = {
+          body: templateBody,
+          deliveryMode: "template",
+          messageType: "template",
+          text: fallbackText,
+        };
+      } else {
+        if (!context.serviceWindowOpen) {
+          throw new Error(
+            "WhatsApp service window is closed. Send an approved template message before sending regular flow replies.",
+          );
+        }
+
+        if (productBody) {
+          delivery = {
+            body: productBody,
+            deliveryMode: "interactive",
+            messageType:
+              productPayload?.mode === "single_product"
+                ? "product"
+                : "product_list",
+            text: reply.text,
+          };
+        } else if (interactiveBody) {
+          delivery = {
+            body: interactiveBody,
+            deliveryMode: "interactive",
+            messageType: reply.type,
+            text: reply.text,
+          };
+        } else if (mediaBody) {
+          delivery = {
+            body: mediaBody,
+            deliveryMode: "media",
+            messageType: mediaBody.type,
+            text: fallbackText,
+          };
+        }
+      }
+
+      const mode = delivery || reply.type === "text" ? "native" : "fallback";
+      if (!delivery) {
+        delivery = {
+          body: buildWhatsAppTextBody({ text: fallbackText, to: context.to }),
+          deliveryMode: "text",
+          messageType: "text",
+          text: fallbackText,
+        };
+        if (reply.type !== "text") {
+          warnings.push(
+            `${capability} requirements were not met; text fallback was used.`,
+          );
+        }
+      }
+
+      return {
+        capability,
+        delivery,
+        mode,
+        source: reply,
+        warnings,
+      };
+    },
+  };
+}
+
 export async function sendWhatsAppRuntimeReply(input: {
   channel: SelectProjectChannel;
   reply: RuntimeReply;
   to: string;
 }): Promise<WhatsAppReplySendResult> {
-  const fallbackText = getRuntimeReplyText(input.reply);
-  const options = getRuntimeReplyOptions(input.reply);
-  const media = getRuntimeReplyMedia(input.reply);
-  const template = getRuntimeReplyTemplate(input.reply);
-  const productPayload = getRuntimeReplyProductPayload(input.reply);
-  const interactiveBody =
-    input.reply.type === "buttons"
-      ? buildWhatsAppButtonBody({
-          options,
-          text: input.reply.text,
-          to: input.to,
-        })
-      : input.reply.type === "list"
-        ? buildWhatsAppListBody({
-            options,
-            text: input.reply.text,
-            to: input.to,
-          })
-        : null;
-  const productBody = productPayload
-    ? buildWhatsAppProductBody({
-        payload: productPayload,
-        text: input.reply.text,
-        to: input.to,
-      })
-    : null;
-  const mediaBody =
-    input.reply.type === "media" && media
-      ? buildWhatsAppMediaBody({
-          media,
-          text: input.reply.text,
-          to: input.to,
-        })
-      : null;
-  const templateBody = template
-    ? buildWhatsAppTemplateBody({
-        template,
-        to: input.to,
-      })
-    : null;
   const serviceWindow = await getWhatsAppRecipientServiceWindow({
     channel: input.channel,
     to: input.to,
   });
-
-  if (templateBody) {
-    const result = await sendWhatsAppMessageBody({
-      channel: input.channel,
-      body: templateBody,
-    });
-
-    return {
-      deliveryMode: "template",
-      messageType: "template",
-      result,
-      text: fallbackText,
-    };
-  }
-
-  if (!serviceWindow.isOpen) {
-    throw new Error(
-      "WhatsApp service window is closed. Send an approved template message before sending regular flow replies.",
-    );
-  }
-
-  if (productBody) {
-    const result = await sendWhatsAppMessageBody({
-      channel: input.channel,
-      body: productBody,
-    });
-
-    return {
-      deliveryMode: "interactive",
-      messageType:
-        productPayload?.mode === "single_product" ? "product" : "product_list",
-      result,
-      text: input.reply.text,
-    };
-  }
-
-  if (interactiveBody) {
-    const result = await sendWhatsAppMessageBody({
-      channel: input.channel,
-      body: interactiveBody,
-    });
-
-    return {
-      deliveryMode: "interactive",
-      messageType: input.reply.type,
-      result,
-      text: input.reply.text,
-    };
-  }
-
-  if (mediaBody) {
-    const result = await sendWhatsAppMessageBody({
-      channel: input.channel,
-      body: mediaBody,
-    });
-
-    return {
-      deliveryMode: "media",
-      messageType: mediaBody.type,
-      result,
-      text: fallbackText,
-    };
-  }
-
-  const result = await sendWhatsAppTextMessage({
+  const adapted = await createWhatsAppChannelAdapter().adaptReply({
+    context: { serviceWindowOpen: serviceWindow.isOpen, to: input.to },
+    reply: input.reply,
+  });
+  const result = await sendWhatsAppMessageBody({
     channel: input.channel,
-    to: input.to,
-    text: fallbackText,
+    body: adapted.delivery.body,
   });
 
   return {
-    deliveryMode: "text",
-    messageType: "text",
+    deliveryMode: adapted.delivery.deliveryMode,
+    messageType: adapted.delivery.messageType,
     result,
-    text: fallbackText,
+    text: adapted.delivery.text,
   };
 }
