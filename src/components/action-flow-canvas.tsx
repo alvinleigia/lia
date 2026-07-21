@@ -59,6 +59,10 @@ import {
   updateCanvasStepAction,
   updateCanvasStepBasicsAction,
 } from "@/app/projects/actions/canvas-actions";
+import {
+  FlowInputAnswerStorageField,
+  FlowInputPrimaryFields,
+} from "@/components/flow-input-primary-fields";
 import { FlowMessageContentEditor } from "@/components/flow-message-content-editor";
 import { FlowTemplateMessageFields } from "@/components/flow-template-message-fields";
 import {
@@ -104,6 +108,7 @@ import {
   getFlowContentComponent,
   resolveFlowContentMenu,
 } from "@/lib/flow-content-components";
+import { isFlowInputStepType } from "@/lib/flow-input-editor";
 import { getFlowMessageFamilyDefinition } from "@/lib/flow-message-editor";
 
 type FlowStep = Awaited<ReturnType<typeof listActionFlowSteps>>[number];
@@ -1917,6 +1922,7 @@ function StepCreateForm({
   const [selectedStepType, setSelectedStepType] = useState(
     step?.stepType ?? defaultStepType,
   );
+  const isInputStep = isFlowInputStepType(selectedStepType);
   const isMessageStep = selectedStepType === "message";
 
   return (
@@ -1948,93 +1954,119 @@ function StepCreateForm({
         </select>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor="canvas-step-label">
-          Label
-        </label>
-        <input
-          id="canvas-step-label"
-          name="label"
-          defaultValue={step?.label ?? ""}
-          placeholder={isMessageStep ? "Welcome message" : "Customer name"}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      {isInputStep ? (
+        <FlowInputPrimaryFields
+          defaultEnabled={step?.isEnabled ?? true}
+          defaultInputType={step?.inputType ?? "text"}
+          defaultLabel={step?.label}
+          defaultPrompt={step?.prompt}
+          defaultRequired={step?.isRequired ?? true}
+          idPrefix="canvas-input"
+          stepType={selectedStepType}
         />
-      </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="canvas-step-label">
+              Label
+            </label>
+            <input
+              id="canvas-step-label"
+              name="label"
+              defaultValue={step?.label ?? ""}
+              placeholder={isMessageStep ? "Welcome message" : "Customer name"}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            />
+          </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor="canvas-step-prompt">
-          {isMessageStep ? "Message" : "Prompt"}
-        </label>
-        <textarea
-          id="canvas-step-prompt"
-          name="prompt"
-          rows={3}
-          defaultValue={step?.prompt ?? ""}
-          placeholder={
-            isMessageStep
-              ? "Enter the message visitors will see"
-              : "What should the chatbot ask or say?"
-          }
-          className="flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        />
-      </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="canvas-step-prompt">
+              {isMessageStep ? "Message" : "Prompt"}
+            </label>
+            <textarea
+              id="canvas-step-prompt"
+              name="prompt"
+              rows={3}
+              defaultValue={step?.prompt ?? ""}
+              placeholder={
+                isMessageStep
+                  ? "Enter the message visitors will see"
+                  : "What should the chatbot ask or say?"
+              }
+              className="flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            />
+          </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          name="isEnabled"
-          defaultChecked={step?.isEnabled ?? true}
-        />
-        Enabled
-      </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="isEnabled"
+              defaultChecked={step?.isEnabled ?? true}
+            />
+            Enabled
+          </label>
+        </>
+      )}
 
       <StepAdvancedOptions collapsed={!step}>
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="canvas-field-key">
-            Field Key
-          </label>
-          <input
-            id="canvas-field-key"
-            name="fieldKey"
-            defaultValue={step?.fieldKey ?? ""}
-            placeholder="customerName"
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        {isInputStep ? (
+          <FlowInputAnswerStorageField
+            defaultValue={step?.fieldKey}
+            idPrefix="canvas-input"
           />
-          <p className="text-xs text-muted-foreground">
-            Used when this step stores or reuses a value.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="canvas-input-type">
-              Input Type
-            </label>
-            <select
-              id="canvas-input-type"
-              name="inputType"
-              defaultValue={step?.inputType ?? "text"}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              {CANVAS_INPUT_TYPES.map((inputType) => (
-                <option key={inputType} value={inputType}>
-                  {formatFlowComponentLabel(inputType)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-end gap-4 pb-2">
-            <label className="flex items-center gap-2 text-sm">
+        ) : (
+          <>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="canvas-field-key">
+                Field Key
+              </label>
               <input
-                type="checkbox"
-                name="isRequired"
-                defaultChecked={step?.isRequired ?? true}
+                id="canvas-field-key"
+                name="fieldKey"
+                defaultValue={step?.fieldKey ?? ""}
+                placeholder="customerName"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               />
-              Required
-            </label>
-          </div>
-        </div>
+              <p className="text-xs text-muted-foreground">
+                Used when this step stores or reuses a value.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-medium"
+                  htmlFor="canvas-input-type"
+                >
+                  Input Type
+                </label>
+                <select
+                  id="canvas-input-type"
+                  name="inputType"
+                  defaultValue={step?.inputType ?? "text"}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  {CANVAS_INPUT_TYPES.map((inputType) => (
+                    <option key={inputType} value={inputType}>
+                      {formatFlowComponentLabel(inputType)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-end gap-4 pb-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="isRequired"
+                    defaultChecked={step?.isRequired ?? true}
+                  />
+                  Required
+                </label>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="space-y-3 rounded-md border p-3">
           <p className="text-sm font-medium">Validation</p>
