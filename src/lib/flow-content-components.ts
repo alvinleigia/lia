@@ -75,7 +75,7 @@ export const FLOW_CONTENT_COMPONENTS = [
     group: "message",
     key: "choice_buttons",
     label: "Text + buttons",
-    requirements: ["answer_collection", "single_choice_block"],
+    requirements: ["single_choice_block", "answer_collection"],
     target: "content_block",
   },
   {
@@ -85,7 +85,7 @@ export const FLOW_CONTENT_COMPONENTS = [
     group: "message",
     key: "list",
     label: "List message",
-    requirements: ["answer_collection", "single_choice_block"],
+    requirements: ["single_choice_block", "answer_collection"],
     target: "content_block",
   },
   {

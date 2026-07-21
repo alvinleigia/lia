@@ -591,7 +591,11 @@ function CanvasContentBlockPreview({ block }: { block: FlowContentBlock }) {
 
 function getContentBlockName(block: FlowContentBlock) {
   if (block.type === "choice") {
-    return "Choice buttons";
+    return block.displayMode === "list"
+      ? "List message"
+      : block.displayMode === "buttons"
+        ? "Text + buttons"
+        : "Text choices";
   }
 
   if (block.type === "media") {
@@ -661,6 +665,21 @@ function CanvasContentBlockEditor({
 
       {draft.type === "choice" && (
         <div className="space-y-2">
+          <select
+            aria-label="Choice display"
+            value={draft.displayMode}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                displayMode: event.target.value as "buttons" | "list" | "text",
+              })
+            }
+            className="flex h-8 w-full rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <option value="buttons">Buttons</option>
+            <option value="list">List</option>
+            <option value="text">Typed response</option>
+          </select>
           {draft.options.map((option, index) => (
             <div
               key={`${draft.id}-inline-option-${index}`}

@@ -605,6 +605,130 @@ test("message step creation keeps technical fields in advanced options", async (
   await expect(dialog.getByText("Validation", { exact: true })).toBeVisible();
 });
 
+test("universal Add Content menu explains availability in both canvas editors", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-content-menu-${runId}@example.test`;
+  const projectName = `E2E Content Menu Project ${runId}`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Content Menu User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(page, projectName);
+  const action = await createChatbotAction({
+    description: "Checks universal Add Content availability and persistence.",
+    name: `E2E Content Menu ${runId}`,
+    projectId,
+    status: "draft",
+    triggerPhrases: [],
+  });
+
+  await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Universal Welcome",
+    projectId,
+    prompt: "Welcome to the content menu test.",
+    sortOrder: 1,
+    stepType: "message",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "universalChoice",
+    inputType: "text",
+    isRequired: true,
+    label: "Universal Question",
+    projectId,
+    prompt: "Which option would you like?",
+    sortOrder: 2,
+    stepType: "collect_input",
+  });
+
+  await page.goto(`/projects/actions/${action.id}/canvas`);
+  const welcomeNode = page
+    .locator(".react-flow__node")
+    .filter({ hasText: "Universal Welcome" });
+  await welcomeNode.getByRole("button", { name: "Add content" }).click();
+
+  let contentMenu = page.locator('[data-slot="popover-content"]:visible').last();
+  await expect(contentMenu).toBeVisible();
+  for (const label of [
+    "Text message",
+    "Text + buttons",
+    "List message",
+    "Media",
+    "Catalogue message",
+    "Single product",
+    "Multiple products",
+    "Template",
+    "Request intervention",
+  ]) {
+    await expect(contentMenu.getByText(label, { exact: true })).toBeVisible();
+  }
+  await expect(
+    contentMenu.getByRole("button", { name: /Text message/i }),
+  ).toBeEnabled();
+  await expect(
+    contentMenu.getByRole("button", { name: /Text \+ buttons/i }),
+  ).toBeDisabled();
+  await expect(
+    contentMenu.getByText(
+      "Available on steps that collect a compatible visitor answer.",
+      { exact: true },
+    ),
+  ).toHaveCount(2);
+  await expect(
+    contentMenu.getByText("Upload an active asset in the Media Library first."),
+  ).toBeVisible();
+  await expect(
+    contentMenu.getByText(/Template is a standalone message block/),
+  ).toBeVisible();
+  await expect(
+    contentMenu.getByText(/Request intervention is a standalone action block/),
+  ).toBeVisible();
+  await welcomeNode.getByRole("button", { name: "Add content" }).click();
+  await expect(contentMenu).not.toBeVisible();
+
+  const questionNode = page
+    .locator(".react-flow__node")
+    .filter({ hasText: "Universal Question" });
+  await questionNode.getByRole("button", { name: "Add content" }).click();
+  contentMenu = page.locator('[data-slot="popover-content"]:visible').last();
+  const listOption = contentMenu.getByRole("button", {
+    name: /List message/i,
+  });
+  await expect(listOption).toBeEnabled();
+  await listOption.click();
+
+  const inlineChoiceDisplay = questionNode.getByLabel("Choice display");
+  await expect(inlineChoiceDisplay).toHaveValue("list");
+  await questionNode.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(inlineChoiceDisplay).not.toBeVisible();
+
+  await page.reload();
+  await expect(questionNode.getByTitle("Edit list message")).toBeVisible();
+  await questionNode.getByText("Universal Question", { exact: true }).click();
+
+  const editDialog = page.getByRole("dialog", { name: "Edit Step" });
+  await editDialog.getByRole("button", { name: "Add content" }).click();
+  contentMenu = page.locator('[data-slot="popover-content"]:visible').last();
+  await expect(
+    contentMenu.getByRole("button", { name: /List message/i }),
+  ).toBeDisabled();
+  await expect(
+    contentMenu.getByText("This step already has a choice or list block.", {
+      exact: true,
+    }),
+  ).toHaveCount(2);
+  await expect(
+    contentMenu.getByRole("button", { name: /Template/i }),
+  ).toBeDisabled();
+});
+
 test("platform admin email lands on the platform dashboard", async ({
   page,
 }) => {

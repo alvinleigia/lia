@@ -29,7 +29,7 @@ is not confused with the historical implementation phases later in this file.
 | 1 | One server execution engine for project chat, widget, and channels | Complete |
 | 2 | Published-version pinning and recoverable flow runs | Complete |
 | 3 | Versioned block contracts and shared channel adapters | Complete |
-| 4 | Universal Add Content menu with explicit disabled reasons | In progress (Step 4 of 6) |
+| 4 | Universal Add Content menu with explicit disabled reasons | In progress (Step 5 of 6) |
 | 5 | Friendly message-family editors | Pending |
 | 6 | Friendly input-family editors | Pending |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Pending |
