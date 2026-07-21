@@ -577,6 +577,49 @@ Spa Service` action while learning the builder.
   Status:
   Notes:
 
+- [ ] Confirm dedicated input blocks choose their answer format automatically.
+  Instructions: Create an `Ask Email` block and inspect its main fields.
+  Expected result: The editor says `Answer format: Email address`, does not show
+  a redundant Input Type selector, and explains that email format is validated
+  automatically. Repeat with Ask Phone, Ask Date, Ask Time, and Ask Number.
+  Status:
+  Notes:
+
+- [ ] Confirm Ask Question permits a general answer format.
+  Instructions: Create an `Ask Question` block and switch Answer format between
+  Text, Email address, Phone number, Date, Time, Whole number, and Number.
+  Expected result: Every option remains selectable and the validation guidance
+  changes to match the selected format without changing the block behavior.
+  Status:
+  Notes:
+
+- [ ] Confirm validation fields are relevant to the input family.
+  Instructions: Expand Advanced options for Text, Number, Date, and Email
+  inputs in turn.
+  Expected result: Text and Email show character limits; Number shows minimum
+  and maximum values; Date shows earliest and latest dates; unrelated controls
+  are absent. Custom answer pattern remains collapsed until opened.
+  Status:
+  Notes:
+
+- [ ] Confirm structured address and location guidance.
+  Instructions: Create Ask Address and Ask Location blocks, then preview each
+  flow input.
+  Expected result: Address collects reusable address parts. Location accepts a
+  place label or valid browser coordinates. Neither editor exposes irrelevant
+  text, number, or date constraints.
+  Status:
+  Notes:
+
+- [ ] Confirm friendly file-upload restrictions.
+  Instructions: Create an Ask Media block, expand Advanced options, and switch
+  Files visitors may upload between Common files, Images only, Documents only,
+  and Custom file types.
+  Expected result: Presets save without entering MIME identifiers. Custom file
+  types reveals one optional field for extensions or media types.
+  Status:
+  Notes:
+
 ### 6.6 Test routing and branching
 
 - [ ] Confirm the normal route order.

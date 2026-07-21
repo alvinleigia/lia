@@ -31,7 +31,7 @@ is not confused with the historical implementation phases later in this file.
 | 3 | Versioned block contracts and shared channel adapters | Complete |
 | 4 | Universal Add Content menu with explicit disabled reasons | Complete |
 | 5 | Friendly message-family editors | Complete |
-| 6 | Friendly input-family editors | In progress (Step 5 of 6) |
+| 6 | Friendly input-family editors | Complete |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Pending |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Pending |
 | 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Pending |
@@ -118,6 +118,23 @@ input blocks derive their answer format from their behavior; only Ask Question
 offers a general answer-format choice. Common validation is shown in plain
 language, while custom patterns and data keys remain available through
 progressive disclosure. Action execution remains scoped to Phase 7.
+
+### Phase 6 Closeout
+
+All 6 Phase 6 steps are complete:
+
+- One shared registry maps every supported input step to a friendly family,
+  automatic answer format, labels, placeholders, and relevant validation.
+- Ask Question retains selectable text, email, phone, date, time, whole-number,
+  and decimal-number formats without changing the persisted action-step model.
+- Dedicated email, phone, date, time, number, address, location, choice,
+  product, date-range, and upload blocks derive their format automatically.
+- Text, number, date, and file constraints use plain-language controls; custom
+  regular expressions and reusable answer keys remain progressively disclosed.
+- Create, compact, and advanced canvas editing use the same family definitions
+  while runtime validation and structured answer handling remain unchanged.
+- Model and browser regression coverage verifies relevance, persistence,
+  compact-editor parity, automatic formats, and upload presets.
 
 ### Phase 3 Delivery Steps
 
