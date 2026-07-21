@@ -30,6 +30,7 @@ import { logChatRequest } from "../../src/lib/chat-logs";
 import { getOrCreateDefaultCompanyForUser } from "../../src/lib/companies";
 import { addContactTag, setContactAttribute } from "../../src/lib/contacts";
 import { getProjectSourceDocuments } from "../../src/lib/documents";
+import { processProjectFlowResumeQueue } from "../../src/lib/durable-flow-resume";
 import { getFlowStepChannelCapabilityIssues } from "../../src/lib/flow-channel-capabilities";
 import { listProjectMediaAssets } from "../../src/lib/media-assets";
 import {
@@ -2775,6 +2776,118 @@ test("active flow stays pinned to the published version it started with", async 
       actionVersionId: versionOne.id,
       status: "submitted",
     }),
+  );
+});
+
+test("durable wait resumes and completes its pinned flow version", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-durable-resume-${runId}@example.test`;
+  const projectName = `E2E Durable Resume Project ${runId}`;
+  const triggerPhrase = `durable resume ${runId}`;
+  const conversationId = `durable-resume-conversation-${runId}`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Durable Resume User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(page, projectName);
+  const user = await getUserByEmail(email);
+  if (!user) {
+    throw new Error("Expected the durable-resume test user to exist.");
+  }
+
+  const action = await createChatbotAction({
+    description: "Certifies queued wait and resume execution.",
+    name: `E2E Durable Resume Action ${runId}`,
+    projectId,
+    status: "active",
+    triggerPhrases: [triggerPhrase],
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Brief Pause",
+    projectId,
+    prompt: "Please wait while this request continues.",
+    settings: { waitAmount: 1, waitUnit: "seconds" },
+    sortOrder: 1,
+    stepType: "wait",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Complete After Pause",
+    projectId,
+    prompt: "The scheduled request is complete.",
+    sortOrder: 2,
+    stepType: "submit",
+  });
+  const publishedVersion = await createPublishedActionFlowVersion({
+    actionId: action.id,
+    projectId,
+    publishedByUserId: user.id,
+  });
+  if (!publishedVersion) {
+    throw new Error("Expected the durable flow to be published.");
+  }
+
+  const startResult = await processChannelFlowText({
+    activeSubmission: null,
+    conversationId,
+    projectId,
+    source: "widget_chat",
+    text: triggerPhrase,
+  });
+  expect(
+    startResult.replies.map((reply) => reply.fallbackText).join("\n"),
+  ).toContain("Please wait while this request continues.");
+
+  const [pausedSubmission] = await listActionSubmissions(projectId, action.id);
+  expect(pausedSubmission).toEqual(
+    expect.objectContaining({
+      actionVersionId: publishedVersion.id,
+      status: "in_progress",
+    }),
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 1_100));
+  const queueResult = await processProjectFlowResumeQueue({
+    maxJobs: 1,
+    projectId,
+    workerId: `e2e-worker-${runId}`,
+  });
+  expect(queueResult).toEqual({
+    completed: 1,
+    failed: 0,
+    idle: false,
+    processed: 1,
+    rescheduled: 0,
+  });
+
+  const [completedSubmission] = await listActionSubmissions(
+    projectId,
+    action.id,
+  );
+  expect(completedSubmission).toEqual(
+    expect.objectContaining({
+      actionVersionId: publishedVersion.id,
+      status: "submitted",
+    }),
+  );
+  const events = await listActionSubmissionEvents(
+    projectId,
+    completedSubmission.id,
+  );
+  expect(events.map((event) => event.eventType)).toEqual(
+    expect.arrayContaining([
+      "flow.paused",
+      "flow.resumed",
+      "submission.submitted",
+    ]),
   );
 });
 

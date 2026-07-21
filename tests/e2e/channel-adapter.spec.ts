@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { createBrowserChannelAdapter } from "../../src/lib/browser-channel-adapter";
 import {
+  CHANNEL_REPLY_CAPABILITIES,
+  getRuntimeReplyCapability,
+} from "../../src/lib/channel-adapter-contract";
+import {
+  createReferenceChannelAdapter,
+  REFERENCE_CHANNEL_TYPE,
+} from "../../src/lib/reference-channel-adapter";
+import {
   createChoiceReply,
   createMediaReply,
   createProductReply,
@@ -9,10 +17,6 @@ import {
   type RuntimeReplyOption,
   type RuntimeReplyProduct,
 } from "../../src/lib/runtime-replies";
-import {
-  createReferenceChannelAdapter,
-  REFERENCE_CHANNEL_TYPE,
-} from "../../src/lib/reference-channel-adapter";
 import { createWhatsAppChannelAdapter } from "../../src/lib/whatsapp";
 
 function createOptions(count: number): RuntimeReplyOption[] {
@@ -168,6 +172,107 @@ test("reference adapter preserves the universal future-channel envelope", () => 
     schemaVersion: 1,
     text: "Choose a service",
   });
+});
+
+test("all runtime reply capabilities cross the shared adapter boundary", async () => {
+  const product = createProduct({
+    id: 450,
+    name: "Certified Product",
+    retailerId: "certified-product",
+  });
+  const catalog = {
+    externalId: "certified-catalog",
+    id: 451,
+    name: "Certified Catalog",
+  };
+  const replies = [
+    createTextReply("Text"),
+    createChoiceReply({
+      displayMode: "buttons",
+      options: createOptions(2),
+      text: "Buttons",
+    }),
+    createChoiceReply({
+      displayMode: "list",
+      options: createOptions(4),
+      text: "List",
+    }),
+    createMediaReply({
+      media: {
+        id: 452,
+        mediaType: "image",
+        mimeType: "image/png",
+        originalName: "certified.png",
+        publicPath: "https://cdn.example.test/certified.png",
+      },
+      text: "Media",
+    }),
+    createTemplateReply({
+      template: {
+        body: "Hello {{1}}",
+        language: "en",
+        name: "certified_template",
+        status: "approved",
+        variables: ["Customer"],
+      },
+      text: "Template",
+    }),
+    createProductReply({
+      catalog,
+      mode: "catalog",
+      products: [product],
+      text: "Catalog",
+    }),
+    createProductReply({
+      catalog,
+      mode: "single_product",
+      products: [product],
+      text: "Single product",
+    }),
+    createProductReply({
+      catalog,
+      mode: "multiple_products",
+      products: [product],
+      text: "Multiple products",
+    }),
+    {
+      fallbackText: "A team member will continue this conversation.",
+      payload: { requested: true },
+      text: "Human handoff requested",
+      type: "handoff" as const,
+    },
+  ];
+
+  expect(replies.map(getRuntimeReplyCapability)).toEqual(
+    CHANNEL_REPLY_CAPABILITIES,
+  );
+
+  const browser = createBrowserChannelAdapter("widget");
+  const reference = createReferenceChannelAdapter();
+  const whatsapp = createWhatsAppChannelAdapter();
+
+  for (const [index, reply] of replies.entries()) {
+    const capability = CHANNEL_REPLY_CAPABILITIES[index];
+    expect(
+      browser.adaptReply({ context: { messageId: `browser-${index}` }, reply })
+        .capability,
+    ).toBe(capability);
+    expect(
+      reference.adaptReply({
+        context: { correlationId: `reference-${index}` },
+        reply,
+      }).capability,
+    ).toBe(capability);
+
+    const whatsappReply = await whatsapp.adaptReply({
+      context: { serviceWindowOpen: true, to: "15550001111" },
+      reply,
+    });
+    expect(whatsappReply.capability).toBe(capability);
+    expect(whatsappReply.mode).toBe(
+      capability === "handoff" ? "fallback" : "native",
+    );
+  }
 });
 
 test("WhatsApp adapter uses native delivery within provider limits", async () => {
