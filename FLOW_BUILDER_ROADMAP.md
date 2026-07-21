@@ -33,7 +33,7 @@ is not confused with the historical implementation phases later in this file.
 | 5 | Friendly message-family editors | Complete |
 | 6 | Friendly input-family editors | Complete |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
-| 8 | Graph compiler with typed conditions and terminal-path validation | In progress (Step 1 of 7) |
+| 8 | Graph compiler with typed conditions and terminal-path validation | Complete |
 | 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Pending |
 | 10 | Cross-channel certification, UAT, and release sign-off | Pending |
 
@@ -199,6 +199,27 @@ groups are stored in branch settings, so no database migration is required.
 Submit, handoff, connected-flow, confirmation, and natural review boundaries
 are terminal outcomes. Broken targets, invalid typed comparisons, and reachable
 routing cycles block publishing; unreachable enabled steps are warnings.
+
+### Phase 8 Closeout
+
+All 7 Phase 8 steps are complete:
+
+- One pure compiler converts enabled runtime steps into branch, explicit
+  default, and ordered fallback edges using the same precedence as execution.
+- Versioned condition groups support up to ten typed conditions with `AND` or
+  `OR` matching while existing single-condition branch columns remain valid.
+- Text, number, date, time, and empty-value comparisons are compiled once and
+  evaluated by the shared server runtime for drafts and published snapshots.
+- Publishing now blocks missing or disabled targets, invalid comparisons,
+  terminal-source routes, reachable cycles, and paths that cannot finish.
+- Enabled steps that cannot be reached are reported as warnings so unfinished
+  canvas work stays visible without silently becoming part of live runtime.
+- The canvas presents named answers, compatible comparison controls, grouped
+  conditions, destinations, progressive route priority, and plain-language
+  diagnostic categories.
+- Model, runtime, publish-validation, and database-backed browser tests cover
+  typed groups, route precedence, field aliases, graph blockers, persistence,
+  reload behavior, and tenant-scoped validation. No migration was required.
 
 ### Phase 3 Delivery Steps
 

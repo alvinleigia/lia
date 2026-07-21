@@ -686,10 +686,38 @@ Spa Service` action while learning the builder.
   Notes:
 
 - [ ] Add a conditional branch.
-  Instructions: Select the Service Choice node, expand `Branching`, create a
-  rule that sends `Support` to the Complete step, and save it.
+  Instructions: Select the Contact Method node, expand `Branching`, create a
+  rule that sends `Support` from Service Choice to the Complete step, and save
+  it.
   Expected result: A branch route appears on the canvas and the branch count
   increases.
+  Status:
+  Notes:
+
+- [ ] Add a second condition to the branch.
+  Instructions: Reopen the branch line. Select `Add condition`, choose Contact
+  Method, set it to equal `Phone`, then switch matching between `All
+  conditions` and `Any condition`. Save with `Any condition` selected.
+  Expected result: Both conditions remain visible, the route preview uses
+  plain `or` language, and the canvas keeps the optional route name.
+  Status:
+  Notes:
+
+- [ ] Confirm grouped conditions survive reload.
+  Instructions: Refresh the canvas, select the same branch line, and review
+  its Match section.
+  Expected result: `Any condition`, both answers, comparisons, values, route
+  destination, active state, and advanced priority are restored.
+  Status:
+  Notes:
+
+- [ ] Confirm comparisons follow the answer type.
+  Instructions: Add a temporary Number or Date answer before a later branch
+  source. In that branch, select the typed answer and review Comparison and
+  Value controls.
+  Expected result: Number and date answers offer equal, not equal, greater
+  than, less than, and empty checks. Text-only `Contains` is not offered, and
+  the Value control uses the matching number or date input.
   Status:
   Notes:
 
@@ -697,6 +725,34 @@ Spa Service` action while learning the builder.
   Instructions: Select the branch line, confirm its condition and destination,
   then close the dialog without changing it.
   Expected result: The branch is understandable and editable from the canvas.
+  Status:
+  Notes:
+
+- [ ] Confirm unreachable-step warnings.
+  Instructions: In the disposable flow, temporarily set a default route that
+  skips an enabled middle step. Review `Flow checks`, then restore the intended
+  route.
+  Expected result: The skipped step is reported as an `Unreachable step`
+  warning. It does not appear as a vague route error.
+  Status:
+  Notes:
+
+- [ ] Confirm routing loops are blocked.
+  Instructions: Temporarily connect two non-terminal steps back to each other,
+  review `Flow checks`, and attempt to return to publishing. Remove the loop
+  after recording the result.
+  Expected result: A `Loop` error names the involved step numbers and the
+  action cannot be published until the loop is removed.
+  Status:
+  Notes:
+
+- [ ] Confirm every reachable path can finish.
+  Instructions: Temporarily create a reachable path that has no terminal or
+  natural review outcome, then review `Flow checks`. Restore a path to Submit,
+  Request Intervention, Connect Flow, Confirmation, or a natural final review.
+  Expected result: A `Finish path` error identifies the affected steps. After
+  repair, the success message reads `Flow compiled. Every reachable path can
+  finish.`
   Status:
   Notes:
 

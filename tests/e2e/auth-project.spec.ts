@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
+  countBlockingActionFlowIssues,
   createActionFlowBranchRule,
   createActionFlowStep,
   createProjectAction as createChatbotAction,
@@ -10,6 +11,7 @@ import {
   listActionSubmissionEvents,
   listActionSubmissions,
   updateActionFlowStep,
+  validateActionFlowRoutes,
 } from "../../src/lib/action-flows";
 import { writeAuditLog } from "../../src/lib/audit";
 import { runBrowserFlowMediaCommand } from "../../src/lib/browser-flow-media-command";
@@ -877,6 +879,8 @@ test("canvas saves and restores friendly grouped route conditions", async ({
       ],
       schemaVersion: 1,
     });
+  const routeIssues = await validateActionFlowRoutes(projectId, action.id);
+  expect(countBlockingActionFlowIssues(routeIssues)).toBe(0);
 
   await page.reload();
   const routeEdge = page
