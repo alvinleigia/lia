@@ -28,8 +28,10 @@ export type ChannelAdapterLimits = {
   productItems: number | null;
 };
 
-export type ChannelAdapterProfile = {
-  channelType: ChannelType;
+export type ChannelAdapterProfile<
+  TChannelType extends string = ChannelType,
+> = {
+  channelType: TChannelType;
   inbound: {
     interactiveSelection: boolean;
     media: boolean;
@@ -47,12 +49,16 @@ export type AdaptedChannelReply<TDelivery> = {
   warnings: string[];
 };
 
-export type ChannelReplyAdapter<TContext, TDelivery> = {
+export type ChannelReplyAdapter<
+  TContext,
+  TDelivery,
+  TChannelType extends string = ChannelType,
+> = {
   adaptReply(input: {
     context: TContext;
     reply: RuntimeReply;
   }): Promise<AdaptedChannelReply<TDelivery>> | AdaptedChannelReply<TDelivery>;
-  profile: ChannelAdapterProfile;
+  profile: ChannelAdapterProfile<TChannelType>;
 };
 
 const browserReplySupport = {

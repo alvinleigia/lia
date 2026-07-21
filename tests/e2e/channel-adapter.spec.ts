@@ -9,6 +9,10 @@ import {
   type RuntimeReplyOption,
   type RuntimeReplyProduct,
 } from "../../src/lib/runtime-replies";
+import {
+  createReferenceChannelAdapter,
+  REFERENCE_CHANNEL_TYPE,
+} from "../../src/lib/reference-channel-adapter";
 import { createWhatsAppChannelAdapter } from "../../src/lib/whatsapp";
 
 function createOptions(count: number): RuntimeReplyOption[] {
@@ -138,6 +142,32 @@ test("browser adapters preserve separate project reply payloads", () => {
   ]);
   expect(tenantA.delivery.text).toBe("Tenant A");
   expect(tenantB.delivery.text).toBe("Tenant B");
+});
+
+test("reference adapter preserves the universal future-channel envelope", () => {
+  const adapter = createReferenceChannelAdapter();
+  const reply = createChoiceReply({
+    displayMode: "buttons",
+    options: createOptions(2),
+    text: "Choose a service",
+  });
+  const adapted = adapter.adaptReply({
+    context: { correlationId: "future-channel-message-1" },
+    reply,
+  });
+
+  expect(adapter.profile.channelType).toBe(REFERENCE_CHANNEL_TYPE);
+  expect(adapted.capability).toBe("buttons");
+  expect(adapted.mode).toBe("native");
+  expect(adapted.warnings).toEqual([]);
+  expect(adapted.delivery).toEqual({
+    correlationId: "future-channel-message-1",
+    fallbackText: reply.fallbackText,
+    kind: "buttons",
+    payload: reply.payload,
+    schemaVersion: 1,
+    text: "Choose a service",
+  });
 });
 
 test("WhatsApp adapter uses native delivery within provider limits", async () => {
