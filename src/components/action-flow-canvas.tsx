@@ -61,6 +61,7 @@ import {
 } from "@/app/projects/actions/canvas-actions";
 import {
   FlowInputAnswerStorageField,
+  FlowInputFamilySummary,
   FlowInputPrimaryFields,
 } from "@/components/flow-input-primary-fields";
 import { FlowInputValidationFields } from "@/components/flow-input-validation-fields";
@@ -109,7 +110,11 @@ import {
   getFlowContentComponent,
   resolveFlowContentMenu,
 } from "@/lib/flow-content-components";
-import { isFlowInputStepType } from "@/lib/flow-input-editor";
+import {
+  FLOW_ANSWER_FORMATS,
+  getFlowInputFamilyDefinition,
+  isFlowInputStepType,
+} from "@/lib/flow-input-editor";
 import { getFlowMessageFamilyDefinition } from "@/lib/flow-message-editor";
 
 type FlowStep = Awaited<ReturnType<typeof listActionFlowSteps>>[number];
@@ -3124,6 +3129,10 @@ function StepBasicsForm({
     !hasDynamicOptions &&
     step.stepType !== "choice" &&
     storedOptions.length === 0;
+  const inputDefinition = getFlowInputFamilyDefinition(
+    step.stepType,
+    step.inputType,
+  );
   const optionsChanged =
     options.length !== storedOptions.length ||
     options.some((option, index) => option !== storedOptions[index]);
@@ -3175,6 +3184,13 @@ function StepBasicsForm({
         />
       )}
 
+      {inputDefinition && (
+        <FlowInputFamilySummary
+          inputType={step.inputType}
+          stepType={step.stepType}
+        />
+      )}
+
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor="quick-step-label">
           Step name
@@ -3193,14 +3209,17 @@ function StepBasicsForm({
 
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor="quick-step-prompt">
-          Message shown to the visitor
+          {inputDefinition?.questionLabel ?? "Message shown to the visitor"}
         </label>
         <textarea
           id="quick-step-prompt"
           name="prompt"
           rows={4}
           defaultValue={step.prompt ?? ""}
-          placeholder="Write what the chatbot should say or ask"
+          placeholder={
+            inputDefinition?.questionPlaceholder ??
+            "Write what the chatbot should say or ask"
+          }
           className="flex min-h-28 w-full resize-y rounded-md border border-input bg-transparent px-3 py-3 text-sm leading-6 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
       </div>
@@ -3225,13 +3244,11 @@ function StepBasicsForm({
             defaultValue={step.inputType ?? "text"}
             className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
-            <option value="text">Text</option>
-            <option value="email">Email address</option>
-            <option value="phone">Phone number</option>
-            <option value="date">Date</option>
-            <option value="time">Time</option>
-            <option value="int">Whole number</option>
-            <option value="float">Number</option>
+            {FLOW_ANSWER_FORMATS.map((format) => (
+              <option key={format.value} value={format.value}>
+                {format.label}
+              </option>
+            ))}
           </select>
           <p className="text-xs text-muted-foreground">
             Lia will validate the visitor&apos;s answer using this format.

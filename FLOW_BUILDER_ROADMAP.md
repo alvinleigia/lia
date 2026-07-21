@@ -31,7 +31,7 @@ is not confused with the historical implementation phases later in this file.
 | 3 | Versioned block contracts and shared channel adapters | Complete |
 | 4 | Universal Add Content menu with explicit disabled reasons | Complete |
 | 5 | Friendly message-family editors | Complete |
-| 6 | Friendly input-family editors | In progress (Step 4 of 6) |
+| 6 | Friendly input-family editors | In progress (Step 5 of 6) |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Pending |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Pending |
 | 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Pending |

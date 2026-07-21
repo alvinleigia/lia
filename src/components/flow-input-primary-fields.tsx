@@ -58,6 +58,36 @@ function getAnswerFormatLabel(value: string) {
   );
 }
 
+export function FlowInputFamilySummary({
+  inputType,
+  stepType,
+}: {
+  inputType: string | null | undefined;
+  stepType: string;
+}) {
+  const definition = getFlowInputFamilyDefinition(stepType, inputType);
+
+  if (!definition) {
+    return null;
+  }
+
+  const Icon = getFamilyIcon(definition.family);
+
+  return (
+    <div className="flex items-start gap-3 rounded-md border bg-gray-50/70 p-4">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white text-gray-700 shadow-xs">
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <p className="font-semibold">{definition.title}</p>
+        <p className="mt-1 text-sm leading-5 text-muted-foreground">
+          {definition.description}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function FlowInputPrimaryFields({
   defaultEnabled = true,
   defaultInputType = "text",
@@ -94,21 +124,12 @@ export function FlowInputPrimaryFields({
     return null;
   }
 
-  const Icon = getFamilyIcon(definition.family);
-
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 rounded-md border bg-gray-50/70 p-4">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white text-gray-700 shadow-xs">
-          <Icon className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="font-semibold">{definition.title}</p>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">
-            {definition.description}
-          </p>
-        </div>
-      </div>
+      <FlowInputFamilySummary
+        inputType={resolvedInputType}
+        stepType={stepType}
+      />
 
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor={`${idPrefix}-label`}>

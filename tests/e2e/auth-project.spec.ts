@@ -558,7 +558,7 @@ test("company owner can apply a bundled action template", async ({ page }) => {
   await expect(page.getByText("Create Support Ticket").first()).toBeVisible();
 });
 
-test("message step creation keeps technical fields in advanced options", async ({
+test("step creation keeps technical fields progressive and input-aware", async ({
   page,
 }) => {
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -603,6 +603,61 @@ test("message step creation keeps technical fields in advanced options", async (
   await expect(dialog.getByPlaceholder("customerName")).toBeVisible();
   await expect(dialog.getByLabel("Input Type")).toBeVisible();
   await expect(dialog.getByText("Validation", { exact: true })).toBeVisible();
+
+  await dialog.getByRole("button", { name: "Close" }).click();
+  const emailBlock = palette.getByRole("button", { name: /Ask Email/ });
+  await emailBlock.scrollIntoViewIfNeeded();
+  await emailBlock.click();
+
+  await expect(
+    dialog.getByText("Email address", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(dialog.getByLabel("Email question")).toBeVisible();
+  await expect(
+    dialog.getByText("Answer format: Email address", { exact: true }),
+  ).toBeVisible();
+  await expect(dialog.getByLabel("Answer required")).toBeChecked();
+  await expect(dialog.getByLabel("Step active")).toBeChecked();
+  await expect(dialog.getByLabel("Input Type")).not.toBeVisible();
+
+  await dialog.getByRole("button", { name: /Advanced options/ }).click();
+  await expect(dialog.getByLabel("Save answer as")).toBeVisible();
+  await expect(dialog.getByLabel("When no answer is provided")).toBeVisible();
+  await expect(dialog.getByLabel("When the answer is invalid")).toBeVisible();
+  await expect(dialog.getByText(/valid email-address format/)).toBeVisible();
+  await expect(dialog.getByLabel("Minimum characters")).toBeVisible();
+  await expect(dialog.getByLabel("Minimum value")).not.toBeVisible();
+  await expect(dialog.getByLabel("Earliest date")).not.toBeVisible();
+
+  await dialog.getByLabel("Step name").fill("Contact Email");
+  await dialog.getByLabel("Email question").fill("Where should we email you?");
+  await dialog.getByLabel("Save answer as").fill("contactEmail");
+  await dialog
+    .getByRole("button", { name: "Create Step", exact: true })
+    .click();
+
+  const emailNode = page
+    .locator(".react-flow__node")
+    .filter({ hasText: "Contact Email" });
+  await expect(emailNode).toBeVisible();
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await emailNode.getByText("Contact Email", { exact: true }).click();
+  const editDialog = page.getByRole("dialog", { name: "Edit Step" });
+  await expect(
+    editDialog.getByText("Email address", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(editDialog.getByLabel("Email question").first()).toHaveValue(
+    "Where should we email you?",
+  );
+  await editDialog.getByRole("button", { name: "Close" }).click();
+
+  const mediaBlock = palette.getByRole("button", { name: /Ask Media/ });
+  await mediaBlock.scrollIntoViewIfNeeded();
+  await mediaBlock.click();
+  await dialog.getByRole("button", { name: /Advanced options/ }).click();
+  await expect(dialog.getByLabel("Allowed upload types")).toHaveValue("common");
+  await dialog.getByLabel("Allowed upload types").selectOption("images");
+  await expect(dialog.getByLabel("Allowed upload types")).toHaveValue("images");
 });
 
 test("universal Add Content menu explains availability in both canvas editors", async ({
