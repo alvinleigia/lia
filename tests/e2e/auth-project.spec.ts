@@ -706,16 +706,30 @@ test("universal Add Content menu explains availability in both canvas editors", 
   await expect(listOption).toBeEnabled();
   await listOption.click();
 
-  const inlineChoiceDisplay = questionNode.getByLabel("Choice display");
-  await expect(inlineChoiceDisplay).toHaveValue("list");
+  const inlineListPresentation = questionNode.getByRole("button", {
+    name: "List",
+    exact: true,
+  });
+  await expect(
+    questionNode.getByLabel("Question or introduction"),
+  ).toBeVisible();
+  await expect(inlineListPresentation).toHaveAttribute("aria-pressed", "true");
+  await expect(questionNode.getByLabel("Option 1")).toBeVisible();
+  await expect(
+    questionNode.getByRole("button", { name: "Add option" }),
+  ).toBeVisible();
   await questionNode.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(inlineChoiceDisplay).not.toBeVisible();
+  await expect(inlineListPresentation).not.toBeVisible();
 
   await page.reload();
   await expect(questionNode.getByTitle("Edit list message")).toBeVisible();
   await questionNode.getByText("Universal Question", { exact: true }).click();
 
   const editDialog = page.getByRole("dialog", { name: "Edit Step" });
+  await expect(editDialog.getByLabel("Question or introduction")).toBeVisible();
+  await expect(
+    editDialog.getByRole("button", { name: "List", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await editDialog.getByRole("button", { name: "Add content" }).click();
   contentMenu = page.locator('[data-slot="popover-content"]:visible').last();
   await expect(

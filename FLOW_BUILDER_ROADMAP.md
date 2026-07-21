@@ -30,7 +30,7 @@ is not confused with the historical implementation phases later in this file.
 | 2 | Published-version pinning and recoverable flow runs | Complete |
 | 3 | Versioned block contracts and shared channel adapters | Complete |
 | 4 | Universal Add Content menu with explicit disabled reasons | Complete |
-| 5 | Friendly message-family editors | In progress (Step 1 of 6) |
+| 5 | Friendly message-family editors | In progress (Step 5 of 6) |
 | 6 | Friendly input-family editors | Pending |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Pending |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Pending |

@@ -59,6 +59,8 @@ import {
   updateCanvasStepAction,
   updateCanvasStepBasicsAction,
 } from "@/app/projects/actions/canvas-actions";
+import { FlowMessageContentEditor } from "@/components/flow-message-content-editor";
+import { FlowTemplateMessageFields } from "@/components/flow-template-message-fields";
 import {
   Accordion,
   AccordionContent,
@@ -102,6 +104,7 @@ import {
   getFlowContentComponent,
   resolveFlowContentMenu,
 } from "@/lib/flow-content-components";
+import { getFlowMessageFamilyDefinition } from "@/lib/flow-message-editor";
 
 type FlowStep = Awaited<ReturnType<typeof listActionFlowSteps>>[number];
 type BranchRule = Awaited<ReturnType<typeof listActionFlowBranchRules>>[number];
@@ -590,27 +593,7 @@ function CanvasContentBlockPreview({ block }: { block: FlowContentBlock }) {
 }
 
 function getContentBlockName(block: FlowContentBlock) {
-  if (block.type === "choice") {
-    return block.displayMode === "list"
-      ? "List message"
-      : block.displayMode === "buttons"
-        ? "Text + buttons"
-        : "Text choices";
-  }
-
-  if (block.type === "media") {
-    return "Media";
-  }
-
-  if (block.type === "catalog") {
-    return block.displayMode === "single_product"
-      ? "Single product"
-      : block.displayMode === "multiple_products"
-        ? "Multiple products"
-        : "Product catalog";
-  }
-
-  return "Text message";
+  return getFlowMessageFamilyDefinition(block).title;
 }
 
 function CanvasContentBlockEditor({
@@ -652,196 +635,13 @@ function CanvasContentBlockEditor({
         </Button>
       </div>
 
-      <textarea
-        aria-label={draft.type === "media" ? "Media caption" : "Message"}
-        value={draft.text}
-        rows={3}
-        placeholder={draft.type === "media" ? "Optional caption" : "Message"}
-        onChange={(event) =>
-          setDraft((current) => ({ ...current, text: event.target.value }))
-        }
-        className="flex min-h-20 w-full resize-y rounded-md border border-input bg-white px-3 py-2 text-xs leading-5 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      <FlowMessageContentEditor
+        block={draft}
+        catalogProducts={catalogProducts}
+        mediaAssets={mediaAssets}
+        onChange={setDraft}
+        productCatalogs={productCatalogs}
       />
-
-      {draft.type === "choice" && (
-        <div className="space-y-2">
-          <select
-            aria-label="Choice display"
-            value={draft.displayMode}
-            onChange={(event) =>
-              setDraft({
-                ...draft,
-                displayMode: event.target.value as "buttons" | "list" | "text",
-              })
-            }
-            className="flex h-8 w-full rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            <option value="buttons">Buttons</option>
-            <option value="list">List</option>
-            <option value="text">Typed response</option>
-          </select>
-          {draft.options.map((option, index) => (
-            <div
-              key={`${draft.id}-inline-option-${index}`}
-              className="flex gap-1.5"
-            >
-              <input
-                aria-label={`Choice ${index + 1}`}
-                value={option}
-                onChange={(event) => {
-                  const options = [...draft.options];
-                  options[index] = event.target.value;
-                  setDraft({ ...draft, options });
-                }}
-                className="flex h-8 min-w-0 flex-1 rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                disabled={draft.options.length === 1}
-                title={`Remove choice ${index + 1}`}
-                onClick={() =>
-                  setDraft({
-                    ...draft,
-                    options: draft.options.filter(
-                      (_, optionIndex) => optionIndex !== index,
-                    ),
-                  })
-                }
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span className="sr-only">Remove choice</span>
-              </Button>
-            </div>
-          ))}
-          {draft.options.length < 20 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full bg-white"
-              onClick={() =>
-                setDraft({
-                  ...draft,
-                  options: [...draft.options, "New choice"],
-                })
-              }
-            >
-              <Plus className="h-4 w-4" />
-              Add choice
-            </Button>
-          )}
-        </div>
-      )}
-
-      {draft.type === "media" && (
-        <select
-          aria-label="Choose media"
-          value={draft.mediaAssetId}
-          onChange={(event) =>
-            setDraft({
-              ...draft,
-              media: null,
-              mediaAssetId: Number(event.target.value),
-            })
-          }
-          className="flex h-9 w-full rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        >
-          {mediaAssets.map((asset) => (
-            <option key={asset.id} value={asset.id}>
-              {asset.label}
-            </option>
-          ))}
-        </select>
-      )}
-
-      {draft.type === "catalog" && (
-        <div className="space-y-2">
-          <select
-            aria-label="Product catalog"
-            value={draft.catalogId}
-            onChange={(event) => {
-              const catalogId = Number(event.target.value);
-              const availableProductIds = catalogProducts
-                .filter((product) => product.catalogId === catalogId)
-                .map((product) => product.id);
-
-              setDraft({
-                ...draft,
-                catalog: null,
-                catalogId,
-                productIds:
-                  draft.displayMode === "catalog"
-                    ? []
-                    : draft.displayMode === "single_product"
-                      ? availableProductIds.slice(0, 1)
-                      : availableProductIds.slice(0, 3),
-                products: [],
-              });
-            }}
-            className="flex h-9 w-full rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            {productCatalogs.map((catalog) => (
-              <option key={catalog.id} value={catalog.id}>
-                {catalog.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="Product card layout"
-            value={draft.layout}
-            onChange={(event) =>
-              setDraft({
-                ...draft,
-                layout: event.target.value as "featured" | "grid" | "list",
-              })
-            }
-            className="flex h-9 w-full rounded-md border border-input bg-white px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            <option value="grid">Grid cards</option>
-            <option value="list">List</option>
-            <option value="featured">Featured card</option>
-          </select>
-
-          {draft.displayMode !== "catalog" && (
-            <select
-              aria-label={
-                draft.displayMode === "single_product"
-                  ? "Choose product"
-                  : "Choose products"
-              }
-              multiple={draft.displayMode === "multiple_products"}
-              size={draft.displayMode === "multiple_products" ? 4 : 1}
-              value={
-                draft.displayMode === "multiple_products"
-                  ? draft.productIds.map(String)
-                  : String(draft.productIds[0] ?? "")
-              }
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  productIds: Array.from(event.target.selectedOptions).map(
-                    (option) => Number(option.value),
-                  ),
-                  products: [],
-                })
-              }
-              className="flex w-full rounded-md border border-input bg-white px-2 py-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              {catalogProducts
-                .filter((product) => product.catalogId === draft.catalogId)
-                .map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-            </select>
-          )}
-        </div>
-      )}
 
       <div className="flex items-center gap-2">
         <Button
@@ -2399,228 +2199,140 @@ function StepCreateForm({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label
-            className="text-sm font-medium"
-            htmlFor="canvas-media-asset-id"
-          >
-            Media Asset
-          </label>
-          <select
-            id="canvas-media-asset-id"
-            name="mediaAssetId"
-            defaultValue={getStepMediaAssetId(step)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            <option value="">No media asset</option>
-            {mediaAssets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.label} ({asset.mediaType})
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-muted-foreground">
-            Used by Media message steps.
-          </p>
-        </div>
-
-        <div className="space-y-3 rounded-md border p-3">
-          <p className="text-sm font-medium">Template Content</p>
-          <div className="space-y-2">
+        {selectedStepType === "media" && (
+          <div className="space-y-2 rounded-md border bg-gray-50/50 p-4">
             <label
               className="text-sm font-medium"
-              htmlFor="canvas-whatsapp-template-body"
+              htmlFor="canvas-media-asset-id"
             >
-              Meta Body Sample
+              Media file
             </label>
-            <textarea
-              id="canvas-whatsapp-template-body"
-              name="whatsappTemplateBody"
-              rows={4}
-              defaultValue={getStepSettingText(step, "whatsappTemplateBody")}
-              placeholder="Hello {{1}}, your appointment is confirmed for {{2}}."
-              className="flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            />
-            <p className="text-xs text-muted-foreground">
-              Paste the approved Meta body with numbered placeholders so
-              variable compatibility can be checked.
+            <select
+              id="canvas-media-asset-id"
+              name="mediaAssetId"
+              defaultValue={getStepMediaAssetId(step)}
+              className="flex h-10 w-full rounded-md border border-input bg-white px-3 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="">Choose an uploaded file</option>
+              {mediaAssets.map((asset) => (
+                <option key={asset.id} value={asset.id}>
+                  {asset.label} ({asset.mediaType})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs leading-5 text-muted-foreground">
+              Upload and manage reusable files from the Media Library.
             </p>
           </div>
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium"
-              htmlFor="canvas-whatsapp-template-name"
-            >
-              WhatsApp Template Name
-            </label>
-            <input
-              id="canvas-whatsapp-template-name"
-              name="whatsappTemplateName"
-              defaultValue={getStepSettingText(step, "whatsappTemplateName")}
-              placeholder="appointment_reminder"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            />
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
+        )}
+
+        {selectedStepType === "template_message" && (
+          <FlowTemplateMessageFields
+            body={getStepSettingText(step, "whatsappTemplateBody")}
+            category={getStepTemplateCategory(step)}
+            language={
+              getStepSettingText(step, "whatsappTemplateLanguage") || "en_US"
+            }
+            name={getStepSettingText(step, "whatsappTemplateName")}
+            status={getStepTemplateStatus(step)}
+            variables={getStepTemplateVariables(step)}
+          />
+        )}
+
+        {[
+          "catalog_message",
+          "multiple_products",
+          "product_selection",
+          "single_product",
+        ].includes(selectedStepType) && (
+          <div className="space-y-3 rounded-md border bg-gray-50/50 p-4">
+            <p className="text-sm font-medium">Products shown to visitors</p>
             <div className="space-y-2">
               <label
                 className="text-sm font-medium"
-                htmlFor="canvas-whatsapp-template-language"
+                htmlFor="canvas-product-display-layout"
               >
-                Language
-              </label>
-              <input
-                id="canvas-whatsapp-template-language"
-                name="whatsappTemplateLanguage"
-                defaultValue={
-                  getStepSettingText(step, "whatsappTemplateLanguage") ||
-                  "en_US"
-                }
-                placeholder="en_US"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              />
-            </div>
-            <div className="space-y-2">
-              <label
-                className="text-sm font-medium"
-                htmlFor="canvas-whatsapp-template-category"
-              >
-                Category
+                Browser Layout
               </label>
               <select
-                id="canvas-whatsapp-template-category"
-                name="whatsappTemplateCategory"
-                defaultValue={getStepTemplateCategory(step)}
+                id="canvas-product-display-layout"
+                name="productDisplayLayout"
+                defaultValue={getStepProductDisplayLayout(step)}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <option value="utility">Utility</option>
-                <option value="marketing">Marketing</option>
-                <option value="authentication">Authentication</option>
+                <option value="grid">Grid cards</option>
+                <option value="list">Compact list</option>
+                <option value="featured">Featured first item</option>
               </select>
             </div>
+            {selectedStepType === "product_selection" && (
+              <>
+                <label className="flex items-center gap-2 text-sm md:col-span-2">
+                  <input
+                    type="checkbox"
+                    name="productSelectionAllowMultiple"
+                    defaultChecked={getStepProductSelectionAllowMultiple(step)}
+                  />
+                  Allow visitors to choose multiple products
+                </label>
+                <label className="flex items-center gap-2 text-sm md:col-span-2">
+                  <input
+                    type="checkbox"
+                    name="productSelectionAllowQuantity"
+                    defaultChecked={getStepProductSelectionAllowQuantity(step)}
+                  />
+                  Ask visitors for a quantity
+                </label>
+              </>
+            )}
+            <div className="space-y-2">
+              <label
+                className="text-sm font-medium"
+                htmlFor="canvas-product-catalog-id"
+              >
+                Product Catalog
+              </label>
+              <select
+                id="canvas-product-catalog-id"
+                name="productCatalogId"
+                defaultValue={getStepProductCatalogId(step)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <option value="">No product catalog</option>
+                {productCatalogs.map((catalog) => (
+                  <option key={catalog.id} value={catalog.id}>
+                    {catalog.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label
+                className="text-sm font-medium"
+                htmlFor="canvas-product-ids"
+              >
+                Products
+              </label>
+              <select
+                id="canvas-product-ids"
+                name="productIds"
+                multiple
+                defaultValue={getStepProductIds(step)}
+                className="flex min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                {catalogProducts.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.catalogName}: {product.name}
+                    {product.sku ? ` (${product.sku})` : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Choose the products visitors should see in this message.
+              </p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium"
-              htmlFor="canvas-whatsapp-template-status"
-            >
-              Approval Status
-            </label>
-            <select
-              id="canvas-whatsapp-template-status"
-              name="whatsappTemplateStatus"
-              defaultValue={getStepTemplateStatus(step)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <option value="draft">Draft</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium"
-              htmlFor="canvas-whatsapp-template-variables"
-            >
-              Body Variables
-            </label>
-            <textarea
-              id="canvas-whatsapp-template-variables"
-              name="whatsappTemplateVariables"
-              rows={4}
-              defaultValue={getStepTemplateVariables(step).join("\n")}
-              placeholder={"{{guestName}}\n{{preferredDate}}"}
-              className="flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            />
-            <p className="text-xs text-muted-foreground">
-              Add one body parameter per line. Use {" {{fieldKey}} "} to fill
-              from collected fields.
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-3 rounded-md border p-3">
-          <p className="text-sm font-medium">Product Content</p>
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium"
-              htmlFor="canvas-product-display-layout"
-            >
-              Browser Layout
-            </label>
-            <select
-              id="canvas-product-display-layout"
-              name="productDisplayLayout"
-              defaultValue={getStepProductDisplayLayout(step)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <option value="grid">Grid cards</option>
-              <option value="list">Compact list</option>
-              <option value="featured">Featured first item</option>
-            </select>
-          </div>
-          <label className="flex items-center gap-2 text-sm md:col-span-2">
-            <input
-              type="checkbox"
-              name="productSelectionAllowMultiple"
-              defaultChecked={getStepProductSelectionAllowMultiple(step)}
-            />
-            Allow multiple products as a cart for Product Selection blocks
-          </label>
-          <label className="flex items-center gap-2 text-sm md:col-span-2">
-            <input
-              type="checkbox"
-              name="productSelectionAllowQuantity"
-              defaultChecked={getStepProductSelectionAllowQuantity(step)}
-            />
-            Collect quantity for Product Selection blocks
-          </label>
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium"
-              htmlFor="canvas-product-catalog-id"
-            >
-              Product Catalog
-            </label>
-            <select
-              id="canvas-product-catalog-id"
-              name="productCatalogId"
-              defaultValue={getStepProductCatalogId(step)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <option value="">No product catalog</option>
-              {productCatalogs.map((catalog) => (
-                <option key={catalog.id} value={catalog.id}>
-                  {catalog.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="canvas-product-ids">
-              Products
-            </label>
-            <select
-              id="canvas-product-ids"
-              name="productIds"
-              multiple
-              defaultValue={getStepProductIds(step)}
-              className="flex min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              {catalogProducts.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.catalogName}: {product.name}
-                  {product.sku ? ` (${product.sku})` : ""}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              Used by Catalogue, Single Product, Multiple Products, and Product
-              Selection blocks.
-            </p>
-          </div>
-        </div>
+        )}
 
         <div className="space-y-2">
           <label className="text-sm font-medium" htmlFor="canvas-operation-id">
@@ -3249,317 +2961,20 @@ function FlowContentBlocksEditor({
                 </div>
               </div>
 
-              <div className="space-y-3 p-3">
-                <textarea
-                  aria-label={
-                    block.type === "choice"
-                      ? "Choice introduction"
-                      : block.type === "media"
-                        ? "Media caption"
-                        : block.type === "catalog"
-                          ? "Product introduction"
-                          : "Additional message"
-                  }
-                  value={block.text}
-                  rows={block.type === "text" ? 3 : 2}
-                  placeholder={
-                    block.type === "media"
-                      ? "Optional caption"
-                      : block.type === "catalog"
-                        ? "Introduce these products"
-                        : undefined
-                  }
-                  onChange={(event) =>
+              <div className="p-3">
+                <FlowMessageContentEditor
+                  block={block}
+                  catalogProducts={catalogProducts}
+                  mediaAssets={mediaAssets}
+                  onChange={(updatedBlock) =>
                     onChange(
                       blocks.map((item) =>
-                        item.id === block.id
-                          ? { ...item, text: event.target.value }
-                          : item,
+                        item.id === updatedBlock.id ? updatedBlock : item,
                       ),
                     )
                   }
-                  className="flex min-h-20 w-full resize-y rounded-md border border-input bg-white px-3 py-2 text-sm leading-5 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  productCatalogs={productCatalogs}
                 />
-
-                {block.type === "media" && (
-                  <div className="mt-3 space-y-2">
-                    <label
-                      className="text-xs font-medium text-muted-foreground"
-                      htmlFor={`content-media-${block.id}`}
-                    >
-                      Choose media
-                    </label>
-                    <select
-                      id={`content-media-${block.id}`}
-                      value={block.mediaAssetId}
-                      onChange={(event) =>
-                        onChange(
-                          blocks.map((item) =>
-                            item.id === block.id && item.type === "media"
-                              ? {
-                                  ...item,
-                                  media: null,
-                                  mediaAssetId: Number(event.target.value),
-                                }
-                              : item,
-                          ),
-                        )
-                      }
-                      className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    >
-                      {mediaAssets.map((asset) => (
-                        <option key={asset.id} value={asset.id}>
-                          {asset.label} ({asset.mediaType})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {block.type === "catalog" && (
-                  <div className="mt-3 space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <label
-                          className="text-xs font-medium text-muted-foreground"
-                          htmlFor={`content-catalog-${block.id}`}
-                        >
-                          Product catalog
-                        </label>
-                        <select
-                          id={`content-catalog-${block.id}`}
-                          value={block.catalogId}
-                          onChange={(event) => {
-                            const catalogId = Number(event.target.value);
-                            const availableProductIds = catalogProducts
-                              .filter(
-                                (product) => product.catalogId === catalogId,
-                              )
-                              .map((product) => product.id);
-
-                            onChange(
-                              blocks.map((item) =>
-                                item.id === block.id && item.type === "catalog"
-                                  ? {
-                                      ...item,
-                                      catalog: null,
-                                      catalogId,
-                                      productIds:
-                                        item.displayMode === "catalog"
-                                          ? []
-                                          : item.displayMode ===
-                                              "single_product"
-                                            ? availableProductIds.slice(0, 1)
-                                            : availableProductIds.slice(0, 3),
-                                      products: [],
-                                    }
-                                  : item,
-                              ),
-                            );
-                          }}
-                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                        >
-                          {productCatalogs.map((catalog) => (
-                            <option key={catalog.id} value={catalog.id}>
-                              {catalog.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label
-                          className="text-xs font-medium text-muted-foreground"
-                          htmlFor={`content-layout-${block.id}`}
-                        >
-                          Card layout
-                        </label>
-                        <select
-                          id={`content-layout-${block.id}`}
-                          value={block.layout}
-                          onChange={(event) =>
-                            onChange(
-                              blocks.map((item) =>
-                                item.id === block.id && item.type === "catalog"
-                                  ? {
-                                      ...item,
-                                      layout: event.target.value as
-                                        | "featured"
-                                        | "grid"
-                                        | "list",
-                                    }
-                                  : item,
-                              ),
-                            )
-                          }
-                          className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                        >
-                          <option value="grid">Grid</option>
-                          <option value="list">List</option>
-                          <option value="featured">Featured</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {block.displayMode !== "catalog" && (
-                      <div className="space-y-2">
-                        <label
-                          className="text-xs font-medium text-muted-foreground"
-                          htmlFor={`content-products-${block.id}`}
-                        >
-                          {block.displayMode === "single_product"
-                            ? "Choose product"
-                            : "Choose products"}
-                        </label>
-                        <select
-                          id={`content-products-${block.id}`}
-                          multiple={block.displayMode === "multiple_products"}
-                          size={
-                            block.displayMode === "multiple_products" ? 4 : 1
-                          }
-                          value={
-                            block.displayMode === "multiple_products"
-                              ? block.productIds.map(String)
-                              : String(block.productIds[0] ?? "")
-                          }
-                          onChange={(event) => {
-                            const productIds = Array.from(
-                              event.target.selectedOptions,
-                            ).map((option) => Number(option.value));
-
-                            onChange(
-                              blocks.map((item) =>
-                                item.id === block.id && item.type === "catalog"
-                                  ? { ...item, productIds, products: [] }
-                                  : item,
-                              ),
-                            );
-                          }}
-                          className="flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                        >
-                          {catalogProducts
-                            .filter(
-                              (product) =>
-                                product.catalogId === block.catalogId,
-                            )
-                            .map((product) => (
-                              <option key={product.id} value={product.id}>
-                                {product.name}
-                                {product.sku ? ` (${product.sku})` : ""}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {block.type === "choice" && (
-                  <div className="mt-3 space-y-3">
-                    <div className="space-y-2">
-                      {block.options.map((option, optionIndex) => (
-                        <div
-                          key={`${block.id}-option-${optionIndex}`}
-                          className="flex gap-2"
-                        >
-                          <input
-                            aria-label={`Choice ${optionIndex + 1}`}
-                            value={option}
-                            onChange={(event) =>
-                              onChange(
-                                blocks.map((item) => {
-                                  if (
-                                    item.id !== block.id ||
-                                    item.type !== "choice"
-                                  ) {
-                                    return item;
-                                  }
-
-                                  const nextOptions = [...item.options];
-                                  nextOptions[optionIndex] = event.target.value;
-                                  return { ...item, options: nextOptions };
-                                }),
-                              )
-                            }
-                            placeholder={`Choice ${optionIndex + 1}`}
-                            className="flex h-9 min-w-0 flex-1 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            disabled={block.options.length === 1}
-                            title={`Remove choice ${optionIndex + 1}`}
-                            onClick={() =>
-                              onChange(
-                                blocks.map((item) =>
-                                  item.id === block.id && item.type === "choice"
-                                    ? {
-                                        ...item,
-                                        options: item.options.filter(
-                                          (_, index) => index !== optionIndex,
-                                        ),
-                                      }
-                                    : item,
-                                ),
-                              )
-                            }
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Remove choice</span>
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          onChange(
-                            blocks.map((item) =>
-                              item.id === block.id && item.type === "choice"
-                                ? {
-                                    ...item,
-                                    options: [...item.options, "New choice"],
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add choice
-                      </Button>
-                      <select
-                        aria-label="Choice display"
-                        value={block.displayMode}
-                        onChange={(event) =>
-                          onChange(
-                            blocks.map((item) =>
-                              item.id === block.id && item.type === "choice"
-                                ? {
-                                    ...item,
-                                    displayMode: event.target.value as
-                                      | "buttons"
-                                      | "list"
-                                      | "text",
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                        className="flex h-8 rounded-md border border-input bg-white px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                      >
-                        <option value="buttons">Buttons</option>
-                        <option value="list">List</option>
-                        <option value="text">Typed response</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           ))}
