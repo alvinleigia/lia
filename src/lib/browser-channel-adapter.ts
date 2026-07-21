@@ -69,9 +69,7 @@ function getBrowserReplyWarnings(
   return warnings;
 }
 
-export function createBrowserChannelAdapter(
-  channelType: BrowserChannelType,
-) {
+export function createBrowserChannelAdapter(channelType: BrowserChannelType) {
   return {
     profile: getChannelAdapterProfile(channelType),
     adaptReply({ context, reply }) {

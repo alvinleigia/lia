@@ -537,7 +537,8 @@ Goal: confirm flows run in project chat and save submissions.
 
 Runtime boundary: project chat and widget use the same server-owned flow
 engine. Browser clients display structured replies and submit user input; they
-must not calculate routing or mutate submission fields directly.
+must not calculate routing or mutate submission fields directly. Both browser
+surfaces render the server replies through the shared browser channel adapter.
 
 - [ ] Set trigger phrase for an active action.
   Expected result: Trigger phrase is saved.
@@ -829,12 +830,40 @@ if Meta test credentials are not available.
   Status:
   Notes:
 
-- [ ] Test media/product fallback behavior.
-  Expected result: Flow still works without native WhatsApp send.
+- [ ] Compare the same published flow in project chat and the website widget.
+  Instructions: Run the same trigger phrase and select the same answers in both
+  channels.
+  Expected result: Text, choices, media, products, validation, and routing are
+  consistent between both browser channels.
   Status:
   Notes:
 
-Exit gate: WhatsApp can be configured later without changing the flow builder model.
+- [ ] Test WhatsApp button and list limits.
+  Instructions: Test a choice with up to three button options and another with
+  four. If available, also test a list with up to ten options and another with
+  eleven.
+  Expected result: Supported sizes use native WhatsApp interactive messages;
+  larger choices remain usable as numbered text fallback.
+  Status:
+  Notes:
+
+- [ ] Test an approved template outside the customer-service window if Meta
+  test credentials are available.
+  Expected result: The approved template can be sent. A regular flow reply is
+  blocked until the customer-service window is open.
+  Status:
+  Notes:
+
+- [ ] Test media/product fallback behavior.
+  Instructions: Test once with complete public media or Meta catalog metadata,
+  then remove one native-provider requirement in a disposable draft.
+  Expected result: Complete metadata uses native delivery where supported;
+  incomplete metadata produces a readable text fallback and a builder warning.
+  Status:
+  Notes:
+
+Exit gate: one flow remains usable across project chat, widget, and WhatsApp,
+with native delivery or an explicit readable fallback as appropriate.
 
 ## Phase 12 - Analytics, Audit, And Tenant Safety
 

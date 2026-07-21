@@ -28,7 +28,7 @@ is not confused with the historical implementation phases later in this file.
 | --- | --- | --- |
 | 1 | Canonical server-owned browser flow runtime | Complete |
 | 2 | Flow state recovery and idempotent commands | Complete |
-| 3 | Shared channel adapter contracts and capability parity | In progress (Step 6 of 7 complete) |
+| 3 | Shared channel adapter contracts and capability parity | Complete |
 | 4 | Graph integrity, routing diagnostics, and safe recovery | Pending |
 | 5 | Operation execution reliability and integration contracts | Pending |
 | 6 | Production media storage and delivery | Pending |
@@ -46,6 +46,33 @@ is not confused with the historical implementation phases later in this file.
 5. Centralize channel capability diagnostics and fallbacks.
 6. Add cross-channel parity and tenant-isolation tests.
 7. Complete regression verification and Phase 3 closeout.
+
+### Phase 3 Closeout
+
+All 7 Phase 3 steps are complete:
+
+- Project chat and widget render runtime replies through the same browser
+  channel adapter.
+- WhatsApp delivery uses a provider adapter that selects native buttons, lists,
+  media, templates, and catalog messages only when their requirements are met.
+- Unsupported or incomplete rich replies degrade to readable text without
+  changing the flow definition.
+- WhatsApp service-window policy remains enforced; approved templates can be
+  sent outside the regular customer-service window.
+- Builder and publish diagnostics use the same shared capability profiles and
+  provider limits as runtime delivery.
+- Adapter parity tests cover browser rendering, provider limits, rich-message
+  fallbacks, service-window rules, and separate project payloads.
+- Database-backed tenant tests cover project channels, conversations, messages,
+  media, catalogs, actions, and related project-owned data.
+
+Current channel adapter boundary:
+
+- Shared profiles and limits: `src/lib/channel-adapter-contract.ts`
+- Browser adapter: `src/lib/browser-channel-adapter.ts`
+- WhatsApp adapter: `createWhatsAppChannelAdapter()` in
+  `src/lib/whatsapp.ts`
+- Builder diagnostics: `src/lib/flow-channel-capabilities.ts`
 
 ### Phase 2 Delivery Steps
 
