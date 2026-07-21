@@ -31,7 +31,7 @@ is not confused with the historical implementation phases later in this file.
 | 3 | Versioned block contracts and shared channel adapters | Complete |
 | 4 | Universal Add Content menu with explicit disabled reasons | Complete |
 | 5 | Friendly message-family editors | Complete |
-| 6 | Friendly input-family editors | Pending |
+| 6 | Friendly input-family editors | In progress (Step 1 of 6) |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Pending |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Pending |
 | 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Pending |
@@ -99,6 +99,25 @@ All 6 Phase 5 steps are complete:
   components against the existing `contentBlocks` persistence contract.
 - Regression and UAT coverage verify menu compatibility, editor parity, list
   persistence, and the expected controls for every message family.
+
+### Phase 6 Delivery Steps
+
+1. Audit the current input blocks, validation settings, and runtime behavior.
+2. Define one shared input-family registry and field-relevance contract.
+3. Build a common friendly editor for the visitor question, answer format,
+   required state, enabled state, and reusable answer key.
+4. Add family-specific validation for text, numbers, dates, files, structured
+   addresses, locations, and selectable answers.
+5. Use the shared input guidance across create, compact, and advanced editing
+   while preserving the existing action-step settings contract.
+6. Add regression coverage, update UAT instructions, and close Phase 6.
+
+Phase 6 keeps the existing action-step schema, server actions, published flow
+versions, runtime validation, structured values, and channel adapters. Fixed
+input blocks derive their answer format from their behavior; only Ask Question
+offers a general answer-format choice. Common validation is shown in plain
+language, while custom patterns and data keys remain available through
+progressive disclosure. Action execution remains scoped to Phase 7.
 
 ### Phase 3 Delivery Steps
 
