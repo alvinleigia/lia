@@ -1585,6 +1585,7 @@ test("project chat resumes an active flow after refresh without duplicate writes
   const actionName = `E2E Runtime Resume ${runId}`;
   const firstPrompt = `What name should we use for ${runId}?`;
   const secondPrompt = `What email should we use for ${runId}?`;
+  const thirdPrompt = `What phone should we use for ${runId}?`;
 
   await signUpOrUseExistingAccount(page, {
     email,
@@ -1629,11 +1630,22 @@ test("project chat resumes an active flow after refresh without duplicate writes
   });
   await createActionFlowStep({
     actionId: action.id,
+    fieldKey: "guestPhone",
+    inputType: "phone",
+    isRequired: true,
+    label: "Guest Phone",
+    projectId,
+    prompt: thirdPrompt,
+    sortOrder: 3,
+    stepType: "phone",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
     isRequired: false,
     label: "Submit Request",
     projectId,
     prompt: "Saving the resumed request.",
-    sortOrder: 3,
+    sortOrder: 4,
     stepType: "submit",
   });
   await createPublishedActionFlowVersion({
@@ -1690,7 +1702,33 @@ test("project chat resumes an active flow after refresh without duplicate writes
     await listActionSubmissionEvents(projectId, submissionBeforeRefresh.id),
   ).toHaveLength(eventsBeforeRefresh.length);
 
-  await sendProjectChatMessage(page, `resume-${runId}@example.test`);
+  const refreshedSubmission = await getActiveActionSubmissionForConversation({
+    conversationId: conversationId ?? "",
+    projectId,
+    source: "project_chat",
+  });
+  if (!refreshedSubmission || !conversationId) {
+    throw new Error("Expected the refreshed flow submission to remain active.");
+  }
+  await runBrowserFlowText({
+    channelType: "project_chat",
+    commandId: `external-tab-${runId}`,
+    conversationId,
+    expectedRevision: refreshedSubmission.revision,
+    projectId,
+    source: "project_chat",
+    text: `resume-${runId}@example.test`,
+  });
+
+  await sendProjectChatMessage(page, `stale-${runId}@example.test`);
+  await expect(page.getByText(thirdPrompt)).toBeVisible();
+  await expect(
+    page.getByText(
+      "This request changed in another tab, so I refreshed it. Please send your answer again.",
+    ),
+  ).toBeVisible();
+
+  await sendProjectChatMessage(page, "+919988776655");
   await expect(page.getByText("Thanks. I saved this request.")).toBeVisible();
 
   const duplicateConversationId = `duplicate-${runId}`;

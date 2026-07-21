@@ -43,6 +43,8 @@ import {
   getOrCreateSessionConversationId,
   postBrowserFlowCommand,
   postBrowserFlowMediaCommand,
+  readBrowserFlowFailure,
+  recoverBrowserFlowState,
 } from "@/lib/browser-conversation";
 import {
   type BrowserFlowRuntimeResult,
@@ -160,6 +162,35 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
         shouldRenderStepControl(getActionStepInputType(activeStep)))
     : false;
 
+  const recoverFlow = async (expectedRevision?: number) => {
+    if (!conversationId) {
+      return false;
+    }
+
+    const result = await recoverBrowserFlowState({
+      body: { conversationId, projectId },
+      expectedRevision,
+      url: "/api/actions/runtime",
+    });
+    if (!result) {
+      return false;
+    }
+
+    setActiveFlow(result.activeFlow);
+    setServerActiveAction(result.activeFlow ? result.action : null);
+    setFlowMessages((current) => [
+      ...current,
+      ...runtimeRepliesToFlowMessages(result.replies),
+      makeFlowMessage(
+        "assistant",
+        result.activeFlow
+          ? "This request changed in another tab, so I refreshed it. Please send your answer again."
+          : "That request is already complete or no longer active. You can start a new request when ready.",
+      ),
+    ]);
+    return true;
+  };
+
   const runCanonicalFlow = async (input: {
     actionId?: number;
     displayUserText?: boolean;
@@ -184,7 +215,21 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to process flow message.");
+        const failure = await readBrowserFlowFailure(
+          response,
+          "Failed to process flow message.",
+        );
+        if (
+          response.status === 409 &&
+          failure.code &&
+          ["conflict", "failed", "processing", "stale"].includes(
+            failure.code,
+          ) &&
+          (await recoverFlow(activeFlow?.revision))
+        ) {
+          return true;
+        }
+        throw new Error(failure.message);
       }
 
       const result = (await response.json()) as BrowserFlowRuntimeResult;
@@ -202,7 +247,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       setActiveFlow(result.activeFlow);
       setServerActiveAction(result.activeFlow ? result.action : null);
       return true;
-    } catch {
+    } catch (error) {
       setFlowMessages((current) => [
         ...current,
         ...(input.displayUserText && input.text
@@ -210,7 +255,9 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
           : []),
         makeFlowMessage(
           "assistant",
-          "I could not process that request. Please try again.",
+          error instanceof Error
+            ? error.message
+            : "I could not process that request. Please try again.",
         ),
       ]);
       return true;
@@ -272,10 +319,21 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       );
 
       if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => null)) as {
-          message?: string;
-        } | null;
-        throw new Error(errorPayload?.message || "Failed to upload media.");
+        const failure = await readBrowserFlowFailure(
+          response,
+          "Failed to upload media.",
+        );
+        if (
+          response.status === 409 &&
+          failure.code &&
+          ["conflict", "failed", "processing", "stale"].includes(
+            failure.code,
+          ) &&
+          (await recoverFlow(flow.revision))
+        ) {
+          return;
+        }
+        throw new Error(failure.message);
       }
 
       const upload = (await response.json()) as FlowMediaUploadResponse;
