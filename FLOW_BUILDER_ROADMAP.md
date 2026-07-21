@@ -34,7 +34,7 @@ is not confused with the historical implementation phases later in this file.
 | 6 | Friendly input-family editors | Complete |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Complete |
-| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | In progress (Step 4 of 7) |
+| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | In progress (Step 5 of 7) |
 | 10 | Cross-channel certification, UAT, and release sign-off | Pending |
 
 ### Phase 4 Delivery Steps
@@ -251,6 +251,13 @@ never plaintext secret values. Trace ids propagate from submissions and
 runtime commands through durable jobs, operation attempts, outbox messages,
 and audit events. Project ownership is required on every read, claim, update,
 retry, and diagnostic query.
+
+Step 4 adds transactional WhatsApp reply outboxes, leased project-scoped
+delivery claims, retry recovery, immediate post-submission operation draining,
+and an authenticated global recovery endpoint that only discovers projects
+with due work before delegating to tenant-scoped workers. The recovery route is
+available for an external scheduler without adding a deployment schedule that
+would exceed Vercel Hobby cron limits.
 
 ### Phase 3 Delivery Steps
 

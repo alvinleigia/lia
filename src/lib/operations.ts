@@ -1950,5 +1950,13 @@ export async function runSubmissionOperations(
     }
   }
 
+  if (attempts.length > 0) {
+    await processProjectDurableOperationQueue({
+      maxJobs: attempts.length,
+      projectId,
+      workerId: `submission:${submission.id}:${Date.now()}`,
+    });
+  }
+
   return attempts;
 }

@@ -17,6 +17,7 @@ export default function proxy(req: NextRequest) {
   const isWidgetApiRoute = pathname.startsWith("/api/widget/");
   const isWhatsAppWebhookRoute = pathname === "/api/whatsapp/webhook";
   const isUploadWorkerRoute = pathname === "/api/upload/process-next";
+  const isDurableWorkerRoute = pathname === "/api/durable/process-next";
   const hasSession =
     req.cookies.has("authjs.session-token") ||
     req.cookies.has("__Secure-authjs.session-token");
@@ -27,7 +28,8 @@ export default function proxy(req: NextRequest) {
     isWidgetRoute ||
     isWidgetApiRoute ||
     isWhatsAppWebhookRoute ||
-    isUploadWorkerRoute
+    isUploadWorkerRoute ||
+    isDurableWorkerRoute
   ) {
     return NextResponse.next();
   }

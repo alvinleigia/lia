@@ -4,11 +4,12 @@ import {
   processChannelFlowMedia,
   processChannelFlowText,
 } from "@/lib/channel-flow-runtime";
+import { recordChannelInboundMessage } from "@/lib/channels";
+import { resolveTraceId } from "@/lib/execution-trace";
 import {
-  recordChannelInboundMessage,
-  recordChannelOutboundMessage,
-} from "@/lib/channels";
-import { getRuntimeReplyText } from "@/lib/runtime-replies";
+  enqueueWhatsAppRuntimeReplies,
+  processProjectOutboxQueue,
+} from "@/lib/outbox";
 import {
   extractWhatsAppMessageChanges,
   getActiveWhatsAppChannelByPhoneNumberId,
@@ -17,7 +18,6 @@ import {
   getWhatsAppInboundMediaReference,
   getWhatsAppInboundText,
   normalizeWhatsAppConfig,
-  sendWhatsAppRuntimeReply,
   verifyWhatsAppSignature,
   type WhatsAppWebhookPayload,
 } from "@/lib/whatsapp";
@@ -113,6 +113,7 @@ export async function POST(req: Request) {
       conversationId: change.message.from,
       source: WHATSAPP_FLOW_SOURCE,
     });
+    const traceId = resolveTraceId(activeSubmission?.traceId);
     const result = media
       ? await processChannelFlowMedia({
           activeSubmission,
@@ -127,46 +128,23 @@ export async function POST(req: Request) {
           projectId: channel.projectId,
           source: WHATSAPP_FLOW_SOURCE,
           text: text ?? (location ? JSON.stringify(location) : ""),
+          traceId,
         });
 
-    for (const reply of result.replies) {
-      const replyText = getRuntimeReplyText(reply);
-      let deliveryMode = "text";
-      let deliveryStatus = "sent";
-      let deliveryError: string | null = null;
-      let messageType = "text";
-      let outboundText = replyText;
-
-      try {
-        const sendResult = await sendWhatsAppRuntimeReply({
-          channel,
-          reply,
-          to: change.message.from,
-        });
-        deliveryMode = sendResult.deliveryMode;
-        messageType = sendResult.messageType;
-        outboundText = sendResult.text;
-      } catch (error) {
-        deliveryStatus = "failed";
-        deliveryError =
-          error instanceof Error ? error.message : "WhatsApp send failed.";
-        console.error("WhatsApp outbound send failed:", error);
-      }
-
-      await recordChannelOutboundMessage({
-        projectId: channel.projectId,
-        channelType: "whatsapp",
+    if (result.replies.length > 0) {
+      await enqueueWhatsAppRuntimeReplies({
+        channelId: channel.id,
         externalConversationId: change.message.from,
-        text: outboundText,
-        messageType,
-        payload: {
-          deliveryMode,
-          deliveryError,
-          deliveryStatus,
-          event: "whatsapp.flow_reply_sent",
-          phoneNumberId: change.phoneNumberId,
-          runtimeReply: reply,
-        },
+        phoneNumberId: change.phoneNumberId,
+        projectId: channel.projectId,
+        replies: result.replies,
+        to: change.message.from,
+        traceId,
+      });
+      await processProjectOutboxQueue({
+        maxMessages: result.replies.length,
+        projectId: channel.projectId,
+        workerId: `whatsapp-webhook:${change.message.id}`,
       });
     }
   }

@@ -1523,6 +1523,7 @@ export async function processChannelFlowText(input: {
   projectId: number;
   source: string;
   text: string;
+  traceId?: string | null;
 }): Promise<ChannelRuntimeResult> {
   if (input.activeSubmission) {
     const action = await getRuntimeProjectActionForSubmission(
@@ -1574,6 +1575,7 @@ export async function processChannelFlowText(input: {
     conversationId: input.conversationId,
     projectId: input.projectId,
     source: input.source,
+    traceId: input.traceId,
   });
 }
 
