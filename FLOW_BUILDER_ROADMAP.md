@@ -30,7 +30,7 @@ is not confused with the historical implementation phases later in this file.
 | 2 | Published-version pinning and recoverable flow runs | Complete |
 | 3 | Versioned block contracts and shared channel adapters | Complete |
 | 4 | Universal Add Content menu with explicit disabled reasons | Complete |
-| 5 | Friendly message-family editors | Pending |
+| 5 | Friendly message-family editors | In progress (Step 1 of 6) |
 | 6 | Friendly input-family editors | Pending |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Pending |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Pending |
@@ -66,6 +66,21 @@ All 6 Phase 4 steps are complete:
   unchanged, so the menu does not introduce a channel-specific flow model.
 - Unit and browser regression coverage verify eligibility, disabled reasons,
   editor parity, and persisted list-mode behavior.
+
+### Phase 5 Delivery Steps
+
+1. Audit the existing message editors and define the friendly editing contract.
+2. Create one shared editor model for every persisted message content family.
+3. Implement focused text, button, and list editing experiences.
+4. Implement focused media, catalog, single-product, and multi-product editors.
+5. Use the same family editors in inline canvas and compact step editing.
+6. Add regression coverage, update UAT instructions, and close Phase 5.
+
+Phase 5 keeps the existing `contentBlocks` schema, published flow versions,
+runtime replies, and channel fallback behavior. It replaces raw or duplicated
+configuration forms with visitor-facing labels, segmented presentation
+controls, label-based asset and product selection, and progressive disclosure.
+Input validation and action execution remain scoped to Phases 6 and 7.
 
 ### Phase 3 Delivery Steps
 
