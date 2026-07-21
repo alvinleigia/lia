@@ -59,6 +59,7 @@ import {
   updateCanvasStepAction,
   updateCanvasStepBasicsAction,
 } from "@/app/projects/actions/canvas-actions";
+import { FlowActionPrimaryFields } from "@/components/flow-action-primary-fields";
 import {
   FlowInputAnswerStorageField,
   FlowInputFamilySummary,
@@ -91,6 +92,7 @@ import type {
   listActionFlowBranchRules,
   listActionFlowSteps,
 } from "@/lib/action-flows";
+import { isFlowActionStepType } from "@/lib/flow-action-editor";
 import {
   type FlowComponentDefinition,
   type FlowComponentGroup,
@@ -1932,6 +1934,7 @@ function StepCreateForm({
     step?.inputType ?? "text",
   );
   const isInputStep = isFlowInputStepType(selectedStepType);
+  const isActionStep = isFlowActionStepType(selectedStepType);
   const isMessageStep = selectedStepType === "message";
 
   return (
@@ -1973,6 +1976,40 @@ function StepCreateForm({
           idPrefix="canvas-input"
           onInputTypeChange={setSelectedInputType}
           stepType={selectedStepType}
+        />
+      ) : isActionStep ? (
+        <FlowActionPrimaryFields
+          defaultEnabled={step?.isEnabled ?? true}
+          defaultLabel={step?.label}
+          defaultOperationId={step?.operationId}
+          defaultPrompt={step?.prompt}
+          defaultStatusFieldKey={step?.fieldKey}
+          failureStepId={getOperationRoutePresetTargetId(
+            branchRules,
+            step?.id,
+            "failure",
+          )}
+          idPrefix="canvas-action"
+          operations={operations.map((operation) => ({
+            id: operation.id,
+            label: operation.name,
+          }))}
+          projectActions={projectActions.map((action) => ({
+            id: action.id,
+            label: action.name,
+          }))}
+          reusableFieldKeys={getInputFieldKeys(steps)}
+          routeSteps={targetSteps.map((targetStep) => ({
+            id: targetStep.id,
+            label: `${targetStep.sortOrder}. ${getStepLabel(targetStep)}`,
+          }))}
+          settings={step?.settings}
+          stepType={selectedStepType}
+          successStepId={getOperationRoutePresetTargetId(
+            branchRules,
+            step?.id,
+            "success",
+          )}
         />
       ) : (
         <>
@@ -2024,7 +2061,7 @@ function StepCreateForm({
             defaultValue={step?.fieldKey}
             idPrefix="canvas-input"
           />
-        ) : (
+        ) : !isActionStep ? (
           <>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="canvas-field-key">
@@ -2076,7 +2113,7 @@ function StepCreateForm({
               </div>
             </div>
           </>
-        )}
+        ) : null}
 
         {isInputStep && (
           <FlowInputValidationFields
@@ -2102,7 +2139,7 @@ function StepCreateForm({
           />
         )}
 
-        {!isInputStep && (
+        {!isInputStep && !isActionStep && (
           <div className="space-y-3 rounded-md border p-3">
             <p className="text-sm font-medium">Validation</p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -2414,289 +2451,304 @@ function StepCreateForm({
           </div>
         )}
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="canvas-operation-id">
-            Operation
-          </label>
-          <select
-            id="canvas-operation-id"
-            name="operationId"
-            defaultValue={step?.operationId ?? ""}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            <option value="">No operation</option>
-            {operations.map((operation) => (
-              <option key={operation.id} value={operation.id}>
-                {operation.name}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-muted-foreground">
-            Operation blocks can run workflow actions. Request Intervention
-            blocks can use this as the staff notification operation.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <label
-            className="text-sm font-medium"
-            htmlFor="canvas-operation-execution-mode"
-          >
-            Operation Execution
-          </label>
-          <select
-            id="canvas-operation-execution-mode"
-            name="operationExecutionMode"
-            defaultValue={getStepOperationExecutionMode(step)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            <option value="post_submit">After submission</option>
-            <option value="inline">Inline during conversation</option>
-          </select>
-        </div>
-
-        <div className="space-y-2 rounded-md border p-3">
-          <label
-            className="text-sm font-medium"
-            htmlFor="canvas-connected-action-id"
-          >
-            Connected Flow
-          </label>
-          <select
-            id="canvas-connected-action-id"
-            name="connectedActionId"
-            defaultValue={getStepConnectedActionId(step)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            <option value="">No connected flow</option>
-            {projectActions.map((projectAction) => (
-              <option key={projectAction.id} value={projectAction.id}>
-                {projectAction.name}
-              </option>
-            ))}
-          </select>
-          <label
-            className="text-sm font-medium"
-            htmlFor="canvas-connect-flow-mode"
-          >
-            Flow Behavior
-          </label>
-          <select
-            id="canvas-connect-flow-mode"
-            name="connectFlowMode"
-            defaultValue={getStepConnectFlowMode(step)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          >
-            <option value="jump">Jump into connected flow</option>
-            <option value="return">Return after connected flow submits</option>
-          </select>
-          <p className="text-xs text-muted-foreground">
-            Jump ends this flow. Return uses the connected flow as a reusable
-            subflow, then resumes here.
-          </p>
-        </div>
-
-        <div className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium"
-              htmlFor="canvas-operation-success-step-id"
-            >
-              Success Route
-            </label>
-            <select
-              id="canvas-operation-success-step-id"
-              name="operationSuccessStepId"
-              defaultValue={getOperationRoutePresetTargetId(
-                branchRules,
-                step?.id,
-                "success",
-              )}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <option value="">No preset route</option>
-              {targetSteps.map((targetStep) => (
-                <option key={targetStep.id} value={targetStep.id}>
-                  {targetStep.sortOrder}. {getStepLabel(targetStep)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium"
-              htmlFor="canvas-operation-failure-step-id"
-            >
-              Failure Route
-            </label>
-            <select
-              id="canvas-operation-failure-step-id"
-              name="operationFailureStepId"
-              defaultValue={getOperationRoutePresetTargetId(
-                branchRules,
-                step?.id,
-                "failure",
-              )}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <option value="">No preset route</option>
-              {targetSteps.map((targetStep) => (
-                <option key={targetStep.id} value={targetStep.id}>
-                  {targetStep.sortOrder}. {getStepLabel(targetStep)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <p className="text-xs text-muted-foreground sm:col-span-2">
-            For inline operation steps, these create completed/failed branch
-            rules from the operation status field.
-          </p>
-        </div>
-
-        <div className="space-y-3 rounded-md border p-3">
-          <p className="text-sm font-medium">Contact Mutation</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+        {!isActionStep && (
+          <>
             <div className="space-y-2">
               <label
                 className="text-sm font-medium"
-                htmlFor="canvas-contact-attribute-key"
+                htmlFor="canvas-operation-id"
               >
-                Attribute Key
-              </label>
-              <input
-                id="canvas-contact-attribute-key"
-                name="contactAttributeKey"
-                defaultValue={getStepSettingText(step, "contactAttributeKey")}
-                placeholder="lead_status"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              />
-            </div>
-            <div className="space-y-2">
-              <label
-                className="text-sm font-medium"
-                htmlFor="canvas-contact-attribute-source"
-              >
-                Value Source
+                Operation
               </label>
               <select
-                id="canvas-contact-attribute-source"
-                name="contactAttributeValueSource"
-                defaultValue={
-                  getStepSettingText(step, "contactAttributeValueSource") ||
-                  "field"
-                }
+                id="canvas-operation-id"
+                name="operationId"
+                defaultValue={step?.operationId ?? ""}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <option value="field">Collected field</option>
-                <option value="static">Static value</option>
+                <option value="">No operation</option>
+                {operations.map((operation) => (
+                  <option key={operation.id} value={operation.id}>
+                    {operation.name}
+                  </option>
+                ))}
               </select>
+              <p className="text-xs text-muted-foreground">
+                Operation blocks can run workflow actions. Request Intervention
+                blocks can use this as the staff notification operation.
+              </p>
             </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label
-                className="text-sm font-medium"
-                htmlFor="canvas-contact-attribute-field"
-              >
-                Field Key
-              </label>
-              <input
-                id="canvas-contact-attribute-field"
-                name="contactAttributeFieldKey"
-                defaultValue={getStepSettingText(
-                  step,
-                  "contactAttributeFieldKey",
-                )}
-                placeholder="guestEmail"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              />
-            </div>
-            <div className="space-y-2">
-              <label
-                className="text-sm font-medium"
-                htmlFor="canvas-contact-attribute-value"
-              >
-                Static Value
-              </label>
-              <input
-                id="canvas-contact-attribute-value"
-                name="contactAttributeValue"
-                defaultValue={getStepSettingText(step, "contactAttributeValue")}
-                placeholder="qualified"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium"
-              htmlFor="canvas-contact-tag-names"
-            >
-              Tags
-            </label>
-            <textarea
-              id="canvas-contact-tag-names"
-              name="contactTagNames"
-              rows={2}
-              defaultValue={getStepSettingText(step, "contactTagNames")}
-              placeholder="Interested Lead"
-              className="flex min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            />
-          </div>
-        </div>
 
-        <div className="space-y-3 rounded-md border p-3">
-          <p className="text-sm font-medium">Handoff</p>
-          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <label
                 className="text-sm font-medium"
-                htmlFor="canvas-handoff-priority"
+                htmlFor="canvas-operation-execution-mode"
               >
-                Priority
+                Operation Execution
               </label>
               <select
-                id="canvas-handoff-priority"
-                name="handoffPriority"
-                defaultValue={getStepHandoffPriority(step)}
+                id="canvas-operation-execution-mode"
+                name="operationExecutionMode"
+                defaultValue={getStepOperationExecutionMode(step)}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
+                <option value="post_submit">After submission</option>
+                <option value="inline">Inline during conversation</option>
               </select>
             </div>
-            <div className="space-y-2">
+
+            <div className="space-y-2 rounded-md border p-3">
               <label
                 className="text-sm font-medium"
-                htmlFor="canvas-handoff-queue"
+                htmlFor="canvas-connected-action-id"
               >
-                Queue
+                Connected Flow
               </label>
-              <input
-                id="canvas-handoff-queue"
-                name="handoffQueue"
-                defaultValue={getStepSettingText(step, "handoffQueue")}
-                placeholder="sales"
+              <select
+                id="canvas-connected-action-id"
+                name="connectedActionId"
+                defaultValue={getStepConnectedActionId(step)}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              />
+              >
+                <option value="">No connected flow</option>
+                {projectActions.map((projectAction) => (
+                  <option key={projectAction.id} value={projectAction.id}>
+                    {projectAction.name}
+                  </option>
+                ))}
+              </select>
+              <label
+                className="text-sm font-medium"
+                htmlFor="canvas-connect-flow-mode"
+              >
+                Flow Behavior
+              </label>
+              <select
+                id="canvas-connect-flow-mode"
+                name="connectFlowMode"
+                defaultValue={getStepConnectFlowMode(step)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <option value="jump">Jump into connected flow</option>
+                <option value="return">
+                  Return after connected flow submits
+                </option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Jump ends this flow. Return uses the connected flow as a
+                reusable subflow, then resumes here.
+              </p>
             </div>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              name="handoffNotifyTeam"
-              defaultChecked={step?.settings.handoffNotifyTeam !== false}
-              className="h-4 w-4"
-            />
-            Notify team when requested
-          </label>
-          <p className="text-xs text-muted-foreground">
-            Request Intervention blocks move the live submission to Under
-            Review.
-          </p>
-        </div>
+
+            <div className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-medium"
+                  htmlFor="canvas-operation-success-step-id"
+                >
+                  Success Route
+                </label>
+                <select
+                  id="canvas-operation-success-step-id"
+                  name="operationSuccessStepId"
+                  defaultValue={getOperationRoutePresetTargetId(
+                    branchRules,
+                    step?.id,
+                    "success",
+                  )}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <option value="">No preset route</option>
+                  {targetSteps.map((targetStep) => (
+                    <option key={targetStep.id} value={targetStep.id}>
+                      {targetStep.sortOrder}. {getStepLabel(targetStep)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-medium"
+                  htmlFor="canvas-operation-failure-step-id"
+                >
+                  Failure Route
+                </label>
+                <select
+                  id="canvas-operation-failure-step-id"
+                  name="operationFailureStepId"
+                  defaultValue={getOperationRoutePresetTargetId(
+                    branchRules,
+                    step?.id,
+                    "failure",
+                  )}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <option value="">No preset route</option>
+                  {targetSteps.map((targetStep) => (
+                    <option key={targetStep.id} value={targetStep.id}>
+                      {targetStep.sortOrder}. {getStepLabel(targetStep)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                For inline operation steps, these create completed/failed branch
+                rules from the operation status field.
+              </p>
+            </div>
+
+            <div className="space-y-3 rounded-md border p-3">
+              <p className="text-sm font-medium">Contact Mutation</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor="canvas-contact-attribute-key"
+                  >
+                    Attribute Key
+                  </label>
+                  <input
+                    id="canvas-contact-attribute-key"
+                    name="contactAttributeKey"
+                    defaultValue={getStepSettingText(
+                      step,
+                      "contactAttributeKey",
+                    )}
+                    placeholder="lead_status"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor="canvas-contact-attribute-source"
+                  >
+                    Value Source
+                  </label>
+                  <select
+                    id="canvas-contact-attribute-source"
+                    name="contactAttributeValueSource"
+                    defaultValue={
+                      getStepSettingText(step, "contactAttributeValueSource") ||
+                      "field"
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    <option value="field">Collected field</option>
+                    <option value="static">Static value</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor="canvas-contact-attribute-field"
+                  >
+                    Field Key
+                  </label>
+                  <input
+                    id="canvas-contact-attribute-field"
+                    name="contactAttributeFieldKey"
+                    defaultValue={getStepSettingText(
+                      step,
+                      "contactAttributeFieldKey",
+                    )}
+                    placeholder="guestEmail"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor="canvas-contact-attribute-value"
+                  >
+                    Static Value
+                  </label>
+                  <input
+                    id="canvas-contact-attribute-value"
+                    name="contactAttributeValue"
+                    defaultValue={getStepSettingText(
+                      step,
+                      "contactAttributeValue",
+                    )}
+                    placeholder="qualified"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-medium"
+                  htmlFor="canvas-contact-tag-names"
+                >
+                  Tags
+                </label>
+                <textarea
+                  id="canvas-contact-tag-names"
+                  name="contactTagNames"
+                  rows={2}
+                  defaultValue={getStepSettingText(step, "contactTagNames")}
+                  placeholder="Interested Lead"
+                  className="flex min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-md border p-3">
+              <p className="text-sm font-medium">Handoff</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor="canvas-handoff-priority"
+                  >
+                    Priority
+                  </label>
+                  <select
+                    id="canvas-handoff-priority"
+                    name="handoffPriority"
+                    defaultValue={getStepHandoffPriority(step)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label
+                    className="text-sm font-medium"
+                    htmlFor="canvas-handoff-queue"
+                  >
+                    Queue
+                  </label>
+                  <input
+                    id="canvas-handoff-queue"
+                    name="handoffQueue"
+                    defaultValue={getStepSettingText(step, "handoffQueue")}
+                    placeholder="sales"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="handoffNotifyTeam"
+                  defaultChecked={step?.settings.handoffNotifyTeam !== false}
+                  className="h-4 w-4"
+                />
+                Notify team when requested
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Request Intervention blocks move the live submission to Under
+                Review.
+              </p>
+            </div>
+          </>
+        )}
 
         <div className="space-y-2">
           <label className="text-sm font-medium" htmlFor="canvas-step-options">
@@ -3451,7 +3503,7 @@ function BranchRuleForm({
 
       <div className="rounded-md border bg-gray-50 p-3 text-sm">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
-          Branch Preview
+          Condition preview
         </p>
         <p className="mt-1 font-medium">{routePreviewLabel}</p>
         <p className="mt-1 text-muted-foreground">
@@ -3460,26 +3512,8 @@ function BranchRuleForm({
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor={`${mode}-sort-order`}>
-          Order
-        </label>
-        <input
-          id={`${mode}-sort-order`}
-          name="sortOrder"
-          type="number"
-          min="1"
-          required
-          defaultValue={
-            rule?.sortOrder ??
-            getNextBranchSortOrder(branchRules, sourceStep.id)
-          }
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        />
-      </div>
-
-      <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor={`${mode}-branch-label`}>
-          Branch Label
+          Route name
         </label>
         <input
           id={`${mode}-branch-label`}
@@ -3490,14 +3524,14 @@ function BranchRuleForm({
           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
         <p className="text-xs text-muted-foreground">
-          Optional label shown on the canvas edge. Leave blank to use the
+          Optional name shown on the canvas line. Leave blank to use the
           condition.
         </p>
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor={`${mode}-field-key`}>
-          Source field
+          Answer to check
         </label>
         <select
           id={`${mode}-field-key`}
@@ -3521,7 +3555,7 @@ function BranchRuleForm({
 
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor={`${mode}-operator`}>
-          Operator
+          Comparison
         </label>
         <select
           id={`${mode}-operator`}
@@ -3544,7 +3578,7 @@ function BranchRuleForm({
 
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor={`${mode}-compare`}>
-          Compare
+          Value
         </label>
         <input
           id={`${mode}-compare`}
@@ -3565,7 +3599,7 @@ function BranchRuleForm({
 
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor={`${mode}-target`}>
-          Target step
+          Go to
         </label>
         <select
           id={`${mode}-target`}
@@ -3590,8 +3624,34 @@ function BranchRuleForm({
           name="isEnabled"
           defaultChecked={rule?.isEnabled ?? true}
         />
-        Enabled
+        Route active
       </label>
+
+      <details className="group rounded-md border bg-gray-50/50">
+        <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium">
+          Advanced route order
+        </summary>
+        <div className="space-y-2 border-t p-3">
+          <label className="text-sm font-medium" htmlFor={`${mode}-sort-order`}>
+            Priority order
+          </label>
+          <input
+            id={`${mode}-sort-order`}
+            name="sortOrder"
+            type="number"
+            min="1"
+            required
+            defaultValue={
+              rule?.sortOrder ??
+              getNextBranchSortOrder(branchRules, sourceStep.id)
+            }
+            className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          />
+          <p className="text-xs text-muted-foreground">
+            Lower numbers are checked first when several routes can match.
+          </p>
+        </div>
+      </details>
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={isPending || targetSteps.length === 0}>
@@ -3602,7 +3662,7 @@ function BranchRuleForm({
           ) : (
             <Save className="h-4 w-4" />
           )}
-          {mode === "create" ? "Create Branch" : "Save Branch"}
+          {mode === "create" ? "Add route" : "Save route"}
         </Button>
         {mode === "edit" && onDelete && (
           <Button
