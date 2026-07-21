@@ -35,7 +35,7 @@ is not confused with the historical implementation phases later in this file.
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Complete |
 | 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Complete |
-| 10 | Cross-channel certification, UAT, and release sign-off | Pending |
+| 10 | Cross-channel certification, UAT, and release sign-off | In progress |
 
 ### Phase 4 Delivery Steps
 
@@ -292,6 +292,35 @@ All 7 Phase 9 steps are complete:
   provider secrets, submissions, events, channels, and existing tenant data.
 - Compiler, editor, duration, authorization, encryption, TypeScript, lint,
   operations-health, and production-build checks form the Phase 9 release gate.
+
+### Phase 10 Delivery Steps
+
+1. Audit existing automated and manual channel coverage, then define one
+   certification and release contract.
+2. Implement a channel-neutral reference adapter that proves a future channel
+   can consume runtime replies without changing flow definitions or database
+   channel types.
+3. Add an automated certification matrix for every enabled flow block and
+   runtime reply family across project chat, widget, WhatsApp, and the reference
+   adapter.
+4. Certify native delivery, readable fallbacks, provider limits, WhatsApp
+   policy, published-version pinning, and durable pause/resume behavior.
+5. Add focused certification commands and a release-readiness command that
+   separates automated gates from live-provider checks.
+6. Update UAT and release-sign-off instructions for each production channel and
+   one future-adapter contract check.
+7. Run the complete automated release gate, commit the phase, and record any
+   live credential or device checks that still require human sign-off.
+
+Phase 10 certifies the existing universal runtime; it does not add another
+runtime or persist a fictional future channel. Project chat and widget must
+remain behaviorally equivalent, WhatsApp may use a native provider format or a
+documented text fallback, and the reference adapter must consume the same
+versioned runtime replies through the public adapter contract. Automated checks
+can prove contracts, isolation, provider limits, version pinning, and durable
+recovery. They cannot honestly certify live Meta credentials, phone-number
+ownership, template approval, browser embedding policy, or visual acceptance;
+those remain explicit UAT sign-off items.
 
 ### Phase 3 Delivery Steps
 
