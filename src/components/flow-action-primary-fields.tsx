@@ -9,7 +9,7 @@ import {
   Workflow,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   type FlowActionStepType,
   getFlowActionFamilyDefinition,
@@ -110,9 +110,19 @@ export function FlowActionPrimaryFields({
   stepType,
   successStepId = "",
 }: FlowActionPrimaryFieldsProps) {
+  const savedOperationExecutionMode =
+    settings.operationExecutionMode === "inline" ? "inline" : "post_submit";
   const [attributeValueSource, setAttributeValueSource] = useState(
     getSettingText(settings, "contactAttributeValueSource") || "field",
   );
+  const [operationExecutionMode, setOperationExecutionMode] = useState<
+    "inline" | "post_submit"
+  >(savedOperationExecutionMode);
+
+  useEffect(() => {
+    setOperationExecutionMode(savedOperationExecutionMode);
+  }, [savedOperationExecutionMode]);
+
   const requiresVisitorMessage = stepType === "handoff";
   const supportsVisitorMessage =
     stepType === "handoff" ||
@@ -264,7 +274,8 @@ export function FlowActionPrimaryFields({
                   type="radio"
                   name="operationExecutionMode"
                   value="inline"
-                  defaultChecked={settings.operationExecutionMode === "inline"}
+                  checked={operationExecutionMode === "inline"}
+                  onChange={() => setOperationExecutionMode("inline")}
                   className="mt-0.5 h-4 w-4"
                 />
                 <span>
@@ -281,7 +292,8 @@ export function FlowActionPrimaryFields({
                   type="radio"
                   name="operationExecutionMode"
                   value="post_submit"
-                  defaultChecked={settings.operationExecutionMode !== "inline"}
+                  checked={operationExecutionMode === "post_submit"}
+                  onChange={() => setOperationExecutionMode("post_submit")}
                   className="mt-0.5 h-4 w-4"
                 />
                 <span>

@@ -660,6 +660,107 @@ test("step creation keeps technical fields progressive and input-aware", async (
   await expect(dialog.getByLabel("Allowed upload types")).toHaveValue("images");
 });
 
+test("action steps use friendly compact editors and preserve integration settings", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-action-editor-${runId}@example.test`;
+  const projectName = `E2E Action Editor Project ${runId}`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Action Editor User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(page, projectName);
+  const provider = await createIntegrationProvider({
+    name: `E2E Booking API ${runId}`,
+    projectId,
+    providerType: "manual_review",
+  });
+  const operation = await createOperation({
+    name: `E2E Create Booking ${runId}`,
+    operationType: "manual_review",
+    projectId,
+    providerId: provider.id,
+  });
+  const action = await createChatbotAction({
+    description: "Checks friendly action-family editing.",
+    name: `E2E Friendly Actions ${runId}`,
+    projectId,
+    status: "draft",
+    triggerPhrases: [],
+  });
+  const submitStep = await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Finish request",
+    projectId,
+    prompt: "Your request is saved.",
+    sortOrder: 2,
+    stepType: "submit",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "booking_status",
+    isRequired: false,
+    label: "Create booking",
+    operationId: operation.id,
+    projectId,
+    settings: { operationExecutionMode: "post_submit" },
+    sortOrder: 1,
+    stepType: "operation",
+  });
+
+  await page.goto(`/projects/actions/${action.id}/canvas`);
+  const palette = page.locator("aside").filter({ hasText: "Blocks" });
+  await expect(
+    palette.getByText("AI and Knowledge", { exact: true }),
+  ).toBeVisible();
+  await expect(palette.getByText("Wait", { exact: true })).toBeVisible();
+  await expect(
+    palette.getByText(/prompt, grounding, output, and failure contracts/),
+  ).toBeVisible();
+  await expect(
+    palette.getByText(/durable scheduling, pause, resume, and cancellation/),
+  ).toBeVisible();
+
+  const operationNode = page
+    .locator(".react-flow__node")
+    .filter({ hasText: "Create booking" });
+  await operationNode.getByText("Create booking", { exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit Step" });
+  await expect(
+    dialog.getByText("Run integration", { exact: true }),
+  ).toBeVisible();
+  await expect(dialog.getByLabel("Integration to run")).toHaveValue(
+    String(operation.id),
+  );
+  await expect(dialog.getByLabel("After submission")).toBeChecked();
+  await dialog.getByLabel("During the conversation").check();
+  await dialog.getByText("Result and routing", { exact: true }).click();
+  await dialog
+    .getByLabel("On success", { exact: true })
+    .selectOption(String(submitStep.id));
+  await dialog.getByRole("button", { name: "Save action" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(
+    page.getByText("Step updated.", { exact: true }).first(),
+  ).toBeVisible();
+
+  await operationNode.getByText("Create booking", { exact: true }).click();
+  await expect(dialog.getByLabel("During the conversation")).toBeChecked();
+  await dialog.getByText("Result and routing", { exact: true }).click();
+  await expect(dialog.getByLabel("On success", { exact: true })).toHaveValue(
+    String(submitStep.id),
+  );
+  await expect(dialog.getByLabel("Integration to run")).toHaveCount(1);
+  await expect(
+    dialog.getByText("Advanced settings", { exact: true }),
+  ).toHaveCount(0);
+});
+
 test("universal Add Content menu explains availability in both canvas editors", async ({
   page,
 }) => {

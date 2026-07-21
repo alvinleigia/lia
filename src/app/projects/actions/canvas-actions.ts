@@ -366,13 +366,44 @@ const canvasStepSchema = z
 const canvasStepBasicsSchema = z.object({
   actionId: z.coerce.number().int().positive(),
   choiceDisplayMode: z.enum(["buttons", "list", "text"]),
+  contactAttributeFieldKey: z.string().trim().max(120).optional(),
+  contactAttributeKey: z.string().trim().max(120).optional(),
+  contactAttributeValue: z.string().trim().max(1000).optional(),
+  contactAttributeValueSource: z.enum(["field", "static"]).optional(),
+  contactTagNames: z.string().trim().max(1000).optional(),
+  connectedActionId: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.coerce.number().int().positive().optional(),
+  ),
+  connectFlowMode: z.enum(["jump", "return"]).optional(),
   contentBlocks: z.string().max(100000),
   contentBlocksChanged: z.coerce.boolean(),
+  fieldKey: z.string().trim().max(80).optional(),
+  handoffNotifyTeam: z.coerce.boolean().optional(),
+  handoffPriority: z.enum(["high", "low", "normal", "urgent"]).optional(),
+  handoffQueue: z.string().trim().max(120).optional(),
   inputType: z.enum(ACTION_STEP_INPUT_TYPES).optional(),
   stepId: z.coerce.number().int().positive(),
   isEnabled: z.coerce.boolean(),
   isRequired: z.coerce.boolean(),
   label: z.string().trim().max(160),
+  operationExecutionMode: z.enum(["post_submit", "inline"]).optional(),
+  operationFailureStepId: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.coerce.number().int().positive().optional(),
+  ),
+  operationId: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.coerce.number().int().positive().optional(),
+  ),
+  operationSuccessStepId: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.coerce.number().int().positive().optional(),
+  ),
   options: z.string().max(4000),
   optionsChanged: z.coerce.boolean(),
   prompt: z.string().trim().max(1000),
@@ -1428,6 +1459,62 @@ export async function updateCanvasStepBasicsAction(
   }
 
   const isInputStep = isInputStepType(existingStep.stepType);
+  const isActionStep = [
+    "add_tag",
+    "connect_flow",
+    "handoff",
+    "operation",
+    "set_attribute",
+    "submit",
+  ].includes(existingStep.stepType);
+  const operation = isActionStep
+    ? await requireCanvasOperation({
+        operationId: parsed.data.operationId,
+        projectId: project.id,
+        stepType: existingStep.stepType,
+      })
+    : null;
+  const connectedAction = isActionStep
+    ? await requireCanvasConnectedAction({
+        actionId: action.id,
+        connectedActionId: parsed.data.connectedActionId,
+        projectId: project.id,
+        stepType: existingStep.stepType,
+      })
+    : null;
+
+  if (
+    existingStep.stepType === "operation" ||
+    (existingStep.stepType === "handoff" && parsed.data.operationId)
+  ) {
+    if (!operation) {
+      return { ok: false, message: "Operation must belong to this project." };
+    }
+  }
+
+  if (existingStep.stepType === "connect_flow" && !connectedAction) {
+    return {
+      ok: false,
+      message: "Connected flow must be an active flow in this project.",
+    };
+  }
+
+  if (
+    existingStep.stepType === "set_attribute" &&
+    (!parsed.data.contactAttributeKey?.trim() ||
+      (parsed.data.contactAttributeValueSource === "static"
+        ? !parsed.data.contactAttributeValue?.trim()
+        : !parsed.data.contactAttributeFieldKey?.trim()))
+  ) {
+    return { ok: false, message: "Choose the contact detail and its value." };
+  }
+
+  if (
+    existingStep.stepType === "add_tag" &&
+    !parsed.data.contactTagNames?.trim()
+  ) {
+    return { ok: false, message: "Add at least one contact tag." };
+  }
   const existingContentBlocks = getFlowContentBlocks(existingStep.settings);
   let contentBlocks = existingContentBlocks;
 
@@ -1514,7 +1601,7 @@ export async function updateCanvasStepBasicsAction(
     return { ok: false, message: "Add at least one choice before saving." };
   }
 
-  const settings = { ...existingStep.settings };
+  let settings = { ...existingStep.settings };
   if (parsed.data.contentBlocksChanged) {
     if (contentBlocks.length > 0) {
       settings.contentBlocks = contentBlocks;
@@ -1536,6 +1623,24 @@ export async function updateCanvasStepBasicsAction(
     settings.choiceDisplayMode = parsed.data.choiceDisplayMode;
   }
 
+  if (isActionStep) {
+    settings = getChoiceStepSettings({
+      contactAttributeFieldKey: parsed.data.contactAttributeFieldKey,
+      contactAttributeKey: parsed.data.contactAttributeKey,
+      contactAttributeValue: parsed.data.contactAttributeValue,
+      contactAttributeValueSource: parsed.data.contactAttributeValueSource,
+      contactTagNames: parsed.data.contactTagNames,
+      connectedAction,
+      connectFlowMode: parsed.data.connectFlowMode,
+      existingSettings: settings,
+      handoffNotifyTeam: parsed.data.handoffNotifyTeam,
+      handoffPriority: parsed.data.handoffPriority,
+      handoffQueue: parsed.data.handoffQueue,
+      operationExecutionMode: parsed.data.operationExecutionMode,
+      stepType: existingStep.stepType,
+    });
+  }
+
   try {
     const step = await updateActionFlowStep({
       projectId: project.id,
@@ -1543,7 +1648,10 @@ export async function updateCanvasStepBasicsAction(
       stepId: existingStep.id,
       sortOrder: existingStep.sortOrder,
       stepType: existingStep.stepType,
-      fieldKey: existingStep.fieldKey,
+      fieldKey:
+        existingStep.stepType === "operation"
+          ? parsed.data.fieldKey || null
+          : existingStep.fieldKey,
       label: parsed.data.label || null,
       prompt: parsed.data.prompt || null,
       inputType: isInputStep
@@ -1552,7 +1660,11 @@ export async function updateCanvasStepBasicsAction(
             parsed.data.inputType ?? existingStep.inputType ?? undefined,
           )
         : existingStep.inputType,
-      operationId: existingStep.operationId,
+      operationId:
+        existingStep.stepType === "operation" ||
+        existingStep.stepType === "handoff"
+          ? (operation?.id ?? null)
+          : existingStep.operationId,
       nextStepId: existingStep.nextStepId,
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled,
@@ -1563,6 +1675,16 @@ export async function updateCanvasStepBasicsAction(
     if (!step) {
       return { ok: false, message: "Could not update the step." };
     }
+
+    await syncCanvasOperationStepRoutes({
+      actionId: action.id,
+      failureStepId: parsed.data.operationFailureStepId,
+      fieldKey: step.fieldKey ?? undefined,
+      projectId: project.id,
+      sourceStepId: step.id,
+      stepType: step.stepType,
+      successStepId: parsed.data.operationSuccessStepId,
+    });
 
     await writeAuditLog({
       ...context,

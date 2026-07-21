@@ -299,12 +299,27 @@ type CanvasStepInput = {
 
 type CanvasStepBasicsInput = {
   choiceDisplayMode: string;
+  contactAttributeFieldKey?: string;
+  contactAttributeKey?: string;
+  contactAttributeValue?: string;
+  contactAttributeValueSource?: string;
+  contactTagNames?: string;
+  connectedActionId?: string;
+  connectFlowMode?: string;
   contentBlocks: string;
   contentBlocksChanged: boolean;
+  fieldKey?: string;
+  handoffNotifyTeam?: boolean;
+  handoffPriority?: string;
+  handoffQueue?: string;
   inputType: string;
   isEnabled: boolean;
   isRequired: boolean;
   label: string;
+  operationExecutionMode?: string;
+  operationFailureStepId?: string;
+  operationId?: string;
+  operationSuccessStepId?: string;
   options: string;
   optionsChanged: boolean;
   prompt: string;
@@ -1458,12 +1473,37 @@ function readStepBasicsForm(form: HTMLFormElement): CanvasStepBasicsInput {
 
   return {
     choiceDisplayMode: String(formData.get("choiceDisplayMode") ?? "buttons"),
+    contactAttributeFieldKey: String(
+      formData.get("contactAttributeFieldKey") ?? "",
+    ),
+    contactAttributeKey: String(formData.get("contactAttributeKey") ?? ""),
+    contactAttributeValue: String(formData.get("contactAttributeValue") ?? ""),
+    contactAttributeValueSource: String(
+      formData.get("contactAttributeValueSource") ?? "field",
+    ),
+    contactTagNames: String(formData.get("contactTagNames") ?? ""),
+    connectedActionId: String(formData.get("connectedActionId") ?? ""),
+    connectFlowMode: String(formData.get("connectFlowMode") ?? "jump"),
     contentBlocks: String(formData.get("contentBlocks") ?? "[]"),
     contentBlocksChanged: formData.get("contentBlocksChanged") === "true",
+    fieldKey: String(formData.get("fieldKey") ?? ""),
+    handoffNotifyTeam: formData.get("handoffNotifyTeam") === "on",
+    handoffPriority: String(formData.get("handoffPriority") ?? "normal"),
+    handoffQueue: String(formData.get("handoffQueue") ?? ""),
     inputType: String(formData.get("inputType") ?? "text"),
     isEnabled: formData.get("isEnabled") === "on",
     isRequired: formData.get("isRequired") === "on",
     label: String(formData.get("label") ?? ""),
+    operationExecutionMode: String(
+      formData.get("operationExecutionMode") ?? "post_submit",
+    ),
+    operationFailureStepId: String(
+      formData.get("operationFailureStepId") ?? "",
+    ),
+    operationId: String(formData.get("operationId") ?? ""),
+    operationSuccessStepId: String(
+      formData.get("operationSuccessStepId") ?? "",
+    ),
     options: String(formData.get("options") ?? ""),
     optionsChanged: formData.get("optionsChanged") === "true",
     prompt: String(formData.get("prompt") ?? ""),
@@ -3142,7 +3182,7 @@ function FlowContentBlocksEditor({
   );
 }
 
-function StepBasicsForm({
+function ContentStepBasicsForm({
   catalogProducts,
   isPending,
   mediaAssets,
@@ -3436,6 +3476,145 @@ function StepBasicsForm({
         Save changes
       </Button>
     </form>
+  );
+}
+
+function ActionStepBasicsForm({
+  branchRules,
+  isPending,
+  onSubmit,
+  operations,
+  projectActions,
+  step,
+  steps,
+}: {
+  branchRules: BranchRule[];
+  isPending: boolean;
+  onSubmit: (input: CanvasStepBasicsInput) => void;
+  operations: OperationOption[];
+  projectActions: ProjectActionOption[];
+  step: FlowStep;
+  steps: FlowStep[];
+}) {
+  if (!isFlowActionStepType(step.stepType)) {
+    return null;
+  }
+
+  const targetSteps = getStepOptions(steps, step.id);
+  const failureStepId = getOperationRoutePresetTargetId(
+    branchRules,
+    step.id,
+    "failure",
+  );
+  const successStepId = getOperationRoutePresetTargetId(
+    branchRules,
+    step.id,
+    "success",
+  );
+  const savedActionRevision = JSON.stringify({
+    failureStepId,
+    fieldKey: step.fieldKey,
+    isEnabled: step.isEnabled,
+    label: step.label,
+    operationId: step.operationId,
+    prompt: step.prompt,
+    settings: step.settings,
+    successStepId,
+  });
+
+  return (
+    <form
+      key={`quick-action-${step.id}-${savedActionRevision}`}
+      className="space-y-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(readStepBasicsForm(event.currentTarget));
+      }}
+    >
+      <FlowActionPrimaryFields
+        defaultEnabled={step.isEnabled}
+        defaultLabel={step.label}
+        defaultOperationId={step.operationId}
+        defaultPrompt={step.prompt}
+        defaultStatusFieldKey={step.fieldKey}
+        failureStepId={failureStepId}
+        idPrefix={`quick-action-${step.id}`}
+        operations={operations.map((operation) => ({
+          id: operation.id,
+          label: operation.name,
+        }))}
+        projectActions={projectActions.map((action) => ({
+          id: action.id,
+          label: action.name,
+        }))}
+        reusableFieldKeys={getInputFieldKeys(steps)}
+        routeSteps={targetSteps.map((targetStep) => ({
+          id: targetStep.id,
+          label: `${targetStep.sortOrder}. ${getStepLabel(targetStep)}`,
+        }))}
+        settings={step.settings}
+        stepType={step.stepType}
+        successStepId={successStepId}
+      />
+
+      <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
+        {isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Save className="h-4 w-4" />
+        )}
+        Save action
+      </Button>
+    </form>
+  );
+}
+
+function StepBasicsForm({
+  branchRules,
+  catalogProducts,
+  isPending,
+  mediaAssets,
+  onSubmit,
+  operations,
+  productCatalogs,
+  projectActions,
+  step,
+  steps,
+}: {
+  branchRules: BranchRule[];
+  catalogProducts: CatalogProductOption[];
+  isPending: boolean;
+  mediaAssets: MediaAssetOption[];
+  onSubmit: (input: CanvasStepBasicsInput) => void;
+  operations: OperationOption[];
+  productCatalogs: ProductCatalogOption[];
+  projectActions: ProjectActionOption[];
+  step: FlowStep;
+  steps: FlowStep[];
+}) {
+  if (isFlowActionStepType(step.stepType)) {
+    return (
+      <ActionStepBasicsForm
+        branchRules={branchRules}
+        isPending={isPending}
+        onSubmit={onSubmit}
+        operations={operations}
+        projectActions={projectActions}
+        step={step}
+        steps={steps}
+      />
+    );
+  }
+
+  return (
+    <ContentStepBasicsForm
+      catalogProducts={catalogProducts}
+      isPending={isPending}
+      mediaAssets={mediaAssets}
+      onSubmit={onSubmit}
+      productCatalogs={productCatalogs}
+      step={step}
+    />
   );
 }
 
@@ -4142,40 +4321,46 @@ export function ActionFlowCanvas({
               </div>
 
               <StepBasicsForm
+                branchRules={branchRules}
                 catalogProducts={catalogProducts}
                 isPending={isPending}
                 mediaAssets={mediaAssets}
                 onSubmit={(input) => updateStepBasics(selectedStep.id, input)}
+                operations={operations}
                 productCatalogs={productCatalogs}
+                projectActions={projectActions}
                 step={selectedStep}
+                steps={steps}
               />
 
-              <details className="group rounded-md border bg-white">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
-                  <span className="flex items-center gap-2">
-                    <Wand2 className="h-4 w-4" />
-                    Advanced settings
-                  </span>
-                  <span className="text-xs font-normal text-muted-foreground group-open:hidden">
-                    Validation, integrations, and channel controls
-                  </span>
-                </summary>
-                <div className="border-t p-4">
-                  <StepCreateForm
-                    branchRules={branchRules}
-                    catalogProducts={catalogProducts}
-                    isPending={isPending}
-                    mediaAssets={mediaAssets}
-                    onSubmit={(input) => updateStep(selectedStep.id, input)}
-                    operations={operations}
-                    productCatalogs={productCatalogs}
-                    projectActions={projectActions}
-                    step={selectedStep}
-                    steps={steps}
-                    submitLabel="Save Advanced Settings"
-                  />
-                </div>
-              </details>
+              {!isFlowActionStepType(selectedStep.stepType) && (
+                <details className="group rounded-md border bg-white">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
+                    <span className="flex items-center gap-2">
+                      <Wand2 className="h-4 w-4" />
+                      Advanced settings
+                    </span>
+                    <span className="text-xs font-normal text-muted-foreground group-open:hidden">
+                      Validation, integrations, and channel controls
+                    </span>
+                  </summary>
+                  <div className="border-t p-4">
+                    <StepCreateForm
+                      branchRules={branchRules}
+                      catalogProducts={catalogProducts}
+                      isPending={isPending}
+                      mediaAssets={mediaAssets}
+                      onSubmit={(input) => updateStep(selectedStep.id, input)}
+                      operations={operations}
+                      productCatalogs={productCatalogs}
+                      projectActions={projectActions}
+                      step={selectedStep}
+                      steps={steps}
+                      submitLabel="Save Advanced Settings"
+                    />
+                  </div>
+                </details>
+              )}
 
               <details className="group rounded-md border bg-white">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
