@@ -1,9 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { getDurableRetryDelayMs } from "../../src/lib/durable-jobs";
 import {
+  decryptSecretValue,
+  encryptSecretValue,
+} from "../../src/lib/encrypted-secrets";
+import {
   normalizeTraceId,
   resolveTraceId,
 } from "../../src/lib/execution-trace";
+import { prepareProviderConfig } from "../../src/lib/provider-secrets";
 
 test.describe("durable execution contracts", () => {
   test("uses deterministic capped exponential retry delays", () => {
@@ -54,5 +59,42 @@ test.describe("durable execution contracts", () => {
     expect(resolveTraceId("bad")).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
+  });
+
+  test("encrypts credentials with authenticated versioned envelopes", () => {
+    const encrypted = encryptSecretValue("test-provider-secret");
+
+    expect(JSON.stringify(encrypted)).not.toContain("test-provider-secret");
+    expect(decryptSecretValue(encrypted)).toBe("test-provider-secret");
+
+    const tampered = structuredClone(encrypted);
+    tampered.$liaEncryptedSecret.ciphertext =
+      Buffer.from("tampered").toString("base64");
+    expect(() => decryptSecretValue(tampered)).toThrow();
+  });
+
+  test("replaces nested provider credentials with secret references", () => {
+    const prepared = prepareProviderConfig({
+      accessToken: "meta-access-token",
+      datasetId: "dataset-123",
+      headers: {
+        Authorization: "Bearer private-value",
+        "Content-Type": "application/json",
+        "x-api-key": "private-api-key",
+      },
+      url: "https://example.test/webhook",
+    });
+    const serializedConfig = JSON.stringify(prepared.config);
+
+    expect(prepared.secrets.map((secret) => secret.secretName)).toEqual([
+      "accessToken",
+      "headers.Authorization",
+      "headers.x-api-key",
+    ]);
+    expect(serializedConfig).not.toContain("meta-access-token");
+    expect(serializedConfig).not.toContain("private-value");
+    expect(serializedConfig).not.toContain("private-api-key");
+    expect(serializedConfig).toContain("dataset-123");
+    expect(serializedConfig).toContain("application/json");
   });
 });

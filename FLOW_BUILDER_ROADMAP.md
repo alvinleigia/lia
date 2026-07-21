@@ -34,7 +34,7 @@ is not confused with the historical implementation phases later in this file.
 | 6 | Friendly input-family editors | Complete |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Complete |
-| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | In progress (Step 5 of 7) |
+| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | In progress (Step 6 of 7) |
 | 10 | Cross-channel certification, UAT, and release sign-off | Pending |
 
 ### Phase 4 Delivery Steps
@@ -258,6 +258,13 @@ and an authenticated global recovery endpoint that only discovers projects
 with due work before delegating to tenant-scoped workers. The recovery route is
 available for an external scheduler without adding a deployment schedule that
 would exceed Vercel Hobby cron limits.
+
+Step 5 adds authenticated AES-256-GCM envelopes with versioned key lookup.
+New integration-provider credentials are removed recursively from config JSON
+and stored in project/provider-scoped secret records; the execution boundary
+hydrates them only on the server. Legacy plaintext provider credentials move
+to the secret table on first execution. WhatsApp access, app-secret, and verify
+tokens use the same encrypted envelope while retaining masked edit behavior.
 
 ### Phase 3 Delivery Steps
 

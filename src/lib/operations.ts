@@ -9,6 +9,7 @@ import {
   integrationProviders,
   operationAttempts,
   operations,
+  providerSecrets,
   type SelectOperation,
   type SelectOperationAttempt,
 } from "@/lib/db-schema";
@@ -18,6 +19,10 @@ import {
   failDurableJob,
 } from "@/lib/durable-jobs";
 import { resolveTraceId } from "@/lib/execution-trace";
+import {
+  hydrateProviderConfig,
+  prepareProviderConfig,
+} from "@/lib/provider-secrets";
 
 export const INTEGRATION_PROVIDER_TYPES = [
   "manual_review",
@@ -209,19 +214,33 @@ export function getOperationAttemptMappedOutput(input: {
 export async function createIntegrationProvider(
   input: CreateIntegrationProviderInput,
 ) {
-  const [provider] = await db
-    .insert(integrationProviders)
-    .values({
-      projectId: input.projectId,
-      name: input.name,
-      providerType: input.providerType,
-      status: input.status ?? "active",
-      config: input.config ?? {},
-      updatedAt: new Date(),
-    })
-    .returning();
+  const prepared = prepareProviderConfig(input.config ?? {});
 
-  return provider;
+  return db.transaction(async (tx) => {
+    const [provider] = await tx
+      .insert(integrationProviders)
+      .values({
+        projectId: input.projectId,
+        name: input.name,
+        providerType: input.providerType,
+        status: input.status ?? "active",
+        config: prepared.config,
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    if (prepared.secrets.length > 0) {
+      await tx.insert(providerSecrets).values(
+        prepared.secrets.map((secret) => ({
+          ...secret,
+          projectId: input.projectId,
+          providerId: provider.id,
+        })),
+      );
+    }
+
+    return provider;
+  });
 }
 
 export async function listProjectIntegrationProviders(projectId: number) {
@@ -563,6 +582,24 @@ async function executeProvider(input: {
     responsePayload: {},
     errorMessage: `Unsupported provider type: ${input.providerType}`,
   };
+}
+
+async function executeConfiguredProvider(input: {
+  config: Record<string, unknown>;
+  idempotencyKey: string;
+  operationType: string;
+  payload: Record<string, unknown>;
+  projectId: number;
+  providerId: number;
+  providerType: string;
+}) {
+  const config = await hydrateProviderConfig({
+    config: input.config,
+    projectId: input.projectId,
+    providerId: input.providerId,
+  });
+
+  return executeProvider({ ...input, config });
 }
 
 function readStringConfig(
@@ -1190,9 +1227,11 @@ export async function runOperationForSubmission(input: {
 
   const attempt = createdAttempt;
 
-  const result = await executeProvider({
+  const result = await executeConfiguredProvider({
     config: provider.config,
     idempotencyKey: input.idempotencyKey,
+    projectId: input.projectId,
+    providerId: provider.id,
     providerType: provider.providerType,
     operationType: operation.operationType,
     payload: requestPayload,
@@ -1471,11 +1510,13 @@ export async function processProjectDurableOperationQueue(input: {
         throw new Error("The operation or provider is no longer active.");
       }
 
-      const result = await executeProvider({
+      const result = await executeConfiguredProvider({
         config: provider.config,
         idempotencyKey: attempt.idempotencyKey ?? job.dedupeKey,
         operationType: operation.operationType,
         payload: attempt.requestPayload,
+        projectId: input.projectId,
+        providerId: provider.id,
         providerType: provider.providerType,
       });
 
@@ -1608,9 +1649,11 @@ export async function runOperationPreview(input: {
     })
     .returning();
 
-  const result = await executeProvider({
+  const result = await executeConfiguredProvider({
     config: provider.config,
     idempotencyKey,
+    projectId: input.projectId,
+    providerId: provider.id,
     providerType: provider.providerType,
     operationType: operation.operationType,
     payload: requestPayload,
@@ -1693,9 +1736,11 @@ export async function replayOperationAttempt(input: {
     })
     .returning();
 
-  const result = await executeProvider({
+  const result = await executeConfiguredProvider({
     config: provider.config,
     idempotencyKey,
+    projectId: input.projectId,
+    providerId: provider.id,
     providerType: provider.providerType,
     operationType: operation.operationType,
     payload: requestPayload,

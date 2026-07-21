@@ -15,6 +15,10 @@ import {
   type SelectProjectChannel,
   workspaces,
 } from "@/lib/db-schema";
+import {
+  decryptSecretValue,
+  encryptSecretValue,
+} from "@/lib/encrypted-secrets";
 import type { FlowMediaUploadValue } from "@/lib/flow-media-values";
 import type { FlowLocationValue } from "@/lib/flow-structured-values";
 import {
@@ -202,11 +206,9 @@ export function normalizeWhatsAppConfig(
         : "",
     businessName:
       typeof config.businessName === "string" ? config.businessName : "",
-    accessToken:
-      typeof config.accessToken === "string" ? config.accessToken : "",
-    appSecret: typeof config.appSecret === "string" ? config.appSecret : "",
-    verifyToken:
-      typeof config.verifyToken === "string" ? config.verifyToken : "",
+    accessToken: decryptSecretValue(config.accessToken) ?? "",
+    appSecret: decryptSecretValue(config.appSecret) ?? "",
+    verifyToken: decryptSecretValue(config.verifyToken) ?? "",
   } satisfies Required<WhatsAppChannelConfig>;
 }
 
@@ -253,6 +255,18 @@ export async function upsertProjectWhatsAppChannel(input: {
     appSecret: input.config.appSecret || existingConfig.appSecret,
     verifyToken: input.config.verifyToken || existingConfig.verifyToken,
   };
+  const storedConfig = {
+    ...mergedConfig,
+    accessToken: mergedConfig.accessToken
+      ? encryptSecretValue(mergedConfig.accessToken)
+      : "",
+    appSecret: mergedConfig.appSecret
+      ? encryptSecretValue(mergedConfig.appSecret)
+      : "",
+    verifyToken: mergedConfig.verifyToken
+      ? encryptSecretValue(mergedConfig.verifyToken)
+      : "",
+  };
 
   if (existing) {
     const [channel] = await db
@@ -261,7 +275,7 @@ export async function upsertProjectWhatsAppChannel(input: {
         name: input.name,
         status: input.status,
         externalId: mergedConfig.phoneNumberId || null,
-        config: mergedConfig,
+        config: storedConfig,
         updatedAt: new Date(),
       })
       .where(
@@ -283,7 +297,7 @@ export async function upsertProjectWhatsAppChannel(input: {
       name: input.name,
       status: input.status,
       externalId: mergedConfig.phoneNumberId || null,
-      config: mergedConfig,
+      config: storedConfig,
     })
     .returning();
 
