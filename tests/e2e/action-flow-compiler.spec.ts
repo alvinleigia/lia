@@ -72,6 +72,27 @@ test("compiler mirrors ordered runtime flow and terminal boundaries", () => {
   expect(graph.issues).toEqual([]);
 });
 
+test("compiler keeps wait steps on a reachable terminal path", () => {
+  const graph = compileActionFlowGraph({
+    branchRules: [],
+    steps: [
+      createStep(1, 1),
+      createStep(2, 2, {
+        settings: { waitAmount: 5, waitUnit: "minutes" },
+        stepType: "wait",
+      }),
+      createStep(3, 3, { stepType: "submit" }),
+    ],
+  });
+
+  expect(graph.edges).toEqual([
+    { sourceStepId: 1, targetStepId: 2, type: "ordered" },
+    { sourceStepId: 2, targetStepId: 3, type: "ordered" },
+  ]);
+  expect(graph.terminalStepIds).toEqual([3]);
+  expect(graph.issues).toEqual([]);
+});
+
 test("compiler types numeric conditions and evaluates them consistently", () => {
   const graph = compileActionFlowGraph({
     branchRules: [

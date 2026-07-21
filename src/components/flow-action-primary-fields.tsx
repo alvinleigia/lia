@@ -2,6 +2,7 @@
 
 import {
   CheckCircle2,
+  Clock3,
   ContactRound,
   GitBranch,
   Tags,
@@ -44,6 +45,7 @@ const ACTION_ICONS = {
   operation: GitBranch,
   set_attribute: ContactRound,
   submit: CheckCircle2,
+  wait: Clock3,
 } as const;
 
 function getSettingText(settings: Record<string, unknown>, key: string) {
@@ -127,7 +129,8 @@ export function FlowActionPrimaryFields({
   const supportsVisitorMessage =
     stepType === "handoff" ||
     stepType === "submit" ||
-    stepType === "connect_flow";
+    stepType === "connect_flow" ||
+    stepType === "wait";
 
   return (
     <div className="space-y-4">
@@ -156,7 +159,9 @@ export function FlowActionPrimaryFields({
               ? "Message shown before handoff"
               : stepType === "submit"
                 ? "Completion message"
-                : "Transition message"}
+                : stepType === "wait"
+                  ? "Message shown before waiting"
+                  : "Transition message"}
           </label>
           <textarea
             id={`${idPrefix}-prompt`}
@@ -169,11 +174,70 @@ export function FlowActionPrimaryFields({
                 ? "A team member will continue this conversation."
                 : stepType === "submit"
                   ? "Thanks. Your details have been saved."
-                  : "Let's continue with the next part."
+                  : stepType === "wait"
+                    ? "I will continue this conversation shortly."
+                    : "Let's continue with the next part."
             }
             className="flex min-h-24 w-full resize-y rounded-md border border-input bg-transparent px-3 py-3 text-sm leading-6 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           />
         </div>
+      )}
+
+      {stepType === "wait" && (
+        <fieldset className="space-y-3 rounded-md border p-4">
+          <legend className="px-1 text-sm font-medium">Wait duration</legend>
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="space-y-2">
+              <label
+                className="text-sm font-medium"
+                htmlFor={`${idPrefix}-wait-amount`}
+              >
+                Amount
+              </label>
+              <input
+                id={`${idPrefix}-wait-amount`}
+                name="waitAmount"
+                type="number"
+                min="1"
+                max="2592000"
+                required
+                defaultValue={
+                  typeof settings.waitAmount === "number"
+                    ? settings.waitAmount
+                    : 1
+                }
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              />
+            </div>
+            <div className="space-y-2">
+              <label
+                className="text-sm font-medium"
+                htmlFor={`${idPrefix}-wait-unit`}
+              >
+                Unit
+              </label>
+              <select
+                id={`${idPrefix}-wait-unit`}
+                name="waitUnit"
+                defaultValue={
+                  typeof settings.waitUnit === "string"
+                    ? settings.waitUnit
+                    : "minutes"
+                }
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <option value="seconds">Seconds</option>
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            The flow resumes automatically from its next route. The maximum
+            effective wait is 30 days.
+          </p>
+        </fieldset>
       )}
 
       {stepType === "handoff" && (

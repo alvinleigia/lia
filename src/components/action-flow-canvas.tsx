@@ -308,6 +308,8 @@ type CanvasStepInput = {
   validationMinLength: string;
   validationMinNumber: string;
   validationRegex: string;
+  waitAmount: string;
+  waitUnit: string;
   whatsappTemplateBody: string;
   whatsappTemplateCategory: string;
   whatsappTemplateLanguage: string;
@@ -342,6 +344,8 @@ type CanvasStepBasicsInput = {
   options: string;
   optionsChanged: boolean;
   prompt: string;
+  waitAmount?: string;
+  waitUnit?: string;
 };
 
 type CanvasStepQuickSave = (
@@ -1525,6 +1529,8 @@ function readStepForm(form: HTMLFormElement): CanvasStepInput {
     validationMinLength: String(formData.get("validationMinLength") ?? ""),
     validationMinNumber: String(formData.get("validationMinNumber") ?? ""),
     validationRegex: String(formData.get("validationRegex") ?? ""),
+    waitAmount: String(formData.get("waitAmount") ?? ""),
+    waitUnit: String(formData.get("waitUnit") ?? "minutes"),
     whatsappTemplateBody: String(formData.get("whatsappTemplateBody") ?? ""),
     whatsappTemplateCategory: String(
       formData.get("whatsappTemplateCategory") ?? "utility",
@@ -1581,6 +1587,8 @@ function readStepBasicsForm(form: HTMLFormElement): CanvasStepBasicsInput {
     options: String(formData.get("options") ?? ""),
     optionsChanged: formData.get("optionsChanged") === "true",
     prompt: String(formData.get("prompt") ?? ""),
+    waitAmount: String(formData.get("waitAmount") ?? ""),
+    waitUnit: String(formData.get("waitUnit") ?? "minutes"),
   };
 }
 

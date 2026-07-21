@@ -286,6 +286,16 @@ const CURRENT_STEP_COMPONENTS: readonly FlowComponentDefinition[] = [
   },
   {
     channels: ["project_chat", "widget", "whatsapp", "future"],
+    color: "#475569",
+    description: "Pause the conversation and resume it after a set duration.",
+    group: "action",
+    key: "wait",
+    label: "Wait",
+    status: "enabled",
+    stepType: "wait",
+  },
+  {
+    channels: ["project_chat", "widget", "whatsapp", "future"],
     color: "#334155",
     description: "Route into another configured flow.",
     group: "action",
@@ -325,17 +335,6 @@ const PLANNED_COMPONENTS: readonly FlowComponentDefinition[] = [
     label: "AI and Knowledge",
     status: "planned",
     disabledReason: FLOW_ACTION_FAMILY_DEFINITIONS.ai_knowledge.plannedReason,
-  },
-  {
-    channels: ["project_chat", "widget", "whatsapp", "future"],
-    color: "#475569",
-    description:
-      "Pause and resume after durable scheduling support is available.",
-    group: "action",
-    key: "wait",
-    label: "Wait",
-    status: "planned",
-    disabledReason: FLOW_ACTION_FAMILY_DEFINITIONS.wait.plannedReason,
   },
 ] as const;
 

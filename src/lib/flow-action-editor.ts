@@ -5,6 +5,7 @@ export const FLOW_ACTION_STEP_TYPES = [
   "connect_flow",
   "set_attribute",
   "add_tag",
+  "wait",
 ] as const;
 
 export type FlowActionStepType = (typeof FLOW_ACTION_STEP_TYPES)[number];
@@ -39,7 +40,9 @@ export type FlowActionField =
   | "operation"
   | "operationRoutes"
   | "operationTiming"
-  | "tags";
+  | "tags"
+  | "waitDuration"
+  | "waitMessage";
 
 export type FlowActionFamilyDefinition = {
   availability: FlowActionAvailability;
@@ -132,12 +135,11 @@ export const FLOW_ACTION_FAMILY_DEFINITIONS: Record<
     title: "AI and knowledge",
   },
   wait: {
-    availability: "planned",
+    availability: "supported",
     description: "Pause a flow and resume it later without losing progress.",
-    fields: [],
+    fields: ["waitDuration", "waitMessage"],
     key: "wait",
-    plannedReason:
-      "Available after durable scheduling, pause, resume, and cancellation are implemented.",
+    stepType: "wait",
     title: "Wait",
   },
 };

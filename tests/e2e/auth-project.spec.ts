@@ -726,8 +726,10 @@ test("action steps use friendly compact editors and preserve integration setting
     palette.getByText(/prompt, grounding, output, and failure contracts/),
   ).toBeVisible();
   await expect(
-    palette.getByText(/durable scheduling, pause, resume, and cancellation/),
-  ).toBeVisible();
+    palette.getByRole("button", {
+      name: /Wait Pause the conversation and resume it after a set duration/,
+    }),
+  ).toBeEnabled();
 
   const operationNode = page
     .locator(".react-flow__node")

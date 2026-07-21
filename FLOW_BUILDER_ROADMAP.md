@@ -34,7 +34,7 @@ is not confused with the historical implementation phases later in this file.
 | 6 | Friendly input-family editors | Complete |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Complete |
-| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | In progress (Step 7 of 7) |
+| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Complete |
 | 10 | Cross-channel certification, UAT, and release sign-off | Pending |
 
 ### Phase 4 Delivery Steps
@@ -169,8 +169,9 @@ All 6 Phase 7 steps are complete:
   success and failure routing.
 - Conditions remain branch routes with plain-language labels and destinations;
   route order stays available through progressive disclosure.
-- AI/knowledge and wait actions are visible in the palette with exact disabled
-  reasons until their runtime contracts are implemented.
+- At Phase 7 closeout, AI/knowledge and wait actions were visible with exact
+  disabled reasons. Wait is now enabled by the durable runtime delivered in
+  Phase 9; AI/knowledge remains planned.
 - Compact canvas editing uses one action editor, tenant-validates referenced
   operations and flows, synchronizes operation route presets, and is covered by
   model and browser persistence tests.
@@ -270,6 +271,27 @@ Step 6 adds a project-scoped execution-health view beside the existing
 operation history. It summarizes queued, processing, failed, and completed
 work and shows recent job attempts, retry timing, errors, and expandable trace
 ids without rendering delivery destinations, payloads, or provider secrets.
+
+### Phase 9 Closeout
+
+All 7 Phase 9 steps are complete:
+
+- Project-scoped durable jobs use stable dedupe keys, bounded attempts, retry
+  backoff, expiring leases, cancellation, and interrupted-worker recovery.
+- Operation delivery and WhatsApp replies use recoverable jobs and a
+  transactional outbox, with immediate draining for responsive requests and
+  an authenticated recovery endpoint for scheduled processing.
+- Wait is a universal flow action for project chat, widget, WhatsApp, and
+  future adapters. It atomically stores progress and schedules a version-pinned
+  resume, while cancellation removes outstanding resume work.
+- Resumed project-chat and widget replies are recorded through the shared
+  channel runtime; resumed WhatsApp replies enter the outbox before delivery.
+- Provider credentials use versioned AES-256-GCM envelopes and server-side
+  hydration, while trace and health views omit payloads and secret values.
+- Static and database-backed tenant checks cover durable jobs, outbox messages,
+  provider secrets, submissions, events, channels, and existing tenant data.
+- Compiler, editor, duration, authorization, encryption, TypeScript, lint,
+  operations-health, and production-build checks form the Phase 9 release gate.
 
 ### Phase 3 Delivery Steps
 

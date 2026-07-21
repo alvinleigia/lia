@@ -999,7 +999,13 @@ Exit gate: project-scoped media and catalog data can be used in flows.
 Goal: confirm integrations and manual review workflows.
 
 - [ ] Open `/projects/operations`.
-  Expected result: Provider and operation pages load.
+  Expected result: Provider, operation, and Execution Health sections load.
+  Status:
+  Notes:
+
+- [ ] Review Execution Health before creating test work.
+  Expected result: Queued, Processing, Failed, and Completed totals are shown;
+  recent items never expose payloads, destinations, or credentials.
   Status:
   Notes:
 
@@ -1009,7 +1015,8 @@ Goal: confirm integrations and manual review workflows.
   Notes:
 
 - [ ] Create webhook or n8n provider if test URL is available.
-  Expected result: Provider is saved without exposing secrets.
+  Expected result: Provider is saved without exposing secrets in the provider
+  list or page source.
   Status:
   Notes:
 
@@ -1024,7 +1031,62 @@ Goal: confirm integrations and manual review workflows.
   Notes:
 
 - [ ] Run flow with operation.
-  Expected result: Attempt is logged as success/failure.
+  Expected result: Attempt is logged and durable work becomes completed,
+  queued for retry, or failed after its bounded attempts.
+  Status:
+  Notes:
+
+- [ ] Expand Trace details on one durable item and one operation attempt.
+  Expected result: Both show a trace id that can be used to follow the request;
+  no provider secret is visible.
+  Status:
+  Notes:
+
+- [ ] Call the durable worker without authorization.
+  Instructions: Send `POST /api/durable/process-next` without a bearer token.
+  Expected result: The endpoint returns HTTP 401.
+  Status:
+  Notes:
+
+- [ ] Call the durable worker with `DURABLE_QUEUE_SECRET` or `CRON_SECRET`.
+  Expected result: The endpoint returns queue results scoped by project and
+  safely reports idle when no work is due.
+  Status:
+  Notes:
+
+- [ ] Add a Wait step before a normal message or input step.
+  Instructions: Set the wait to one minute, save the flow, confirm the graph
+  has a terminal path, and publish a new version.
+  Expected result: Wait is available as an enabled universal action and the
+  published flow passes validation.
+  Status:
+  Notes:
+
+- [ ] Start the published flow in project chat and reach the Wait step.
+  Expected result: The wait message appears once, the submission remains in
+  progress, and Execution Health shows one queued `flow_resume` job with no
+  payload or destination exposed.
+  Status:
+  Notes:
+
+- [ ] Process the durable worker after the wait is due.
+  Instructions: Call `POST /api/durable/process-next` with the configured
+  worker bearer token.
+  Expected result: The conversation continues from the step after Wait, the
+  job becomes completed, and the submission has `flow.paused` and
+  `flow.resumed` trace events.
+  Status:
+  Notes:
+
+- [ ] Call the durable worker again for the completed wait.
+  Expected result: No duplicate reply or side effect is created and the worker
+  safely reports no due resume work.
+  Status:
+  Notes:
+
+- [ ] Start another wait and reply `Cancel` before it is due.
+  Expected result: The submission and queued resume job become cancelled, and
+  processing the worker later does not resume the flow.
   Status:
   Notes:
 
@@ -1061,7 +1123,8 @@ if Meta test credentials are not available.
   Notes:
 
 - [ ] Save test channel settings.
-  Expected result: Settings save for selected project.
+  Expected result: Settings save for the selected project and credential
+  fields remain masked. Leaving them blank on the next save retains them.
   Status:
   Notes:
 
@@ -1071,7 +1134,8 @@ if Meta test credentials are not available.
   Notes:
 
 - [ ] Send test message if credentials are available.
-  Expected result: Test message sends or shows clear provider error.
+  Expected result: Test message sends or shows a clear provider error. Flow
+  replies create outbound delivery health records with trace details.
   Status:
   Notes:
 

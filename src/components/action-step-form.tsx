@@ -217,6 +217,17 @@ function getHandoffPriority(settings?: Record<string, unknown>) {
     : "normal";
 }
 
+function getWaitUnit(settings?: Record<string, unknown>) {
+  const unit = settings?.waitUnit;
+
+  return unit === "seconds" ||
+    unit === "minutes" ||
+    unit === "hours" ||
+    unit === "days"
+    ? unit
+    : "minutes";
+}
+
 function getSettingText(settings: Record<string, unknown>, key: string) {
   const value = settings[key];
   return typeof value === "string" ? value : "";
@@ -851,6 +862,38 @@ export function ActionStepForm({
           defaultValue={step?.prompt ?? ""}
           placeholder="What should the chatbot say or ask?"
         />
+      </div>
+
+      <div className="grid gap-4 rounded-md border p-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="waitAmount">Wait Duration</Label>
+          <Input
+            id="waitAmount"
+            name="waitAmount"
+            type="number"
+            min="1"
+            max="2592000"
+            defaultValue={getSettingNumber(settings, "waitAmount") || 1}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="waitUnit">Wait Unit</Label>
+          <select
+            id="waitUnit"
+            name="waitUnit"
+            defaultValue={getWaitUnit(settings)}
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <option value="seconds">Seconds</option>
+            <option value="minutes">Minutes</option>
+            <option value="hours">Hours</option>
+            <option value="days">Days</option>
+          </select>
+        </div>
+        <p className="text-xs text-muted-foreground md:col-span-2">
+          Used only by Wait steps. The flow resumes automatically after this
+          duration.
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

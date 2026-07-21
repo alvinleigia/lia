@@ -49,6 +49,7 @@ type RunBrowserFlowTextInput = {
   editSection?: FlowEditSection;
   expectedRevision?: number;
   projectId: number;
+  recordReplies?: boolean;
   resume?: boolean;
   resumeExecution?: boolean;
   source: string;
@@ -199,7 +200,7 @@ async function executeBrowserFlowText(
           }),
         };
 
-    if (input.resumeExecution) {
+    if (input.resumeExecution && input.recordReplies !== false) {
       await recordBrowserFlowReplies({
         channelType: input.channelType,
         conversationId: input.conversationId,

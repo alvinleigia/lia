@@ -36,6 +36,10 @@ Lia AI is a multi-project AI chatbot platform built with Next.js, Drizzle, Postg
 - Server-side action flow validation, custom validation messages, and validation failure events.
 - Submission saving, detail view, status workflow, operation attempts, and event logs.
 - Generic operation/provider management with webhook and n8n webhook execution logs.
+- Durable operation jobs, scheduled flow resumes, transactional WhatsApp
+  outbox delivery, bounded retries, lease recovery, and trace diagnostics.
+- Encrypted provider and WhatsApp credentials using authenticated AES-256-GCM
+  envelopes and project-scoped provider secret records.
 - Append-only audit logs for sensitive tenant, project, widget, document, action, and password reset changes.
 - Read-only audit log view for recent company-scoped events.
 - Basic chat analytics for request volume, latency, errors, and token usage.
@@ -85,6 +89,12 @@ MAIL_FROM="Lia AI <no-reply@example.com>"
 # Optional upload queue endpoint protection
 CRON_SECRET=""
 UPLOAD_QUEUE_SECRET=""
+
+# Optional dedicated durable worker and provider-encryption secrets.
+# CRON_SECRET protects the worker when DURABLE_QUEUE_SECRET is empty.
+DURABLE_QUEUE_SECRET=""
+PROVIDER_SECRETS_ENCRYPTION_KEY=""
+PROVIDER_SECRETS_KEY_VERSION="1"
 ```
 
 Notes:
@@ -227,9 +237,25 @@ curl -X POST http://localhost:3000/api/upload/process-next \
   -H "Authorization: Bearer YOUR_UPLOAD_QUEUE_SECRET"
 ```
 
-On Vercel Hobby, `vercel.json` schedules this endpoint once per day to stay
-within cron limits. If the project moves to Vercel Pro, this can be changed to
-run more frequently.
+Durable execution recovery endpoint:
+
+```bash
+curl -X POST http://localhost:3000/api/durable/process-next \
+  -H "Authorization: Bearer YOUR_DURABLE_QUEUE_OR_CRON_SECRET"
+```
+
+New post-submission operations and WhatsApp replies are attempted immediately.
+Call the durable endpoint from a scheduler to resume delayed flows and recover
+work that was rescheduled after provider failures or interrupted requests.
+The current Vercel Hobby configuration does not add a second frequent cron;
+use an external scheduler for UAT or configure a suitable schedule on a plan
+that supports the required frequency.
+
+On Vercel Hobby, `vercel.json` schedules the upload queue endpoint once per day
+to stay within cron limits. The durable endpoint is intentionally not assigned
+a second deployment cron; use an external scheduler for delayed flow resumes
+and retry recovery, or configure a suitable schedule on a plan that supports
+the required frequency.
 
 ### Media Library
 
@@ -575,8 +601,9 @@ Operations notes:
 - Treat schema push commands as local-development only.
 - Use `npm run check:cron-config` to confirm Vercel cron still points at the
   upload queue worker endpoint.
-- Use `npm run check:ops-health` to report failed upload jobs and failed
-  operation attempts. Add `-- --fail-on-alert` when wiring it to alerting.
+- Use `npm run check:ops-health` to report failed uploads, operation attempts,
+  durable jobs, and outbound messages. Add `-- --fail-on-alert` when wiring it
+  to alerting.
 - Keep deployment, backup, restore, cron, and webhook readiness notes in
   [`docs/OPERATIONS_READINESS.md`](docs/OPERATIONS_READINESS.md).
 
@@ -600,9 +627,8 @@ Operations notes:
   `public/uploads` media is only suitable for small test usage.
 - Browser E2E has critical smoke coverage, but exhaustive browser/device
   coverage is deferred for internal beta.
-- Operation success/failure routing is available for inline operation steps, and
-  recent attempts can be manually replayed. Automated retry queues are not
-  implemented yet.
+- Durable retries need a production scheduler frequency and alert threshold
+  chosen for the expected flow volume and provider limits.
 - Action detection is simple trigger phrase matching in the client.
 - Operation/provider management is intentionally basic; webhook, n8n webhook,
   and Meta Conversions delivery exists, but advanced delivery management is not

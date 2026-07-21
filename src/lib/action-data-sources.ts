@@ -84,6 +84,8 @@ export type ActionDataSourceSettings = {
   validationMinLength?: number;
   validationMinNumber?: number;
   validationRegex?: string;
+  waitAmount?: number;
+  waitUnit?: "days" | "hours" | "minutes" | "seconds";
   whatsappTemplateCategory?: "authentication" | "marketing" | "utility";
   whatsappTemplateBody?: string;
   whatsappTemplateLanguage?: string;

@@ -333,31 +333,3 @@ export async function cancelDurableJob(input: {
 
   return cancelled ?? null;
 }
-
-export function scheduleFlowResume(input: {
-  availableAt: Date;
-  channelType: string;
-  conversationId: string;
-  expectedRevision: number;
-  externalUserId?: string | null;
-  projectId: number;
-  source: string;
-  submissionId: number;
-  traceId?: string | null;
-}) {
-  return enqueueDurableJob({
-    availableAt: input.availableAt,
-    dedupeKey: `submission:${input.submissionId}:revision:${input.expectedRevision}`,
-    jobType: "flow_resume",
-    payload: {
-      channelType: input.channelType,
-      conversationId: input.conversationId,
-      expectedRevision: input.expectedRevision,
-      externalUserId: input.externalUserId ?? null,
-      source: input.source,
-    },
-    projectId: input.projectId,
-    submissionId: input.submissionId,
-    traceId: input.traceId,
-  });
-}

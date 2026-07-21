@@ -186,6 +186,20 @@ const actionStepSchema = z
     handoffNotifyTeam: z.coerce.boolean().optional(),
     handoffPriority: z.enum(["high", "low", "normal", "urgent"]).optional(),
     handoffQueue: z.string().trim().max(120).optional(),
+    waitAmount: z.preprocess(
+      (value) =>
+        value === null || (typeof value === "string" && value.trim() === "")
+          ? undefined
+          : value,
+      z.coerce.number().int().min(1).max(2_592_000).optional(),
+    ),
+    waitUnit: z.preprocess(
+      (value) =>
+        value === null || (typeof value === "string" && value.trim() === "")
+          ? undefined
+          : value,
+      z.enum(["seconds", "minutes", "hours", "days"]).optional(),
+    ),
     requiredMessage: z.string().trim().max(240).optional(),
     validationMessage: z.string().trim().max(240).optional(),
     validationAllowedFileTypes: z.string().trim().max(1000).optional(),
@@ -648,6 +662,8 @@ function buildStepSettings(input: {
   handoffNotifyTeam?: boolean;
   handoffPriority?: "high" | "low" | "normal" | "urgent";
   handoffQueue?: string;
+  waitAmount?: number;
+  waitUnit?: "seconds" | "minutes" | "hours" | "days";
   filterByField?: string;
   mediaAsset?: SelectMediaAsset | null;
   mediaAssetId?: number;
@@ -858,6 +874,11 @@ function buildStepSettings(input: {
     if (input.handoffQueue?.trim()) {
       settings.handoffQueue = input.handoffQueue.trim();
     }
+  }
+
+  if (input.stepType === "wait") {
+    settings.waitAmount = input.waitAmount ?? 1;
+    settings.waitUnit = input.waitUnit ?? "minutes";
   }
 
   return settings;
@@ -1658,6 +1679,8 @@ export async function createActionFlowStepAction(formData: FormData) {
     handoffNotifyTeam: formData.get("handoffNotifyTeam") === "on",
     handoffPriority: formData.get("handoffPriority"),
     handoffQueue: formData.get("handoffQueue"),
+    waitAmount: formData.get("waitAmount") || undefined,
+    waitUnit: formData.get("waitUnit"),
     requiredMessage: formData.get("requiredMessage"),
     validationAllowedFileTypes: formData.get("validationAllowedFileTypes"),
     validationMaxDate: formData.get("validationMaxDate"),
@@ -1848,6 +1871,8 @@ export async function updateActionFlowStepAction(formData: FormData) {
     handoffNotifyTeam: formData.get("handoffNotifyTeam") === "on",
     handoffPriority: formData.get("handoffPriority"),
     handoffQueue: formData.get("handoffQueue"),
+    waitAmount: formData.get("waitAmount") || undefined,
+    waitUnit: formData.get("waitUnit"),
     requiredMessage: formData.get("requiredMessage"),
     validationAllowedFileTypes: formData.get("validationAllowedFileTypes"),
     validationMaxDate: formData.get("validationMaxDate"),

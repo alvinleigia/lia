@@ -228,6 +228,10 @@ export function getActionStepPrompt(step: RuntimeActionStep) {
     return step.prompt || step.label || "Updating contact tags.";
   }
 
+  if (step.stepType === "wait") {
+    return step.prompt || step.label || "I will continue shortly.";
+  }
+
   return (
     step.prompt || step.label || step.fieldKey || "Please provide a value."
   );
@@ -300,6 +304,10 @@ export function isActionMutationStep(step: RuntimeActionStep) {
 
 export function isActionConnectFlowStep(step: RuntimeActionStep) {
   return step.stepType === "connect_flow";
+}
+
+export function isActionWaitStep(step: RuntimeActionStep) {
+  return step.stepType === "wait";
 }
 
 export function isInlineOperationStep(step: RuntimeActionStep) {

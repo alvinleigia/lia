@@ -29,16 +29,15 @@ test("action fields stay relevant to their runtime family", () => {
   expect(isFlowActionFieldRelevant("connect_flow", "connectedFlow")).toBe(true);
   expect(isFlowActionFieldRelevant("add_tag", "tags")).toBe(true);
   expect(isFlowActionFieldRelevant("submit", "completionMessage")).toBe(true);
+  expect(isFlowActionFieldRelevant("wait", "waitDuration")).toBe(true);
+  expect(isFlowActionFieldRelevant("wait", "waitMessage")).toBe(true);
 });
 
 test("route and planned families describe honest availability", () => {
   expect(FLOW_ACTION_FAMILY_DEFINITIONS.condition.availability).toBe("route");
 
   const planned = listPlannedFlowActionFamilies();
-  expect(planned.map((definition) => definition.key)).toEqual([
-    "ai_knowledge",
-    "wait",
-  ]);
+  expect(planned.map((definition) => definition.key)).toEqual(["ai_knowledge"]);
 
   for (const definition of planned) {
     expect(definition.plannedReason).toBeTruthy();
@@ -46,9 +45,13 @@ test("route and planned families describe honest availability", () => {
   }
 
   const plannedComponents = listPlannedFlowComponents();
-  for (const key of ["ai_knowledge", "wait"]) {
+  for (const key of ["ai_knowledge"]) {
     const component = plannedComponents.find((item) => item.key === key);
     expect(component?.disabledReason).toBeTruthy();
     expect(component?.stepType).toBeUndefined();
   }
+
+  expect(
+    plannedComponents.find((component) => component.key === "wait"),
+  ).toBeUndefined();
 });

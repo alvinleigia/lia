@@ -8,9 +8,22 @@ import {
   normalizeTraceId,
   resolveTraceId,
 } from "../../src/lib/execution-trace";
+import {
+  getFlowWaitAvailableAt,
+  getFlowWaitDurationMs,
+} from "../../src/lib/flow-wait";
 import { prepareProviderConfig } from "../../src/lib/provider-secrets";
 
 test.describe("durable execution contracts", () => {
+  test("rejects unauthenticated durable worker requests", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/durable/process-next");
+
+    expect(response.status()).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
+  });
+
   test("uses deterministic capped exponential retry delays", () => {
     const first = getDurableRetryDelayMs({
       attempt: 1,
@@ -45,6 +58,24 @@ test.describe("durable execution contracts", () => {
         maxDelayMs: 8_000,
       }),
     ).toBe(second);
+  });
+
+  test("normalizes wait durations and caps them at thirty days", () => {
+    expect(getFlowWaitDurationMs({})).toBe(60_000);
+    expect(getFlowWaitDurationMs({ waitAmount: 15, waitUnit: "seconds" })).toBe(
+      15_000,
+    );
+    expect(getFlowWaitDurationMs({ waitAmount: 90, waitUnit: "days" })).toBe(
+      30 * 24 * 60 * 60_000,
+    );
+
+    const now = new Date("2026-07-21T10:00:00.000Z");
+    expect(
+      getFlowWaitAvailableAt(
+        { waitAmount: 2, waitUnit: "hours" },
+        now,
+      ).toISOString(),
+    ).toBe("2026-07-21T12:00:00.000Z");
   });
 
   test("accepts safe incoming trace ids and replaces invalid values", () => {

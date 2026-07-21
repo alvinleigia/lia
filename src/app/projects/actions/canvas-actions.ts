@@ -143,6 +143,13 @@ const canvasStepSchema = z
     handoffNotifyTeam: z.coerce.boolean().optional(),
     handoffPriority: z.enum(["high", "low", "normal", "urgent"]).optional(),
     handoffQueue: z.string().trim().max(120).optional(),
+    waitAmount: optionalValidationNumber(
+      z.coerce.number().int().min(1).max(2_592_000),
+    ),
+    waitUnit: z.preprocess(
+      (value) => (value === "" || value === null ? undefined : value),
+      z.enum(["seconds", "minutes", "hours", "days"]).optional(),
+    ),
     requiredMessage: z.string().trim().max(240).optional(),
     validationAllowedFileTypes: z.string().trim().max(1000).optional(),
     validationMaxDate: z.string().trim().max(20).optional(),
@@ -384,6 +391,13 @@ const canvasStepBasicsSchema = z.object({
   handoffNotifyTeam: z.coerce.boolean().optional(),
   handoffPriority: z.enum(["high", "low", "normal", "urgent"]).optional(),
   handoffQueue: z.string().trim().max(120).optional(),
+  waitAmount: optionalValidationNumber(
+    z.coerce.number().int().min(1).max(2_592_000),
+  ),
+  waitUnit: z.preprocess(
+    (value) => (value === "" || value === null ? undefined : value),
+    z.enum(["seconds", "minutes", "hours", "days"]).optional(),
+  ),
   inputType: z.enum(ACTION_STEP_INPUT_TYPES).optional(),
   stepId: z.coerce.number().int().positive(),
   isEnabled: z.coerce.boolean(),
@@ -663,6 +677,8 @@ function getChoiceStepSettings(input: {
   handoffNotifyTeam?: boolean;
   handoffPriority?: "high" | "low" | "normal" | "urgent";
   handoffQueue?: string;
+  waitAmount?: number;
+  waitUnit?: "seconds" | "minutes" | "hours" | "days";
   mediaAsset?: SelectMediaAsset | null;
   operationExecutionMode?: "post_submit" | "inline";
   productCatalog?: SelectProductCatalog | null;
@@ -898,6 +914,14 @@ function getChoiceStepSettings(input: {
     delete settings.handoffNotifyTeam;
     delete settings.handoffPriority;
     delete settings.handoffQueue;
+  }
+
+  if (input.stepType === "wait") {
+    settings.waitAmount = input.waitAmount ?? 1;
+    settings.waitUnit = input.waitUnit ?? "minutes";
+  } else {
+    delete settings.waitAmount;
+    delete settings.waitUnit;
   }
 
   return settings;
@@ -1234,6 +1258,8 @@ export async function createCanvasStepAction(
         handoffNotifyTeam: parsed.data.handoffNotifyTeam,
         handoffPriority: parsed.data.handoffPriority,
         handoffQueue: parsed.data.handoffQueue,
+        waitAmount: parsed.data.waitAmount,
+        waitUnit: parsed.data.waitUnit,
         mediaAsset,
         operationExecutionMode: parsed.data.operationExecutionMode,
         whatsappTemplateCategory: parsed.data.whatsappTemplateCategory,
@@ -1423,6 +1449,8 @@ export async function updateCanvasStepAction(
         handoffNotifyTeam: parsed.data.handoffNotifyTeam,
         handoffPriority: parsed.data.handoffPriority,
         handoffQueue: parsed.data.handoffQueue,
+        waitAmount: parsed.data.waitAmount,
+        waitUnit: parsed.data.waitUnit,
         mediaAsset,
         operationExecutionMode: parsed.data.operationExecutionMode,
         whatsappTemplateCategory: parsed.data.whatsappTemplateCategory,
@@ -1517,6 +1545,7 @@ export async function updateCanvasStepBasicsAction(
     "operation",
     "set_attribute",
     "submit",
+    "wait",
   ].includes(existingStep.stepType);
   const operation = isActionStep
     ? await requireCanvasOperation({
@@ -1687,6 +1716,8 @@ export async function updateCanvasStepBasicsAction(
       handoffNotifyTeam: parsed.data.handoffNotifyTeam,
       handoffPriority: parsed.data.handoffPriority,
       handoffQueue: parsed.data.handoffQueue,
+      waitAmount: parsed.data.waitAmount,
+      waitUnit: parsed.data.waitUnit,
       operationExecutionMode: parsed.data.operationExecutionMode,
       stepType: existingStep.stepType,
     });

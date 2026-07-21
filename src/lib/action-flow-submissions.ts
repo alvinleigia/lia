@@ -1,3 +1,4 @@
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   addActionSubmissionEvent,
   createActionSubmission,
@@ -5,6 +6,13 @@ import {
   updateActionSubmission,
 } from "@/lib/action-flows";
 import { isRunnableActionStep } from "@/lib/action-runtime";
+import { db } from "@/lib/db-config";
+import {
+  actionSubmissionEvents,
+  actionSubmissions,
+  durableJobs,
+} from "@/lib/db-schema";
+import { resolveTraceId } from "@/lib/execution-trace";
 import { runSubmissionOperations } from "@/lib/operations";
 import { getRuntimeProjectAction } from "@/lib/runtime-actions";
 
@@ -45,6 +53,22 @@ type CancelActionFlowSubmissionInput = {
   projectId: number;
   submissionId: number;
   expectedRevision: number;
+};
+
+type PauseActionFlowSubmissionInput = {
+  availableAt: Date;
+  channelType: string;
+  conversationId: string;
+  currentStepId: number | null;
+  expectedRevision: number;
+  externalUserId?: string | null;
+  fields: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  projectId: number;
+  source: string;
+  submissionId: number;
+  traceId?: string | null;
+  waitStepId: number;
 };
 
 export class ActionSubmissionConflictError extends Error {
@@ -168,6 +192,77 @@ export async function recordActionFlowProgress(
   return updatedSubmission;
 }
 
+export async function pauseActionFlowSubmission(
+  input: PauseActionFlowSubmissionInput,
+) {
+  const traceId = resolveTraceId(input.traceId);
+  const nextRevision = input.expectedRevision + 1;
+
+  return db.transaction(async (tx) => {
+    const [submission] = await tx
+      .update(actionSubmissions)
+      .set({
+        currentStepId: input.currentStepId,
+        fields: input.fields,
+        metadata: input.metadata,
+        revision: sql`${actionSubmissions.revision} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(actionSubmissions.projectId, input.projectId),
+          eq(actionSubmissions.id, input.submissionId),
+          eq(actionSubmissions.status, "in_progress"),
+          eq(actionSubmissions.revision, input.expectedRevision),
+        ),
+      )
+      .returning();
+
+    if (!submission) {
+      throw new ActionSubmissionConflictError();
+    }
+
+    const [job] = await tx
+      .insert(durableJobs)
+      .values({
+        availableAt: input.availableAt,
+        dedupeKey: `submission:${input.submissionId}:revision:${nextRevision}`,
+        jobType: "flow_resume",
+        payload: {
+          channelType: input.channelType,
+          conversationId: input.conversationId,
+          expectedRevision: nextRevision,
+          externalUserId: input.externalUserId ?? null,
+          source: input.source,
+        },
+        projectId: input.projectId,
+        submissionId: input.submissionId,
+        traceId,
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (!job) {
+      throw new Error("Could not schedule the flow resume job.");
+    }
+
+    await tx.insert(actionSubmissionEvents).values({
+      eventType: "flow.paused",
+      message: "Flow paused for a scheduled wait.",
+      payload: {
+        availableAt: input.availableAt.toISOString(),
+        nextStepId: input.currentStepId,
+        waitStepId: input.waitStepId,
+      },
+      projectId: input.projectId,
+      submissionId: input.submissionId,
+      traceId,
+    });
+
+    return { job, submission };
+  });
+}
+
 export async function submitActionFlowSubmission(
   input: SubmitActionFlowSubmissionInput,
 ) {
@@ -241,15 +336,32 @@ export async function cancelActionFlowSubmission(
     throw new ActionSubmissionConflictError();
   }
 
-  if (updatedSubmission) {
-    await addActionSubmissionEvent({
-      projectId: input.projectId,
-      submissionId: updatedSubmission.id,
-      eventType: "flow.cancelled",
-      message: "Flow was cancelled before submission.",
-      payload: {},
-    });
-  }
+  const now = new Date();
+  await db
+    .update(durableJobs)
+    .set({
+      cancelledAt: now,
+      leaseExpiresAt: null,
+      leaseOwner: null,
+      status: "cancelled",
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(durableJobs.projectId, input.projectId),
+        eq(durableJobs.submissionId, updatedSubmission.id),
+        eq(durableJobs.jobType, "flow_resume"),
+        inArray(durableJobs.status, ["queued", "processing"]),
+      ),
+    );
+
+  await addActionSubmissionEvent({
+    projectId: input.projectId,
+    submissionId: updatedSubmission.id,
+    eventType: "flow.cancelled",
+    message: "Flow was cancelled before submission.",
+    payload: {},
+  });
 
   return updatedSubmission;
 }

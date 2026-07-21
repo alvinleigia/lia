@@ -13,7 +13,8 @@ intended for a pre-beta dry run before real customers or production-like traffic
 - Staging environment variables are configured outside the repo.
 - `NEXT_PUBLIC_APP_URL` and `NEXTAUTH_URL` point to the public HTTPS staging URL.
 - `PLATFORM_ADMIN_EMAILS` contains only intended SaaS owner emails.
-- `CRON_SECRET` and `UPLOAD_QUEUE_SECRET` are set.
+- `CRON_SECRET`, `UPLOAD_QUEUE_SECRET`, and `DURABLE_QUEUE_SECRET` are set.
+- `PROVIDER_SECRETS_ENCRYPTION_KEY` is set and its key version is recorded.
 - Staging uses separate OpenAI, SMTP2GO and WhatsApp credentials where possible.
 
 ## Migration Dry Run
@@ -70,6 +71,10 @@ After deploy:
 - Confirm the widget snippet uses the staging URL.
 - Confirm the upload worker endpoint rejects requests without
   `UPLOAD_QUEUE_SECRET`.
+- Confirm `/api/durable/process-next` rejects requests without a durable or
+  cron secret and succeeds with the staging worker secret.
+- Configure an external recovery schedule before testing delayed wait steps or
+  retry timing on Vercel Hobby.
 - Confirm platform admin can access `/platform`.
 - Confirm non-platform users cannot access `/platform`.
 
@@ -81,6 +86,8 @@ When WhatsApp staging credentials exist:
 - Verify the webhook in Meta.
 - Send an inbound text message.
 - Confirm the correct project channel receives the conversation.
+- Confirm the outbound reply appears in execution health as delivered, queued,
+  or failed with a trace id.
 - Confirm disabled tenant/project behavior blocks runtime use.
 - Confirm public media URLs are reachable by Meta before testing media sends.
 
@@ -94,4 +101,3 @@ Before production launch:
 - Restore one backup into staging.
 - Point staging at the restored database.
 - Run the required verification commands against the restored environment.
-

@@ -20,6 +20,7 @@ const requiredTables = [
   "source_documents",
   "documents",
   "integration_providers",
+  "provider_secrets",
   "operations",
   "project_actions",
   "action_flow_steps",
@@ -38,6 +39,8 @@ const requiredTables = [
   "product_catalogs",
   "catalog_products",
   "operation_attempts",
+  "durable_jobs",
+  "outbox_messages",
   "audit_logs",
 ];
 
@@ -605,6 +608,86 @@ async function createTenantFixture(tx, label, suffix) {
     `,
   );
 
+  const providerSecret = await insertOne(
+    tx`
+      insert into provider_secrets (
+        project_id,
+        provider_id,
+        secret_name,
+        key_version,
+        ciphertext,
+        initialization_vector,
+        authentication_tag
+      )
+      values (
+        ${project.id},
+        ${provider.id},
+        'fixtureToken',
+        1,
+        ${`ciphertext-${label}-${suffix}`},
+        ${`iv-${label}-${suffix}`},
+        ${`tag-${label}-${suffix}`}
+      )
+      returning id
+    `,
+  );
+
+  const durableJob = await insertOne(
+    tx`
+      insert into durable_jobs (
+        project_id,
+        submission_id,
+        operation_attempt_id,
+        job_type,
+        status,
+        dedupe_key,
+        trace_id,
+        payload
+      )
+      values (
+        ${project.id},
+        ${submission.id},
+        ${operationAttempt.id},
+        'operation_delivery',
+        'queued',
+        ${`durable-${label}-${suffix}`},
+        ${`trace-${label}-${suffix}`},
+        ${tx.json({ fixture: true })}
+      )
+      returning id
+    `,
+  );
+
+  const outboxMessage = await insertOne(
+    tx`
+      insert into outbox_messages (
+        project_id,
+        durable_job_id,
+        submission_id,
+        operation_attempt_id,
+        topic,
+        destination,
+        status,
+        dedupe_key,
+        trace_id,
+        payload
+      )
+      values (
+        ${project.id},
+        ${durableJob.id},
+        ${submission.id},
+        ${operationAttempt.id},
+        'whatsapp.runtime_reply',
+        ${`destination-${label}`},
+        'queued',
+        ${`outbox-${label}-${suffix}`},
+        ${`trace-${label}-${suffix}`},
+        ${tx.json({ fixture: true })}
+      )
+      returning id
+    `,
+  );
+
   const event = await insertOne(
     tx`
       insert into action_submission_events (
@@ -681,6 +764,9 @@ async function createTenantFixture(tx, label, suffix) {
     productCatalog,
     catalogProduct,
     operationAttempt,
+    providerSecret,
+    durableJob,
+    outboxMessage,
     event,
     auditLog,
   };
@@ -875,6 +961,41 @@ async function runIsolationAssertions(tx, tenantA, tenantB) {
     "Tenant A project could read tenant B operation attempts.",
   );
 
+  const foreignProviderSecret = await tx`
+    select id
+    from provider_secrets
+    where id = ${tenantB.providerSecret.id}
+      and project_id = ${tenantA.project.id}
+  `;
+  assert(
+    foreignProviderSecret.length === 0,
+    "Tenant A project could read tenant B provider secret.",
+  );
+
+  const claimForeignDurableJob = await tx`
+    update durable_jobs
+    set status = 'processing'
+    where id = ${tenantB.durableJob.id}
+      and project_id = ${tenantA.project.id}
+    returning id
+  `;
+  assert(
+    claimForeignDurableJob.length === 0,
+    "Tenant A project could claim tenant B durable job.",
+  );
+
+  const claimForeignOutboxMessage = await tx`
+    update outbox_messages
+    set status = 'processing'
+    where id = ${tenantB.outboxMessage.id}
+      and project_id = ${tenantA.project.id}
+    returning id
+  `;
+  assert(
+    claimForeignOutboxMessage.length === 0,
+    "Tenant A project could claim tenant B outbox message.",
+  );
+
   const foreignProjectChannel = await tx`
     select id
     from project_channels
@@ -1034,6 +1155,8 @@ async function runIsolationAssertions(tx, tenantA, tenantB) {
       ip.name as provider_name,
       o.name as operation_name,
       oat.status as operation_attempt_status,
+      dj.status as durable_job_status,
+      om.status as outbox_message_status,
       pc.name as channel_name,
       cc.external_conversation_id as conversation_external_id,
       c.display_name as contact_name,
@@ -1051,6 +1174,9 @@ async function runIsolationAssertions(tx, tenantA, tenantB) {
     join integration_providers ip on ip.project_id = p.id
     join operations o on o.project_id = p.id
     join operation_attempts oat on oat.project_id = p.id
+    join provider_secrets ps on ps.project_id = p.id
+    join durable_jobs dj on dj.project_id = p.id
+    join outbox_messages om on om.project_id = p.id
     join project_channels pc on pc.project_id = p.id
     join channel_conversations cc on cc.project_id = p.id
     join contacts c on c.project_id = p.id
@@ -1072,6 +1198,9 @@ async function runIsolationAssertions(tx, tenantA, tenantB) {
       and ip.id = ${tenantB.provider.id}
       and o.id = ${tenantB.operation.id}
       and oat.id = ${tenantB.operationAttempt.id}
+      and ps.id = ${tenantB.providerSecret.id}
+      and dj.id = ${tenantB.durableJob.id}
+      and om.id = ${tenantB.outboxMessage.id}
       and pc.id = ${tenantB.projectChannel.id}
       and cc.id = ${tenantB.channelConversation.id}
       and c.id = ${tenantB.contact.id}
@@ -1108,6 +1237,14 @@ async function runIsolationAssertions(tx, tenantA, tenantB) {
   assert(
     tenantBStillIntact[0].operation_attempt_status === "completed",
     "Tenant B operation attempt status changed.",
+  );
+  assert(
+    tenantBStillIntact[0].durable_job_status === "queued",
+    "Tenant B durable job status changed.",
+  );
+  assert(
+    tenantBStillIntact[0].outbox_message_status === "queued",
+    "Tenant B outbox message status changed.",
   );
   assert(
     tenantBStillIntact[0].channel_name === "WhatsApp B",
@@ -1168,6 +1305,8 @@ async function main() {
       checks.push("document delete scoping");
       checks.push("action, branch rule, and flow version scoping");
       checks.push("operation provider and attempt scoping");
+      checks.push("provider secret scoping");
+      checks.push("durable job and outbox claim scoping");
       checks.push("submission and event scoping");
       checks.push("project channel and conversation scoping");
       checks.push("contact, attribute, tag, and assignment scoping");

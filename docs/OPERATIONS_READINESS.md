@@ -18,6 +18,8 @@ Use separate infrastructure for each environment.
 | Auth secret | Local generated value | Strong staging secret | Strong production secret |
 | Public URL | `http://localhost:3000` | Public HTTPS staging URL | Public HTTPS production URL |
 | Upload queue secret | Local generated value | Staging secret | Production secret |
+| Durable queue secret | Local generated value | Staging secret | Production secret |
+| Provider encryption key | Local generated value | Staging key | Production key |
 | Cron secret | Local generated value | Staging secret | Production secret |
 
 Never point staging and production at the same database.
@@ -35,6 +37,9 @@ NEXT_PUBLIC_APP_URL="https://your-app.example.com"
 PLATFORM_ADMIN_EMAILS="owner@example.com"
 CRON_SECRET="long-random-secret"
 UPLOAD_QUEUE_SECRET="long-random-secret"
+DURABLE_QUEUE_SECRET="long-random-secret"
+PROVIDER_SECRETS_ENCRYPTION_KEY="long-random-secret"
+PROVIDER_SECRETS_KEY_VERSION="1"
 ```
 
 Optional integrations:
@@ -192,19 +197,30 @@ POST /api/upload/process-next
 Authorization: Bearer <UPLOAD_QUEUE_SECRET>
 ```
 
+The durable execution endpoint accepts `DURABLE_QUEUE_SECRET` or
+`CRON_SECRET`:
+
+```text
+POST /api/durable/process-next
+Authorization: Bearer <DURABLE_QUEUE_SECRET>
+```
+
 Before beta:
 
 - Confirm `UPLOAD_QUEUE_SECRET` is set outside the repo.
 - Confirm `CRON_SECRET` is set if the deployment platform requires it.
+- Confirm `DURABLE_QUEUE_SECRET` is set for an external recovery scheduler, or
+  use `CRON_SECRET` as the worker bearer token.
 - Run `npm run check:cron-config` to confirm Vercel cron calls the upload
   queue endpoint.
-- Keep operation retry processing manual during beta.
+- Configure the durable recovery endpoint at the frequency required by wait
+  steps and retry policy. The current Vercel Hobby config intentionally does
+  not add a second high-frequency cron.
 - Review and replay failed operation attempts from `/projects/operations` or
   the linked submission detail page.
-- Revisit automated retry workers after beta traffic shows the needed retry
-  policy, backoff rules, provider limits, and alert thresholds.
-- Run `npm run check:ops-health` to report failed upload jobs and failed
-  operation attempts.
+- Review execution health and trace details from `/projects/operations`.
+- Run `npm run check:ops-health` to report failed uploads, operation attempts,
+  durable jobs, and outbox messages.
 - Use `npm run check:ops-health -- --fail-on-alert` from a scheduler or
   monitoring service when failures in the last 24 hours should raise an alert.
 

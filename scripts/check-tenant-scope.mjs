@@ -107,6 +107,7 @@ const schemaScopeChecks = [
   ["projects", ["workspaceId", "ownerUserId"]],
   ["projectWidgetKeys", ["projectId"]],
   ["integrationProviders", ["projectId"]],
+  ["providerSecrets", ["projectId", "providerId"]],
   ["operations", ["projectId", "providerId"]],
   ["projectActions", ["projectId"]],
   ["actionFlowSteps", ["projectId", "actionId", "operationId"]],
@@ -128,6 +129,14 @@ const schemaScopeChecks = [
   ["contactTags", ["projectId", "name"]],
   ["contactTagAssignments", ["projectId", "contactId", "tagId"]],
   ["operationAttempts", ["projectId", "operationId", "providerId"]],
+  [
+    "durableJobs",
+    ["projectId", "submissionId", "operationAttemptId", "traceId"],
+  ],
+  [
+    "outboxMessages",
+    ["projectId", "submissionId", "operationAttemptId", "traceId"],
+  ],
   ["chatRequestLogs", ["projectId"]],
   ["auditLogs", ["companyId", "workspaceId", "projectId"]],
   ["sourceDocuments", ["projectId"]],
@@ -240,6 +249,7 @@ const scopedReadRequirements = new Map([
   ["projects", ["projects.workspaceId", "projects.ownerUserId"]],
   ["projectWidgetKeys", ["projectWidgetKeys.projectId"]],
   ["integrationProviders", ["integrationProviders.projectId"]],
+  ["providerSecrets", ["providerSecrets.projectId"]],
   ["operations", ["operations.projectId"]],
   ["projectActions", ["projectActions.projectId"]],
   ["actionFlowSteps", ["actionFlowSteps.projectId"]],
@@ -258,6 +268,8 @@ const scopedReadRequirements = new Map([
   ["contactTags", ["contactTags.projectId"]],
   ["contactTagAssignments", ["contactTagAssignments.projectId"]],
   ["operationAttempts", ["operationAttempts.projectId"]],
+  ["durableJobs", ["durableJobs.projectId"]],
+  ["outboxMessages", ["outboxMessages.projectId"]],
   ["chatRequestLogs", ["chatRequestLogs.projectId"]],
   ["auditLogs", ["auditLogs.companyId"]],
   ["companyInvitations", ["companyInvitations.companyId"]],
@@ -290,6 +302,18 @@ const allowedUnscopedStatements = [
     table: "projectChannels",
     reason:
       "public WhatsApp webhook resolves the project boundary from Meta phone number id or verify token",
+  },
+  {
+    file: "src/lib/durable-execution-worker.ts",
+    table: "durableJobs",
+    reason:
+      "global recovery discovery selects only project ids before tenant-scoped workers claim jobs",
+  },
+  {
+    file: "src/lib/durable-execution-worker.ts",
+    table: "outboxMessages",
+    reason:
+      "global recovery discovery selects only project ids before tenant-scoped workers claim messages",
   },
   {
     file: "src/lib/upload-queue.ts",

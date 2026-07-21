@@ -35,6 +35,7 @@ export const ACTION_STEP_TYPES = [
   "connect_flow",
   "set_attribute",
   "add_tag",
+  "wait",
 ] as const;
 export const ACTION_STEP_INPUT_TYPES = [
   "text",

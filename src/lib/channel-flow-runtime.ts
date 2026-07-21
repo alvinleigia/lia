@@ -1,6 +1,7 @@
 import {
   ActionSubmissionConflictError,
   cancelActionFlowSubmission,
+  pauseActionFlowSubmission,
   recordActionFlowProgress,
   startActionFlowSubmission,
   submitActionFlowSubmission,
@@ -33,6 +34,7 @@ import {
   isActionMessageStep,
   isActionMutationStep,
   isActionSubmitStep,
+  isActionWaitStep,
   isInlineOperationStep,
   isProductMessageStep,
   normalizeActionText,
@@ -58,6 +60,7 @@ import {
   formatFlowMediaUploadValue,
   isFlowMediaUploadValue,
 } from "@/lib/flow-media-values";
+import { getFlowWaitAvailableAt } from "@/lib/flow-wait";
 import { buildHandoffMetadata, runHandoffNotification } from "@/lib/handoff";
 import { runOperationForSubmission } from "@/lib/operations";
 import {
@@ -80,6 +83,7 @@ const CANCEL_WORDS = new Set(["cancel", "stop", "no", "exit"]);
 const MAX_CONNECTED_FLOW_DEPTH = 5;
 const FLOW_EDIT_POSITION_KEY = "flowEditPosition";
 const FLOW_EDIT_STEP_IDS_KEY = "flowEditStepIds";
+const FLOW_WAIT_METADATA_KEY = "flowWait";
 
 type ChannelRuntimeResult = {
   replies: RuntimeReply[];
@@ -89,6 +93,19 @@ type ReturnFlowFrame = {
   returnToActionId: number;
   returnToStepId: number;
 };
+
+function getFlowWaitMetadata(submission: SelectActionSubmission) {
+  const value = submission.metadata[FLOW_WAIT_METADATA_KEY];
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const availableAt = (value as Record<string, unknown>).availableAt;
+  return typeof availableAt === "string" && availableAt.trim()
+    ? { availableAt }
+    : null;
+}
 
 function getSubmissionContactId(submission: SelectActionSubmission) {
   const contactId = submission.metadata.contactId;
@@ -763,6 +780,44 @@ async function advanceFlowToNextStep(input: {
 
     visitedStepIds.add(step.id);
 
+    if (isActionWaitStep(step)) {
+      const decision = getNextActionStepDecision(
+        input.action,
+        step,
+        stepIndex,
+        submission.fields,
+      );
+      const availableAt = getFlowWaitAvailableAt(step.settings);
+      const paused = await pauseActionFlowSubmission({
+        availableAt,
+        channelType: getChannelTypeForFlowSource(submission.source),
+        conversationId:
+          submission.conversationId ?? `submission-${submission.id}`,
+        currentStepId: decision.targetStepId,
+        expectedRevision: submission.revision,
+        fields: submission.fields,
+        metadata: {
+          ...submission.metadata,
+          [FLOW_WAIT_METADATA_KEY]: {
+            availableAt: availableAt.toISOString(),
+            stepId: step.id,
+          },
+        },
+        projectId: input.projectId,
+        source: submission.source,
+        submissionId: submission.id,
+        traceId: submission.traceId,
+        waitStepId: step.id,
+      });
+
+      return {
+        replies: [
+          ...replies,
+          ...buildRuntimeRepliesForStep(step, paused.submission.fields),
+        ],
+      };
+    }
+
     if (step.stepType === "handoff") {
       replies.push(...buildRuntimeRepliesForStep(step, submission.fields));
       await requestHumanHandoff({
@@ -981,17 +1036,39 @@ async function advanceFlowToNextStep(input: {
   };
 }
 
-export function resumeChannelFlowExecution(input: {
+export async function resumeChannelFlowExecution(input: {
   action: RuntimeAction;
   contactId?: number | null;
   projectId: number;
   submission: SelectActionSubmission;
 }) {
+  let submission = input.submission;
+  const waitMetadata = getFlowWaitMetadata(submission);
+
+  if (waitMetadata) {
+    const metadata = { ...submission.metadata };
+    delete metadata[FLOW_WAIT_METADATA_KEY];
+    const resumed = await recordActionFlowProgress({
+      currentStepId: submission.currentStepId,
+      event: {
+        eventType: "flow.resumed",
+        message: "Flow resumed after a scheduled wait.",
+        payload: { availableAt: waitMetadata.availableAt },
+      },
+      expectedRevision: submission.revision,
+      fields: submission.fields,
+      metadata,
+      projectId: input.projectId,
+      submissionId: submission.id,
+    });
+    submission = resumed ?? submission;
+  }
+
   const steps = getRunnableActionSteps(input.action);
   const stepIndex =
-    input.submission.currentStepId === null
+    submission.currentStepId === null
       ? steps.length
-      : steps.findIndex((step) => step.id === input.submission.currentStepId);
+      : steps.findIndex((step) => step.id === submission.currentStepId);
 
   if (stepIndex < 0) {
     return {
@@ -1008,7 +1085,7 @@ export function resumeChannelFlowExecution(input: {
     contactId: input.contactId,
     projectId: input.projectId,
     stepIndex,
-    submission: input.submission,
+    submission,
   });
 }
 
@@ -1526,6 +1603,27 @@ export async function processChannelFlowText(input: {
   traceId?: string | null;
 }): Promise<ChannelRuntimeResult> {
   if (input.activeSubmission) {
+    if (getFlowWaitMetadata(input.activeSubmission)) {
+      if (CANCEL_WORDS.has(normalizeActionText(input.text))) {
+        await cancelActionFlowSubmission({
+          expectedRevision: input.activeSubmission.revision,
+          projectId: input.projectId,
+          submissionId: input.activeSubmission.id,
+        });
+        return {
+          replies: [createTextReply("No problem. I cancelled this request.")],
+        };
+      }
+
+      return {
+        replies: [
+          createTextReply(
+            "This flow is paused and will continue automatically. Reply Cancel to stop it.",
+          ),
+        ],
+      };
+    }
+
     const action = await getRuntimeProjectActionForSubmission(
       input.projectId,
       input.activeSubmission,
@@ -1590,6 +1688,16 @@ export async function processChannelFlowMedia(input: {
       replies: [
         createTextReply(
           "I received the media, but no active flow is waiting for it. Please send a configured trigger phrase to start.",
+        ),
+      ],
+    };
+  }
+
+  if (getFlowWaitMetadata(input.activeSubmission)) {
+    return {
+      replies: [
+        createTextReply(
+          "This flow is paused and will continue automatically. Reply Cancel to stop it.",
         ),
       ],
     };
