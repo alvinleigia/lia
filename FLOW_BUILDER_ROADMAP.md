@@ -35,7 +35,7 @@ is not confused with the historical implementation phases later in this file.
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Complete |
 | 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Complete |
-| 10 | Cross-channel certification, UAT, and release sign-off | In progress |
+| 10 | Cross-channel certification, UAT, and release sign-off | Engineering complete; live UAT pending |
 
 ### Phase 4 Delivery Steps
 
@@ -321,6 +321,33 @@ can prove contracts, isolation, provider limits, version pinning, and durable
 recovery. They cannot honestly certify live Meta credentials, phone-number
 ownership, template approval, browser embedding policy, or visual acceptance;
 those remain explicit UAT sign-off items.
+
+### Phase 10 Engineering Closeout
+
+All 7 Phase 10 engineering steps are complete:
+
+- A typed 108-cell matrix covers all 27 enabled step types across Project
+  Chat, widget, WhatsApp, and the future-adapter contract.
+- A channel-neutral `reference_future` adapter preserves the versioned reply
+  envelope without adding a database channel, navigation, or production UI.
+- All nine reply capabilities cross the shared adapter boundary, with browser
+  parity and WhatsApp native, fallback, provider-limit, and service-window
+  behavior covered automatically.
+- Database-backed tests prove immutable published-version pinning and a queued
+  Wait step that resumes and submits exactly once.
+- `npm run certify:release:fast` provides a deterministic daily contract gate;
+  `npm run certify:release` adds the production build, complete E2E suite, and
+  database tenant-isolation checks.
+- Phase 14 in `docs/UAT_TEST_PLAN.md` separates live channel acceptance from
+  automated certification and records one result per production channel.
+- The full automated release gate passed with 11 channel contract tests, 71
+  E2E tests, a successful Next.js production build, and passing database tenant
+  isolation.
+
+Engineering completion makes the release candidate ready for live UAT. Final
+release approval remains pending until Project Chat presentation, widget
+embedding, and live WhatsApp credentials, number ownership, template approval,
+provider resources, and device delivery are signed off.
 
 ### Phase 3 Delivery Steps
 
