@@ -401,6 +401,7 @@ export const actionSubmissions = pgTable(
     conversationId: text("conversation_id"),
     source: text("source").notNull().default("chat_widget"),
     status: text("status").notNull().default("in_progress"),
+    revision: integer("revision").notNull().default(0),
     fields: jsonb("fields")
       .$type<Record<string, unknown>>()
       .notNull()

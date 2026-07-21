@@ -177,6 +177,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
         commandId: createBrowserCommandId(),
         conversationId,
         editSection: input.editSection,
+        expectedRevision: activeFlow?.revision,
         projectId,
         text: input.text,
       });

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ActionSubmissionConflictError } from "@/lib/action-flow-submissions";
 import {
   getActionSubmission,
   getActiveActionSubmissionForConversation,
@@ -44,6 +45,7 @@ type RunBrowserFlowTextInput = {
   conversationId: string;
   externalUserId?: string | null;
   editSection?: FlowEditSection;
+  expectedRevision?: number;
   projectId: number;
   resume?: boolean;
   source: string;
@@ -53,7 +55,7 @@ type RunBrowserFlowTextInput = {
 export class BrowserFlowCommandError extends Error {
   constructor(
     message: string,
-    public readonly code: "conflict" | "failed" | "processing",
+    public readonly code: "conflict" | "failed" | "processing" | "stale",
   ) {
     super(message);
     this.name = "BrowserFlowCommandError";
@@ -92,6 +94,7 @@ function toActiveActionFlow(input: {
       (currentStep && isActionConfirmationStep(currentStep))
         ? "confirming"
         : "collecting",
+    revision: input.submission.revision,
     stepIndex: stepIndex >= 0 ? stepIndex : steps.length,
     submissionId: input.submission.id,
   };
@@ -155,6 +158,14 @@ async function executeBrowserFlowText(
   });
   const text = input.text?.trim() ?? "";
   let action: RuntimeAction | null = null;
+
+  if (
+    activeSubmission &&
+    input.expectedRevision !== undefined &&
+    activeSubmission.revision !== input.expectedRevision
+  ) {
+    throw new ActionSubmissionConflictError();
+  }
 
   if (input.resume) {
     if (!activeSubmission) {
@@ -301,6 +312,7 @@ function hashBrowserFlowCommand(input: RunBrowserFlowTextInput) {
       JSON.stringify({
         actionId: input.actionId ?? null,
         editSection: input.editSection ?? null,
+        expectedRevision: input.expectedRevision ?? null,
         text: input.text ?? null,
       }),
     )
@@ -350,6 +362,12 @@ export async function runBrowserFlowText(
         error instanceof Error ? error.message : "Unknown runtime failure.",
       projectId: input.projectId,
     });
+    if (error instanceof ActionSubmissionConflictError) {
+      throw new BrowserFlowCommandError(
+        "This flow changed in another request. Refresh and try again.",
+        "stale",
+      );
+    }
     throw error;
   }
 }

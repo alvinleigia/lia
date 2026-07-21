@@ -17,6 +17,7 @@ const requestSchema = z
     editSection: z
       .enum(["all", "email", "name", "phone", "schedule", "service"])
       .optional(),
+    expectedRevision: z.number().int().nonnegative().optional(),
     projectId: z.number().int().positive().optional(),
     resume: z.boolean().optional(),
     text: z.string().max(4000).optional(),
@@ -64,6 +65,7 @@ export async function POST(req: Request) {
       commandId: parsed.data.commandId,
       conversationId: parsed.data.conversationId,
       editSection: parsed.data.editSection,
+      expectedRevision: parsed.data.expectedRevision,
       projectId: project.id,
       resume: parsed.data.resume,
       source: "project_chat",

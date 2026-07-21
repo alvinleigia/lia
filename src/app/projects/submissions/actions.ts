@@ -313,6 +313,7 @@ export async function updateActionSubmissionStatusAction(formData: FormData) {
     project.id,
     parsed.data.submissionId,
     parsed.data.status as ActionSubmissionStatus,
+    existingSubmission.revision,
   );
 
   if (!submission) {
@@ -386,6 +387,7 @@ export async function updateHandoffAssignmentAction(formData: FormData) {
     submissionId: existingSubmission.id,
     currentStepId: existingSubmission.currentStepId,
     fields: existingSubmission.fields,
+    expectedRevision: existingSubmission.revision,
     metadata: {
       ...existingSubmission.metadata,
       handoff: nextHandoff,
@@ -460,6 +462,7 @@ export async function updateHandoffQueueAction(formData: FormData) {
         project.id,
         existingSubmission.id,
         nextStatus,
+        existingSubmission.revision,
       );
 
       if (!submission) {
@@ -501,6 +504,7 @@ export async function updateHandoffQueueAction(formData: FormData) {
       submissionId: existingSubmission.id,
       currentStepId: existingSubmission.currentStepId,
       fields: existingSubmission.fields,
+      expectedRevision: existingSubmission.revision,
       metadata: {
         ...existingSubmission.metadata,
         handoff: nextHandoff,
@@ -595,6 +599,7 @@ export async function importSubmissionMediaAction(formData: FormData) {
       submissionId: submission.id,
       currentStepId: submission.currentStepId,
       fields,
+      expectedRevision: submission.revision,
       metadata: submission.metadata,
     });
 

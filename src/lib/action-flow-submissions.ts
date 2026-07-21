@@ -25,6 +25,7 @@ type RecordActionFlowProgressInput = {
   currentStepId?: number | null;
   fields: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  expectedRevision: number;
   event?: {
     eventType: string;
     message: string;
@@ -36,12 +37,21 @@ type SubmitActionFlowSubmissionInput = {
   projectId: number;
   submissionId: number;
   fields: Record<string, unknown>;
+  expectedRevision: number;
 };
 
 type CancelActionFlowSubmissionInput = {
   projectId: number;
   submissionId: number;
+  expectedRevision: number;
 };
+
+export class ActionSubmissionConflictError extends Error {
+  constructor() {
+    super("This flow changed before the command could be saved.");
+    this.name = "ActionSubmissionConflictError";
+  }
+}
 
 function getFirstRuntimeStepId(
   action: Awaited<ReturnType<typeof getRuntimeProjectAction>>,
@@ -123,6 +133,10 @@ export async function recordActionFlowProgress(
     return null;
   }
 
+  if (submission.revision !== input.expectedRevision) {
+    throw new ActionSubmissionConflictError();
+  }
+
   const updatedSubmission = await updateActionSubmission({
     projectId: input.projectId,
     submissionId: submission.id,
@@ -130,7 +144,12 @@ export async function recordActionFlowProgress(
     status: "in_progress",
     fields: input.fields,
     metadata: input.metadata ?? submission.metadata,
+    expectedRevision: input.expectedRevision,
   });
+
+  if (!updatedSubmission) {
+    throw new ActionSubmissionConflictError();
+  }
 
   if (input.event) {
     await addActionSubmissionEvent({
@@ -157,6 +176,10 @@ export async function submitActionFlowSubmission(
     return null;
   }
 
+  if (submission.revision !== input.expectedRevision) {
+    throw new ActionSubmissionConflictError();
+  }
+
   const updatedSubmission = await updateActionSubmission({
     projectId: input.projectId,
     submissionId: submission.id,
@@ -164,10 +187,11 @@ export async function submitActionFlowSubmission(
     status: "submitted",
     fields: input.fields,
     metadata: submission.metadata,
+    expectedRevision: input.expectedRevision,
   });
 
   if (!updatedSubmission) {
-    return null;
+    throw new ActionSubmissionConflictError();
   }
 
   await addActionSubmissionEvent({
@@ -195,6 +219,10 @@ export async function cancelActionFlowSubmission(
     return null;
   }
 
+  if (submission.revision !== input.expectedRevision) {
+    throw new ActionSubmissionConflictError();
+  }
+
   const updatedSubmission = await updateActionSubmission({
     projectId: input.projectId,
     submissionId: submission.id,
@@ -202,7 +230,12 @@ export async function cancelActionFlowSubmission(
     status: "cancelled",
     fields: submission.fields,
     metadata: submission.metadata,
+    expectedRevision: input.expectedRevision,
   });
+
+  if (!updatedSubmission) {
+    throw new ActionSubmissionConflictError();
+  }
 
   if (updatedSubmission) {
     await addActionSubmissionEvent({

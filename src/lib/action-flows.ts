@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import {
   ACTION_BRANCH_OPERATORS,
   type ActionBranchOperator,
@@ -692,6 +692,7 @@ export type UpdateActionSubmissionInput = {
   status?: ActionSubmissionStatus;
   fields?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  expectedRevision: number;
 };
 
 export async function listProjectActions(projectId: number) {
@@ -1891,6 +1892,7 @@ export async function updateActionSubmission(
       status: input.status,
       fields: input.fields,
       metadata: input.metadata,
+      revision: sql`${actionSubmissions.revision} + 1`,
       submittedAt: input.status === "submitted" ? new Date() : undefined,
       updatedAt: new Date(),
     })
@@ -1898,6 +1900,7 @@ export async function updateActionSubmission(
       and(
         eq(actionSubmissions.projectId, input.projectId),
         eq(actionSubmissions.id, input.submissionId),
+        eq(actionSubmissions.revision, input.expectedRevision),
       ),
     )
     .returning();
@@ -1909,6 +1912,7 @@ export async function markActionSubmissionForReview(input: {
   currentStepId?: number | null;
   fields?: Record<string, unknown>;
   handoff: Record<string, unknown>;
+  expectedRevision: number;
   projectId: number;
   submissionId: number;
 }) {
@@ -1931,12 +1935,14 @@ export async function markActionSubmissionForReview(input: {
         handoff: input.handoff,
       },
       status: "under_review",
+      revision: sql`${actionSubmissions.revision} + 1`,
       updatedAt: new Date(),
     })
     .where(
       and(
         eq(actionSubmissions.projectId, input.projectId),
         eq(actionSubmissions.id, input.submissionId),
+        eq(actionSubmissions.revision, input.expectedRevision),
       ),
     )
     .returning();
@@ -1948,11 +1954,13 @@ export async function setActionSubmissionStatus(
   projectId: number,
   submissionId: number,
   status: ActionSubmissionStatus,
+  expectedRevision?: number,
 ) {
   const [submission] = await db
     .update(actionSubmissions)
     .set({
       status,
+      revision: sql`${actionSubmissions.revision} + 1`,
       submittedAt: status === "submitted" ? new Date() : undefined,
       updatedAt: new Date(),
     })
@@ -1960,6 +1968,9 @@ export async function setActionSubmissionStatus(
       and(
         eq(actionSubmissions.projectId, projectId),
         eq(actionSubmissions.id, submissionId),
+        expectedRevision === undefined
+          ? undefined
+          : eq(actionSubmissions.revision, expectedRevision),
       ),
     )
     .returning();

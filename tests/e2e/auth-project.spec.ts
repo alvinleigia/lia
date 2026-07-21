@@ -1746,6 +1746,58 @@ test("project chat resumes an active flow after refresh without duplicate writes
       text: "different request",
     }),
   ).rejects.toThrow("already used for another request");
+
+  const expectedRevision = firstResult.activeFlow?.revision;
+  expect(expectedRevision).toBeDefined();
+  const concurrentResults = await Promise.allSettled([
+    runBrowserFlowText({
+      channelType: "project_chat",
+      commandId: `concurrent-a-${runId}`,
+      conversationId: duplicateConversationId,
+      expectedRevision,
+      projectId,
+      source: "project_chat",
+      text: "Concurrent Guest A",
+    }),
+    runBrowserFlowText({
+      channelType: "project_chat",
+      commandId: `concurrent-b-${runId}`,
+      conversationId: duplicateConversationId,
+      expectedRevision,
+      projectId,
+      source: "project_chat",
+      text: "Concurrent Guest B",
+    }),
+  ]);
+  expect(
+    concurrentResults.filter((result) => result.status === "fulfilled"),
+  ).toHaveLength(1);
+  const rejectedResult = concurrentResults.find(
+    (result) => result.status === "rejected",
+  );
+  expect(rejectedResult).toEqual(
+    expect.objectContaining({
+      reason: expect.objectContaining({ code: "stale" }),
+    }),
+  );
+
+  const submissionAfterConcurrentCommands =
+    await getActiveActionSubmissionForConversation({
+      conversationId: duplicateConversationId,
+      projectId,
+      source: "project_chat",
+    });
+  expect(submissionAfterConcurrentCommands?.fields.guestName).toMatch(
+    /^Concurrent Guest [AB]$/,
+  );
+  expect(
+    (
+      await listActionSubmissionEvents(
+        projectId,
+        submissionAfterConcurrentCommands?.id ?? 0,
+      )
+    ).filter((event) => event.eventType === "field.collected"),
+  ).toHaveLength(1);
 });
 
 test("browser media upload advances the canonical pinned flow", async ({

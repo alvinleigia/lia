@@ -174,6 +174,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
           commandId: createBrowserCommandId(),
           conversationId,
           editSection: input.editSection,
+          expectedRevision: activeFlow?.revision,
           text: input.text,
           token,
         },

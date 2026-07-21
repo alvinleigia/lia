@@ -108,6 +108,7 @@ export type ActiveActionFlow = {
   stepIndex: number;
   fields: Record<string, unknown>;
   mode: "collecting" | "confirming";
+  revision: number;
   submissionId?: number;
 };
 

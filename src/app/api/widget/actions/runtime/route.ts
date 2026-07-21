@@ -14,6 +14,7 @@ const requestSchema = z
     editSection: z
       .enum(["all", "email", "name", "phone", "schedule", "service"])
       .optional(),
+    expectedRevision: z.number().int().nonnegative().optional(),
     resume: z.boolean().optional(),
     text: z.string().max(4000).optional(),
     token: z.string().trim().min(1).max(256),
@@ -72,6 +73,7 @@ export async function POST(req: Request) {
       commandId: parsed.data.commandId,
       conversationId: parsed.data.conversationId,
       editSection: parsed.data.editSection,
+      expectedRevision: parsed.data.expectedRevision,
       projectId: accessResult.widgetAccess.projectId,
       resume: parsed.data.resume,
       source: "widget_chat",

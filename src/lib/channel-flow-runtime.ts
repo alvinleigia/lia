@@ -1,4 +1,5 @@
 import {
+  ActionSubmissionConflictError,
   cancelActionFlowSubmission,
   recordActionFlowProgress,
   startActionFlowSubmission,
@@ -344,6 +345,7 @@ async function submitFlow(input: {
     projectId: input.projectId,
     submissionId: input.submission.id,
     fields: input.submission.fields,
+    expectedRevision: input.submission.revision,
   });
 
   if (!submission) {
@@ -399,6 +401,7 @@ async function cancelParentReturnFlow(input: {
   await cancelActionFlowSubmission({
     projectId: input.projectId,
     submissionId: parentSubmission.id,
+    expectedRevision: parentSubmission.revision,
   });
 
   await addActionSubmissionEvent({
@@ -481,6 +484,7 @@ async function resumeParentFlowAfterSubmit(input: {
     submissionId: parentSubmission.id,
     currentStepId: nextStep?.id ?? null,
     fields,
+    expectedRevision: parentSubmission.revision,
     event: {
       eventType: "flow.returned",
       message: `Returned from connected flow ${input.childSubmission.metadata.actionName ?? input.childSubmission.actionId}.`,
@@ -545,9 +549,14 @@ async function requestHumanHandoff(input: {
     currentStepId: input.step.id,
     fields: input.submission.fields,
     handoff,
+    expectedRevision: input.submission.revision,
     projectId: input.projectId,
     submissionId: input.submission.id,
   });
+
+  if (!submission) {
+    throw new ActionSubmissionConflictError();
+  }
 
   await addActionSubmissionEvent({
     eventType: "flow.handoff_requested",
@@ -578,7 +587,7 @@ async function requestHumanHandoff(input: {
     submissionId: input.submission.id,
   });
 
-  return submission ?? input.submission;
+  return submission;
 }
 
 async function connectFlow(input: {
@@ -595,6 +604,7 @@ async function connectFlow(input: {
     await cancelActionFlowSubmission({
       projectId: input.projectId,
       submissionId: input.submission.id,
+      expectedRevision: input.submission.revision,
     });
 
     return {
@@ -617,6 +627,7 @@ async function connectFlow(input: {
     await cancelActionFlowSubmission({
       projectId: input.projectId,
       submissionId: input.submission.id,
+      expectedRevision: input.submission.revision,
     });
 
     return {
@@ -637,6 +648,7 @@ async function connectFlow(input: {
     await cancelActionFlowSubmission({
       projectId: input.projectId,
       submissionId: input.submission.id,
+      expectedRevision: input.submission.revision,
     });
 
     return {
@@ -666,6 +678,7 @@ async function connectFlow(input: {
     await cancelActionFlowSubmission({
       projectId: input.projectId,
       submissionId: input.submission.id,
+      expectedRevision: input.submission.revision,
     });
   }
 
@@ -735,6 +748,7 @@ async function advanceFlowToNextStep(input: {
       await cancelActionFlowSubmission({
         projectId: input.projectId,
         submissionId: submission.id,
+        expectedRevision: submission.revision,
       });
 
       return {
@@ -851,6 +865,7 @@ async function advanceFlowToNextStep(input: {
         submissionId: submission.id,
         currentStepId: step.id,
         fields: nextFields,
+        expectedRevision: submission.revision,
         event: {
           eventType: "flow.operation_result",
           message: "Inline operation completed.",
@@ -905,6 +920,7 @@ async function advanceFlowToNextStep(input: {
         submissionId: submission.id,
         currentStepId: step.id,
         fields: submission.fields,
+        expectedRevision: submission.revision,
       });
       submission = updatedSubmission ?? submission;
       replies.push(
@@ -927,6 +943,7 @@ async function advanceFlowToNextStep(input: {
         submissionId: submission.id,
         currentStepId: step.id,
         fields: submission.fields,
+        expectedRevision: submission.revision,
       });
       submission = updatedSubmission ?? submission;
       replies.push(...buildRuntimeRepliesForStep(step, submission.fields));
@@ -941,6 +958,7 @@ async function advanceFlowToNextStep(input: {
     submissionId: submission.id,
     currentStepId: null,
     fields: submission.fields,
+    expectedRevision: submission.revision,
   });
   submission = updatedSubmission ?? submission;
 
@@ -1052,6 +1070,7 @@ export async function startChannelFlowEdit(input: {
       actionName: input.action.name,
       fields: input.submission.fields,
       mode: "confirming",
+      revision: input.submission.revision,
       stepIndex: getRunnableActionSteps(input.action).length,
       submissionId: input.submission.id,
     },
@@ -1080,6 +1099,7 @@ export async function startChannelFlowEdit(input: {
     submissionId: input.submission.id,
     currentStepId: editStepIds[0],
     fields: editFlow.fields,
+    expectedRevision: input.submission.revision,
     metadata,
     event: {
       eventType: "flow.edit_started",
@@ -1141,6 +1161,7 @@ async function continueChannelFlow(input: {
       await cancelActionFlowSubmission({
         projectId: input.projectId,
         submissionId: input.submission.id,
+        expectedRevision: input.submission.revision,
       });
       await cancelParentReturnFlow({
         projectId: input.projectId,
@@ -1250,6 +1271,7 @@ async function continueChannelFlow(input: {
     submissionId: input.submission.id,
     currentStepId: nextStep?.id ?? null,
     fields: nextFields,
+    expectedRevision: input.submission.revision,
     metadata: editState
       ? updateFlowEditMetadata(
           input.submission.metadata,
@@ -1401,6 +1423,7 @@ async function continueChannelFlowMedia(input: {
     submissionId: input.submission.id,
     currentStepId: nextStep?.id ?? null,
     fields: nextFields,
+    expectedRevision: input.submission.revision,
     metadata: editState
       ? updateFlowEditMetadata(
           input.submission.metadata,
@@ -1475,6 +1498,7 @@ export async function processChannelFlowText(input: {
       await cancelActionFlowSubmission({
         projectId: input.projectId,
         submissionId: input.activeSubmission.id,
+        expectedRevision: input.activeSubmission.revision,
       });
       return {
         replies: [
@@ -1542,6 +1566,7 @@ export async function processChannelFlowMedia(input: {
     await cancelActionFlowSubmission({
       projectId: input.projectId,
       submissionId: input.activeSubmission.id,
+      expectedRevision: input.activeSubmission.revision,
     });
     return {
       replies: [

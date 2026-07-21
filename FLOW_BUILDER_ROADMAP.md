@@ -27,7 +27,7 @@ is not confused with the historical implementation phases later in this file.
 | Phase | Focus | Status |
 | --- | --- | --- |
 | 1 | Canonical server-owned browser flow runtime | Complete |
-| 2 | Flow state recovery and idempotent commands | In progress (Step 2 of 6 complete) |
+| 2 | Flow state recovery and idempotent commands | In progress (Step 3 of 6 complete) |
 | 3 | Shared channel adapter contracts and capability parity | Pending |
 | 4 | Graph integrity, routing diagnostics, and safe recovery | Pending |
 | 5 | Operation execution reliability and integration contracts | Pending |
