@@ -27,6 +27,7 @@ import { logChatRequest } from "../../src/lib/chat-logs";
 import { getOrCreateDefaultCompanyForUser } from "../../src/lib/companies";
 import { addContactTag, setContactAttribute } from "../../src/lib/contacts";
 import { getProjectSourceDocuments } from "../../src/lib/documents";
+import { getFlowStepChannelCapabilityIssues } from "../../src/lib/flow-channel-capabilities";
 import { listProjectMediaAssets } from "../../src/lib/media-assets";
 import {
   createIntegrationProvider,
@@ -95,6 +96,36 @@ test("shared channel adapter contract describes capability parity", async () => 
   });
   expect(fallbackButtons.mode).toBe("fallback");
   expect(fallbackButtons.delivery.body.type).toBe("text");
+
+  const buttonWarnings = getFlowStepChannelCapabilityIssues({
+    id: 1,
+    options: [],
+    settings: {
+      contentBlocks: [
+        {
+          displayMode: "buttons",
+          id: "choice-1",
+          options: ["One", "Two", "Three", "Four"],
+          text: "Choose one",
+          type: "choice",
+        },
+      ],
+    },
+    sortOrder: 1,
+    stepType: "choice",
+  });
+  expect(buttonWarnings).toHaveLength(1);
+  expect(buttonWarnings[0]?.message).toContain("3 native reply buttons");
+
+  const listWarnings = getFlowStepChannelCapabilityIssues({
+    id: 2,
+    options: Array.from({ length: 11 }, (_, index) => `Option ${index}`),
+    settings: { choiceDisplayMode: "list" },
+    sortOrder: 2,
+    stepType: "choice",
+  });
+  expect(listWarnings).toHaveLength(1);
+  expect(listWarnings[0]?.message).toContain("10 native list rows");
 });
 const platformAdminEmail =
   process.env.E2E_PLATFORM_ADMIN_EMAIL ?? "e2e-platform-admin@example.test";

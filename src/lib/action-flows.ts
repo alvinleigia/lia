@@ -15,8 +15,8 @@ import {
   operationAttempts,
   projectActions,
 } from "@/lib/db-schema";
+import { getFlowStepChannelCapabilityIssues } from "@/lib/flow-channel-capabilities";
 import { getInvalidAllowedFileTypeTokens } from "@/lib/flow-file-validation";
-import { getWhatsAppTemplateMetadataIssues } from "@/lib/whatsapp-template-metadata";
 
 export type {
   ActionBranchOperator,
@@ -232,182 +232,6 @@ function isInputStepType(stepType: string) {
     "product_selection",
     "file_upload",
   ].includes(stepType);
-}
-
-function canResolveMediaUrl(publicPath: unknown) {
-  if (typeof publicPath !== "string" || !publicPath.trim()) {
-    return false;
-  }
-
-  if (/^https?:\/\//i.test(publicPath)) {
-    return true;
-  }
-
-  const appBaseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? "";
-
-  return Boolean(appBaseUrl && publicPath.startsWith("/"));
-}
-
-function getProductCatalogExternalId(settings: Record<string, unknown>) {
-  const catalog = settings.productCatalog;
-
-  if (!catalog || typeof catalog !== "object" || Array.isArray(catalog)) {
-    return "";
-  }
-
-  const externalId = (catalog as Record<string, unknown>).externalId;
-  return typeof externalId === "string" ? externalId.trim() : "";
-}
-
-function hasWhatsAppProductRetailerId(product: unknown) {
-  if (!product || typeof product !== "object" || Array.isArray(product)) {
-    return false;
-  }
-
-  const record = product as Record<string, unknown>;
-  const retailerId =
-    typeof record.whatsappRetailerId === "string"
-      ? record.whatsappRetailerId.trim()
-      : "";
-  const sku = typeof record.sku === "string" ? record.sku.trim() : "";
-
-  return Boolean(retailerId || sku);
-}
-
-function getCapabilityWarningsForStep(step: {
-  id: number;
-  sortOrder: number;
-  stepType: string;
-  settings: Record<string, unknown>;
-}) {
-  const warnings: ActionFlowRouteValidationIssue[] = [];
-
-  if (
-    step.stepType === "media" &&
-    step.settings.mediaAsset &&
-    !canResolveMediaUrl(
-      (step.settings.mediaAsset as Record<string, unknown>).publicPath,
-    )
-  ) {
-    warnings.push({
-      source: "channel_capability",
-      severity: "warning",
-      stepId: step.id,
-      message: `Step ${step.sortOrder} can show media in browser channels, but WhatsApp native media needs a public app URL or absolute media URL.`,
-    });
-  }
-
-  if (isProductMessageStepType(step.stepType)) {
-    const products = Array.isArray(step.settings.products)
-      ? step.settings.products
-      : [];
-
-    if (!getProductCatalogExternalId(step.settings)) {
-      warnings.push({
-        source: "channel_capability",
-        severity: "warning",
-        stepId: step.id,
-        message: `Step ${step.sortOrder} has browser product cards, but WhatsApp native product messages need a Meta catalog id on the selected catalog.`,
-      });
-    }
-
-    if (products.length > 30) {
-      warnings.push({
-        source: "channel_capability",
-        severity: "warning",
-        stepId: step.id,
-        message: `Step ${step.sortOrder} has more than 30 products, so WhatsApp will use text fallback instead of a native product list.`,
-      });
-    }
-
-    if (products.some((product) => !hasWhatsAppProductRetailerId(product))) {
-      warnings.push({
-        source: "channel_capability",
-        severity: "warning",
-        stepId: step.id,
-        message: `Step ${step.sortOrder} has products without WhatsApp retailer ids or SKUs, so those products cannot be sent as native WhatsApp catalog items.`,
-      });
-    }
-  }
-
-  if (
-    step.stepType === "product_selection" &&
-    step.settings.productSelectionAllowMultiple === true
-  ) {
-    const products = Array.isArray(step.settings.products)
-      ? step.settings.products
-      : [];
-
-    if (!getProductCatalogExternalId(step.settings)) {
-      warnings.push({
-        source: "channel_capability",
-        severity: "warning",
-        stepId: step.id,
-        message: `Step ${step.sortOrder} can collect a cart, but native WhatsApp checkout needs a Meta catalog id on the selected catalog.`,
-      });
-    }
-
-    if (products.length > 30) {
-      warnings.push({
-        source: "channel_capability",
-        severity: "warning",
-        stepId: step.id,
-        message: `Step ${step.sortOrder} can collect a cart, but WhatsApp native cart payloads support up to 30 items.`,
-      });
-    }
-
-    if (products.some((product) => !hasWhatsAppProductRetailerId(product))) {
-      warnings.push({
-        source: "channel_capability",
-        severity: "warning",
-        stepId: step.id,
-        message: `Step ${step.sortOrder} can collect a cart, but every product needs a WhatsApp retailer id or SKU for native checkout handoff.`,
-      });
-    }
-  }
-
-  if (
-    isTemplateMessageStepType(step.stepType) &&
-    step.settings.whatsappTemplateStatus !== "approved"
-  ) {
-    warnings.push({
-      source: "channel_capability",
-      severity: "warning",
-      stepId: step.id,
-      message: `Step ${step.sortOrder} uses a WhatsApp template that is not marked approved, so runtime will use text fallback.`,
-    });
-  }
-
-  if (isTemplateMessageStepType(step.stepType)) {
-    const variables = Array.isArray(step.settings.whatsappTemplateVariables)
-      ? step.settings.whatsappTemplateVariables.filter(
-          (value): value is string => typeof value === "string",
-        )
-      : [];
-    const metadataIssues = getWhatsAppTemplateMetadataIssues({
-      body:
-        typeof step.settings.whatsappTemplateBody === "string"
-          ? step.settings.whatsappTemplateBody
-          : null,
-      status:
-        typeof step.settings.whatsappTemplateStatus === "string"
-          ? step.settings.whatsappTemplateStatus
-          : null,
-      variables,
-    });
-
-    for (const issue of metadataIssues) {
-      warnings.push({
-        source: "channel_capability",
-        severity: issue.severity === "info" ? "warning" : issue.severity,
-        stepId: step.id,
-        message: `Step ${step.sortOrder}: ${issue.message}`,
-      });
-    }
-  }
-
-  return warnings;
 }
 
 function hasManualOptions(options: unknown) {
@@ -1491,7 +1315,7 @@ export async function validateActionFlowRoutes(
   const issues: ActionFlowRouteValidationIssue[] = [];
 
   for (const step of steps) {
-    issues.push(...getCapabilityWarningsForStep(step));
+    issues.push(...getFlowStepChannelCapabilityIssues(step));
     issues.push(...getStepConfigIssues(step));
 
     if (step.stepType === "set_attribute") {
