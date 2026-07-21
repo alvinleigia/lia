@@ -313,6 +313,26 @@ const PLANNED_COMPONENTS: readonly FlowComponentDefinition[] = [
     label: "List Message",
     status: "planned",
   },
+  {
+    channels: ["project_chat", "widget", "whatsapp", "future"],
+    color: "#7c3aed",
+    description:
+      "Generate a grounded response after AI action contracts are available.",
+    group: "action",
+    key: "ai_knowledge",
+    label: "AI and Knowledge",
+    status: "planned",
+  },
+  {
+    channels: ["project_chat", "widget", "whatsapp", "future"],
+    color: "#475569",
+    description:
+      "Pause and resume after durable scheduling support is available.",
+    group: "action",
+    key: "wait",
+    label: "Wait",
+    status: "planned",
+  },
 ] as const;
 
 export const FLOW_COMPONENTS: readonly FlowComponentDefinition[] = [
