@@ -34,7 +34,7 @@ is not confused with the historical implementation phases later in this file.
 | 6 | Friendly input-family editors | Complete |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Complete |
-| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Pending |
+| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | In progress (Step 2 of 7) |
 | 10 | Cross-channel certification, UAT, and release sign-off | Pending |
 
 ### Phase 4 Delivery Steps
@@ -220,6 +220,37 @@ All 7 Phase 8 steps are complete:
 - Model, runtime, publish-validation, and database-backed browser tests cover
   typed groups, route precedence, field aliases, graph blockers, persistence,
   reload behavior, and tenant-scoped validation. No migration was required.
+
+### Phase 9 Delivery Steps
+
+1. Audit current operation execution, retries, queues, secrets, and tracing
+   boundaries.
+2. Define durable job, outbox, encrypted-secret, and trace contracts.
+3. Implement idempotent execution with retries, timeouts, lease recovery, and
+   pause/resume state.
+4. Implement transactional outbox delivery and recovery workers.
+5. Add encrypted provider-secret storage and safe provider configuration.
+6. Expose execution health, attempts, and trace diagnostics without revealing
+   secret values.
+7. Add regression coverage, run full verification, update UAT instructions,
+   and close Phase 9.
+
+Phase 9 uses one project-scoped durable-job contract for operation delivery,
+outbox dispatch, and scheduled flow resumption. A job has a stable dedupe key,
+a trace id, an availability time, bounded attempts, and an expiring processing
+lease so interrupted workers can safely recover it. Retry timing uses capped
+exponential backoff with jitter, and a completed dedupe key cannot execute a
+side effect again.
+
+Outbox messages are created in the same database transaction as the state
+change that requests delivery. Workers claim queued records atomically, record
+every attempt, and mark delivery only after the channel or provider confirms
+success. Secret-bearing provider fields are encrypted with AES-256-GCM under a
+versioned environment master key; provider configuration stores references,
+never plaintext secret values. Trace ids propagate from submissions and
+runtime commands through durable jobs, operation attempts, outbox messages,
+and audit events. Project ownership is required on every read, claim, update,
+retry, and diagnostic query.
 
 ### Phase 3 Delivery Steps
 
