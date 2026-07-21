@@ -34,7 +34,7 @@ is not confused with the historical implementation phases later in this file.
 | 6 | Friendly input-family editors | Complete |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Complete |
-| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | In progress (Step 2 of 7) |
+| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | In progress (Step 3 of 7) |
 | 10 | Cross-channel certification, UAT, and release sign-off | Pending |
 
 ### Phase 4 Delivery Steps

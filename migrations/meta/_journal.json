@@ -218,6 +218,13 @@
       "when": 1785015000000,
       "tag": "0030_operation_attempt_idempotency",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1785101400000,
+      "tag": "0031_durable_execution_foundation",
+      "breakpoints": true
     }
   ]
 }

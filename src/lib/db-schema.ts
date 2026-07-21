@@ -203,6 +203,34 @@ export const integrationProviders = pgTable(
   ],
 );
 
+export const providerSecrets = pgTable(
+  "provider_secrets",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    providerId: integer("provider_id")
+      .notNull()
+      .references(() => integrationProviders.id),
+    secretName: text("secret_name").notNull(),
+    keyVersion: integer("key_version").notNull().default(1),
+    ciphertext: text("ciphertext").notNull(),
+    initializationVector: text("initialization_vector").notNull(),
+    authenticationTag: text("authentication_tag").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("provider_secrets_project_idx").on(table.projectId),
+    index("provider_secrets_provider_idx").on(table.providerId),
+    uniqueIndex("provider_secrets_provider_name_unique").on(
+      table.providerId,
+      table.secretName,
+    ),
+  ],
+);
+
 export const operations = pgTable(
   "operations",
   {
@@ -399,6 +427,7 @@ export const actionSubmissions = pgTable(
     ),
     currentStepId: integer("current_step_id"),
     conversationId: text("conversation_id"),
+    traceId: text("trace_id"),
     source: text("source").notNull().default("chat_widget"),
     status: text("status").notNull().default("in_progress"),
     revision: integer("revision").notNull().default(0),
@@ -419,6 +448,7 @@ export const actionSubmissions = pgTable(
     index("action_submissions_action_idx").on(table.actionId),
     index("action_submissions_action_version_idx").on(table.actionVersionId),
     index("action_submissions_status_idx").on(table.status),
+    index("action_submissions_trace_idx").on(table.traceId),
     index("action_submissions_created_at_idx").on(table.createdAt),
   ],
 );
@@ -434,6 +464,7 @@ export const actionSubmissionEvents = pgTable(
       .notNull()
       .references(() => actionSubmissions.id),
     eventType: text("event_type").notNull(),
+    traceId: text("trace_id"),
     message: text("message"),
     payload: jsonb("payload")
       .$type<Record<string, unknown>>()
@@ -444,6 +475,7 @@ export const actionSubmissionEvents = pgTable(
   (table) => [
     index("action_submission_events_project_idx").on(table.projectId),
     index("action_submission_events_submission_idx").on(table.submissionId),
+    index("action_submission_events_trace_idx").on(table.traceId),
     index("action_submission_events_created_at_idx").on(table.createdAt),
   ],
 );
@@ -458,6 +490,7 @@ export const flowRuntimeCommands = pgTable(
     source: text("source").notNull(),
     conversationId: text("conversation_id").notNull(),
     commandId: text("command_id").notNull(),
+    traceId: text("trace_id"),
     requestHash: text("request_hash").notNull(),
     status: text("status").notNull().default("processing"),
     response: jsonb("response").$type<Record<string, unknown>>(),
@@ -469,6 +502,7 @@ export const flowRuntimeCommands = pgTable(
   (table) => [
     index("flow_runtime_commands_project_idx").on(table.projectId),
     index("flow_runtime_commands_status_idx").on(table.status),
+    index("flow_runtime_commands_trace_idx").on(table.traceId),
     uniqueIndex("flow_runtime_commands_scope_unique").on(
       table.projectId,
       table.source,
@@ -794,6 +828,7 @@ export const operationAttempts = pgTable(
       () => actionSubmissions.id,
     ),
     idempotencyKey: text("idempotency_key"),
+    traceId: text("trace_id"),
     status: text("status").notNull().default("pending"),
     requestPayload: jsonb("request_payload")
       .$type<Record<string, unknown>>()
@@ -815,10 +850,112 @@ export const operationAttempts = pgTable(
     index("operation_attempts_action_idx").on(table.actionId),
     index("operation_attempts_submission_idx").on(table.submissionId),
     index("operation_attempts_status_idx").on(table.status),
+    index("operation_attempts_trace_idx").on(table.traceId),
     index("operation_attempts_created_at_idx").on(table.createdAt),
     uniqueIndex("operation_attempts_idempotency_unique").on(
       table.projectId,
       table.idempotencyKey,
+    ),
+  ],
+);
+
+export const durableJobs = pgTable(
+  "durable_jobs",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    submissionId: integer("submission_id").references(
+      () => actionSubmissions.id,
+    ),
+    operationAttemptId: integer("operation_attempt_id").references(
+      () => operationAttempts.id,
+    ),
+    jobType: text("job_type").notNull(),
+    status: text("status").notNull().default("queued"),
+    dedupeKey: text("dedupe_key").notNull(),
+    traceId: text("trace_id").notNull(),
+    payload: jsonb("payload")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    result: jsonb("result")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(5),
+    availableAt: timestamp("available_at").defaultNow().notNull(),
+    leaseOwner: text("lease_owner"),
+    leaseExpiresAt: timestamp("lease_expires_at"),
+    lastError: text("last_error"),
+    completedAt: timestamp("completed_at"),
+    cancelledAt: timestamp("cancelled_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("durable_jobs_project_idx").on(table.projectId),
+    index("durable_jobs_status_available_idx").on(
+      table.status,
+      table.availableAt,
+    ),
+    index("durable_jobs_lease_idx").on(table.leaseExpiresAt),
+    index("durable_jobs_trace_idx").on(table.traceId),
+    uniqueIndex("durable_jobs_dedupe_unique").on(
+      table.projectId,
+      table.jobType,
+      table.dedupeKey,
+    ),
+  ],
+);
+
+export const outboxMessages = pgTable(
+  "outbox_messages",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    durableJobId: integer("durable_job_id").references(() => durableJobs.id),
+    submissionId: integer("submission_id").references(
+      () => actionSubmissions.id,
+    ),
+    operationAttemptId: integer("operation_attempt_id").references(
+      () => operationAttempts.id,
+    ),
+    topic: text("topic").notNull(),
+    destination: text("destination"),
+    status: text("status").notNull().default("queued"),
+    dedupeKey: text("dedupe_key").notNull(),
+    traceId: text("trace_id").notNull(),
+    payload: jsonb("payload")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(5),
+    availableAt: timestamp("available_at").defaultNow().notNull(),
+    leaseOwner: text("lease_owner"),
+    leaseExpiresAt: timestamp("lease_expires_at"),
+    lastError: text("last_error"),
+    deliveredAt: timestamp("delivered_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("outbox_messages_project_idx").on(table.projectId),
+    index("outbox_messages_status_available_idx").on(
+      table.status,
+      table.availableAt,
+    ),
+    index("outbox_messages_lease_idx").on(table.leaseExpiresAt),
+    index("outbox_messages_trace_idx").on(table.traceId),
+    uniqueIndex("outbox_messages_dedupe_unique").on(
+      table.projectId,
+      table.topic,
+      table.dedupeKey,
     ),
   ],
 );
@@ -982,10 +1119,16 @@ export type InsertIntegrationProvider =
   typeof integrationProviders.$inferInsert;
 export type SelectIntegrationProvider =
   typeof integrationProviders.$inferSelect;
+export type InsertProviderSecret = typeof providerSecrets.$inferInsert;
+export type SelectProviderSecret = typeof providerSecrets.$inferSelect;
 export type InsertOperation = typeof operations.$inferInsert;
 export type SelectOperation = typeof operations.$inferSelect;
 export type InsertOperationAttempt = typeof operationAttempts.$inferInsert;
 export type SelectOperationAttempt = typeof operationAttempts.$inferSelect;
+export type InsertDurableJob = typeof durableJobs.$inferInsert;
+export type SelectDurableJob = typeof durableJobs.$inferSelect;
+export type InsertOutboxMessage = typeof outboxMessages.$inferInsert;
+export type SelectOutboxMessage = typeof outboxMessages.$inferSelect;
 export type InsertProjectAction = typeof projectActions.$inferInsert;
 export type SelectProjectAction = typeof projectActions.$inferSelect;
 export type InsertActionFlowStep = typeof actionFlowSteps.$inferInsert;
