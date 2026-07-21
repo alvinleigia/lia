@@ -1295,7 +1295,8 @@ export function createWhatsAppChannelAdapter(): ChannelReplyAdapter<
         }
       }
 
-      const mode = delivery || reply.type === "text" ? "native" : "fallback";
+      const hasNativeDelivery = Boolean(delivery) || reply.type === "text";
+      const mode = hasNativeDelivery ? "native" : "fallback";
       if (!delivery) {
         delivery = {
           body: buildWhatsAppTextBody({ text: fallbackText, to: context.to }),
