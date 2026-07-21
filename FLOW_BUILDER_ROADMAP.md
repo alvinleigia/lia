@@ -33,7 +33,7 @@ is not confused with the historical implementation phases later in this file.
 | 5 | Friendly message-family editors | Complete |
 | 6 | Friendly input-family editors | Complete |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
-| 8 | Graph compiler with typed conditions and terminal-path validation | Pending |
+| 8 | Graph compiler with typed conditions and terminal-path validation | In progress (Step 1 of 7) |
 | 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Pending |
 | 10 | Cross-channel certification, UAT, and release sign-off | Pending |
 
@@ -174,6 +174,31 @@ All 6 Phase 7 steps are complete:
 - Compact canvas editing uses one action editor, tenant-validates referenced
   operations and flows, synchronizes operation route presets, and is covered by
   model and browser persistence tests.
+
+### Phase 8 Delivery Steps
+
+1. Audit route validation, branch operators, publish gates, and runtime
+   traversal, then define the compiler boundary.
+2. Define versioned typed-condition and compiled-graph contracts that preserve
+   existing single-condition branch rules.
+3. Implement a pure graph compiler with entry resolution, runtime-equivalent
+   fallback edges, reachability, cycle detection, and terminal-path analysis.
+4. Use compiler diagnostics at publish and runtime boundaries without changing
+   published-version pinning or channel behavior.
+5. Add friendly AND/OR condition editing and compiler diagnostics to the visual
+   builder while keeping technical ordering progressively disclosed.
+6. Add model, persistence, publish-gate, and runtime regression coverage.
+7. Run full verification, update UAT instructions, and close Phase 8.
+
+Phase 8 compiles enabled runtime steps rather than drawing-only canvas data.
+Post-submission operations remain deferred work and are not executable graph
+nodes. Branches are evaluated before explicit default routes and implicit
+ordered fallback, matching the current server runtime. Existing branch columns
+remain the primary condition for compatibility; optional versioned AND/OR
+groups are stored in branch settings, so no database migration is required.
+Submit, handoff, connected-flow, confirmation, and natural review boundaries
+are terminal outcomes. Broken targets, invalid typed comparisons, and reachable
+routing cycles block publishing; unreachable enabled steps are warnings.
 
 ### Phase 3 Delivery Steps
 
