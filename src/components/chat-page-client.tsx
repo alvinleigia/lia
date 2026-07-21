@@ -38,6 +38,7 @@ import {
   isActionInputStep,
   type RuntimeAction,
 } from "@/lib/action-runtime";
+import { browserRuntimeRepliesToFlowMessages } from "@/lib/browser-channel-adapter";
 import {
   createBrowserCommandId,
   getOrCreateSessionConversationId,
@@ -46,10 +47,7 @@ import {
   readBrowserFlowFailure,
   recoverBrowserFlowState,
 } from "@/lib/browser-conversation";
-import {
-  type BrowserFlowRuntimeResult,
-  runtimeRepliesToFlowMessages,
-} from "@/lib/browser-flow-contract";
+import type { BrowserFlowRuntimeResult } from "@/lib/browser-flow-contract";
 
 type ChatPageClientProps = {
   actions: RuntimeAction[];
@@ -119,7 +117,9 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
           return;
         }
 
-        setFlowMessages(runtimeRepliesToFlowMessages(result.replies));
+        setFlowMessages(
+          browserRuntimeRepliesToFlowMessages("project_chat", result.replies),
+        );
         setActiveFlow(result.activeFlow);
         setServerActiveAction(result.activeFlow ? result.action : null);
       })
@@ -180,7 +180,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     setServerActiveAction(result.activeFlow ? result.action : null);
     setFlowMessages((current) => [
       ...current,
-      ...runtimeRepliesToFlowMessages(result.replies),
+      ...browserRuntimeRepliesToFlowMessages("project_chat", result.replies),
       makeFlowMessage(
         "assistant",
         result.activeFlow
@@ -242,7 +242,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
         ...(input.displayUserText && input.text
           ? [makeFlowMessage("user", input.text)]
           : []),
-        ...runtimeRepliesToFlowMessages(result.replies),
+        ...browserRuntimeRepliesToFlowMessages("project_chat", result.replies),
       ]);
       setActiveFlow(result.activeFlow);
       setServerActiveAction(result.activeFlow ? result.action : null);
@@ -340,7 +340,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       setFlowMessages((current) => [
         ...current,
         makeFlowMessage("user", upload.label),
-        ...runtimeRepliesToFlowMessages(upload.replies),
+        ...browserRuntimeRepliesToFlowMessages("project_chat", upload.replies),
       ]);
       setActiveFlow(upload.activeFlow);
       setServerActiveAction(upload.activeFlow ? upload.action : null);
