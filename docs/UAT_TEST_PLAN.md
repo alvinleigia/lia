@@ -620,7 +620,62 @@ Spa Service` action while learning the builder.
   Status:
   Notes:
 
-### 6.6 Test routing and branching
+### 6.6 Test friendly action editors
+
+- [ ] Add a completion action.
+  Instructions: Select `Submit` from the Actions group. Give the step a clear
+  name, add the short confirmation shown to the visitor, keep it active, and
+  save it.
+  Expected result: Only the step name, optional confirmation, and active state
+  are shown. The saved action appears as a terminal step.
+  Status:
+  Notes:
+
+- [ ] Add and edit an integration action.
+  Instructions: Ensure a project operation exists under `/projects/operations`,
+  then add `API Request`. Select the operation by name, choose `During the
+  conversation`, expand `Result and routing`, enter a result field, and select
+  success and failure destinations. Save, close, and reopen the step.
+  Expected result: The operation, timing, result field, and route destinations
+  persist. Exactly one friendly integration editor is shown and no duplicate
+  technical action form appears.
+  Status:
+  Notes:
+
+- [ ] Add a human handoff action.
+  Instructions: Add `Request Intervention`. Enter the visitor message, team or
+  queue, priority, and whether the team should be notified. Optionally select a
+  notification operation when one is configured.
+  Expected result: Handoff settings use business language and save without
+  exposing operation IDs or raw settings.
+  Status:
+  Notes:
+
+- [ ] Add a connected-flow action.
+  Instructions: Create a second disposable action, then add `Connect Flow` to
+  the UAT flow. Select the other flow by name and choose whether to return to
+  the current flow or end it after the connected flow finishes.
+  Expected result: Only active flows from the selected project can be chosen,
+  and the selected flow and return behavior persist after reopening.
+  Status:
+  Notes:
+
+- [ ] Add contact-detail and contact-tag actions.
+  Instructions: Add `Set Attribute`, choose a reusable answer or a fixed value,
+  and save it. Add `Add Tag` with two plain-language tags.
+  Expected result: Each action displays only its relevant fields. The reusable
+  answer list uses field names already collected by this project's flows.
+  Status:
+  Notes:
+
+- [ ] Confirm planned actions are honest.
+  Instructions: Review `AI and Knowledge` and `Wait` in the Actions palette.
+  Expected result: Both remain visible but disabled. Each shows a specific
+  reason describing the runtime contract that must be completed first.
+  Status:
+  Notes:
+
+### 6.7 Test routing and branching
 
 - [ ] Confirm the normal route order.
   Instructions: Connect or configure the default path as Welcome, Service
@@ -645,7 +700,7 @@ Spa Service` action while learning the builder.
   Status:
   Notes:
 
-### 6.7 Validate and publish
+### 6.8 Validate and publish
 
 - [ ] Review diagnostics before publishing.
   Instructions: Return to the action detail page and review readiness warnings.

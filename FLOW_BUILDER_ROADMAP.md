@@ -32,7 +32,7 @@ is not confused with the historical implementation phases later in this file.
 | 4 | Universal Add Content menu with explicit disabled reasons | Complete |
 | 5 | Friendly message-family editors | Complete |
 | 6 | Friendly input-family editors | Complete |
-| 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | In progress (Step 1 of 6) |
+| 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Pending |
 | 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Pending |
 | 10 | Cross-channel certification, UAT, and release sign-off | Pending |
@@ -155,6 +155,25 @@ defined prompt, grounding, output, and failure contract; wait requires durable
 pause and resume execution. Both remain discoverable but disabled until those
 runtime contracts are implemented, avoiding flow definitions that can be saved
 but not executed.
+
+### Phase 7 Closeout
+
+All 6 Phase 7 steps are complete:
+
+- One shared registry maps every executable action step to a friendly family
+  and limits fields to the settings relevant to that runtime behavior.
+- Completion, handoff, connected-flow, contact-detail, and contact-tag actions
+  use plain-language primary editors without changing their stored contracts.
+- Integration actions select a project operation by name, choose inline or
+  post-submission execution, and progressively disclose result storage plus
+  success and failure routing.
+- Conditions remain branch routes with plain-language labels and destinations;
+  route order stays available through progressive disclosure.
+- AI/knowledge and wait actions are visible in the palette with exact disabled
+  reasons until their runtime contracts are implemented.
+- Compact canvas editing uses one action editor, tenant-validates referenced
+  operations and flows, synchronizes operation route presets, and is covered by
+  model and browser persistence tests.
 
 ### Phase 3 Delivery Steps
 
