@@ -793,6 +793,7 @@ export const operationAttempts = pgTable(
     submissionId: integer("submission_id").references(
       () => actionSubmissions.id,
     ),
+    idempotencyKey: text("idempotency_key"),
     status: text("status").notNull().default("pending"),
     requestPayload: jsonb("request_payload")
       .$type<Record<string, unknown>>()
@@ -815,6 +816,10 @@ export const operationAttempts = pgTable(
     index("operation_attempts_submission_idx").on(table.submissionId),
     index("operation_attempts_status_idx").on(table.status),
     index("operation_attempts_created_at_idx").on(table.createdAt),
+    uniqueIndex("operation_attempts_idempotency_unique").on(
+      table.projectId,
+      table.idempotencyKey,
+    ),
   ],
 );
 

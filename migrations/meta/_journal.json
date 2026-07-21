@@ -211,6 +211,13 @@
       "when": 1784928600000,
       "tag": "0029_action_submission_revision",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1785015000000,
+      "tag": "0030_operation_attempt_idempotency",
+      "breakpoints": true
     }
   ]
 }

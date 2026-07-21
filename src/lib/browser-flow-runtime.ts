@@ -64,6 +64,7 @@ export class BrowserFlowCommandError extends Error {
 
 type RunBrowserFlowMediaInput = {
   channelType: ChannelType;
+  expectedRevision: number;
   media: FlowMediaUploadValue;
   projectId: number;
   source: string;
@@ -326,7 +327,7 @@ export async function runBrowserFlowText(
     return executeBrowserFlowText(input);
   }
 
-  const claim = await claimFlowRuntimeCommand({
+  const claim = await claimFlowRuntimeCommand<BrowserFlowRuntimeResult>({
     commandId: input.commandId,
     conversationId: input.conversationId,
     projectId: input.projectId,
@@ -387,6 +388,13 @@ export async function runBrowserFlowMedia(
     !submission.conversationId
   ) {
     return { action: null, activeFlow: null, handled: true, replies: [] };
+  }
+
+  if (submission.revision !== input.expectedRevision) {
+    throw new BrowserFlowCommandError(
+      "This flow changed in another request. Refresh and try again.",
+      "stale",
+    );
   }
 
   const result = await processChannelFlowMedia({

@@ -834,6 +834,7 @@ async function advanceFlowToNextStep(input: {
           : await runOperationForSubmission({
               actionId: input.action.id,
               fields: submission.fields,
+              idempotencyKey: `submission:${submission.id}:step:${step.id}:revision:${submission.revision}`,
               operationId: step.operationId,
               projectId: input.projectId,
               submissionId: submission.id,

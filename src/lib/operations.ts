@@ -489,6 +489,7 @@ export async function getProjectOperationAttemptWithDetails(
 
 async function executeProvider(input: {
   config: Record<string, unknown>;
+  idempotencyKey: string;
   providerType: string;
   operationType: string;
   payload: Record<string, unknown>;
@@ -516,18 +517,30 @@ async function executeProvider(input: {
   }
 
   if (input.providerType === "email") {
-    return executeEmailProvider(input.config, input.payload);
+    return executeEmailProvider(
+      input.config,
+      input.payload,
+      input.idempotencyKey,
+    );
   }
 
   if (
     input.providerType === "webhook" ||
     input.providerType === "n8n_webhook"
   ) {
-    return executeWebhookProvider(input.config, input.payload);
+    return executeWebhookProvider(
+      input.config,
+      input.payload,
+      input.idempotencyKey,
+    );
   }
 
   if (input.providerType === "meta_conversions_api") {
-    return executeMetaConversionsProvider(input.config, input.payload);
+    return executeMetaConversionsProvider(
+      input.config,
+      input.payload,
+      input.idempotencyKey,
+    );
   }
 
   return {
@@ -795,6 +808,7 @@ async function postWebhookAttempt(input: {
 async function executeWebhookProvider(
   config: Record<string, unknown>,
   payload: Record<string, unknown>,
+  idempotencyKey: string,
 ) {
   const url = readStringConfig(config, "url");
   if (!url) {
@@ -820,6 +834,7 @@ async function executeWebhookProvider(
   const secret = readStringConfig(config, "secret");
   const headers = {
     "content-type": "application/json",
+    "idempotency-key": idempotencyKey,
     "x-lia-event": "operation.execute",
     ...(secret ? { "x-lia-signature": buildSignature(secret, body) } : {}),
     ...readHeadersConfig(config),
@@ -871,11 +886,16 @@ async function executeWebhookProvider(
 async function executeEmailProvider(
   config: Record<string, unknown>,
   payload: Record<string, unknown>,
+  idempotencyKey: string,
 ) {
   const webhookUrl = readStringConfig(config, "webhookUrl");
 
   if (webhookUrl) {
-    return executeWebhookProvider({ ...config, url: webhookUrl }, payload);
+    return executeWebhookProvider(
+      { ...config, url: webhookUrl },
+      payload,
+      idempotencyKey,
+    );
   }
 
   return {
@@ -893,6 +913,7 @@ async function executeEmailProvider(
 async function executeMetaConversionsProvider(
   config: Record<string, unknown>,
   payload: Record<string, unknown>,
+  idempotencyKey: string,
 ) {
   const datasetId =
     readStringConfig(config, "datasetId") ??
@@ -922,9 +943,7 @@ async function executeMetaConversionsProvider(
     readStringConfig(config, "eventSourceUrl");
   const eventId =
     readPayloadString(mappedPayload, "eventId", "event_id") ??
-    (typeof payload.submissionId === "number"
-      ? `submission-${payload.submissionId}`
-      : null);
+    (typeof payload.submissionId === "number" ? idempotencyKey : null);
   const testEventCode =
     readPayloadString(mappedPayload, "testEventCode", "test_event_code") ??
     readStringConfig(config, "testEventCode");
@@ -1062,11 +1081,12 @@ async function addOperationSubmissionEvent(input: {
 }
 
 export async function runOperationForSubmission(input: {
-  projectId: number;
   actionId: number;
-  submissionId: number;
-  operationId: number;
   fields: Record<string, unknown>;
+  idempotencyKey: string;
+  operationId: number;
+  projectId: number;
+  submissionId: number;
 }): Promise<OperationRunResult | null> {
   const operationContext = await getProjectOperation(
     input.projectId,
@@ -1083,12 +1103,13 @@ export async function runOperationForSubmission(input: {
   }
 
   const requestPayload = {
+    idempotencyKey: input.idempotencyKey,
     operationType: operation.operationType,
     submissionId: input.submissionId,
     payload: buildInputPayload(input.fields, operation.inputMapping),
   };
   const startedAt = new Date();
-  const [attempt] = await db
+  const [createdAttempt] = await db
     .insert(operationAttempts)
     .values({
       projectId: input.projectId,
@@ -1096,14 +1117,62 @@ export async function runOperationForSubmission(input: {
       providerId: provider.id,
       actionId: input.actionId,
       submissionId: input.submissionId,
+      idempotencyKey: input.idempotencyKey,
       status: "pending",
       requestPayload,
       startedAt,
     })
+    .onConflictDoNothing()
     .returning();
+
+  if (!createdAttempt) {
+    const [existingAttempt] = await db
+      .select()
+      .from(operationAttempts)
+      .where(
+        and(
+          eq(operationAttempts.projectId, input.projectId),
+          eq(operationAttempts.idempotencyKey, input.idempotencyKey),
+        ),
+      )
+      .limit(1);
+
+    if (!existingAttempt) {
+      throw new Error("Could not reserve the operation attempt.");
+    }
+
+    if (existingAttempt.status === "pending") {
+      throw new Error("This operation is already being processed.");
+    }
+
+    if (
+      existingAttempt.status !== "completed" &&
+      existingAttempt.status !== "failed"
+    ) {
+      throw new Error("This operation attempt has an invalid status.");
+    }
+
+    const replayOutput = buildOutputPayload({
+      attemptId: existingAttempt.id,
+      errorMessage: existingAttempt.errorMessage,
+      outputMapping: operation.outputMapping,
+      requestPayload: existingAttempt.requestPayload,
+      responsePayload: existingAttempt.responsePayload,
+      status: existingAttempt.status,
+    });
+
+    return {
+      attempt: existingAttempt,
+      contactAttributes: replayOutput.contactAttributes,
+      fields: replayOutput.fields,
+    };
+  }
+
+  const attempt = createdAttempt;
 
   const result = await executeProvider({
     config: provider.config,
+    idempotencyKey: input.idempotencyKey,
     providerType: provider.providerType,
     operationType: operation.operationType,
     payload: requestPayload,
@@ -1189,6 +1258,7 @@ export async function runOperationPreview(input: {
     payload: buildInputPayload(input.fields, operation.inputMapping),
   };
   const startedAt = new Date();
+  const idempotencyKey = `preview:${input.projectId}:${operation.id}:${startedAt.getTime()}`;
   const [attempt] = await db
     .insert(operationAttempts)
     .values({
@@ -1197,6 +1267,7 @@ export async function runOperationPreview(input: {
       providerId: provider.id,
       actionId: null,
       submissionId: null,
+      idempotencyKey,
       status: "pending",
       requestPayload,
       startedAt,
@@ -1205,6 +1276,7 @@ export async function runOperationPreview(input: {
 
   const result = await executeProvider({
     config: provider.config,
+    idempotencyKey,
     providerType: provider.providerType,
     operationType: operation.operationType,
     payload: requestPayload,
@@ -1270,6 +1342,7 @@ export async function replayOperationAttempt(input: {
     },
   };
   const startedAt = new Date();
+  const idempotencyKey = `replay:${sourceAttempt.id}:${startedAt.getTime()}`;
   const [attempt] = await db
     .insert(operationAttempts)
     .values({
@@ -1278,6 +1351,7 @@ export async function replayOperationAttempt(input: {
       providerId: provider.id,
       actionId: sourceAttempt.actionId,
       submissionId: sourceAttempt.submissionId,
+      idempotencyKey,
       status: "pending",
       requestPayload,
       startedAt,
@@ -1286,6 +1360,7 @@ export async function replayOperationAttempt(input: {
 
   const result = await executeProvider({
     config: provider.config,
+    idempotencyKey,
     providerType: provider.providerType,
     operationType: operation.operationType,
     payload: requestPayload,
@@ -1528,6 +1603,7 @@ export async function runSubmissionOperations(
       projectId,
       actionId: submission.actionId,
       submissionId: submission.id,
+      idempotencyKey: `submission:${submission.id}:step:${row.step.id}`,
       operationId: row.operation.id,
       fields: submission.fields,
     });

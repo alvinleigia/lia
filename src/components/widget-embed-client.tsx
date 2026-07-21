@@ -25,6 +25,7 @@ import {
   createBrowserCommandId,
   getOrCreateSessionConversationId,
   postBrowserFlowCommand,
+  postBrowserFlowMediaCommand,
 } from "@/lib/browser-conversation";
 import {
   type BrowserFlowRuntimeResult,
@@ -258,14 +259,16 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("commandId", createBrowserCommandId());
+      formData.append("expectedRevision", String(flow.revision));
       formData.append("stepId", String(step.id));
       formData.append("submissionId", String(flow.submissionId));
       formData.append("token", token);
 
-      const response = await fetch("/api/widget/actions/flow/media", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await postBrowserFlowMediaCommand(
+        "/api/widget/actions/flow/media",
+        formData,
+      );
 
       if (!response.ok) {
         const errorPayload = (await response.json().catch(() => null)) as {

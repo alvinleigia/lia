@@ -3,33 +3,24 @@ import {
   isInactiveAccountError,
   resolveUserAndProject,
 } from "@/lib/auth-project";
-import { runBrowserFlowMedia } from "@/lib/browser-flow-runtime";
-import {
-  FlowMediaUploadError,
-  uploadActionFlowMedia,
-} from "@/lib/flow-media-upload";
+import { runBrowserFlowMediaCommand } from "@/lib/browser-flow-media-command";
+import { FlowMediaUploadError } from "@/lib/flow-media-upload";
 
 export async function POST(req: Request) {
   try {
     const { project } = await resolveUserAndProject();
-    const upload = await uploadActionFlowMedia({
+    const result = await runBrowserFlowMediaCommand({
+      channelType: "project_chat",
       formData: await req.formData(),
       projectId: project.id,
       source: "project_chat",
     });
-    const runtime = await runBrowserFlowMedia({
-      channelType: "project_chat",
-      media: upload.value,
-      projectId: project.id,
-      source: "project_chat",
-      submissionId: upload.submissionId,
-    });
 
-    return NextResponse.json({ ...upload, ...runtime });
+    return NextResponse.json(result);
   } catch (error) {
     if (error instanceof FlowMediaUploadError) {
       return NextResponse.json(
-        { message: error.message },
+        { code: error.code, message: error.message },
         { status: error.status },
       );
     }

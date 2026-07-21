@@ -1,4 +1,7 @@
-import { getActionSubmission } from "@/lib/action-flows";
+import {
+  getActionSubmission,
+  reserveActionSubmissionRevision,
+} from "@/lib/action-flows";
 import { type ChannelType, recordChannelInboundMessage } from "@/lib/channels";
 import {
   doesFileMatchAllowedFileTypes,
@@ -12,12 +15,18 @@ import {
 import { getRuntimeProjectActionForSubmission } from "@/lib/runtime-actions";
 
 export class FlowMediaUploadError extends Error {
+  code?: "conflict" | "failed" | "processing" | "stale";
   status: number;
 
-  constructor(message: string, status = 400) {
+  constructor(
+    message: string,
+    status = 400,
+    code?: "conflict" | "failed" | "processing" | "stale",
+  ) {
     super(message);
     this.name = "FlowMediaUploadError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -45,6 +54,7 @@ function getChannelTypeForSubmissionSource(source: string): ChannelType | null {
 }
 
 export async function uploadActionFlowMedia(input: {
+  expectedRevision: number;
   formData: FormData;
   projectId: number;
   source: "project_chat" | "widget_chat";
@@ -114,6 +124,19 @@ export async function uploadActionFlowMedia(input: {
     );
   }
 
+  const reservedSubmission = await reserveActionSubmissionRevision({
+    expectedRevision: input.expectedRevision,
+    projectId: input.projectId,
+    submissionId,
+  });
+  if (!reservedSubmission) {
+    throw new FlowMediaUploadError(
+      "This flow changed in another request. Refresh and try again.",
+      409,
+      "stale",
+    );
+  }
+
   let asset: Awaited<ReturnType<typeof saveProjectMediaFileUpload>>;
 
   try {
@@ -121,11 +144,11 @@ export async function uploadActionFlowMedia(input: {
       file,
       projectId: input.projectId,
       metadata: {
-        actionId: submission.actionId,
+        actionId: reservedSubmission.actionId,
         source: "flow_upload",
         stepId,
         submissionId,
-        submissionSource: submission.source,
+        submissionSource: reservedSubmission.source,
       },
     });
   } catch {
@@ -141,26 +164,29 @@ export async function uploadActionFlowMedia(input: {
     sizeBytes: asset.sizeBytes,
   };
 
-  const channelType = getChannelTypeForSubmissionSource(submission.source);
-  if (channelType && submission.conversationId) {
+  const channelType = getChannelTypeForSubmissionSource(
+    reservedSubmission.source,
+  );
+  if (channelType && reservedSubmission.conversationId) {
     await recordChannelInboundMessage({
       projectId: input.projectId,
       channelType,
-      externalConversationId: submission.conversationId,
+      externalConversationId: reservedSubmission.conversationId,
       text: asset.originalName,
       messageType: asset.mediaType,
       payload: {
         event: "flow.media_uploaded",
         mediaAsset: value,
         stepId,
-        submissionId: submission.id,
+        submissionId: reservedSubmission.id,
       },
     });
   }
 
   return {
     label: `Uploaded ${asset.originalName}`,
-    submissionId: submission.id,
+    revision: reservedSubmission.revision,
+    submissionId: reservedSubmission.id,
     value,
   };
 }

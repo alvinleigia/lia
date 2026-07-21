@@ -31,6 +31,19 @@ export async function postBrowserFlowCommand(
   }
 }
 
+export async function postBrowserFlowMediaCommand(
+  url: string,
+  formData: FormData,
+) {
+  const send = () => fetch(url, { body: formData, method: "POST" });
+
+  try {
+    return await send();
+  } catch {
+    return send();
+  }
+}
+
 export function getOrCreateSessionConversationId(input: {
   key: string;
   prefix: string;

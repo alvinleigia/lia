@@ -1908,6 +1908,30 @@ export async function updateActionSubmission(
   return submission ?? null;
 }
 
+export async function reserveActionSubmissionRevision(input: {
+  expectedRevision: number;
+  projectId: number;
+  submissionId: number;
+}) {
+  const [submission] = await db
+    .update(actionSubmissions)
+    .set({
+      revision: sql`${actionSubmissions.revision} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(actionSubmissions.projectId, input.projectId),
+        eq(actionSubmissions.id, input.submissionId),
+        eq(actionSubmissions.status, "in_progress"),
+        eq(actionSubmissions.revision, input.expectedRevision),
+      ),
+    )
+    .returning();
+
+  return submission ?? null;
+}
+
 export async function markActionSubmissionForReview(input: {
   currentStepId?: number | null;
   fields?: Record<string, unknown>;

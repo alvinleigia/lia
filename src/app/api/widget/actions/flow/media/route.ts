@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { runBrowserFlowMedia } from "@/lib/browser-flow-runtime";
-import {
-  FlowMediaUploadError,
-  uploadActionFlowMedia,
-} from "@/lib/flow-media-upload";
+import { runBrowserFlowMediaCommand } from "@/lib/browser-flow-media-command";
+import { FlowMediaUploadError } from "@/lib/flow-media-upload";
 import { resolveWidgetTokenAccessForRequest } from "@/lib/widget-keys";
 
 export async function POST(req: Request) {
@@ -26,24 +23,18 @@ export async function POST(req: Request) {
     }
     const { widgetAccess } = widgetAccessResult;
 
-    const upload = await uploadActionFlowMedia({
+    const result = await runBrowserFlowMediaCommand({
+      channelType: "widget",
       formData,
       projectId: widgetAccess.projectId,
       source: "widget_chat",
     });
-    const runtime = await runBrowserFlowMedia({
-      channelType: "widget",
-      media: upload.value,
-      projectId: widgetAccess.projectId,
-      source: "widget_chat",
-      submissionId: upload.submissionId,
-    });
 
-    return NextResponse.json({ ...upload, ...runtime });
+    return NextResponse.json(result);
   } catch (error) {
     if (error instanceof FlowMediaUploadError) {
       return NextResponse.json(
-        { message: error.message },
+        { code: error.code, message: error.message },
         { status: error.status },
       );
     }

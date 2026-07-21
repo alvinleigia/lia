@@ -11,10 +11,8 @@ import {
   updateActionFlowStep,
 } from "../../src/lib/action-flows";
 import { writeAuditLog } from "../../src/lib/audit";
-import {
-  runBrowserFlowMedia,
-  runBrowserFlowText,
-} from "../../src/lib/browser-flow-runtime";
+import { runBrowserFlowMediaCommand } from "../../src/lib/browser-flow-media-command";
+import { runBrowserFlowText } from "../../src/lib/browser-flow-runtime";
 import { processChannelFlowText } from "../../src/lib/channel-flow-runtime";
 import {
   recordChannelInboundMessage,
@@ -24,12 +22,12 @@ import { logChatRequest } from "../../src/lib/chat-logs";
 import { getOrCreateDefaultCompanyForUser } from "../../src/lib/companies";
 import { addContactTag, setContactAttribute } from "../../src/lib/contacts";
 import { getProjectSourceDocuments } from "../../src/lib/documents";
-import { uploadActionFlowMedia } from "../../src/lib/flow-media-upload";
 import { listProjectMediaAssets } from "../../src/lib/media-assets";
 import {
   createIntegrationProvider,
   createOperation,
   listProjectOperationAttemptsWithDetails,
+  runOperationForSubmission,
 } from "../../src/lib/operations";
 import {
   listProjectCatalogProducts,
@@ -1868,27 +1866,39 @@ test("browser media upload advances the canonical pinned flow", async ({
     throw new Error("Expected an active runtime-media submission.");
   }
 
-  const formData = new FormData();
-  formData.append(
-    "file",
-    new File([`runtime media ${runId}`], `runtime-media-${runId}.txt`, {
-      type: "text/plain",
-    }),
-  );
-  formData.append("stepId", String(uploadStep.id));
-  formData.append("submissionId", String(activeSubmission.id));
-  const upload = await uploadActionFlowMedia({
-    formData,
-    projectId,
-    source: "widget_chat",
-  });
-  const mediaResult = await runBrowserFlowMedia({
+  const mediaAssetCountBefore = (await listProjectMediaAssets(projectId))
+    .length;
+  const commandId = `e2e-media-command-${runId}`;
+  const createMediaFormData = () => {
+    const formData = new FormData();
+    formData.append(
+      "file",
+      new File([`runtime media ${runId}`], `runtime-media-${runId}.txt`, {
+        type: "text/plain",
+      }),
+    );
+    formData.append("commandId", commandId);
+    formData.append("expectedRevision", String(activeSubmission.revision));
+    formData.append("stepId", String(uploadStep.id));
+    formData.append("submissionId", String(activeSubmission.id));
+    return formData;
+  };
+  const mediaResult = await runBrowserFlowMediaCommand({
     channelType: "widget",
-    media: upload.value,
+    formData: createMediaFormData(),
     projectId,
     source: "widget_chat",
-    submissionId: upload.submissionId,
   });
+  const replayedMediaResult = await runBrowserFlowMediaCommand({
+    channelType: "widget",
+    formData: createMediaFormData(),
+    projectId,
+    source: "widget_chat",
+  });
+  expect(replayedMediaResult).toEqual(mediaResult);
+  expect((await listProjectMediaAssets(projectId)).length).toBe(
+    mediaAssetCountBefore + 1,
+  );
   expect(mediaResult.activeFlow).toBeNull();
   expect(
     mediaResult.replies.map((reply) => reply.fallbackText).join("\n"),
@@ -1982,6 +1992,24 @@ test("channel action flow follows inline operation success and failure routes", 
     projectId,
   });
   expect(successAttempt.attempt.status).toBe("completed");
+  if (!successAttempt.attempt.idempotencyKey) {
+    throw new Error("Expected an idempotency key for the operation attempt.");
+  }
+  const replayedAttempt = await runOperationForSubmission({
+    actionId: successFlow.action.id,
+    fields: successSubmission.fields,
+    idempotencyKey: successAttempt.attempt.idempotencyKey,
+    operationId: successFlow.operation.id,
+    projectId,
+    submissionId: successSubmission.id,
+  });
+  expect(replayedAttempt?.attempt.id).toBe(successAttempt.attempt.id);
+  expect(
+    await listProjectOperationAttemptsWithDetails({
+      operationId: successFlow.operation.id,
+      projectId,
+    }),
+  ).toHaveLength(1);
 
   const successEvents = await listActionSubmissionEvents(
     projectId,

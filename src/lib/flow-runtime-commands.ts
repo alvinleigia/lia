@@ -1,5 +1,4 @@
 import { and, eq } from "drizzle-orm";
-import type { BrowserFlowRuntimeResult } from "@/lib/browser-flow-contract";
 import { db } from "@/lib/db-config";
 import { flowRuntimeCommands } from "@/lib/db-schema";
 
@@ -11,9 +10,9 @@ type ClaimFlowRuntimeCommandInput = {
   source: string;
 };
 
-export type FlowRuntimeCommandClaim =
+export type FlowRuntimeCommandClaim<TResponse> =
   | { commandId: number; state: "claimed" }
-  | { result: BrowserFlowRuntimeResult; state: "replay" }
+  | { result: TResponse; state: "replay" }
   | { state: "conflict" | "failed" | "processing" };
 
 function commandScope(input: ClaimFlowRuntimeCommandInput) {
@@ -25,9 +24,9 @@ function commandScope(input: ClaimFlowRuntimeCommandInput) {
   );
 }
 
-export async function claimFlowRuntimeCommand(
+export async function claimFlowRuntimeCommand<TResponse>(
   input: ClaimFlowRuntimeCommandInput,
-): Promise<FlowRuntimeCommandClaim> {
+): Promise<FlowRuntimeCommandClaim<TResponse>> {
   const [created] = await db
     .insert(flowRuntimeCommands)
     .values(input)
@@ -50,7 +49,7 @@ export async function claimFlowRuntimeCommand(
 
   if (existing.status === "completed" && existing.response) {
     return {
-      result: existing.response as BrowserFlowRuntimeResult,
+      result: existing.response as TResponse,
       state: "replay",
     };
   }
@@ -62,16 +61,16 @@ export async function claimFlowRuntimeCommand(
   return { state: "processing" };
 }
 
-export async function completeFlowRuntimeCommand(input: {
+export async function completeFlowRuntimeCommand<TResponse>(input: {
   commandId: number;
   projectId: number;
-  result: BrowserFlowRuntimeResult;
+  result: TResponse;
 }) {
   await db
     .update(flowRuntimeCommands)
     .set({
       completedAt: new Date(),
-      response: input.result,
+      response: input.result as Record<string, unknown>,
       status: "completed",
       updatedAt: new Date(),
     })

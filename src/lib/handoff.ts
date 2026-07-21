@@ -52,6 +52,7 @@ export async function runHandoffNotification(input: {
       handoffStepLabel: input.handoff.stepLabel,
       handoffSubmissionId: input.submissionId,
     },
+    idempotencyKey: `submission:${input.submissionId}:handoff:${input.step.id}`,
     operationId: input.step.operationId,
     projectId: input.projectId,
     submissionId: input.submissionId,
