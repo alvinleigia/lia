@@ -1,4 +1,4 @@
-import { PlugZap, Plus, Workflow } from "lucide-react";
+import { Activity, PlugZap, Plus, Workflow } from "lucide-react";
 import Link from "next/link";
 import { NoProjectState } from "@/components/no-project-state";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { assertPermission } from "@/lib/access-control";
+import { getProjectExecutionDiagnostics } from "@/lib/execution-diagnostics";
 import {
   getOperationAttemptMappedOutput,
   getProjectOperationAttemptWithDetails,
@@ -153,16 +154,18 @@ export default async function OperationsPage({
   const attemptOperationId = parsePositiveInteger(params.attemptOperationId);
   const attemptStatus = parseAttemptStatus(params.attemptStatus);
   const attemptReplayFilter = parseReplayFilter(params.attemptReplay);
-  const [providers, operationRows, attemptRows] = await Promise.all([
-    listProjectIntegrationProviders(project.id),
-    listProjectOperations(project.id),
-    listProjectOperationAttemptsWithDetails({
-      projectId: project.id,
-      limit: attemptReplayFilter === "all" ? 25 : 100,
-      operationId: attemptOperationId,
-      status: attemptStatus,
-    }),
-  ]);
+  const [providers, operationRows, attemptRows, executionDiagnostics] =
+    await Promise.all([
+      listProjectIntegrationProviders(project.id),
+      listProjectOperations(project.id),
+      listProjectOperationAttemptsWithDetails({
+        projectId: project.id,
+        limit: attemptReplayFilter === "all" ? 25 : 100,
+        operationId: attemptOperationId,
+        status: attemptStatus,
+      }),
+      getProjectExecutionDiagnostics(project.id),
+    ]);
   const recentAttempts = attemptRows
     .filter(({ attempt }) => {
       const replaySource = getAttemptReplaySource(attempt.requestPayload);
@@ -293,6 +296,87 @@ export default async function OperationsPage({
                         </Button>
                       </form>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Execution Health
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                ["Queued", executionDiagnostics.counts.queued],
+                ["Processing", executionDiagnostics.counts.processing],
+                ["Failed", executionDiagnostics.counts.failed],
+                ["Completed", executionDiagnostics.counts.completed],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-md border bg-white p-3">
+                  <p className="text-xs uppercase text-muted-foreground">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            {executionDiagnostics.items.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No durable execution activity yet.
+              </p>
+            ) : (
+              <div className="divide-y rounded-md border bg-white">
+                {executionDiagnostics.items.map((item) => (
+                  <div
+                    key={`${item.kind}:${item.id}`}
+                    className="space-y-2 px-4 py-3"
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="font-medium capitalize">
+                          {item.name.replaceAll("_", " ")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.kind === "outbox"
+                            ? "Outbound delivery"
+                            : "Background job"}
+                          {` · Attempt ${item.attempts} of ${item.maxAttempts}`}
+                        </p>
+                      </div>
+                      <div className="text-left sm:text-right">
+                        <span className="inline-flex rounded-md border px-2 py-1 text-xs capitalize">
+                          {item.status}
+                        </span>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Updated {item.updatedAt.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    {item.status === "queued" && item.attempts > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Next retry {item.availableAt.toLocaleString()}
+                      </p>
+                    )}
+                    {item.lastError && (
+                      <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                        {item.lastError}
+                      </p>
+                    )}
+                    <details className="text-xs text-muted-foreground">
+                      <summary className="cursor-pointer select-none">
+                        Trace details
+                      </summary>
+                      <code className="mt-2 block break-all rounded-md bg-gray-50 p-2">
+                        {item.traceId}
+                      </code>
+                    </details>
                   </div>
                 ))}
               </div>
@@ -545,6 +629,16 @@ export default async function OperationsPage({
                           Replay of attempt #
                           {getAttemptReplaySource(attempt.requestPayload)}
                         </p>
+                      )}
+                      {attempt.traceId && (
+                        <details className="text-xs text-muted-foreground">
+                          <summary className="cursor-pointer select-none">
+                            Trace details
+                          </summary>
+                          <code className="mt-2 block break-all rounded-md bg-gray-50 p-2">
+                            {attempt.traceId}
+                          </code>
+                        </details>
                       )}
                     </div>
                     <div className="space-y-2 text-left text-xs text-muted-foreground md:text-right">

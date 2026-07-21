@@ -34,7 +34,7 @@ is not confused with the historical implementation phases later in this file.
 | 6 | Friendly input-family editors | Complete |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
 | 8 | Graph compiler with typed conditions and terminal-path validation | Complete |
-| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | In progress (Step 6 of 7) |
+| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | In progress (Step 7 of 7) |
 | 10 | Cross-channel certification, UAT, and release sign-off | Pending |
 
 ### Phase 4 Delivery Steps
@@ -265,6 +265,11 @@ and stored in project/provider-scoped secret records; the execution boundary
 hydrates them only on the server. Legacy plaintext provider credentials move
 to the secret table on first execution. WhatsApp access, app-secret, and verify
 tokens use the same encrypted envelope while retaining masked edit behavior.
+
+Step 6 adds a project-scoped execution-health view beside the existing
+operation history. It summarizes queued, processing, failed, and completed
+work and shows recent job attempts, retry timing, errors, and expandable trace
+ids without rendering delivery destinations, payloads, or provider secrets.
 
 ### Phase 3 Delivery Steps
 
