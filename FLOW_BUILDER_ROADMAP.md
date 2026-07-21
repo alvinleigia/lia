@@ -29,7 +29,7 @@ is not confused with the historical implementation phases later in this file.
 | 1 | One server execution engine for project chat, widget, and channels | Complete |
 | 2 | Published-version pinning and recoverable flow runs | Complete |
 | 3 | Versioned block contracts and shared channel adapters | Complete |
-| 4 | Universal Add Content menu with explicit disabled reasons | In progress (Step 5 of 6) |
+| 4 | Universal Add Content menu with explicit disabled reasons | Complete |
 | 5 | Friendly message-family editors | Pending |
 | 6 | Friendly input-family editors | Pending |
 | 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Pending |
@@ -49,6 +49,23 @@ is not confused with the historical implementation phases later in this file.
 Phase 4 preserves the existing runtime and persisted `contentBlocks` contract.
 It improves discoverability and guidance without introducing a second flow
 model or pretending that action-only blocks are inline message content.
+
+### Phase 4 Closeout
+
+All 6 Phase 4 steps are complete:
+
+- One registry defines the available content components, their defaults, and
+  their applicability requirements.
+- Both the inline canvas menu and compact step editor show the same nine
+  message and action options.
+- Inapplicable options remain visible and explain the missing asset, catalog,
+  answer field, existing choice block, block limit, or standalone-step rule.
+- Text buttons and list messages use distinct display defaults and retain the
+  selected mode after saving and reloading.
+- Existing `contentBlocks` persistence and runtime interpretation remain
+  unchanged, so the menu does not introduce a channel-specific flow model.
+- Unit and browser regression coverage verify eligibility, disabled reasons,
+  editor parity, and persisted list-mode behavior.
 
 ### Phase 3 Delivery Steps
 

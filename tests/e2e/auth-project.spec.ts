@@ -654,7 +654,9 @@ test("universal Add Content menu explains availability in both canvas editors", 
     .filter({ hasText: "Universal Welcome" });
   await welcomeNode.getByRole("button", { name: "Add content" }).click();
 
-  let contentMenu = page.locator('[data-slot="popover-content"]:visible').last();
+  let contentMenu = page
+    .locator('[data-slot="popover-content"]:visible')
+    .last();
   await expect(contentMenu).toBeVisible();
   for (const label of [
     "Text message",

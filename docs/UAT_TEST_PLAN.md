@@ -420,6 +420,15 @@ Spa Service` action while learning the builder.
   Status:
   Notes:
 
+- [ ] Add an answer step for content testing.
+  Instructions: Select `Ask Question` from the Blocks panel. Set the label to
+  `Contact Method`, field key to `preferredContact`, prompt to `How should we
+  contact you?`, input type to `Text`, and enable `Required`. Create the step.
+  Expected result: A Contact Method node appears without an existing choice or
+  list content block.
+  Status:
+  Notes:
+
 - [ ] Add a terminal step.
   Instructions: Select `Message` from the Blocks panel. Set the label to
   `Complete` and the message to `Thank you. Your request is complete.` Create
@@ -430,6 +439,32 @@ Spa Service` action while learning the builder.
   Notes:
 
 ### 6.4 Test canvas content editing
+
+- [ ] Review every Add Content option on a message node.
+  Instructions: On the Welcome node, select `Add content`. Confirm the menu
+  shows Text message, Text + buttons, List message, Media, Catalogue message,
+  Single product, Multiple products, Template, and Request intervention.
+  Expected result: All options remain visible. Text message is available.
+  Options that need an answer, media, catalog, product, or standalone step are
+  disabled with a plain-language reason.
+  Status:
+  Notes:
+
+- [ ] Confirm answer-specific content becomes available.
+  Instructions: Close the Welcome menu. On the Contact Method node, select
+  `Add content` and choose `List message`. Add two options: `Email` and `Phone`.
+  Save the node.
+  Expected result: List message is available on this answer step, both options
+  appear in the node, and the content is identified as a list message.
+  Status:
+  Notes:
+
+- [ ] Confirm duplicate choice content is prevented.
+  Instructions: Reopen `Add content` on the Contact Method node.
+  Expected result: Text + buttons and List message remain visible but are
+  disabled with `This step already has a choice or list block.`
+  Status:
+  Notes:
 
 - [ ] Edit content directly inside a node.
   Instructions: On the Welcome node, select the pencil icon beside its content.
@@ -457,12 +492,20 @@ Spa Service` action while learning the builder.
 
 - [ ] Confirm content persists after reload.
   Instructions: Refresh the browser and reopen the UAT Flow Test canvas.
-  Expected result: The saved steps, content, order, and canvas positions remain
-  unchanged.
+  Expected result: The saved steps, text content, Contact Method list mode,
+  options, content order, and canvas positions remain unchanged.
   Status:
   Notes:
 
 ### 6.5 Test compact and advanced editing
+
+- [ ] Confirm the compact editor uses the same Add Content menu.
+  Instructions: Select the Contact Method node itself, outside its inline
+  controls. In the Edit Step dialog, select `Add content`.
+  Expected result: The same nine options and disabled reasons shown on the
+  canvas are present in the compact editor.
+  Status:
+  Notes:
 
 - [ ] Open the compact Edit Step dialog.
   Instructions: Select the Email node itself, outside its inline controls.
