@@ -25,9 +25,7 @@ test("certification matrix contains one cell per enabled step and channel", () =
   expect(matrix).toHaveLength(enabled.length * CERTIFICATION_CHANNELS.length);
 
   for (const component of enabled) {
-    const cells = matrix.filter(
-      (cell) => cell.stepType === component.stepType,
-    );
+    const cells = matrix.filter((cell) => cell.stepType === component.stepType);
     expect(cells.map((cell) => cell.channel).sort()).toEqual(
       [...CERTIFICATION_CHANNELS].sort(),
     );
@@ -53,15 +51,13 @@ test("channel exclusions stay explicit instead of silently falling back", () => 
   expect(
     matrix.find(
       (cell) =>
-        cell.channel === "project_chat" &&
-        cell.stepType === "template_message",
+        cell.channel === "project_chat" && cell.stepType === "template_message",
     )?.expectation,
   ).toBe("unavailable");
   expect(
     matrix.find(
       (cell) =>
-        cell.channel === "project_chat" &&
-        cell.stepType === "catalog_message",
+        cell.channel === "project_chat" && cell.stepType === "catalog_message",
     )?.expectation,
   ).toBe("unavailable");
   expect(

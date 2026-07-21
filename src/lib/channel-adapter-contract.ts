@@ -28,9 +28,7 @@ export type ChannelAdapterLimits = {
   productItems: number | null;
 };
 
-export type ChannelAdapterProfile<
-  TChannelType extends string = ChannelType,
-> = {
+export type ChannelAdapterProfile<TChannelType extends string = ChannelType> = {
   channelType: TChannelType;
   inbound: {
     interactiveSelection: boolean;

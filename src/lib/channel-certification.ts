@@ -71,7 +71,9 @@ export type ChannelCertificationCell = {
   stepType: ActionStepType;
 };
 
-function toComponentChannel(channel: CertificationChannel): FlowComponentChannel {
+function toComponentChannel(
+  channel: CertificationChannel,
+): FlowComponentChannel {
   return channel === "reference_future" ? "future" : channel;
 }
 
@@ -108,8 +110,7 @@ export function buildChannelCertificationMatrix(): ChannelCertificationCell[] {
             : "runtime",
         family,
         label: component.label,
-        liveSignOffRequired:
-          isAvailable && channel !== "reference_future",
+        liveSignOffRequired: isAvailable && channel !== "reference_future",
         stepType: component.stepType,
       } satisfies ChannelCertificationCell;
     });
