@@ -168,10 +168,15 @@ export type CanvasStepBasicsInput = {
   waitUnit?: string;
 };
 
+export type CanvasMutationResult = {
+  message: string;
+  ok: boolean;
+};
+
 export type CanvasStepQuickSave = (
   stepId: number,
   input: CanvasStepBasicsInput,
-) => Promise<{ message: string; ok: boolean }>;
+) => Promise<CanvasMutationResult>;
 
 export type CanvasQuickEditChange = (
   stepId: number,
