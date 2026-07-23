@@ -51,6 +51,7 @@ import type {
   SelectMediaAsset,
   SelectProductCatalog,
 } from "@/lib/db-schema";
+import { getFlowInputType, isFlowInputStepType } from "@/lib/flow-input-editor";
 import { getProjectMediaAsset } from "@/lib/media-assets";
 import {
   getProjectCatalog,
@@ -223,7 +224,7 @@ const actionStepSchema = z
     options: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    const isInputStep = isInputStepType(data.stepType);
+    const isInputStep = isFlowInputStepType(data.stepType);
     const isPromptStep =
       data.stepType === "message" ||
       data.stepType === "display_result" ||
@@ -573,47 +574,6 @@ function buildActionSettings(input: {
   }
 
   return settings;
-}
-
-function isInputStepType(stepType: string) {
-  return [
-    "collect_input",
-    "choice",
-    "date",
-    "date_range",
-    "address",
-    "time",
-    "number",
-    "email",
-    "phone",
-    "location",
-    "product_selection",
-  ].includes(stepType);
-}
-
-function getInputTypeForStepType(
-  stepType: string,
-  inputType?: string,
-): string | null {
-  switch (stepType) {
-    case "date":
-      return "date";
-    case "email":
-      return "email";
-    case "number":
-      return "float";
-    case "phone":
-      return "phone";
-    case "time":
-      return "time";
-    case "address":
-    case "date_range":
-    case "location":
-    case "product_selection":
-      return "text";
-    default:
-      return inputType || null;
-  }
 }
 
 function getOperationStatusFieldKey(stepId: number, fieldKey?: string) {
@@ -1707,9 +1667,9 @@ export async function createActionFlowStepAction(formData: FormData) {
 
   const context = await resolveActionForCurrentProject(parsed.data.actionId);
   const { project, action } = context;
-  const isInputStep = isInputStepType(parsed.data.stepType);
+  const isInputStep = isFlowInputStepType(parsed.data.stepType);
   const canStoreFieldKey = isInputStep || parsed.data.stepType === "operation";
-  const inputType = getInputTypeForStepType(
+  const inputType = getFlowInputType(
     parsed.data.stepType,
     parsed.data.inputType,
   );
@@ -1900,9 +1860,9 @@ export async function updateActionFlowStepAction(formData: FormData) {
 
   const context = await resolveActionForCurrentProject(parsed.data.actionId);
   const { project, action } = context;
-  const isInputStep = isInputStepType(parsed.data.stepType);
+  const isInputStep = isFlowInputStepType(parsed.data.stepType);
   const canStoreFieldKey = isInputStep || parsed.data.stepType === "operation";
-  const inputType = getInputTypeForStepType(
+  const inputType = getFlowInputType(
     parsed.data.stepType,
     parsed.data.inputType,
   );

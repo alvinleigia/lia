@@ -35,6 +35,7 @@ import {
   getFlowContentBlocks,
   parseFlowContentBlocks,
 } from "@/lib/flow-content-blocks";
+import { getFlowInputType, isFlowInputStepType } from "@/lib/flow-input-editor";
 import { getProjectMediaAsset } from "@/lib/media-assets";
 import { getProjectOperation } from "@/lib/operations";
 import {
@@ -173,7 +174,7 @@ const canvasStepSchema = z
     options: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    const isInputStep = isInputStepType(data.stepType);
+    const isInputStep = isFlowInputStepType(data.stepType);
     const isPromptStep =
       data.stepType === "message" ||
       data.stepType === "display_result" ||
@@ -592,44 +593,6 @@ function setOptionalNumberSetting(
     settings[key] = value;
   } else {
     delete settings[key];
-  }
-}
-
-function isInputStepType(stepType: string) {
-  return [
-    "collect_input",
-    "choice",
-    "date",
-    "date_range",
-    "address",
-    "time",
-    "number",
-    "email",
-    "phone",
-    "location",
-    "product_selection",
-  ].includes(stepType);
-}
-
-function getInputTypeForStepType(stepType: string, inputType?: string) {
-  switch (stepType) {
-    case "date":
-      return "date";
-    case "email":
-      return "email";
-    case "number":
-      return "float";
-    case "phone":
-      return "phone";
-    case "time":
-      return "time";
-    case "address":
-    case "date_range":
-    case "location":
-    case "product_selection":
-      return "text";
-    default:
-      return inputType || null;
   }
 }
 
@@ -1150,8 +1113,8 @@ export async function createCanvasStepAction(
   const steps = await listActionFlowSteps(project.id, action.id);
   const sortOrder =
     steps.reduce((max, step) => Math.max(max, step.sortOrder), 0) + 1;
-  const isInputStep = isInputStepType(parsed.data.stepType);
-  const inputType = getInputTypeForStepType(
+  const isInputStep = isFlowInputStepType(parsed.data.stepType);
+  const inputType = getFlowInputType(
     parsed.data.stepType,
     parsed.data.inputType,
   );
@@ -1342,8 +1305,8 @@ export async function updateCanvasStepAction(
     return { ok: false, message: "Step not found." };
   }
 
-  const isInputStep = isInputStepType(parsed.data.stepType);
-  const inputType = getInputTypeForStepType(
+  const isInputStep = isFlowInputStepType(parsed.data.stepType);
+  const inputType = getFlowInputType(
     parsed.data.stepType,
     parsed.data.inputType,
   );
@@ -1537,7 +1500,7 @@ export async function updateCanvasStepBasicsAction(
     return { ok: false, message: "Step not found." };
   }
 
-  const isInputStep = isInputStepType(existingStep.stepType);
+  const isInputStep = isFlowInputStepType(existingStep.stepType);
   const isActionStep = [
     "add_tag",
     "connect_flow",
@@ -1737,9 +1700,9 @@ export async function updateCanvasStepBasicsAction(
       label: parsed.data.label || null,
       prompt: parsed.data.prompt || null,
       inputType: isInputStep
-        ? getInputTypeForStepType(
+        ? getFlowInputType(
             existingStep.stepType,
-            parsed.data.inputType ?? existingStep.inputType ?? undefined,
+            parsed.data.inputType ?? existingStep.inputType,
           )
         : existingStep.inputType,
       operationId:

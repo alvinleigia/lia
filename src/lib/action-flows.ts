@@ -22,6 +22,7 @@ import {
 import { resolveTraceId } from "@/lib/execution-trace";
 import { getFlowStepChannelCapabilityIssues } from "@/lib/flow-channel-capabilities";
 import { getInvalidAllowedFileTypeTokens } from "@/lib/flow-file-validation";
+import { isFlowInputStepType } from "@/lib/flow-input-editor";
 
 export type {
   ActionBranchOperator,
@@ -219,23 +220,6 @@ function isTemplateMessageStepType(stepType: string) {
   return stepType === "template_message";
 }
 
-function isInputStepType(stepType: string) {
-  return [
-    "collect_input",
-    "choice",
-    "date",
-    "date_range",
-    "address",
-    "time",
-    "number",
-    "email",
-    "phone",
-    "location",
-    "product_selection",
-    "file_upload",
-  ].includes(stepType);
-}
-
 function hasManualOptions(options: unknown) {
   return Array.isArray(options) && options.length > 0;
 }
@@ -411,7 +395,7 @@ function getStepConfigIssues(step: {
 }) {
   const issues: ActionFlowRouteValidationIssue[] = [];
 
-  if (isInputStepType(step.stepType)) {
+  if (isFlowInputStepType(step.stepType)) {
     if (!step.fieldKey?.trim()) {
       issues.push({
         source: "step_config",

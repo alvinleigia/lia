@@ -44,6 +44,7 @@ import {
   listActionFlowVersions,
   validateActionFlowRoutes,
 } from "@/lib/action-flows";
+import { isFlowInputStepType } from "@/lib/flow-input-editor";
 import {
   getActiveProjectIdCookie,
   resolvePageUserAndProject,
@@ -83,22 +84,6 @@ function formatOptionLabel(value: string) {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function isInputStepType(stepType: string) {
-  return [
-    "collect_input",
-    "choice",
-    "date",
-    "date_range",
-    "address",
-    "time",
-    "number",
-    "email",
-    "phone",
-    "location",
-    "product_selection",
-  ].includes(stepType);
 }
 
 function hasDynamicOptions(settings: Record<string, unknown>) {
@@ -187,7 +172,7 @@ function getPublishReadinessIssues(input: {
     (step) => step.stepType !== "operation",
   );
   const enabledFieldKeys = enabledSteps
-    .filter((step) => isInputStepType(step.stepType))
+    .filter((step) => isFlowInputStepType(step.stepType))
     .map((step) => step.fieldKey?.trim())
     .filter((fieldKey): fieldKey is string => Boolean(fieldKey));
   const fieldKeyCounts = enabledFieldKeys.reduce<Map<string, number>>(
@@ -218,7 +203,7 @@ function getPublishReadinessIssues(input: {
       issues.push(`Step ${step.sortOrder} is missing a prompt.`);
     }
 
-    if (isInputStepType(step.stepType)) {
+    if (isFlowInputStepType(step.stepType)) {
       if (!step.fieldKey?.trim()) {
         issues.push(`Step ${step.sortOrder} is missing a field key.`);
       }

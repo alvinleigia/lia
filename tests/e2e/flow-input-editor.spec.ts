@@ -26,6 +26,8 @@ test("fixed input blocks derive their runtime answer type", () => {
   expect(getFlowInputType("date", "text")).toBe("date");
   expect(getFlowInputType("time", "text")).toBe("time");
   expect(getFlowInputType("number", "text")).toBe("float");
+  expect(isFlowInputStepType("file_upload")).toBe(true);
+  expect(getFlowInputType("file_upload", null)).toBe("text");
   expect(getFlowInputType("collect_input", "int")).toBe("int");
   expect(allowsFlowAnswerFormatSelection("collect_input")).toBe(true);
   expect(allowsFlowAnswerFormatSelection("email")).toBe(false);
