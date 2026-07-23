@@ -931,7 +931,7 @@ test("universal Add Content menu explains availability in both canvas editors", 
     triggerPhrases: [],
   });
 
-  await createActionFlowStep({
+  const welcomeStep = await createActionFlowStep({
     actionId: action.id,
     isRequired: false,
     label: "Universal Welcome",
@@ -953,9 +953,15 @@ test("universal Add Content menu explains availability in both canvas editors", 
   });
 
   await page.goto(`/projects/actions/${action.id}/canvas`);
-  const welcomeNode = page
-    .locator(".react-flow__node")
-    .filter({ hasText: "Universal Welcome" });
+  const welcomeNode = page.locator(
+    `.react-flow__node[data-id="${welcomeStep.id}"]`,
+  );
+  await welcomeNode.getByTitle("Quick edit text").click();
+  await expect(welcomeNode.getByText("Quick edit step 1")).toBeVisible();
+  await expect(welcomeNode).toHaveCSS("z-index", "10000");
+  await welcomeNode.getByTitle("Cancel quick edit").click();
+  await expect(welcomeNode.getByText("Quick edit step 1")).not.toBeVisible();
+
   await welcomeNode.getByRole("button", { name: "Add content" }).click();
 
   let contentMenu = page

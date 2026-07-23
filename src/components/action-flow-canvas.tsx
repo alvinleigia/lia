@@ -352,6 +352,7 @@ type CanvasStepQuickSave = (
   stepId: number,
   input: CanvasStepBasicsInput,
 ) => Promise<{ message: string; ok: boolean }>;
+type CanvasQuickEditChange = (stepId: number, isEditing: boolean) => void;
 
 const CANVAS_INPUT_TYPES = [
   "text",
@@ -737,6 +738,7 @@ function CanvasStepNodeContent({
   catalogProducts,
   issueCount,
   mediaAssets,
+  onQuickEditChange,
   onQuickSave,
   productCatalogs,
   step,
@@ -744,6 +746,7 @@ function CanvasStepNodeContent({
   catalogProducts: CatalogProductOption[];
   issueCount: number;
   mediaAssets: MediaAssetOption[];
+  onQuickEditChange: CanvasQuickEditChange;
   onQuickSave: CanvasStepQuickSave;
   productCatalogs: ProductCatalogOption[];
   step: FlowStep;
@@ -780,6 +783,16 @@ function CanvasStepNodeContent({
   const [localFeedback, setLocalFeedback] = useState("");
   const [isSaving, startSaving] = useTransition();
   const stepColor = getStepColor(step);
+
+  useEffect(() => {
+    onQuickEditChange(step.id, isEditing);
+
+    return () => {
+      if (isEditing) {
+        onQuickEditChange(step.id, false);
+      }
+    };
+  }, [isEditing, onQuickEditChange, step.id]);
 
   useEffect(() => {
     if (isEditing) {
@@ -1262,6 +1275,7 @@ function CanvasStepNodeContent({
 function buildNodes(input: {
   catalogProducts: CatalogProductOption[];
   mediaAssets: MediaAssetOption[];
+  onQuickEditChange: CanvasQuickEditChange;
   onQuickSave: CanvasStepQuickSave;
   productCatalogs: ProductCatalogOption[];
   routeIssues: ActionFlowRouteValidationIssue[];
@@ -1294,6 +1308,7 @@ function buildNodes(input: {
             catalogProducts={input.catalogProducts}
             issueCount={issueCount}
             mediaAssets={input.mediaAssets}
+            onQuickEditChange={input.onQuickEditChange}
             onQuickSave={input.onQuickSave}
             productCatalogs={input.productCatalogs}
             step={step}
@@ -4212,8 +4227,19 @@ export function ActionFlowCanvas({
   const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
   const [isCreateStepDialogOpen, setIsCreateStepDialogOpen] = useState(false);
   const [paletteStepType, setPaletteStepType] = useState("collect_input");
+  const [quickEditingStepId, setQuickEditingStepId] = useState<number | null>(
+    null,
+  );
   const [selection, setSelection] = useState<InspectorSelection>(null);
   const [isPending, startTransition] = useTransition();
+  const handleQuickEditChange = useCallback(
+    (stepId: number, isEditing: boolean) => {
+      setQuickEditingStepId((currentStepId) =>
+        isEditing ? stepId : currentStepId === stepId ? null : currentStepId,
+      );
+    },
+    [],
+  );
   const quickSaveStep = useCallback(
     async (stepId: number, input: CanvasStepBasicsInput) => {
       setFeedback("");
@@ -4237,6 +4263,7 @@ export function ActionFlowCanvas({
       buildNodes({
         catalogProducts,
         mediaAssets,
+        onQuickEditChange: handleQuickEditChange,
         onQuickSave: quickSaveStep,
         productCatalogs,
         routeIssues,
@@ -4244,6 +4271,7 @@ export function ActionFlowCanvas({
       }),
     [
       catalogProducts,
+      handleQuickEditChange,
       mediaAssets,
       productCatalogs,
       quickSaveStep,
@@ -4300,6 +4328,17 @@ export function ActionFlowCanvas({
     setNodes(initialNodes);
     setHasUnsavedLayout(false);
   }, [initialNodes, setNodes]);
+
+  useEffect(() => {
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => {
+        const zIndex =
+          Number(node.id) === quickEditingStepId ? 10_000 : undefined;
+
+        return node.zIndex === zIndex ? node : { ...node, zIndex };
+      }),
+    );
+  }, [quickEditingStepId, setNodes]);
 
   const createStep = useCallback(
     (input: CanvasStepInput) => {
