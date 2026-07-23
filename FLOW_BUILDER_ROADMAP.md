@@ -1,1178 +1,850 @@
-# Chat Flow Builder Implementation Roadmap
-
-This roadmap describes how Lia AI should evolve from the current SaaS action
-builder into a robust visual flow builder for website widget, project chat,
-WhatsApp, and future channels.
-
-The roadmap has been revised after reviewing `docs/Flow Builder.docx`, which
-lists the essential builder components seen in a competitor-style flow builder:
-
-- Message types: text buttons, media buttons, list, catalogue message, single
-  product, multiple product, template.
-- Actions: request intervention, Meta Conversions API, condition, connect flow,
-  ask address, ask location, ask question, ask media, set attribute, add tag,
-  API request.
-
-The key conclusion is that the UI should not move faster than the runtime. A
-canvas can show these blocks today, but the product becomes robust only when
-each block has a clear config schema, runtime behavior, channel formatter,
-fallback behavior, validation, and tenant scoping.
-
-## Current Modernization Track
-
-The original 15-phase builder foundation is implemented. Ongoing hardening is
-tracked separately in the 10-phase modernization program below so current work
-is not confused with the historical implementation phases later in this file.
-
-| Phase | Focus | Status |
-| --- | --- | --- |
-| 1 | One server execution engine for project chat, widget, and channels | Complete |
-| 2 | Published-version pinning and recoverable flow runs | Complete |
-| 3 | Versioned block contracts and shared channel adapters | Complete |
-| 4 | Universal Add Content menu with explicit disabled reasons | Complete |
-| 5 | Friendly message-family editors | Complete |
-| 6 | Friendly input-family editors | Complete |
-| 7 | Action-family editors for conditions, handoff, API, subflows, AI, and wait | Complete |
-| 8 | Graph compiler with typed conditions and terminal-path validation | Complete |
-| 9 | Durable execution, retries, outbox delivery, secrets, and tracing | Complete |
-| 10 | Cross-channel certification, UAT, and release sign-off | Engineering complete; live UAT pending |
-
-### Phase 4 Delivery Steps
-
-1. Rebaseline this roadmap and audit the current Add Content implementation.
-2. Define one universal content-type registry and applicability contract.
-3. Centralize eligibility and disabled-reason resolution.
-4. Render every Add Content option with clear enabled or disabled states.
-5. Integrate the same menu into inline node editing and compact step editing.
-6. Add regression coverage, update UAT instructions, and close Phase 4.
-
-Phase 4 preserves the existing runtime and persisted `contentBlocks` contract.
-It improves discoverability and guidance without introducing a second flow
-model or pretending that action-only blocks are inline message content.
-
-### Phase 4 Closeout
-
-All 6 Phase 4 steps are complete:
-
-- One registry defines the available content components, their defaults, and
-  their applicability requirements.
-- Both the inline canvas menu and compact step editor show the same nine
-  message and action options.
-- Inapplicable options remain visible and explain the missing asset, catalog,
-  answer field, existing choice block, block limit, or standalone-step rule.
-- Text buttons and list messages use distinct display defaults and retain the
-  selected mode after saving and reloading.
-- Existing `contentBlocks` persistence and runtime interpretation remain
-  unchanged, so the menu does not introduce a channel-specific flow model.
-- Unit and browser regression coverage verify eligibility, disabled reasons,
-  editor parity, and persisted list-mode behavior.
-
-### Phase 5 Delivery Steps
-
-1. Audit the existing message editors and define the friendly editing contract.
-2. Create one shared editor model for every persisted message content family.
-3. Implement focused text, button, and list editing experiences.
-4. Implement focused media, catalog, single-product, and multi-product editors.
-5. Use the same family editors in inline canvas and compact step editing.
-6. Add regression coverage, update UAT instructions, and close Phase 5.
-
-Phase 5 keeps the existing `contentBlocks` schema, published flow versions,
-runtime replies, and channel fallback behavior. It replaces raw or duplicated
-configuration forms with visitor-facing labels, segmented presentation
-controls, label-based asset and product selection, and progressive disclosure.
-Input validation and action execution remain scoped to Phases 6 and 7.
-
-### Phase 5 Closeout
-
-All 6 Phase 5 steps are complete:
-
-- One shared family model defines friendly names, descriptions, labels, and
-  message limits for text, buttons, lists, typed choices, media, catalogs, and
-  product messages.
-- Text and choice editors provide character guidance, segmented presentation
-  controls, option ordering, and readable channel-limit warnings.
-- Media, catalog, single-product, and multi-product editors select resources by
-  name and keep technical identifiers out of the primary editing experience.
-- Template messages present the visible name and preview first while keeping
-  delivery metadata available through progressive disclosure.
-- Inline canvas editing and compact step editing render the same editor
-  components against the existing `contentBlocks` persistence contract.
-- Regression and UAT coverage verify menu compatibility, editor parity, list
-  persistence, and the expected controls for every message family.
-
-### Phase 6 Delivery Steps
-
-1. Audit the current input blocks, validation settings, and runtime behavior.
-2. Define one shared input-family registry and field-relevance contract.
-3. Build a common friendly editor for the visitor question, answer format,
-   required state, enabled state, and reusable answer key.
-4. Add family-specific validation for text, numbers, dates, files, structured
-   addresses, locations, and selectable answers.
-5. Use the shared input guidance across create, compact, and advanced editing
-   while preserving the existing action-step settings contract.
-6. Add regression coverage, update UAT instructions, and close Phase 6.
-
-Phase 6 keeps the existing action-step schema, server actions, published flow
-versions, runtime validation, structured values, and channel adapters. Fixed
-input blocks derive their answer format from their behavior; only Ask Question
-offers a general answer-format choice. Common validation is shown in plain
-language, while custom patterns and data keys remain available through
-progressive disclosure. Action execution remains scoped to Phase 7.
-
-### Phase 6 Closeout
-
-All 6 Phase 6 steps are complete:
-
-- One shared registry maps every supported input step to a friendly family,
-  automatic answer format, labels, placeholders, and relevant validation.
-- Ask Question retains selectable text, email, phone, date, time, whole-number,
-  and decimal-number formats without changing the persisted action-step model.
-- Dedicated email, phone, date, time, number, address, location, choice,
-  product, date-range, and upload blocks derive their format automatically.
-- Text, number, date, and file constraints use plain-language controls; custom
-  regular expressions and reusable answer keys remain progressively disclosed.
-- Create, compact, and advanced canvas editing use the same family definitions
-  while runtime validation and structured answer handling remain unchanged.
-- Model and browser regression coverage verifies relevance, persistence,
-  compact-editor parity, automatic formats, and upload presets.
-
-### Phase 7 Delivery Steps
-
-1. Audit action blocks, branch rules, runtime behavior, and operation settings.
-2. Define one action-family registry with supported and planned capabilities.
-3. Build friendly primary editors for conditions, handoff, contact updates,
-   tags, submission, and connected flows.
-4. Build friendly primary editors for API operations while keeping AI/knowledge
-   and wait actions visible with honest disabled reasons until runtime support.
-5. Use the shared action editors across create, compact, and advanced canvas
-   editing, then add model and browser regression coverage.
-6. Run full verification, update UAT instructions, and close Phase 7.
-
-Phase 7 preserves the existing action-step, operation, branch-rule, published
-version, and channel-independent runtime contracts. Conditions remain routes
-between steps rather than artificial executable nodes. AI/knowledge requires a
-defined prompt, grounding, output, and failure contract; wait requires durable
-pause and resume execution. Both remain discoverable but disabled until those
-runtime contracts are implemented, avoiding flow definitions that can be saved
-but not executed.
-
-### Phase 7 Closeout
-
-All 6 Phase 7 steps are complete:
-
-- One shared registry maps every executable action step to a friendly family
-  and limits fields to the settings relevant to that runtime behavior.
-- Completion, handoff, connected-flow, contact-detail, and contact-tag actions
-  use plain-language primary editors without changing their stored contracts.
-- Integration actions select a project operation by name, choose inline or
-  post-submission execution, and progressively disclose result storage plus
-  success and failure routing.
-- Conditions remain branch routes with plain-language labels and destinations;
-  route order stays available through progressive disclosure.
-- At Phase 7 closeout, AI/knowledge and wait actions were visible with exact
-  disabled reasons. Wait is now enabled by the durable runtime delivered in
-  Phase 9; AI/knowledge remains planned.
-- Compact canvas editing uses one action editor, tenant-validates referenced
-  operations and flows, synchronizes operation route presets, and is covered by
-  model and browser persistence tests.
-
-### Phase 8 Delivery Steps
-
-1. Audit route validation, branch operators, publish gates, and runtime
-   traversal, then define the compiler boundary.
-2. Define versioned typed-condition and compiled-graph contracts that preserve
-   existing single-condition branch rules.
-3. Implement a pure graph compiler with entry resolution, runtime-equivalent
-   fallback edges, reachability, cycle detection, and terminal-path analysis.
-4. Use compiler diagnostics at publish and runtime boundaries without changing
-   published-version pinning or channel behavior.
-5. Add friendly AND/OR condition editing and compiler diagnostics to the visual
-   builder while keeping technical ordering progressively disclosed.
-6. Add model, persistence, publish-gate, and runtime regression coverage.
-7. Run full verification, update UAT instructions, and close Phase 8.
-
-Phase 8 compiles enabled runtime steps rather than drawing-only canvas data.
-Post-submission operations remain deferred work and are not executable graph
-nodes. Branches are evaluated before explicit default routes and implicit
-ordered fallback, matching the current server runtime. Existing branch columns
-remain the primary condition for compatibility; optional versioned AND/OR
-groups are stored in branch settings, so no database migration is required.
-Submit, handoff, connected-flow, confirmation, and natural review boundaries
-are terminal outcomes. Broken targets, invalid typed comparisons, and reachable
-routing cycles block publishing; unreachable enabled steps are warnings.
-
-### Phase 8 Closeout
-
-All 7 Phase 8 steps are complete:
-
-- One pure compiler converts enabled runtime steps into branch, explicit
-  default, and ordered fallback edges using the same precedence as execution.
-- Versioned condition groups support up to ten typed conditions with `AND` or
-  `OR` matching while existing single-condition branch columns remain valid.
-- Text, number, date, time, and empty-value comparisons are compiled once and
-  evaluated by the shared server runtime for drafts and published snapshots.
-- Publishing now blocks missing or disabled targets, invalid comparisons,
-  terminal-source routes, reachable cycles, and paths that cannot finish.
-- Enabled steps that cannot be reached are reported as warnings so unfinished
-  canvas work stays visible without silently becoming part of live runtime.
-- The canvas presents named answers, compatible comparison controls, grouped
-  conditions, destinations, progressive route priority, and plain-language
-  diagnostic categories.
-- Model, runtime, publish-validation, and database-backed browser tests cover
-  typed groups, route precedence, field aliases, graph blockers, persistence,
-  reload behavior, and tenant-scoped validation. No migration was required.
-
-### Phase 9 Delivery Steps
-
-1. Audit current operation execution, retries, queues, secrets, and tracing
-   boundaries.
-2. Define durable job, outbox, encrypted-secret, and trace contracts.
-3. Implement idempotent execution with retries, timeouts, lease recovery, and
-   pause/resume state.
-4. Implement transactional outbox delivery and recovery workers.
-5. Add encrypted provider-secret storage and safe provider configuration.
-6. Expose execution health, attempts, and trace diagnostics without revealing
-   secret values.
-7. Add regression coverage, run full verification, update UAT instructions,
-   and close Phase 9.
-
-Phase 9 uses one project-scoped durable-job contract for operation delivery,
-outbox dispatch, and scheduled flow resumption. A job has a stable dedupe key,
-a trace id, an availability time, bounded attempts, and an expiring processing
-lease so interrupted workers can safely recover it. Retry timing uses capped
-exponential backoff with jitter, and a completed dedupe key cannot execute a
-side effect again.
-
-Outbox messages are created in the same database transaction as the state
-change that requests delivery. Workers claim queued records atomically, record
-every attempt, and mark delivery only after the channel or provider confirms
-success. Secret-bearing provider fields are encrypted with AES-256-GCM under a
-versioned environment master key; provider configuration stores references,
-never plaintext secret values. Trace ids propagate from submissions and
-runtime commands through durable jobs, operation attempts, outbox messages,
-and audit events. Project ownership is required on every read, claim, update,
-retry, and diagnostic query.
-
-Step 4 adds transactional WhatsApp reply outboxes, leased project-scoped
-delivery claims, retry recovery, immediate post-submission operation draining,
-and an authenticated global recovery endpoint that only discovers projects
-with due work before delegating to tenant-scoped workers. The recovery route is
-available for an external scheduler without adding a deployment schedule that
-would exceed Vercel Hobby cron limits.
-
-Step 5 adds authenticated AES-256-GCM envelopes with versioned key lookup.
-New integration-provider credentials are removed recursively from config JSON
-and stored in project/provider-scoped secret records; the execution boundary
-hydrates them only on the server. Legacy plaintext provider credentials move
-to the secret table on first execution. WhatsApp access, app-secret, and verify
-tokens use the same encrypted envelope while retaining masked edit behavior.
-
-Step 6 adds a project-scoped execution-health view beside the existing
-operation history. It summarizes queued, processing, failed, and completed
-work and shows recent job attempts, retry timing, errors, and expandable trace
-ids without rendering delivery destinations, payloads, or provider secrets.
-
-### Phase 9 Closeout
-
-All 7 Phase 9 steps are complete:
-
-- Project-scoped durable jobs use stable dedupe keys, bounded attempts, retry
-  backoff, expiring leases, cancellation, and interrupted-worker recovery.
-- Operation delivery and WhatsApp replies use recoverable jobs and a
-  transactional outbox, with immediate draining for responsive requests and
-  an authenticated recovery endpoint for scheduled processing.
-- Wait is a universal flow action for project chat, widget, WhatsApp, and
-  future adapters. It atomically stores progress and schedules a version-pinned
-  resume, while cancellation removes outstanding resume work.
-- Resumed project-chat and widget replies are recorded through the shared
-  channel runtime; resumed WhatsApp replies enter the outbox before delivery.
-- Provider credentials use versioned AES-256-GCM envelopes and server-side
-  hydration, while trace and health views omit payloads and secret values.
-- Static and database-backed tenant checks cover durable jobs, outbox messages,
-  provider secrets, submissions, events, channels, and existing tenant data.
-- Compiler, editor, duration, authorization, encryption, TypeScript, lint,
-  operations-health, and production-build checks form the Phase 9 release gate.
-
-### Phase 10 Delivery Steps
-
-1. Audit existing automated and manual channel coverage, then define one
-   certification and release contract.
-2. Implement a channel-neutral reference adapter that proves a future channel
-   can consume runtime replies without changing flow definitions or database
-   channel types.
-3. Add an automated certification matrix for every enabled flow block and
-   runtime reply family across project chat, widget, WhatsApp, and the reference
-   adapter.
-4. Certify native delivery, readable fallbacks, provider limits, WhatsApp
-   policy, published-version pinning, and durable pause/resume behavior.
-5. Add focused certification commands and a release-readiness command that
-   separates automated gates from live-provider checks.
-6. Update UAT and release-sign-off instructions for each production channel and
-   one future-adapter contract check.
-7. Run the complete automated release gate, commit the phase, and record any
-   live credential or device checks that still require human sign-off.
-
-Phase 10 certifies the existing universal runtime; it does not add another
-runtime or persist a fictional future channel. Project chat and widget must
-remain behaviorally equivalent, WhatsApp may use a native provider format or a
-documented text fallback, and the reference adapter must consume the same
-versioned runtime replies through the public adapter contract. Automated checks
-can prove contracts, isolation, provider limits, version pinning, and durable
-recovery. They cannot honestly certify live Meta credentials, phone-number
-ownership, template approval, browser embedding policy, or visual acceptance;
-those remain explicit UAT sign-off items.
-
-### Phase 10 Engineering Closeout
-
-All 7 Phase 10 engineering steps are complete:
-
-- A typed 108-cell matrix covers all 27 enabled step types across Project
-  Chat, widget, WhatsApp, and the future-adapter contract.
-- A channel-neutral `reference_future` adapter preserves the versioned reply
-  envelope without adding a database channel, navigation, or production UI.
-- All nine reply capabilities cross the shared adapter boundary, with browser
-  parity and WhatsApp native, fallback, provider-limit, and service-window
-  behavior covered automatically.
-- Database-backed tests prove immutable published-version pinning and a queued
-  Wait step that resumes and submits exactly once.
-- `npm run certify:release:fast` provides a deterministic daily contract gate;
-  `npm run certify:release` adds the production build, complete E2E suite, and
-  database tenant-isolation checks.
-- Phase 14 in `docs/UAT_TEST_PLAN.md` separates live channel acceptance from
-  automated certification and records one result per production channel.
-- The full automated release gate passed with 11 channel contract tests, 71
-  E2E tests, a successful Next.js production build, and passing database tenant
-  isolation.
-
-Engineering completion makes the release candidate ready for live UAT. Final
-release approval remains pending until Project Chat presentation, widget
-embedding, and live WhatsApp credentials, number ownership, template approval,
-provider resources, and device delivery are signed off.
-
-### Phase 3 Delivery Steps
-
-1. Define shared channel adapter and capability contracts.
-2. Migrate project chat rendering onto the shared adapter.
-3. Migrate widget rendering onto the shared adapter.
-4. Migrate WhatsApp delivery onto the shared adapter.
-5. Centralize channel capability diagnostics and fallbacks.
-6. Add cross-channel parity and tenant-isolation tests.
-7. Complete regression verification and Phase 3 closeout.
-
-### Phase 3 Closeout
-
-All 7 Phase 3 steps are complete:
-
-- Project chat and widget render runtime replies through the same browser
-  channel adapter.
-- WhatsApp delivery uses a provider adapter that selects native buttons, lists,
-  media, templates, and catalog messages only when their requirements are met.
-- Unsupported or incomplete rich replies degrade to readable text without
-  changing the flow definition.
-- WhatsApp service-window policy remains enforced; approved templates can be
-  sent outside the regular customer-service window.
-- Builder and publish diagnostics use the same shared capability profiles and
-  provider limits as runtime delivery.
-- Adapter parity tests cover browser rendering, provider limits, rich-message
-  fallbacks, service-window rules, and separate project payloads.
-- Database-backed tenant tests cover project channels, conversations, messages,
-  media, catalogs, actions, and related project-owned data.
-
-Current channel adapter boundary:
-
-- Shared profiles and limits: `src/lib/channel-adapter-contract.ts`
-- Browser adapter: `src/lib/browser-channel-adapter.ts`
-- WhatsApp adapter: `createWhatsAppChannelAdapter()` in
-  `src/lib/whatsapp.ts`
-- Builder diagnostics: `src/lib/flow-channel-capabilities.ts`
-
-### Phase 2 Delivery Steps
-
-1. Stable browser conversation identity and read-only active-flow resume.
-2. Command idempotency keys and duplicate-response replay.
-3. Submission-level optimistic concurrency and conflict detection.
-4. Idempotent media uploads and side-effecting steps.
-5. Recovery UX for stale, conflicting, and expired flows.
-6. Full regression verification and Phase 2 closeout.
-
-### Phase 1 Closeout
-
-All 7 Phase 1 steps are complete:
-
-1. Pin active runs to immutable published action versions.
-2. Introduce one server-owned browser flow execution path.
-3. Move review edits and media progression onto that canonical runtime.
-4. Remove the duplicated project-chat and widget browser executors.
-5. Retire the generic client-driven flow mutation routes.
-6. Harden canonical request parsing and HTTP error contracts.
-7. Complete regression coverage and architecture/UAT documentation.
-
-Current browser runtime boundary:
-
-- Project text/input runtime: `/api/actions/runtime`
-- Widget text/input runtime: `/api/widget/actions/runtime`
-- Project media progression: `/api/actions/flow/media`
-- Widget media progression: `/api/widget/actions/flow/media`
-
-Clients render replies and submit user input. Routing, validation, mutations,
-handoff, editing, version selection, and submission state remain server-owned.
-
-## Current Baseline
-
-Already implemented foundations:
-
-- Multi-tenant company, workspace, and project scoping.
-- Project-scoped knowledge base, RAG chat, OpenAI chat model, and embeddings.
-- Project actions with trigger phrases and draft/active/archive status.
-- Flow steps stored in project-scoped `action_flow_steps`.
-- Branch rules stored in project-scoped `action_flow_branch_rules`.
-- In-progress and submitted flow sessions stored in `action_submissions`.
-- Submission event history in `action_submission_events`.
-- Current generic step support for message, input, choice, date, date range,
-  time, number, email, phone, location, display result, confirmation, submit,
-  operation, handoff, connect-flow, and file-upload placeholder.
-- Conditional branching with default next-step routing, branch rules, route
-  validation, branch decision events, and loop protection.
-- Vertical builder pages for action overview, step edit, branch rules,
-  reorder, duplicate, enable/disable, publish readiness, preview, versions,
-  import/export, restore, and analytics.
-- React Flow visual canvas at `/projects/actions/[actionId]/canvas`.
-- Canvas node layout persistence in step settings.
-- Canvas creation and editing for common steps and operation selection.
-- Canvas product shell with left block palette, center canvas, right inspector,
-  toolbar metrics/actions, and validation panel.
-- Flow component registry for enabled current blocks and planned DOCX blocks.
-- Choice steps support buttons, list, and text fallback display modes in the
-  builder, project chat, widget chat, and channel runtime payloads.
-- WhatsApp choice replies send native interactive buttons or list messages
-  when option counts fit WhatsApp limits, with automatic text fallback.
-- Project-scoped contact, contact attribute, contact tag, and contact-tag
-  assignment tables.
-- Channel conversations automatically resolve and attach an active contact.
-- Set Attribute and Add Tag action blocks are enabled in the builder and
-  runtime, with project/widget/WhatsApp execution support.
-- Contact management view at `/projects/contacts` for contact profiles,
-  attributes, tags, linked conversations, channel transcripts, and linked flow
-  submissions.
-- Operation steps can opt into inline execution during live flows while keeping
-  existing post-submit operation behavior as the default.
-- Inline operation output mapping can save response/status values back into flow
-  fields or contact attributes.
-- Inline operation steps can create success/failure route presets that are
-  stored as normal branch rules.
-- API Request setup can create webhook/n8n providers and operations together
-  with sensible defaults.
-- Operation sandbox preview can run sample payloads without linking to a live
-  submission and display request, response, and mapped outputs.
-- Project-scoped media asset table and media library upload/archive UI.
-- Media message steps can attach reusable project media assets and emit a
-  structured runtime media reply with text fallback.
-- WhatsApp can send configured Media message assets as native image, video,
-  audio, or document messages when the media URL is publicly reachable.
-- Ask Media file-upload steps can collect project/widget uploads and save the
-  uploaded media reference into flow fields and submission events.
-- WhatsApp inbound image, video, audio, and document messages can satisfy Ask
-  Media steps by storing the WhatsApp media id and message metadata as an
-  external media reference.
-- Submission detail pages render collected media references with provider,
-  mime type, file size, captions, open links for local media, and raw JSON for
-  auditability.
-- Contact profiles include a channel-independent transcript view over stored
-  widget, project chat, WhatsApp, and future channel messages, including media
-  references found in message payloads.
-- Admins can import submitted WhatsApp media references into the project media
-  library, converting the field to a local reusable media asset and recording a
-  submission event.
-- Project-scoped product catalog and product records with a basic admin library
-  at `/projects/catalog`.
-- Shared channel tables for project channels, conversations, and messages.
-- Canonical server-owned project chat and widget flow runtime endpoints, with
-  dedicated media progression routes.
-- WhatsApp Cloud API setup, webhook verification, inbound text handling,
-  outbound text replies, and test send.
-- Operation provider model with manual review, internal save, email, webhook,
-  and n8n webhook providers.
-- Operation attempts with signed webhook requests, immediate retry config,
-  queued replay retry config, timeout handling, and attempt visibility.
-- Industry template catalog, project custom templates, and template apply flow.
-- Draft/publish versions, runtime version selection, diff, rollback, restore,
-  import/export, and analytics.
-- Dedicated handoff queue at `/projects/handoffs` with open/my/unassigned/queue
-  filters, bulk claim/release, and bulk status actions.
-- Connect Flow supports jump and return modes: admins can select an active
-  sibling flow, runtime preserves collected fields, records the transition,
-  starts the connected flow, prevents cross-flow loops, and can resume the
-  parent flow after a connected subflow submits.
-
-Important current limitations:
-
-- Runtime replies now have a structured model with text fallback. Buttons,
-  lists, media, template, and product/catalog payloads have initial structured
-  support; native provider policy enforcement still needs dedicated adapters.
-- WhatsApp service-window enforcement now blocks non-template runtime replies
-  outside the 24-hour customer-service window. Proactive outbound campaigns are
-  still not modeled as a separate product area.
-- WhatsApp inbound media collection stores Cloud API media references first;
-  admins can import available submitted media into the project media library
-  while Meta's media URL remains accessible.
-- Product/catalog messages are first-class message blocks with product snapshots
-  and text fallback; Product Selection can collect one product or a
-  multi-product cart into flow fields. Browser channels render configurable
-  product cards, and WhatsApp product/catalog formatting is available when Meta
-  catalog/product ids are configured.
-- WhatsApp approved template sending has started, and runtime replies enforce
-  the 24-hour customer-service window for regular outbound messages.
-- Operation steps mostly execute after submission; inline operation execution
-  and success/failure routing still need work.
-- Inline operation mapping is still JSON-driven; friendlier mapping helpers can
-  be added later.
-- Connect Flow jump and return behavior are modeled with submission metadata;
-  richer reusable-subflow reporting can be layered on later.
-- Meta Conversions API is now a dedicated operation provider with guided setup,
-  mapped event payloads, request/response attempts, and user-data hashing.
-
-## Architecture Principles
-
-- The flow builder is the source of truth for every channel.
-- WhatsApp, widget, and project chat are channel adapters, not separate flow
-  engines.
-- A builder block must define:
-  - config schema
-  - validation rules
-  - runtime behavior
-  - channel-specific rendering
-  - text fallback
-  - event/audit logging
-  - import/export/version behavior
-- The database model should remain generic. Prefer `step_type`, `settings`,
-  `options`, `operation_id`, `next_step_id`, and branch rules before adding a
-  table.
-- Add new tables only for durable domain concepts, such as contacts, tags,
-  media assets, reusable subflows, or template approvals.
-- All tenant-owned data must remain scoped to `project_id`.
-- The visual canvas must edit the same database model as the vertical builder.
-  It must not become a separate workflow engine.
-- Every phase should leave the application usable.
-
-## Target Builder Component Model
-
-The builder should expose two user-facing groups.
-
-### Message Components
-
-- Text + Buttons
-- Media
-- List Message
-- Catalogue Message
-- Single Product Message
-- Multiple Product Message
-- Template Message
-
-### Action Components
-
-- Ask Question
-- Ask Address
-- Ask Location
-- Ask Media
-- Condition
-- Connect Flow
-- Request Intervention
-- Set Attribute
-- Add Tag
-- API Request
-- Meta Conversions API
-
-## Capability Fit
-
-| DOCX Component | Current Fit | Required Work |
-| --- | --- | --- |
-| Text + Buttons | Partial | Structured button reply, channel formatter, button answer parsing. |
-| Media | Partial | Media asset/upload model, media send/receive runtime, channel adapters. |
-| List Message | Partial | Structured list reply, WhatsApp list formatting, text fallback. |
-| Catalogue Message | Partial | Richer channel adapters and capability warnings. |
-| Single Product | Partial | Richer selection handling and capability warnings. |
-| Multiple Product | Partial | Native provider cart adapters and capability warnings. |
-| Template | Partial | WhatsApp template config, approval metadata, 24-hour window logic. |
-| Request Intervention | Partial | Handoff exists; needs assignment/status/team workflow integration. |
-| Meta Conversions API | Good | Dedicated provider/action exists; richer event presets and replay UX can be layered later. |
-| Condition | Good | Branch rules exist; UI should be more visual. |
-| Connect Flow | Good | Jump and return modes exist; submissions show parent/child reporting. |
-| Ask Address | Partial | Can collect text; needs structured address schema and validation. |
-| Ask Location | Partial | Location step exists; needs structured lat/lng/channel location support. |
-| Ask Question | Good | Existing input/choice/date/phone/email steps cover this. |
-| Ask Media | Partial | File-upload placeholder exists; needs media upload/storage. |
-| Set Attribute | Good | Expand contact editing and segmentation UI over time. |
-| Add Tag | Good | Expand contact editing and segmentation UI over time. |
-| API Request | Partial | Webhook/n8n providers exist; inline runtime execution needed. |
-
-## Revised Implementation Plan
-
-## Phase 1: Structured Runtime Reply Model
-
-Goal: replace plain string-only replies with structured runtime messages while
-keeping text fallback everywhere.
-
-Deliverables:
-
-- Introduce a `RuntimeReply` type, for example:
-  - `text`
-  - `buttons`
-  - `list`
-  - `media`
-  - `template`
-  - `catalog`
-  - `handoff`
-- Keep `text` as the baseline fallback for all channels.
-- Update channel flow runtime to return structured replies.
-- Update widget/project chat/WhatsApp senders to format structured replies.
-- Store outbound channel message payloads as structured JSON.
-- Preserve existing behavior for current flows.
-
-Acceptance criteria:
-
-- Existing flows behave the same as today.
-- Runtime can emit text plus button/list metadata.
-- WhatsApp can still send a text fallback if rich formatting is unsupported.
-
-## Phase 2: Flow Component Registry
-
-Goal: define every builder block centrally before building more UI.
-
-Deliverables:
-
-- Add a component registry for message and action blocks.
-- Each block defines:
-  - key
-  - label
-  - group
-  - icon
-  - default step/operation config
-  - required settings
-  - supported channels
-  - fallback behavior
-- Map current `ACTION_STEP_TYPES` into registry entries.
-- Add initial entries for DOCX blocks, including unsupported entries marked as
-  planned/disabled.
-- Use the registry in canvas palette, vertical forms, validation, and docs.
-
-Acceptance criteria:
-
-- Builder UI reads block labels/options from one source.
-- Unsupported future blocks can be shown as planned without corrupting flows.
-- Adding a block later does not require scattered constants.
-
-## Phase 3: Visual Canvas Product Shell
-
-Goal: make the canvas feel like a proper flow builder, while still using the
-existing database model.
-
-Deliverables:
-
-- Left block palette grouped into Message and Actions.
-- Center React Flow canvas.
-- Right inspector for selected node/edge.
-- Top toolbar with save layout, validate, preview, publish, version status.
-- Node cards styled by block type.
-- Empty-state prompt to add the first node.
-- Route warnings visible on nodes and in a validation panel.
-
-Acceptance criteria:
-
-- Admin can add DOCX-style block types from a palette.
-- Existing steps still render and edit correctly.
-- Vertical builder and canvas stay consistent.
-
-## Phase 4: Text Buttons And List Messages
-
-Goal: support richer choice UX without changing the underlying flow logic.
-
-Deliverables:
-
-- Add button/list settings to choice-like steps.
-- Add structured `buttons` and `list` runtime replies.
-- Parse button/list replies by id, label, or numeric fallback.
-- Format buttons/lists in widget chat where possible.
-- Format WhatsApp buttons/lists where allowed.
-- Fall back to numbered text choices.
-
-Acceptance criteria:
-
-- A choice step can be displayed as text buttons or a list.
-- The same flow works in widget, project chat, and WhatsApp.
-- Text fallback remains reliable.
-
-## Phase 5: Contact Profile, Attributes, And Tags
-
-Goal: support Set Attribute and Add Tag actions from the DOCX.
-
-Deliverables:
-
-- Add project-scoped contact/customer records linked to channel conversations.
-- Add project-scoped contact attributes.
-- Add project-scoped tags and contact-tag assignments.
-- Resolve the active contact from widget/project chat/WhatsApp conversation.
-- Add Set Attribute action block.
-- Add Add Tag action block.
-- Record contact mutations as submission/channel events.
-
-Acceptance criteria:
-
-- A flow can set a contact attribute from a collected field or static value.
-- A flow can add one or more tags to the active contact.
-- Contact data remains project-scoped.
-
-## Phase 6: Inline Operation Execution
-
-Goal: make API Request and Meta Conversions API usable inside the flow, not only
-after submission.
-
-Deliverables:
-
-- Execute operation steps during runtime.
-- Support success and failure routing.
-- Store request/response attempt payloads.
-- Allow operation input mapping from current fields/contact attributes.
-- Allow operation output mapping back into fields/contact attributes.
-- Add API Request block UI backed by webhook/n8n providers.
-- Add operation preview/sandbox behavior in test mode.
-
-Acceptance criteria:
-
-- A flow can call an API before the final submit step.
-- API success/failure can route to different next steps.
-- Runtime continues gracefully when an operation fails.
-
-## Phase 7: Media And File Handling
-
-Goal: make Media and Ask Media real across supported channels.
-
-Deliverables:
-
-- Add project-scoped media/file asset model. [done: initial local media
-  library]
-- Add secure upload endpoint and storage abstraction. [partial: authenticated
-  local development storage]
-- Support image/video/audio/file metadata. [done: initial metadata]
-- Add Media message block. [done: outbound media asset selection and runtime
-  fallback, plus native WhatsApp media send by public link]
-- Add Ask Media action block. [partial: project/widget upload collection]
-- Store inbound media references from widget and WhatsApp. [done: local
-  uploads and WhatsApp external media references]
-- Add validation for required media and accepted media types. [partial: upload
-  size/type and required field validation]
-
-Acceptance criteria:
-
-- Admin can send a configured media message.
-- User can upload or send required media in a flow.
-- Media references are stored with submissions/contact events.
-
-## Phase 8: Address And Location
-
-Goal: make Ask Address and Ask Location structured rather than plain text.
-
-Deliverables:
-
-- Add address field schema support.
-- Add address validation and formatted summary.
-- Extend location step to store lat/lng, label, and raw channel payload.
-- Support WhatsApp location inbound messages.
-- Add widget location capture where browser permissions allow it.
-
-Acceptance criteria:
-
-- Address is stored as structured fields.
-- Location can store coordinates when the channel provides them.
-- Text fallback remains available.
-
-## Phase 9: Catalog And Product Messages
-
-Goal: support catalogue, single product, and multiple product messages.
-
-Deliverables:
-
-- Decide whether catalog source is internal, provider-backed, or both. [done:
-  internal source first, provider-backed later]
-- Add project-scoped catalog/product records or catalog provider config. [done:
-  initial internal catalog/product records and admin UI]
-- Add catalogue message block. [done: message block with product snapshot and
-  text fallback]
-- Add single product message block. [done: message block with product snapshot
-  and text fallback]
-- Add multiple product message block. [done: message block with product
-  snapshots and text fallback]
-- Add Product Selection block for mapping selected products into flow fields.
-  [done: single product selection and multi-product cart selection via runtime
-  options and product metadata, with optional quantity capture and companion
-  total fields]
-- Support WhatsApp catalog/product message formatting where configured.
-  [done: Cloud API product/product-list payloads when Meta catalog and product
-  retailer ids are configured]
-- Render catalog/single-product/multiple-product blocks as product cards in
-  browser channels. [done: project chat and widget]
-- Add browser product card layout controls. [done: grid, compact list, and
-  featured first item]
-- Add channel capability warnings for product, template, and media blocks.
-  [partial: media/product diagnostics now warn about WhatsApp public media URLs,
-  Meta catalog ids, product retailer ids/SKUs, and native cart checkout
-  readiness]
-- Add native provider cart checkout adapters where supported by commerce
-  channels. [partial: Product Selection cart fields now include a WhatsApp
-  checkout handoff payload when catalog/product ids are native-ready, and
-  WhatsApp order webhooks normalize into the shared cart answer format]
-- Keep text/list fallback for non-commerce channels.
-
-Acceptance criteria:
-
-- A project can configure products/catalog items.
-- A flow can present and collect product selections.
-- Product selections can feed API requests and submissions.
-
-## Phase 10: WhatsApp Template And Policy Layer
-
-Goal: support approved WhatsApp templates and prevent policy-breaking sends.
-
-Deliverables:
-
-- Add template message block. [done: initial Template block]
-- Store WhatsApp template name, language, variables, category, approval status,
-  and Meta body sample. [done: stored in step settings]
-- Track service window status per WhatsApp conversation. [done: inbound
-  WhatsApp messages record `lastInboundMessageAt` conversation metadata]
-- Enforce template requirement outside the 24-hour customer service window.
-  [done: runtime WhatsApp sender blocks non-template replies when the window is
-  closed]
-- Add admin warnings for unsupported interactive formats. [partial: unapproved
-  template warning, Meta body variable compatibility checks, and native
-  fallback behavior]
-- Log WhatsApp delivery errors in channel messages. [done: existing WhatsApp
-  reply logging captures delivery errors]
-
-Acceptance criteria:
-
-- Admin can configure a WhatsApp template message.
-- Runtime blocks non-template outbound messages outside the allowed window.
-- Template variables can be filled from fields.
-- Template body placeholders can be checked against configured body variables.
-
-## Phase 11: Request Intervention And Team Workflow
-
-Goal: make human handoff operational.
-
-Deliverables:
-
-- Expand handoff/request-intervention block settings. [done: priority, queue,
-  and notify-team intent]
-- Add assignment/status metadata to submissions or contact conversations.
-  [done: handoff metadata is stored on submissions and channel
-  conversations, submissions move to Under Review, and admins can claim/release
-  handoff ownership]
-- Notify internal staff through configured operation/provider. [done: Handoff
-  steps can run their selected operation as the notification action]
-- Add admin queue filters for under-review/handoff items. [partial: handoff
-  metadata appears in submission list/detail views with handoff, queue,
-  assigned-to-me, and unassigned filters; `/projects/handoffs` provides a
-  dedicated work queue with bulk assignment/status actions]
-- Preserve the existing manual review operation.
-
-Acceptance criteria:
-
-- A flow can mark a conversation/submission for staff intervention.
-- Admins can see and act on intervention requests.
-- Handoff works from widget and WhatsApp.
-
-## Phase 12: Connect Flow And Reusable Subflows
-
-Goal: support competitor-style Connect Flow without duplicating steps.
-
-Deliverables:
-
-- Add reusable subflow or callable action concept.
-- Define jump-only vs return-to-parent behavior. [done: editors expose jump or
-  return behavior]
-- Add recursion/loop protection across flows. [done for jump and return
-  transitions]
-- Add canvas node for Connect Flow. [done: Connect Flow is selectable in the
-  canvas and vertical editor]
-- Support import/export/version snapshots for connected flows. [partial: JSON
-  imports clear environment-specific connected action ids and preserve the
-  original action name/id as reconnect context]
-
-Acceptance criteria:
-
-- Admin can route into another flow safely.
-- Runtime prevents infinite cross-flow loops.
-- Return-mode subflows merge child fields back into the parent and continue the
-  parent route after the Connect Flow step.
-- Published versions remain deterministic.
-- Imported flows do not silently keep invalid connected-flow ids.
-
-## Phase 13: Meta Conversions API Provider
-
-Goal: make Meta CAPI a first-class automation action.
-
-Deliverables:
-
-- Add Meta provider config for pixel/dataset id and token reference. [done:
-  guided Operations setup creates a `meta_conversions_api` provider]
-- Add event mapping UI. [done: guided input mapping supports `user_data.*`,
-  `custom_data.*`, event fields, and test event code]
-- Map fields/contact attributes to CAPI payload. [done: operation input mapping
-  feeds the Meta event payload]
-- Add hashing/normalization for customer data where required. [done: common
-  user data keys such as `em` and `ph` are normalized and hashed before send]
-- Store request/response attempts. [done: operation attempts capture request
-  payload, response payload, status, and errors]
-- Allow retry and failure routing. [partial: inline operation success/failure
-  routing works through existing operation branches; dedicated retry/replay UI
-  remains later]
-
-Acceptance criteria:
-
-- A flow can fire configured Meta conversion events.
-- CAPI attempts are visible and auditable.
-- Failures do not break unrelated flow execution.
-
-## Phase 14: Advanced Validation And Rules
-
-Goal: move beyond basic typed validation.
-
-Deliverables:
-
-- Add min/max length, regex, min/max number, date constraints, allowed file
-  types, and custom error messages. [done: settings save/edit and runtime
-  enforcement for text/number/date constraints; upload-specific file type
-  enforcement]
-- Add route validation for required block settings. [done: publish diagnostics
-  now catch stale/imported missing field, prompt, operation, option-source, and
-  product config]
-- Add publish blockers for incomplete rich-message/action config. [partial:
-  validation constraint integrity and product/action config blockers]
-- Add test-mode diagnostics for validation and routing. [done: preview test
-  mode records validation failures, route decisions, loop stops, and completion
-  in a diagnostics timeline]
-
-Acceptance criteria:
-
-- Admin can define richer validation without code changes.
-- Publish readiness catches incomplete or broken block configs.
-
-## Phase 15: Templates, Marketplace, And Analytics
-
-Goal: turn the builder into a reusable SaaS setup engine.
-
-Deliverables:
-
-- Template versioning. [partial: bundled and project templates expose version
-  metadata, and admins can set project-template versions from action settings]
-- Marketplace-style template catalog. [partial: bundled and project templates
-  share `/projects/templates`, with project adoption and applied-version
-  visibility]
-- Template block compatibility checks. [partial: template cards surface setup
-  errors/warnings for project operations, connected flows, media, products, and
-  WhatsApp template approval]
-- Flow-level and block-level analytics. [partial: action detail shows
-  step-level metrics, and `/projects/analytics` now shows project-level flow
-  totals by action]
-- Drop-off reporting by node. [partial: flow detail shows per-step drop-offs,
-  and `/projects/analytics` surfaces the highest project-wide drop-off nodes]
-- A/B flow variants. [partial: action settings can mark a flow as an
-  experiment variant with key, variant label, and traffic weight metadata;
-  `/projects/actions` groups variants with starts, submissions, completion
-  rate, and configured weight; runtime traffic allocation remains later work]
-- Reusable fields. [partial: step editors derive reusable field-key
-  suggestions from existing project flows, and `/projects/actions` now exposes
-  a reusable field-key library]
-- Custom template authoring from existing flows. [partial: admins can save a
-  project flow as a reusable project template, manage its catalog visibility
-  and version from action settings, and apply it back into the same project
-  with steps and branch rules copied]
-
-Acceptance criteria:
-
-- Templates can evolve without breaking applied flows.
-- Admins can understand performance and improve flows over time.
-
-## Recommended Immediate Next Steps
-
-1. Add route validation and publish blockers for incomplete rich block settings.
-2. Add automated operation retry queues. [partial: providers can opt into
-   queued retries, and `/projects/operations` can process due failed attempts
-   for the selected project; background scheduling remains later work]
-3. Add marketplace template duplication/custom-template authoring. [partial:
-   project flows can be saved as reusable project templates and reapplied with
-   step routes/branch rules copied; action settings can now manage whether a
-   flow is exposed as a project template and which template version it uses]
-
-## Legacy Roadmap Implementation Status
-
-All 15 historical roadmap phases have foundational implementations. The notes
-below describe capability maturity and remaining depth; they no longer identify
-the currently active development phase. Current work is tracked in the
-10-phase modernization program near the top of this document.
-
-Phase 5 persists contacts, attaches channel conversations to contacts, executes
-Set Attribute and Add Tag across channels, and lets admins inspect contacts
-from `/projects/contacts`.
-
-The current Phase 6 foundation lets operation steps opt into inline execution
-during live project/widget/WhatsApp flows. Inline operation attempts are saved,
-submission events are recorded, and operation output mapping can write response
-values into flow fields or contact attributes. The operation status is also
-written to a flow field so existing branch rules can route on `completed` or
-`failed`.
-
-The Phase 7 foundation now includes project-scoped `media_assets`, a media
-library at `/projects/media`, outbound Media message steps, native WhatsApp
-media sending by public link, Ask Media uploads for project chat and widget
-flows, WhatsApp inbound media references, admin-side media rendering on
-submission detail pages, and channel-independent contact transcripts with media
-payload rendering. Submitted WhatsApp media references can also be imported into
-the project media library.
-
-The Phase 8 foundation has started: Address is now an enabled flow step,
-browser channels can collect structured address and location values, text
-channels can still provide text fallbacks, and WhatsApp location messages are
-normalized into the same shared location value shape.
-
-The Phase 9 foundation now includes internal `product_catalogs` and
-`catalog_products`, a `/projects/catalog` admin library, enabled Catalogue
-Message, Single Product, Multiple Products, and Product Selection blocks. These
-blocks snapshot project-scoped product data into step settings and emit
-channel-independent catalog replies/options with text fallback. Product
-Selection writes the chosen product id or selected cart product ids plus
-companion metadata into flow fields. WhatsApp sends native
-product/product-list messages when the catalog has a Meta catalog id and
-products have WhatsApp retailer ids or SKUs. Product Selection can optionally
-collect quantity and can collect a multi-product cart with companion item,
-quantity, line-total, cart-total, and provider checkout fields. WhatsApp order
-webhooks now normalize native cart replies into the same shared cart answer
-format, and cart fields include a WhatsApp checkout handoff payload when
-catalog/product ids are native-ready. Browser channels now render product cards
-for product message blocks and product-selection cards for Product Selection
-steps. Product blocks can choose grid, compact list, or featured browser
-layouts. Flow diagnostics now separate blocking errors from non-blocking
-channel capability warnings for WhatsApp media/product requirements and native
-cart checkout readiness.
-
-The Phase 10 foundation has started: Template is now an enabled message block,
-with WhatsApp template name, language, category, approval status, Meta body
-sample, and body variables stored in step settings. Runtime emits structured
-template replies with text fallback, resolves `{{fieldKey}}` body variables
-from collected flow fields, can render a body preview from `{{1}}` Meta
-placeholders, and WhatsApp sends native approved template messages through the
-Cloud API. Inbound WhatsApp messages now update conversation service-window
-metadata, and the WhatsApp runtime sender blocks regular flow replies outside
-the 24-hour customer-service window unless the reply is an approved template.
-Flow diagnostics warn when a template is not marked approved and when the Meta
-body placeholder count does not match configured body variables.
-
-The Phase 13 foundation now includes a `meta_conversions_api` integration
-provider, guided Meta Conversion operation creation, mapped event payloads,
-customer data normalization/hashing, and operation attempt logging. These
-conversion events run through the existing Operation block, so they remain
-channel-independent across widget, project chat, WhatsApp, and future channels.
-
-The canvas condition editor now supports optional branch labels, clearer
-When/Then previews, guided source-field/operator/target selection, operator
-hints, and operation status fields in the source-field picker. Branch labels
-are stored on rule settings, so the runtime condition stays unchanged while the
-visual canvas becomes easier to read.
-
-The Phase 15 template foundation has started: bundled and project custom
-templates now expose computed version/status/channel/field summaries,
-`/projects/templates` supports search and industry filtering, and applied
-actions store source template key, version, source, and applied timestamp
-metadata. Admins can save an existing project flow as a reusable project
-template, then apply it back into the same project with steps, default routes,
-and branch rules copied. Template cards now include setup compatibility checks
-for project-specific operations, connected flows, media assets, product
-catalogs, and WhatsApp template approval so admins know what to verify after
-applying a flow.
-
-Template marketplace adoption visibility has started: `/projects/templates`
-now counts how many times each template was applied in the selected project,
-shows the latest applied date, and lists the applied template versions so admins
-can spot whether a newer marketplace/custom template version has not yet been
-used.
-
-The reusable-fields foundation has started: new/edit step pages now derive a
-project-scoped field-key library from existing flow steps and surface common
-field keys as suggestions in the Field Key input. This keeps field reuse simple
-for now while still nudging admins toward consistent keys for routing,
-operation mappings, templates, and submissions. `/projects/actions` now also
-shows the reusable field-key library with usage counts, labels, step types, and
-the actions where each field appears.
-
-Project custom template authoring now has a management surface: action settings
-can expose or hide a flow from the project template catalog and set the template
-version used by `/projects/templates`. This keeps template publishing simple
-for now while preserving a versioned metadata path for later marketplace
-approval, lifecycle, and compatibility workflows.
-
-The A/B flow variant foundation has started: action settings now preserve
-existing action metadata while optionally storing `settings.experiment` with an
-experiment key, variant label, and traffic weight. The action list and flow
-detail pages surface this metadata so admins can organize variants before the
-runtime allocator is added. `/projects/actions` also groups matching experiment
-keys and shows basic comparison metrics for each variant using existing flow
-analytics.
-
-The project flow analytics foundation has started: `/projects/analytics` now
-combines chat request analytics with action-flow totals, including project
-starts, submitted flows, completion rate, drop-offs, validation failures,
-branch decisions, and a per-flow comparison table that links back to each flow.
-The same view now highlights the highest drop-off nodes across the selected
-project, using each in-progress submission's current step as the drop-off
-signal.
-
-The operation management foundation now includes manual attempt replay and a
-project-scoped retry queue processor. Admins can retry failed attempts or
-replay completed attempts from `/projects/operations`. Replays create a fresh
-operation attempt using the original request payload, record the source attempt
-id, and add replay completion/failure events when the attempt is linked to a
-submission. API Request providers can opt into queued retries with a retry
-limit and delay. The Operations page can process due failed attempts for the
-selected project and can filter attempt history by operation, status, and
-replay/original attempts. Background cron scheduling remains later work.
-
-The Phase 11 foundation has started: Request Intervention/Handoff steps can
-store priority, queue, and notify-team intent. When a live flow reaches a
-handoff step, the submission moves to `under_review`, handoff metadata is saved
-on the submission and channel conversation, and the submission list/detail pages
-surface the handoff context. Handoff steps can also run their selected
-operation as the staff notification action, so existing email/webhook/n8n
-providers can be used without a separate notification engine. `/projects/handoffs`
-now provides the dedicated work queue with open/my/unassigned/queue filters,
-bulk claim/release, and bulk status actions.
-
-The Phase 12 foundation has started: Connect Flow is enabled in the vertical
-editor and visual canvas with jump or return behavior. Admins can connect to
-another active flow in the same project, route diagnostics block
-missing/self/inactive targets, and the shared runtime starts the connected flow
-while preserving collected fields and preventing cross-flow loops. Return mode
-uses submission metadata as a lightweight call stack, merges child fields back
-into the parent submission, and continues the parent route after the Connect
-Flow step. Export/import treats connected action ids as environment-specific:
-exported JSON preserves reconnect context, and imported Connect Flow blocks
-require the admin to select a valid active action in the destination project.
-Submission reporting now shows Connect Flow parent/child counts, a connected
-flow filter, and linked parent/child submission details.
-
-The Phase 14 validation foundation has started: step editors and the visual
-canvas can save custom required/invalid messages plus min/max length, regex,
-min/max number, min/max date, and allowed file type settings. Runtime answer
-validation now enforces text, number, and date constraints across channels
-before normalizing collected fields. Ask Media uploads now enforce configured
-file type settings server-side for project chat and widget uploads, and the
-browser file picker reflects the same accepted file types.
-
-Publish readiness now also checks richer block configuration before a flow can
-go live. It blocks missing field/prompt labels on input steps, missing operation
-links, invalid choice option sources, incomplete product blocks, and malformed
-validation constraints, including bad regex/date ranges and invalid file type
-tokens.
-
-Preview And Test Mode now includes a diagnostics timeline. While admins test a
-draft flow, the preview records validation failures, selected routes, possible
-route loops, and completion without creating a live submission.
+# Lia Conversational Flow Roadmap
+
+Status date: 2026-07-23
+
+## Document Authority
+
+This file is the single source of truth for implementation status across Lia's
+flow builder, conversational tasks, tool system, execution runtime, channel
+adapters, and flow-specific verification.
+
+- Update capability and phase checkboxes only in this file.
+- `BETA_READINESS_CHECKLIST.md` owns the overall beta release decision and
+  references this roadmap's exit gates instead of duplicating implementation
+  tasks.
+- `docs/UAT_TEST_PLAN.md` owns manual test instructions and individual test-run
+  evidence. Passing one UAT item does not mark an unfinished roadmap capability
+  complete.
+- `LEIGIA_BLUEPRINT_ALIGNMENT_AUDIT.md` is architectural background, not an
+  active implementation tracker.
+
+When documents disagree about whether a flow capability is implemented, this
+roadmap controls. When they disagree about whether Lia may be released to beta,
+`BETA_READINESS_CHECKLIST.md` controls.
+
+This is the active implementation roadmap for Lia's universal conversational
+automation platform. Lia will use a hybrid model:
+
+- Goal-driven conversational tasks let an LLM conduct natural interactions,
+  collect several required details from one message, ask only for missing or
+  invalid information, accept corrections, and use approved business tools.
+- Deterministic flow nodes remain available for exact messages, menus,
+  compliance, routing, transactions, fallbacks, handoff, and channel-specific
+  presentation.
+- The server, not the LLM, remains responsible for validation, business truth,
+  permissions, side effects, routing, versioning, and audit history.
+
+The primary canvas unit therefore becomes a business task such as `Book an
+appointment`, not necessarily one node per question. Explicit question and
+content nodes remain available when a business needs a tightly scripted
+journey.
+
+`docs/Flow Builder v2.pdf` remains the minimum functional reference for
+deterministic content types and actions. Its examples define capabilities Lia
+must support, but they do not force every interaction to use a long
+question-by-question canvas.
+
+WhatsApp remains the strongest initial standards reference and live
+certification channel. Persisted task, flow, state, and tool contracts must
+remain channel-independent so the same published automation works in project
+chat, the website widget, WhatsApp, and future channels.
+
+`docs/UAT_TEST_PLAN.md` contains detailed manual test instructions.
+`BETA_READINESS_CHECKLIST.md` continues to track the broader SaaS, deployment,
+database, backup, and provider readiness work.
+
+## Status Rules
+
+- `[x]` means the capability or architecture decision is complete in the current repository.
+- `[ ]` means implementation, migration, automated verification, live UAT, or approval remains.
+- A similarly named feature does not count as complete when its runtime, persistence, validation, routing, security, or editor behavior is partial.
+- A major roadmap item is complete only after implementation, focused tests, and the relevant UAT instructions are updated.
+- Create a commit at each stable contract, migration, runtime, tool, editor, adapter, and verification boundary.
+
+## Current Position
+
+- [x] The original 15-phase flow-builder foundation is complete.
+- [x] The later 10-phase runtime modernization program is engineering-complete.
+- [x] One shared server runtime executes project chat, widget, WhatsApp, and future-adapter flows.
+- [x] Active runs are pinned to immutable published flow versions.
+- [x] The current runtime supports 27 executable deterministic step types.
+- [x] Current nodes persist ordered text, choice, media, and catalog content blocks.
+- [x] Current content blocks can be added, edited, reordered, duplicated, and removed.
+- [x] Friendly message, input, and action editor families exist.
+- [x] The React Flow canvas supports saved layout, routes, diagnostics, compact editing, and advanced editing.
+- [x] Typed conditions support AND/OR groups, value checking, reachability, cycle detection, and terminal-path validation.
+- [x] Durable jobs support retries, idempotency, leases, outbox delivery, encrypted secrets, tracing, and Wait resumption.
+- [x] Shared channel adapters declare native, conditional, fallback, and unsupported delivery.
+- [x] A 108-cell matrix covers 27 step types across project chat, widget, WhatsApp, and the reference future adapter.
+- [x] Twenty-three focused editor/compiler tests and eleven channel contract tests passed on 2026-07-23.
+- [ ] A first-class goal-driven Conversational Task does not yet exist.
+- [ ] Durable conversational field collection, correction, and confirmation do not yet exist.
+- [ ] The LLM does not yet have a constrained turn-planning and tool-request protocol.
+- [ ] Grounded Q&A cannot yet enter a bounded task and return to Q&A within one version-pinned conversation.
+- [ ] Full rich-content parity with `docs/Flow Builder v2.pdf` is not complete.
+- [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
+- [ ] Live cross-channel UAT and release approval are not complete.
+
+Current implementation target: Priority 1, Phase 1 of 18.
+
+## Product Direction
+
+- [x] Make bounded business tasks the primary abstraction for natural conversations.
+- [x] Keep explicit deterministic nodes as a complementary precision mode.
+- [x] Let one visitor message populate several task fields.
+- [x] Ask only for information that is still required, invalid, ambiguous, or stale.
+- [x] Let visitors correct or clear previously collected information.
+- [x] Keep task completion deterministic even when conversation wording is generated by an LLM.
+- [x] Keep validation and business rules outside the model.
+- [x] Keep prices, availability, catalog entries, policies, and booking results grounded in approved tools or project data.
+- [x] Require explicit confirmation before a task performs a consequential write operation.
+- [x] Keep one channel-independent task and flow definition.
+- [x] Keep one server-owned execution engine.
+- [x] Preserve immutable published versions and deterministic active runs.
+- [x] Use WhatsApp interaction standards without making persisted contracts WhatsApp-specific.
+- [x] Treat every functional example in `docs/Flow Builder v2.pdf` as a required capability, not a required graph topology.
+- [x] Use the existing project retrieval pipeline as a controlled knowledge capability without replacing document ingestion or chunking.
+- [x] Let ordinary Q&A enter a bounded task and return to Q&A without making the visitor choose between separate bot modes.
+- [x] Give the active task ownership of required field collection while allowing bounded side questions to return to the same task.
+- [x] Transfer only explicitly reusable, validated values across Q&A and task boundaries, with provenance preserved.
+
+## External Capability Benchmark
+
+The non-voice functional benchmark combines the strongest relevant patterns
+from Telnyx AI Assistants and the previously reviewed WhatsApp flow-builder
+references.
+
+- Assistant-level identity, greeting, behavior, model policy, context,
+  knowledge, tools, testing, versions, and observability.
+- Goal-driven prompt stages for natural intake, qualification, booking,
+  verification, support, and escalation.
+- Deterministic exact-message stages for disclosures, compliance text,
+  confirmations, and other wording that must not be generated.
+- Reusable shared tools attached by stable versioned references.
+- Per-task and per-stage tool permissions.
+- Typed runtime context variables with declared sources and safe defaults.
+- Semantic conditions for meaning-based decisions and deterministic conditions
+  for structured business rules.
+- Asynchronous tool execution with typed result delivery back into an active
+  task.
+- Rich message composition, direct option-to-node routing, deterministic
+  actions, and channel-aware rendering based on the WhatsApp builder
+  references.
+- Immutable publication, realistic test scenarios, traceable runtime
+  decisions, and rollback.
+
+Lia is not targeting Telnyx telephony-network parity. PSTN, SIP, DTMF,
+transcription, voice interruption, call transfer, and hang-up controls remain
+future adapter capabilities and are not required for the non-voice beta.
+Provider ecosystem size and years of production scale are also not capability
+checkboxes.
+
+The target is:
+
+- Phase 8: safe goal-driven conversational core.
+- Phase 14: beta-level functional parity for project chat, website widget, and
+  WhatsApp within the declared non-voice scope.
+- Phase 18: documented extension parity for new channels, models, and tools.
+
+## Runtime Responsibility Boundary
+
+The LLM may:
+
+- Interpret the visitor's current message in conversation context.
+- Extract candidate values for allowed task fields.
+- Recognize corrections, cancellation, uncertainty, and requests for clarification.
+- Request an approved read-only tool when current business information is needed.
+- Propose the next conversational action from a closed set.
+- Compose a concise visitor-facing response within the published task policy.
+- Recommend handoff when confidence or policy requires it.
+
+The LLM must not:
+
+- Change which fields or rules are required by the published task.
+- Mark an invalid value as valid.
+- Invent project resources, identifiers, prices, availability, policies, or operation results.
+- Directly read or write tenant data.
+- Directly call an arbitrary URL, database, provider, or operation.
+- Perform a consequential write before deterministic confirmation and authorization.
+- Change graph routes, publish flows, or modify the active task contract.
+- Treat retrieved documents, visitor messages, or tool results as higher-priority instructions.
+
+The Lia server must:
+
+- Validate every model response against a versioned structured schema.
+- Validate and normalize every candidate field value.
+- Resolve every resource and tool inside the current tenant and project.
+- Decide which fields remain required.
+- Authorize and execute approved tools.
+- Generate the canonical confirmation summary.
+- Apply idempotency, retry, timeout, secret, and audit controls.
+- Decide the final task outcome and graph route.
+- Provide a deterministic fallback when the model is unavailable or unsafe.
+
+## Reference Conversational Task
+
+The first complete reference task will be `Book Spa Service`.
+
+It will collect and maintain canonical values for:
+
+- Service category.
+- Service.
+- Preferred date.
+- Preferred time.
+- Guest name.
+- Guest email.
+- Guest phone.
+
+It will use project-owned resources and tools for:
+
+- Service and category discovery.
+- Price and duration lookup.
+- Date and time validation.
+- Current availability lookup.
+- Confirmed booking submission.
+
+It will expose named graph outcomes for:
+
+- `completed`
+- `cancelled`
+- `unavailable`
+- `validation_failed`
+- `timeout`
+- `provider_failed`
+- `handoff`
+
+# Priority 1: Goal-Driven Conversational Core
+
+Priority 1 proves that Lia can safely complete a real business task through a
+natural conversation. The LLM controls wording and interpretation inside a
+bounded task; the existing graph, runtime, tools, and published versions
+control business behavior.
+
+## Phase 1: Versioned Conversational Task Contract
+
+Goal: define the universal task model before implementing model-driven runtime
+behavior.
+
+- [ ] Define `ConversationalTaskV1` as a versioned, channel-independent contract.
+- [ ] Define `KnowledgeConversationV1` as the versioned, channel-independent contract for grounded ordinary Q&A.
+- [ ] Define `ConversationEntryPolicyV1` for knowledge-first, task-first, or deterministic-node entry using published configuration.
+- [ ] Define `ConversationIdentityV1` for project-scoped anonymous visitors, sessions, channel identities, and verified contact association.
+- [ ] Require an explicit verified rule before identities or conversation state can be linked across channels.
+- [ ] Define `DataHandlingPolicyV1` for field sensitivity, consent, retention, expiry, model/tool/log visibility, export, and deletion.
+- [ ] Define `AssistantPolicyV1` for shared identity, greeting strategy, base behavior, global constraints, and model policy.
+- [ ] Keep assistant policy separate from task-specific objectives, fields, tools, and outcomes.
+- [ ] Give every task a stable ID, name, objective, description, and schema version.
+- [ ] Define `TaskIntentRecommendationV1` so Q&A can recommend only an allowlisted published task and optional candidate field mappings.
+- [ ] Define `ConversationReturnPolicyV1` for completed, cancelled, failed, no-answer, and handoff task outcomes.
+- [ ] Define named knowledge outcomes for answered, task-recommended, no-answer, handoff, and cancelled.
+- [ ] Define one active response-owner rule across knowledge, task, deterministic graph nodes, and authorized humans.
+- [ ] Limit V1 to one active conversational task and prohibit recursive task calls.
+- [ ] Define bounded task-switch, connected-flow, and handoff depth with deterministic cycle fallback.
+- [ ] Define an explicit field-transfer whitelist with source, validation state, freshness, sensitivity, and provenance requirements.
+- [ ] Define a versioned task-field contract with a stable field ID and field key.
+- [ ] Keep visitor-facing labels separate from field keys and canonical values.
+- [ ] Define `ContextVariableDefinitionV1` with a stable key, type, source, default, sensitivity, expiry, and model/tool visibility.
+- [ ] Reserve a `lia_` namespace for system context such as channel, current time, conversation ID, project, locale, and timezone.
+- [ ] Distinguish trusted initialization context from visitor-collected task fields and transient model output.
+- [ ] Define deterministic precedence for system, tenant, project, contact, channel, webhook, and default context sources.
+- [ ] Support text, email, phone, integer, decimal, boolean, date, time, date range, address, location, media, enum, and project-resource field types.
+- [ ] Define required and conditionally required fields.
+- [ ] Define field validation, normalization, sensitivity, and confirmation policies.
+- [ ] Define field source priority for visitor input, trusted profile data, project resources, and tool results.
+- [ ] Define field dependencies such as category before service and service before availability.
+- [ ] Define `ToolDefinitionRefV1` and `ToolBindingV1` so tasks reference stable versioned tools instead of embedding provider configuration.
+- [ ] Define allowed read tools and allowed write operations separately.
+- [ ] Define default-deny tool permissions at assistant, task, and conversational-stage boundaries.
+- [ ] Define task-level wording, brevity, language, fallback, and handoff policies.
+- [ ] Define a degraded-mode policy for model, retrieval, business-tool, and outbound-channel unavailability.
+- [ ] Define model policy separately from business task data.
+- [ ] Define named task outcomes and stable output ports.
+- [ ] Define deterministic task completion and cancellation conditions.
+- [ ] Define the order of extraction, validation, lookup, clarification, confirmation, operation, and routing.
+- [ ] Embed the complete task contract in immutable published versions.
+- [ ] Pin assistant policy, context definitions, tool versions, and bindings in immutable published versions.
+- [ ] Keep existing V1 deterministic flow definitions readable and executable.
+- [ ] Add assistant-policy, task, field, context, tool-binding, and outcome fixtures.
+- [ ] Add focused schema and compatibility tests.
+
+Phase 1 exit gate: the versioned contracts can describe the complete reference
+booking task, grounded Q&A entry, approved task recommendation, return
+behavior, identity, data handling, degraded behavior, trusted context, and
+allowed tools without embedding channel or provider-specific logic.
+
+## Phase 2: Durable Task State And Field Lifecycle
+
+Goal: persist everything needed to collect, validate, correct, confirm, pause,
+and resume a conversational task safely.
+
+- [ ] Add project-scoped task-run state pinned to the active published version.
+- [ ] Persist the active conversation owner and mode as knowledge, task, deterministic graph node, or authorized human.
+- [ ] Persist the active node, active task, suspended return target, and published version as one coherent execution position.
+- [ ] Persist anonymous visitor, session, channel identity, and verified contact references without silently merging them.
+- [ ] Apply session expiry and rotation without losing an active durable task that policy allows to resume.
+- [ ] Define `InboundEventV1` with a stable event ID, channel identity, conversation ID, occurred time, received time, and provider sequence when available.
+- [ ] Persist a resolved initialization-context snapshot separately from task fields and conversation messages.
+- [ ] Store task field values separately from transient model messages.
+- [ ] Track each field as missing, candidate, valid, invalid, confirmed, or cleared.
+- [ ] Track value provenance without exposing hidden model reasoning.
+- [ ] Track validation results, update time, attempt count, and last requested field.
+- [ ] Accept several field candidates from one visitor message.
+- [ ] Support explicit and contextual corrections.
+- [ ] Support clearing a previously collected value.
+- [ ] Revalidate dependent fields when an upstream value changes.
+- [ ] Recalculate conditionally required fields after every valid update.
+- [ ] Preserve canonical values while allowing natural visitor wording.
+- [ ] Support cancellation, restart, pause, no-reply, and resume.
+- [ ] Support answering a bounded side question and resuming the same task without losing its requested field.
+- [ ] Support explicit task cancellation or switching according to the published return policy.
+- [ ] Ensure only the active response owner can consume and mutate state for an inbound turn.
+- [ ] Preserve task state through Wait and connected-flow boundaries where permitted.
+- [ ] Track pending synchronous and asynchronous tool requests against the current task run and published version.
+- [ ] Accept authenticated typed external-result events without allowing arbitrary system-prompt injection.
+- [ ] Prevent duplicate inbound events from applying the same update twice.
+- [ ] Prevent stale concurrent turns from overwriting newer state.
+- [ ] Serialize state mutation per conversation and handle delayed or out-of-order events deterministically.
+- [ ] Quarantine or safely ignore events that cannot be reconciled with the active version and execution position.
+- [ ] Redact sensitive values from routine logs and diagnostics.
+- [ ] Enforce configured field and message expiry, export, and deletion without breaking tenant isolation.
+- [ ] Record a readable, tenant-scoped task audit trail.
+- [ ] Add migration and cleanup behavior for abandoned task runs.
+- [ ] Add database-backed task-state isolation and concurrency tests.
+
+Phase 2 exit gate: an isolated conversation can move between grounded Q&A and
+one active task, answer a side question, and resume, correct, cancel, or
+complete the task without losing values or applying duplicate, stale, or
+out-of-order updates.
+
+## Phase 3: Structured LLM Turn Engine
+
+Goal: let an LLM interpret and continue a task through a narrow, validated
+protocol rather than unrestricted agent behavior.
+
+- [ ] Define one server-owned model-provider interface.
+- [ ] Compile model instructions from the versioned assistant policy, active task or stage, allowed tools, resolved context, and current validated state.
+- [ ] Define a strict turn-result schema for grounded reply, field candidates, task-intent recommendation, requested tool, next action, and outcome recommendation.
+- [ ] Restrict next actions to ask, clarify, lookup, confirm, complete, cancel, handoff, or fail.
+- [ ] Build model instructions from the published task contract and current validated state.
+- [ ] Ground ordinary Q&A through the existing project retrieval interface and the published answer and no-answer policy.
+- [ ] Treat every task-intent result as a recommendation that the server validates against published, reachable, and allowed task IDs.
+- [ ] Require deterministic confirmation or one focused clarification before an ambiguous semantic task switch.
+- [ ] Treat values inferred during Q&A as candidates until the target task validates and accepts them.
+- [ ] During an active task, distinguish a field answer or correction from a side question, cancellation, or explicit task switch.
+- [ ] Support wait-for-visitor, exact configured greeting, and policy-generated greeting modes.
+- [ ] Define versioned default-model and fallback-model behavior with bounded time and cost.
+- [ ] Keep per-stage model overrides in advanced configuration and pin them to the published version.
+- [ ] Send only the task context and tenant data required for the current turn.
+- [ ] Keep system and task policy above visitor, document, and tool content.
+- [ ] Treat retrieved text as untrusted knowledge content that cannot start a task, grant a tool, or change graph policy.
+- [ ] Apply published input and output safety policy before visitor content reaches the model and before generated content is delivered.
+- [ ] Define deterministic refuse, clarify, safe-fallback, and human-handoff behavior for blocked content.
+- [ ] Apply project and platform abuse, turn-rate, token, and cost limits before model or tool execution.
+- [ ] Ensure moderation and abuse decisions cannot silently mutate task fields, invoke tools, or advance routes.
+- [ ] Validate every model result before applying any field or action.
+- [ ] Reject unknown fields, tools, actions, outputs, and resource identifiers.
+- [ ] Add bounded repair attempts for malformed structured output.
+- [ ] Add confidence and ambiguity handling without trusting confidence as validation.
+- [ ] Treat semantic route recommendations as proposals that require server validation before the graph advances.
+- [ ] Ask one focused clarification when several interpretations remain valid.
+- [ ] Support multilingual visitor messages while retaining canonical field values.
+- [ ] Prevent the assistant from repeatedly introducing itself during one conversation.
+- [ ] Keep responses concise and avoid unsolicited offers or contact details.
+- [ ] Add deterministic wording fallbacks when model generation fails.
+- [ ] Add model timeout, retry, rate, token, cost, and latency controls.
+- [ ] Store safe decision summaries rather than private chain-of-thought.
+- [ ] Add adversarial prompt-injection and malformed-output tests.
+- [ ] Add model-independent fixtures so core runtime tests do not require a live provider.
+
+Phase 3 exit gate: the model can answer grounded Q&A and propose a safe task
+transition or conversational turn but cannot change state, call a tool, or
+route the graph without server approval.
+
+## Phase 4: Deterministic Validation And Business Tools
+
+Goal: ground every task field and business fact in project-owned validation,
+resources, or approved tools.
+
+- [ ] Build one typed validator registry for every supported task-field type.
+- [ ] Normalize phone, email, number, date, time, date-range, address, location, and media values.
+- [ ] Apply project timezone and locale consistently.
+- [ ] Support fixed choices and dynamic project-resource choices.
+- [ ] Resolve catalog categories, services, products, and other resources by stable project ID.
+- [ ] Add a typed, tenant-scoped tool registry with versioned input and output schemas.
+- [ ] Add a company/project-scoped reusable Tool Library with stable tool IDs and immutable tool versions.
+- [ ] Keep reusable tool definitions separate from assistant, task, and stage bindings.
+- [ ] Require a clear model-facing description and server-facing execution policy for every tool.
+- [ ] Separate read tools from consequential write operations.
+- [ ] Default every task and stage to no model-callable tools until tools are explicitly allowed.
+- [ ] Validate every requested tool against the published task allowlist.
+- [ ] Validate tool arguments against current canonical task state.
+- [ ] Reject resources that do not belong to the current project.
+- [ ] Add service detail, price, duration, and availability lookup tools for the reference task.
+- [ ] Support versioned synchronous and asynchronous execution modes, timeouts, retries, and cancellation behavior.
+- [ ] Define `ToolResultEventV1` for validated success, no-result, rejected, timeout, provider-failure, and cancelled outcomes.
+- [ ] Map only approved tool-result paths into canonical context or task state.
+- [ ] Store current business facts from tool results rather than model assertions.
+- [ ] Mark stale or failed lookups for refresh before confirmation.
+- [ ] Present tool errors in plain language without exposing credentials or provider payloads.
+- [ ] Define deterministic no-result, ambiguous-result, timeout, and provider-failure behavior.
+- [ ] Add safe test fixtures for every tool outcome.
+- [ ] Add tenant-isolation tests for resources, tools, results, and task mappings.
+
+Phase 4 exit gate: the task can collect natural language while every canonical
+value and current business fact remains deterministic and tenant-safe.
+
+## Phase 5: Confirmation, Operations, And Outcomes
+
+Goal: complete consequential business tasks without allowing the LLM to perform
+or fabricate side effects.
+
+- [ ] Generate the confirmation summary from canonical validated values.
+- [ ] Require confirmation for every configured consequential write operation.
+- [ ] Let the visitor correct any value from the confirmation step.
+- [ ] Revalidate changed and dependent values before showing confirmation again.
+- [ ] Prevent the model from treating conversational agreement as confirmation when policy requires an explicit answer.
+- [ ] Map confirmed fields into approved operation inputs.
+- [ ] Authorize the operation against the published task and current project.
+- [ ] Re-read volatile price, availability, eligibility, and authorization facts immediately before a consequential write.
+- [ ] Derive a stable operation idempotency key from the task run, published version, and operation definition.
+- [ ] Use existing encrypted secrets, timeout, retry, idempotency, job, and trace infrastructure.
+- [ ] Prevent double submission after retries, duplicate messages, refreshes, or resumed runs.
+- [ ] Treat a lost or ambiguous provider response as `outcome_unknown` instead of assuming success or failure.
+- [ ] Add reconciliation and, where supported, compensating behavior for partial or uncertain external outcomes.
+- [ ] Do not tell the visitor an operation succeeded until the authoritative result is persisted.
+- [ ] Store sanitized operation outputs and map approved values back into task state.
+- [ ] Route successful completion through the `completed` output.
+- [ ] Route unavailable, validation, timeout, provider failure, outcome unknown, cancellation, and handoff independently.
+- [ ] Add a deterministic human-handoff boundary.
+- [ ] Keep the task open when a recoverable operation fails.
+- [ ] Close the task only after a terminal outcome is persisted.
+- [ ] Add operation audit events without exposing credentials or unnecessary PII.
+- [ ] Add end-to-end operation tests for every named outcome.
+
+Phase 5 exit gate: a confirmed reference task executes exactly once, routes
+according to the persisted business result, and reconciles an uncertain
+external outcome without reporting false success.
+
+## Phase 6: Conversational Task Builder Experience
+
+Goal: let a non-technical business user configure a bounded conversational task
+without writing prompts, JSON, or one question node per field.
+
+- [ ] Add a first-class Conversational Task block to the builder.
+- [ ] Offer task templates for booking, lead capture, support intake, and custom collection.
+- [ ] Organize assistant and task setup into Behavior, Context, Tools, Knowledge, Workflow, Test, and Versions views.
+- [ ] Use task name, objective, and completion action as the primary setup.
+- [ ] Present required information as friendly field cards.
+- [ ] Add, remove, duplicate, and reorder task fields.
+- [ ] Configure field type, required state, validation, and visitor-facing description without technical terminology.
+- [ ] Configure conditional requirements through a guided rule editor.
+- [ ] Select catalogs, services, tools, operations, and reusable fields by name.
+- [ ] Add a reusable Tool Library view and select pinned tool versions by friendly name.
+- [ ] Show inherited and task/stage-specific tools with explicit default-off permissions.
+- [ ] Add typed context-variable setup with source, fallback, sensitivity, and autocomplete in supported text fields.
+- [ ] Show missing project resources as `Needs setup` instead of inventing defaults.
+- [ ] Configure confirmation, cancellation, retry, fallback, and handoff policies.
+- [ ] Connect named outcomes through both canvas handles and a simple `Go to` selector.
+- [ ] Keep exact wording optional and separate from the business field definition.
+- [ ] Keep raw prompt overrides and model settings out of the primary editor.
+- [ ] Keep provider-specific and voice-only controls out of the non-voice primary editor.
+- [ ] Place allowed advanced controls inside collapsed sections with safe defaults.
+- [ ] Add a task test chat that shows canonical fields, validation, requested tools, and outcome decisions.
+- [ ] Distinguish visitor-visible replies from developer diagnostics.
+- [ ] Add per-channel preview without changing the universal task.
+- [ ] Preserve keyboard, responsive, and screen-reader usability.
+- [ ] Confirm a non-technical tester can configure the reference booking task.
+
+Phase 6 exit gate: a business user can create and test the reference task from
+one focused editor without constructing seven separate collection nodes.
+
+## Phase 7: Hybrid Graph Compiler And Runtime Integration
+
+Goal: allow deterministic nodes and conversational tasks to coexist in one
+versioned graph with predictable routing.
+
+- [ ] Extend the universal graph contract with conversational-task nodes.
+- [ ] Add a first-class knowledge-conversation node backed by the existing project retrieval interface.
+- [ ] Represent goal-driven prompt stages and deterministic exact-message stages through one versioned graph contract.
+- [ ] Resolve the published entry policy for normal sessions, approved deep links, campaigns, and channel entry points.
+- [ ] Keep the knowledge node active after an answered outcome unless an approved route explicitly changes ownership.
+- [ ] Allow a server-approved task recommendation to enter an allowlisted published conversational task.
+- [ ] Return completed, cancelled, failed, and handed-off tasks to their configured knowledge or deterministic target.
+- [ ] Answer an allowed side question and resume the suspended task without a graph transition.
+- [ ] Give explicit button, list-row, product, and deterministic routes precedence over semantic task recommendations.
+- [ ] Transfer only whitelisted validated fields and approved context across knowledge and task boundaries.
+- [ ] Compile every task outcome as a named source output port.
+- [ ] Keep task-internal clarification turns inside the active task node.
+- [ ] Advance the graph only after the server records a task outcome.
+- [ ] Allow deterministic content before and after a conversational task.
+- [ ] Allow deterministic conditions to route into and out of a task.
+- [ ] Allow Wait, handoff, approved operations, and connected flows at task boundaries.
+- [ ] Prevent two active response collectors from competing for one inbound message.
+- [ ] Transfer response ownership atomically when a human accepts a handoff and suppress automated replies while human-owned.
+- [ ] Record inbound messages during human ownership without model or task mutation unless an explicit policy permits it.
+- [ ] Resume automation only through an authorized release action and a valid published return target.
+- [ ] Preserve branch precedence and explicit default routes.
+- [ ] Support semantic, deterministic variable, default, tool-result, and named task-outcome transitions.
+- [ ] Restrict semantic conditions to meaning-based decisions and require deterministic conditions for structured business rules.
+- [ ] Persist per-stage tool bindings and advanced model overrides in the published graph.
+- [ ] Validate required task outcomes, tool mappings, resources, and operations at publish time.
+- [ ] Block publication when a task recommendation target, return target, no-answer route, handoff route, or fallback is missing.
+- [ ] Detect unreachable tasks, orphan outputs, cycles, and paths without terminal outcomes.
+- [ ] Reject recursive task entry and task-switch or connected-flow paths that exceed the published depth limit.
+- [ ] Pin task behavior, fields, tools, prompts, and routes to the published version.
+- [ ] Resume the correct task and version after delayed or asynchronous work.
+- [ ] Normalize inbound free text, button, list, product, location, and media responses before task interpretation.
+- [ ] Emit channel-neutral reply intents from the shared runtime.
+- [ ] Preserve existing deterministic V1 flows without forced conversion.
+- [ ] Add import and export support for task contracts and named routes.
+- [ ] Add compiler, runtime, migration, and version-pinning tests.
+
+Phase 7 exit gate: one published graph can safely move between grounded Q&A,
+natural conversational tasks, and exact deterministic steps across the shared
+runtime while keeping exactly one response owner.
+
+## Phase 8: Reference Booking Task And Priority 1 Verification
+
+Goal: prove the new architecture through the complete `Book Spa Service`
+journey before broadening task types or channel certification.
+
+- [ ] Build the reference task using the project service catalog.
+- [ ] Start the reference journey in grounded Q&A, answer a normal project question, and then recognize a booking request.
+- [ ] Enter `Book Spa Service` only after the server approves the task recommendation.
+- [ ] Carry only fresh, whitelisted candidate values into the task and validate them before use.
+- [ ] Collect all seven reference fields through one task node.
+- [ ] Accept several valid details in one visitor message.
+- [ ] Ask only for missing, invalid, ambiguous, or stale details.
+- [ ] Resolve category and service dependencies.
+- [ ] Look up current price, duration, and availability.
+- [ ] Correct one field without restarting the task.
+- [ ] Answer a project side question during booking and resume the same requested field.
+- [ ] Cancel the task and return to ordinary Q&A without ending the conversation.
+- [ ] Complete the task and return to the configured Q&A or deterministic continuation.
+- [ ] Clarify an ambiguous task request instead of choosing a task silently.
+- [ ] Verify an explicit button or list route enters its mapped task without semantic rerouting.
+- [ ] Invalidate and refresh dependent availability after date, time, or service changes.
+- [ ] Show a canonical confirmation summary.
+- [ ] Submit one idempotent booking operation after confirmation.
+- [ ] Exercise completed, cancelled, unavailable, validation-failed, timeout, provider-failed, and handoff outcomes.
+- [ ] Resume the correct task after refresh, Wait, and a simulated worker interruption.
+- [ ] Verify model failure uses the deterministic fallback.
+- [ ] Verify prompt injection cannot change fields, tools, operations, or routes.
+- [ ] Verify tool data cannot override task instructions.
+- [ ] Verify retrieved content cannot start a task, invoke a tool, or change the configured return target.
+- [ ] Verify anonymous sessions remain isolated and contact or cross-channel state links only after the configured verification rule.
+- [ ] Verify duplicate, delayed, and out-of-order inbound events cannot overwrite newer task state or repeat an operation.
+- [ ] Verify retention, export, and deletion policies cover conversation messages, task fields, model traces, and operation records.
+- [ ] Verify blocked or abusive content follows the published safety outcome without mutating business state.
+- [ ] Verify an ambiguous provider response enters reconciliation and never produces a false success message.
+- [ ] Verify human takeover prevents dual replies and authorized release resumes the correct version-pinned target.
+- [ ] Verify recursive task entry and excessive task-switch or connected-flow depth are rejected.
+- [ ] Exercise deterministic degraded behavior for model, retrieval, business-tool, and outbound-channel outages.
+- [ ] Verify logs and diagnostics do not expose secrets or unnecessary PII.
+- [ ] Add deterministic model fixtures and live-provider smoke tests.
+- [ ] Add scenario tests with explicit success criteria for expected fields, tool calls, routes, replies, and terminal outcomes.
+- [ ] Add safe mocked outcomes for synchronous, asynchronous, timeout, rejected, provider-failed, outcome-unknown, and reconciled tools.
+- [ ] Trace assistant policy version, conversation-owner transitions, task/stage, return reason, field changes, tool calls, routes, model usage, latency, and cost with PII redaction.
+- [ ] Add database-backed cross-tenant tests.
+- [ ] Update the conversational-task phases in `docs/UAT_TEST_PLAN.md`.
+- [ ] Record no unresolved Critical or High Priority 1 defect.
+
+Priority 1 exit gate: Lia can complete a real booking through a bounded,
+versioned, resumable, and tenant-safe natural conversation.
+
+# Priority 2: Deterministic Controls And Channel Readiness
+
+Priority 2 retains the precision of the existing builder, completes the PDF
+capability baseline, and certifies both conversational tasks and explicit flows
+across production channels.
+
+## Phase 9: Composed Content And Explicit Interaction Controls
+
+Goal: preserve a complete deterministic authoring mode for exact messages and
+structured interactions.
+
+- [x] Existing nodes can combine ordered text, choice, media, and catalog content.
+- [x] Existing content can be reordered, duplicated, edited, and removed.
+- [ ] Finalize the versioned universal node and ordered-content contracts.
+- [ ] Allow several compatible presentation blocks and one response collector in a node.
+- [ ] Prevent incompatible or ambiguous response collectors.
+- [ ] Show every universal Add Content option in one menu.
+- [ ] Keep inapplicable content visible with a plain-language disabled reason.
+- [ ] Complete Text and Buttons.
+- [ ] Complete Media and Buttons.
+- [ ] Complete structured lists with sections and rows.
+- [ ] Complete Catalog, Single Product, and Multiple Product messages.
+- [ ] Complete media for image, video, audio, and documents.
+- [ ] Complete typed template components and variable mappings.
+- [ ] Keep visible labels separate from stable IDs and stored values.
+- [ ] Preserve content order through save, reload, preview, publish, export, import, and runtime.
+- [ ] Keep provider identifiers and channel restrictions out of primary universal fields.
+- [ ] Add publish blockers for incomplete content.
+- [ ] Confirm every deterministic message example in `docs/Flow Builder v2.pdf` can be authored without raw JSON.
+
+Phase 9 exit gate: explicit nodes provide complete composed-content control
+when a business needs exact interaction wording or presentation.
+
+## Phase 10: Per-Option Routing And Response Policies
+
+Goal: complete exact routing and deterministic collection behavior around the
+new task-first model.
+
+- [x] Existing choice values can route through branch rules.
+- [x] Ask Question supports common text, contact, date, time, and number formats.
+- [x] Ask Address, Ask Location, and Ask Media store structured values.
+- [ ] Give every button, list row, product, and selectable result a stable option ID and output port.
+- [ ] Add route, URL, and phone button behavior where supported.
+- [ ] Connect each routable option through a canvas handle or `Go to` selector.
+- [ ] Make both routing controls write the same graph edge.
+- [ ] Preserve routing when labels change or are translated.
+- [ ] Add documented default and no-match outputs.
+- [ ] Warn before deleting a connected option.
+- [ ] Block duplicate, conflicting, missing, or invalid option routes.
+- [ ] Add a first-class boolean input.
+- [ ] Add retry count, retry message, and retry-exhausted output.
+- [ ] Add no-reply reminder, timeout, and output.
+- [ ] Add cancellation and validation-failure outputs.
+- [ ] Keep retry, no-reply, cancellation, and collection state durable.
+- [ ] Keep deterministic response policies pinned to the active published version.
+- [ ] Confirm every deterministic input example in `docs/Flow Builder v2.pdf` has complete success and failure behavior.
+
+Phase 10 exit gate: businesses can choose either flexible task collection or
+fully scripted collection with stable per-option routes.
+
+## Phase 11: Actions, API Operations, And Deterministic Outcomes
+
+Goal: complete the deterministic action baseline and expose every operational
+result as a named route.
+
+- [x] Request Intervention supports visitor message, queue, priority, notification intent, and operation notification.
+- [x] Conditions support typed values and AND/OR groups.
+- [x] Connect Flow supports jump and return behavior with recursion protection.
+- [x] Set Attribute and Add Tag persist contact data.
+- [x] Wait supports durable pause and resume.
+- [x] Operations support mappings, success and failure routing, retries, timeouts, idempotency, encrypted secrets, and attempt history.
+- [ ] Add Remove Tag, Subscribe, Unsubscribe, Assign Agent, and Assign Team where permissions permit.
+- [ ] Add HTTP method selection for GET, POST, PUT, PATCH, and DELETE.
+- [ ] Add friendly query parameter, header, and body editing.
+- [ ] Add safe test requests with test values.
+- [ ] Preview sanitized response status and response body.
+- [ ] Map nested response values through a friendly selector.
+- [ ] Add custom HTTP status-code outputs.
+- [ ] Add success, client-error, server-error, timeout, and network-failure outputs.
+- [ ] Connect every API output directly to a specific node.
+- [ ] Keep credentials out of flow exports and diagnostics.
+- [ ] Add publish blockers for invalid URL, method, mapping, secret, and output configuration.
+- [ ] Confirm every action in `docs/Flow Builder v2.pdf` can be configured and executed.
+- [ ] Add focused runtime and tenant-isolation tests for every result path.
+
+Phase 11 exit gate: explicit actions and conversational tasks use the same
+approved operation, security, durability, and routing boundaries.
+
+## Phase 12: Universal Channel Adapter Upgrade
+
+Goal: carry conversational tasks and richer deterministic content through the
+existing channel adapter boundary.
+
+- [x] Project chat and widget already use the shared browser adapter.
+- [x] WhatsApp already uses native and fallback delivery from the shared runtime.
+- [x] The reference future adapter already consumes the channel-neutral reply envelope.
+- [ ] Version the runtime reply envelope for task prompts, structured choices, content, and outcomes.
+- [ ] Normalize free text and native interactive replies into one inbound contract.
+- [ ] Preserve stable option and project-resource IDs across adapters.
+- [ ] Let a task request a question, choices, confirmation, media, or handoff without naming a channel.
+- [ ] Let adapters select a native interaction or readable fallback.
+- [ ] Map composed content, lists, products, media, and templates.
+- [ ] Enforce channel limits without changing the saved task or graph.
+- [ ] Keep model instructions and task state free of provider-specific payloads.
+- [ ] Add per-channel preview without changing the universal definition.
+- [ ] Prevent adapter delivery failure from changing task semantics.
+- [ ] Extend the certification matrix for every task reply and V2 content capability.
+
+Phase 12 exit gate: the same task and deterministic graph have declared
+delivery behavior in project chat, widget, WhatsApp, and a future adapter.
+
+## Phase 13: Cross-Channel Conversational Certification
+
+Goal: prove semantic task parity and deterministic outcome parity across live
+channels.
+
+- [ ] Execute the reference booking task in project chat.
+- [ ] Execute the same published task in the website widget.
+- [ ] Execute the same published task through a UAT WhatsApp Business number.
+- [ ] Confirm all channels produce the same canonical fields and business outcomes.
+- [ ] Confirm response wording may vary without changing validation or routes.
+- [ ] Confirm multi-field extraction, clarification, correction, cancellation, and handoff.
+- [ ] Confirm button, list, product, location, media, and free-text replies normalize correctly.
+- [ ] Confirm service-window and approved-template requirements on WhatsApp.
+- [ ] Confirm content beyond provider limits uses documented readable fallbacks.
+- [ ] Confirm page refresh and delayed replies resume the correct version-pinned task.
+- [ ] Confirm duplicate events and stale clients do not duplicate operations.
+- [ ] Confirm project chat and widget visual acceptance.
+- [ ] Confirm widget responsive, origin, token, and accessibility acceptance.
+- [ ] Confirm WhatsApp webhook, media, template, retry, and outbox behavior.
+- [ ] Record every provider limitation as an adapter rule.
+
+Phase 13 exit gate: every production channel reaches equivalent validated task
+outcomes without introducing channel-specific task or graph persistence.
+
+## Phase 14: Priority 2 Release Gate
+
+Goal: approve the hybrid conversational platform for production-like beta
+traffic.
+
+- [x] `npm run certify:release:fast` exists.
+- [x] `npm run certify:release` exists.
+- [ ] Create or confirm a staging app and staging database.
+- [ ] Apply migrations to both a clean database and an existing database containing V1 flows.
+- [ ] Confirm rollback, restore, and abandoned-task cleanup procedures.
+- [ ] Configure HTTPS, media delivery, cron recovery, encrypted secrets, model provider, and UAT channel credentials.
+- [ ] Set project and platform model rate, token, cost, timeout, and retention limits.
+- [ ] Confirm anonymous-session expiry, verified contact association, cross-channel linking, export, and deletion policies.
+- [ ] Confirm the reconciliation queue and operator procedure for uncertain external-operation outcomes.
+- [ ] Run deterministic task fixtures without a live model.
+- [ ] Run approved live-model evaluation fixtures.
+- [ ] Run prompt-injection, tool-abuse, PII-redaction, and cross-tenant security checks.
+- [ ] Run duplicate, delayed, out-of-order, and concurrent inbound-event tests.
+- [ ] Run human-takeover and authorized automation-resume tests with no dual replies.
+- [ ] Run the degraded-mode matrix for model, retrieval, business tools, and outbound delivery.
+- [ ] Run `npm run lint`.
+- [ ] Run `npm run typecheck`.
+- [ ] Run `npm run check:tenant-scope`.
+- [ ] Run `npm run test:tenant-isolation`.
+- [ ] Run `npm run test:channel-certification`.
+- [ ] Run `npm run test:e2e`.
+- [ ] Run `npm run build`.
+- [ ] Run `npm run certify:release`.
+- [ ] Record Project Chat as Pass, Pass with accepted limitations, or Fail.
+- [ ] Record Website Widget as Pass, Pass with accepted limitations, or Fail.
+- [ ] Record WhatsApp as Pass, Pass with accepted limitations, or Fail.
+- [ ] Confirm no unresolved Critical or High Priority 1 or Priority 2 defect.
+- [ ] Approve the hybrid platform for production-like beta traffic.
+
+Priority 2 exit gate: automated certification and live UAT approve both
+conversational tasks and deterministic flows for beta traffic.
+
+# Priority 3: Advanced Conversational Platform
+
+Priority 3 broadens the task engine after the bounded booking reference and
+production channels are stable.
+
+## Phase 15: Advanced Knowledge, Memory, And Specialist Routing
+
+Goal: extend the Priority 1 Q&A-to-task bridge with richer knowledge policy,
+multi-intent selection, durable memory, and bounded specialist routing without
+creating an unrestricted whole-bot agent.
+
+- [ ] Extend `KnowledgeConversationV1` with source selection, citations, recency, answer policy, and advanced no-answer behavior.
+- [ ] Keep retrieval sources, citations, recency, answer policy, and no-answer behavior explicit.
+- [ ] Prevent retrieved content from changing task instructions or tool permissions.
+- [ ] Keep company, project, and assistant references natural without mentioning internal documents or chunks.
+- [ ] Add concise grounded support replies with project-level answer guidance.
+- [ ] Extend baseline knowledge outcomes with moderation, timeout, provider-failure, and specialist-handoff outcomes.
+- [ ] Extend the baseline single-task recommendation into multi-intent routing with confidence thresholds and deterministic fallback.
+- [ ] Route into bounded booking, lead, support, and handoff tasks.
+- [ ] Add bounded specialist-task selection and explicit switch, pause, resume, and return policies.
+- [ ] Define a tenant-, project-, and contact-scoped memory policy with retention, consent, and selected structured facts.
+- [ ] Do not expose unrestricted cross-customer or cross-project conversation history to a model.
+- [ ] Add versioned post-conversation jobs for summaries, CRM logging, quality checks, and structured insights.
+- [ ] Restrict post-conversation jobs to explicitly approved idempotent tools and prevent channel-control actions.
+- [ ] Define bounded task/assistant handoff context with current intent, validated fields, prior actions, and handoff reason.
+- [ ] Track handoff history, enforce a maximum handoff depth, detect cycles, and provide a deterministic human fallback.
+- [ ] Let visitors change intent while preserving only explicitly reusable fields.
+- [ ] Add tenant-safe prompt, knowledge, model, and task isolation tests.
+- [ ] Add token, cost, latency, citation, retrieval, and outcome tracing.
+- [ ] Add channel-neutral knowledge replies and readable adapter fallbacks.
+
+Phase 15 exit gate: Lia can apply advanced knowledge policy, memory,
+multi-intent selection, and bounded specialist handoffs without granting the
+model unrestricted graph or tool control.
+
+## Phase 16: Contact Lifecycle, Handoff, And Structured Forms
+
+Goal: complete commercial conversation management and optional rich form
+experiences.
+
+- [ ] Add remove tag, subscribe, unsubscribe, assign agent, and assign team.
+- [ ] Add reopen, resolve, close, and cancel conversation outcomes.
+- [ ] Add business-hours and queue-availability conditions.
+- [ ] Preserve lifecycle actions in audit logs and contact timelines.
+- [ ] Add permission rules before exposing assignment and lifecycle controls.
+- [ ] Preserve validated task fields during an authorized human handoff.
+- [ ] Define a universal structured-form capability.
+- [ ] Keep WhatsApp Flow JSON and future provider schemas at adapter boundaries.
+- [ ] Add browser rendering or guided conversational fallback for structured forms.
+- [ ] Add secure data-exchange, provider validation, versioning, and publication controls.
+
+Phase 16 exit gate: conversations can move safely between tasks, people, and
+structured forms while retaining canonical state and audit history.
+
+## Phase 17: Reuse, Evaluations, Analytics, And Optimization
+
+Goal: help teams reuse and improve both conversational tasks and deterministic
+flows.
+
+- [x] Reusable subflows, custom templates, reusable-field suggestions, flow analytics, and experiment metadata have working foundations.
+- [ ] Add a typed reusable-field registry with ownership and compatibility checks.
+- [ ] Add reusable task, field-set, node, and composed-content templates.
+- [ ] Complete template approval, versioning, duplication, and upgrade guidance.
+- [ ] Add deterministic simulation fixtures for success, failure, retry, timeout, and provider responses.
+- [ ] Add conversational evaluation datasets for extraction, correction, clarification, safety, and completion.
+- [ ] Add regression thresholds before model or prompt changes are promoted.
+- [ ] Measure task starts, completion, abandonment, correction, validation failure, handoff, and operation success.
+- [ ] Measure token, latency, cost, tool usage, and model-fallback rates.
+- [ ] Add conversion attribution by task, field, option, route, channel, and published version.
+- [ ] Add draft comparison, published-version diff, and rollback controls.
+- [ ] Add runtime traffic allocation for approved A/B variants.
+- [ ] Add flow and task cloning across projects with safe resource remapping.
+
+Phase 17 exit gate: teams can safely reuse, compare, evaluate, measure, and
+optimize versioned conversational automations.
+
+## Phase 18: Future Channels And Extension Model
+
+Goal: prove that channels, models, tools, and task families extend the same
+universal contracts.
+
+- [x] The reference future adapter consumes the current universal runtime envelope.
+- [ ] Document the public conversational task, reply, tool, operation, and V2 adapter contracts.
+- [ ] Add conformance tests for third-party channel adapters.
+- [ ] Add conformance tests for model providers and business tools.
+- [ ] Certify at least one real non-WhatsApp external channel.
+- [ ] Define plugin boundaries for inbound normalization and outbound delivery.
+- [ ] Define plugin boundaries for capability declarations and readable fallbacks.
+- [ ] Define plugin boundaries for encrypted credentials and tool authorization.
+- [ ] Evaluate voice as a future adapter over the same task state.
+- [ ] Confirm a new channel can be added without changing task or flow persistence.
+- [ ] Confirm a new model can be added without changing business task contracts.
+- [ ] Confirm a new business tool cannot bypass tenant, validation, confirmation, or audit boundaries.
+
+Priority 3 exit gate: new channels, models, and tools extend Lia without
+weakening deterministic business control.
+
+## Recommended Execution Order
+
+Start with Priority 1, Phase 1 of 18 and finish the phases in order.
+
+The first implementation slice should use:
+
+- One bounded reference task.
+- One configured model provider behind the provider interface.
+- One project-owned service catalog.
+- Read-only service and availability tools.
+- One idempotent booking operation.
+- Project chat as the first development channel.
+
+After the reference task is deterministic and well tested, certify the widget
+and WhatsApp through the same runtime and task contract.
+
+Do not begin with an unrestricted agent responsible for the whole chatbot.
+Begin with bounded tasks that have explicit fields, tools, rules,
+confirmation, outcomes, and fallbacks.
+
+Do not remove or rewrite the existing deterministic runtime. Use it for exact
+journeys, task boundaries, operational execution, recovery, and channel
+delivery while the conversational task engine is added beside it.
+
+Do not wait for every remaining visual PDF refinement before implementing the
+task contract. The task-first runtime is now the primary product direction;
+deterministic PDF parity remains mandatory complementary functionality.

@@ -1,21 +1,41 @@
 # Beta Readiness Checklist
 
-Status date: 2026-07-12
+Status date: 2026-07-23
 
 This checklist turns `LEIGIA_BLUEPRINT_ALIGNMENT_AUDIT.md` into a practical
 beta-readiness track. Use it before putting real customers or production-like
 traffic on Lia AI.
 
+## Document Authority
+
+This file is the single source of truth for the overall beta release decision.
+It tracks environment, security, operations, provider, staging, and final
+approval gates without duplicating subsystem implementation plans.
+
+- `FLOW_BUILDER_ROADMAP.md` is authoritative for flow builder, conversational
+  task, tool, runtime, adapter, and flow-verification implementation status.
+- `docs/UAT_TEST_PLAN.md` is the manual test procedure and test-run evidence.
+- `docs/OPERATIONS_READINESS.md` contains detailed operational procedures.
+- `LEIGIA_BLUEPRINT_ALIGNMENT_AUDIT.md` is architectural background and does
+  not control current status.
+
+A completed UAT smoke test proves the tested behavior worked in that build; it
+does not mark a later roadmap capability complete. This checklist may approve
+beta only when its own gates and the referenced roadmap exit gates pass.
+
 ## Current Position
 
-Current hardening track:
+Overall beta status: Not ready for production-like beta traffic.
 
-- Blueprint Hardening 1/6: E2E and tenant isolation foundation.
-- Blueprint Hardening 2/6: production operations readiness.
-- Blueprint Hardening 3/6: SaaS admin readiness.
-- Blueprint Hardening 4/6: billing and plans design.
-- Blueprint Hardening 5/6: domains strategy.
-- Blueprint Hardening 6/6: RLS readiness.
+Authoritative product implementation status:
+
+- Flow roadmap target: Priority 1, Phase 1 of 18.
+- Priority 1, Phases 1-8 remain required for the goal-driven conversational
+  core.
+- Priority 2, Phases 9-14 remain required for declared non-voice beta
+  capability parity, live channel certification, and release approval.
+- Priority 3, Phases 15-18 are advanced post-beta work unless an earlier beta
+  requirement explicitly depends on them.
 
 Completed foundations:
 
@@ -32,9 +52,9 @@ Subdomain and custom-domain setup:
 
 ## Gate 1: Local And Staging Basics
 
-- [ ] Confirm Node.js 20+ is used locally and in deployment.
-- [ ] Confirm `npm install --legacy-peer-deps` is documented if peer
-  resolution blocks fresh installs.
+- [ ] Confirm Node.js 20.9+ is used locally and in deployment.
+- [ ] Confirm a clean `npm ci` succeeds without `--force` or
+  `--legacy-peer-deps`.
 - [ ] Confirm `.env.local` is not committed.
 - [ ] Confirm local `.env.local` has:
   - [ ] `DATABASE_URL`
@@ -76,12 +96,15 @@ Subdomain and custom-domain setup:
 Required commands before beta:
 
 ```bash
+npm run check:local-env
 npm run lint
+npm run typecheck
 npm run check:tenant-scope
 npm run test:tenant-isolation
+npm run test:channel-certification
 npm run test:e2e
 npm run build
-npx tsc --noEmit
+npm run certify:release
 ```
 
 ## Gate 3: Database And Migration Safety
@@ -158,23 +181,26 @@ Subdomain note:
 - [x] Decide whether platform audit-log view/export is needed for beta.
 - [x] Do not add support impersonation until support-access audit rules exist.
 
-## Gate 9: Core Product Smoke Test
+## Gate 9: Flow Builder Product Readiness
 
-- [x] Sign up as a new company owner.
-- [x] Create a project.
-- [x] Upload and process a document.
-- [x] Ask a RAG question from project chat.
-- [x] Apply a template.
-- [x] Run a flow from project chat.
-- [x] Run a flow from widget.
-- [x] Create a media asset.
-- [x] Create a product catalog/product.
-- [x] Run a flow with branching.
-- [x] Run a flow with inline operation success/failure routing.
-- [x] Review submissions and submission events.
-- [x] Review contacts and channel transcript.
-- [x] Review analytics.
-- [x] Review audit logs.
+- [x] Existing deterministic product baseline has completed its historical
+  smoke test.
+- [ ] Complete Priority 1, Phases 1-8 in `FLOW_BUILDER_ROADMAP.md`.
+- [ ] Complete Priority 2, Phases 9-14 in `FLOW_BUILDER_ROADMAP.md`.
+- [ ] Update `docs/UAT_TEST_PLAN.md` for every completed roadmap capability.
+- [ ] Verify anonymous sessions, verified contact association, and cross-channel identity linking cannot expose another visitor's state.
+- [ ] Verify configured retention, export, and deletion behavior for messages, task fields, model traces, and operation records.
+- [ ] Verify duplicate, delayed, out-of-order, and concurrent events cannot repeat operations or overwrite newer state.
+- [ ] Verify model, retrieval, business-tool, and outbound-channel outages use the approved degraded behavior.
+- [ ] Verify human takeover stops automated replies and authorized release resumes the correct published target.
+- [ ] Verify uncertain external-operation results enter reconciliation and never produce a false success response.
+- [ ] Execute the complete UAT plan against the intended beta deployment and
+  record its commit.
+- [ ] Pass project chat, website widget, and WhatsApp live channel
+  certification within the declared non-voice scope.
+- [ ] Pass `npm run certify:release`.
+- [ ] Confirm no unresolved Critical or High flow-builder, conversational-task,
+  tenant-safety, or channel defect.
 
 ## Gate 10: Known Deferred Items
 
@@ -189,6 +215,11 @@ These are not blockers for internal beta, but they must be explicitly accepted:
 - [x] Full browser E2E coverage is not complete.
 - [x] Live business operations such as availability, booking, quote, payment,
   and status checks need provider-specific setup.
+- [x] Telnyx telephony-network parity, PSTN, SIP, DTMF, transcription,
+  voice interruption, call transfer, and hang-up controls are outside the
+  non-voice beta scope.
+- [x] Advanced Priority 3 roadmap capabilities remain post-beta unless promoted
+  through an explicit beta-scope decision.
 
 ## Gate 11: SaaS Admin Readiness
 
@@ -234,12 +265,19 @@ These are not blockers for internal beta, but they must be explicitly accepted:
 
 ## Recommended Next Implementation Order
 
-1. Run `npm run check:local-env` and fix local `.env.local` gaps without
-   committing secrets.
-2. Create staging app and database environments.
-3. Run staging migrations, build and required beta command suite.
-4. Complete provider backup, restore, public URL, email and WhatsApp checks.
-5. Defer actual RLS migration until testing and deployment process is mature.
-6. Defer DNS/subdomain setup until domain routing needs a staging test.
-7. Keep provider checkout, invoices and webhooks deferred until manual plans
-   work.
+1. Complete Priority 1, Phases 1-8 in `FLOW_BUILDER_ROADMAP.md`, updating
+   implementation status only there.
+2. Extend and run the focused conversational-task UAT evidence in
+   `docs/UAT_TEST_PLAN.md`.
+3. Complete Priority 2, Phases 9-14 and the non-voice cross-channel release
+   gate.
+4. Keep local environment, tenant-safety, migration, and operations checks
+   passing while product implementation proceeds.
+5. Create or refresh staging app and database environments before live channel
+   certification.
+6. Run staging migrations, the complete UAT plan, and the required beta command
+   suite against the exact release candidate.
+7. Complete provider backup, restore, public URL, email, and WhatsApp checks.
+8. Defer DNS/subdomain setup until domain routing needs a staging test.
+9. Keep RLS activation and provider billing checkout deferred until their
+   documented prerequisites are approved.

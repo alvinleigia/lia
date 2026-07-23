@@ -3,6 +3,16 @@
 Use this checklist to test Lia AI in phases instead of trying to validate the
 whole application in one sitting.
 
+## Document Role
+
+This file contains manual test instructions and evidence for a specific build.
+It is not the implementation-status source or the final beta approval source.
+
+- `FLOW_BUILDER_ROADMAP.md` controls flow capability and phase completion.
+- `BETA_READINESS_CHECKLIST.md` controls the overall beta release decision.
+- A passing item here is evidence for those documents; it does not replace
+  their exit gates.
+
 ## UAT Environment
 
 - UAT URL:
