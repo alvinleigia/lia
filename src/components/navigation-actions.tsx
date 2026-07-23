@@ -11,6 +11,7 @@ import {
   FolderKanban,
   IdCard,
   LayoutTemplate,
+  ListTodo,
   LogIn,
   LogOut,
   MessageSquare,
@@ -159,6 +160,12 @@ export function NavigationActions({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Flows & Records</DropdownMenuLabel>
+              <DropdownMenuItem asChild>
+                <Link href="/projects/tasks">
+                  <ListTodo className="h-4 w-4 mr-2" />
+                  Tasks
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/projects/actions">
                   <Bot className="h-4 w-4 mr-2" />

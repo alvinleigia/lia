@@ -105,6 +105,7 @@ const schemaScopeChecks = [
   ["companyMemberships", ["companyId", "userId"]],
   ["companyInvitations", ["companyId", "email", "tokenHash"]],
   ["projects", ["workspaceId", "ownerUserId"]],
+  ["conversationalTasks", ["projectId"]],
   ["projectWidgetKeys", ["projectId"]],
   ["integrationProviders", ["projectId"]],
   ["providerSecrets", ["projectId", "providerId"]],
@@ -173,6 +174,12 @@ assertIncludes(
   "src/lib/action-flows.ts",
   "eq(projectActions.projectId, projectId)",
   "Action access",
+);
+assertCountAtLeast(
+  "src/lib/conversational-tasks.ts",
+  "eq(conversationalTasks.projectId, projectId)",
+  4,
+  "Conversational task access",
 );
 assertIncludes(
   "src/lib/action-flows.ts",
@@ -247,6 +254,7 @@ assertIncludes(
 
 const scopedReadRequirements = new Map([
   ["projects", ["projects.workspaceId", "projects.ownerUserId"]],
+  ["conversationalTasks", ["conversationalTasks.projectId"]],
   ["projectWidgetKeys", ["projectWidgetKeys.projectId"]],
   ["integrationProviders", ["integrationProviders.projectId"]],
   ["providerSecrets", ["providerSecrets.projectId"]],

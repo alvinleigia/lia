@@ -87,6 +87,9 @@ database, backup, and provider readiness work.
 
 Current implementation target: Priority 1, Phase 1 of 18.
 
+Current delivery slice: Slice 1 of 7, Task Workspace, is implemented and
+awaiting the manual acceptance check in `docs/UAT_TEST_PLAN.md`.
+
 ## Product Direction
 
 - [x] Make bounded business tasks the primary abstraction for natural conversations.
@@ -233,7 +236,7 @@ behavior.
 - [ ] Define `DataHandlingPolicyV1` for field sensitivity, consent, retention, expiry, model/tool/log visibility, export, and deletion.
 - [ ] Define `AssistantPolicyV1` for shared identity, greeting strategy, base behavior, global constraints, and model policy.
 - [ ] Keep assistant policy separate from task-specific objectives, fields, tools, and outcomes.
-- [ ] Give every task a stable ID, name, objective, description, and schema version.
+- [x] Give every task a stable ID, name, objective, description, and schema version.
 - [ ] Define `TaskIntentRecommendationV1` so Q&A can recommend only an allowlisted published task and optional candidate field mappings.
 - [ ] Define `ConversationReturnPolicyV1` for completed, cancelled, failed, no-answer, and handoff task outcomes.
 - [ ] Define named knowledge outcomes for answered, task-recommended, no-answer, handoff, and cancelled.

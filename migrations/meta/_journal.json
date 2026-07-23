@@ -225,6 +225,13 @@
       "when": 1785101400000,
       "tag": "0031_durable_execution_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1785187800000,
+      "tag": "0032_conversational_task_workspace",
+      "breakpoints": true
     }
   ]
 }

@@ -17,6 +17,7 @@ const requiredTables = [
   "company_invitations",
   "workspaces",
   "projects",
+  "conversational_tasks",
   "source_documents",
   "documents",
   "integration_providers",
@@ -144,6 +145,24 @@ async function createTenantFixture(tx, label, suffix) {
     tx`
       insert into projects (workspace_id, owner_user_id, name)
       values (${workspace.id}, ${user.id}, ${`Project ${label}`})
+      returning id
+    `,
+  );
+
+  const conversationalTask = await insertOne(
+    tx`
+      insert into conversational_tasks (
+        project_id,
+        name,
+        objective,
+        description
+      )
+      values (
+        ${project.id},
+        ${`Task ${label}`},
+        ${`Complete goal ${label}`},
+        ${`Task notes ${label}`}
+      )
       returning id
     `,
   );
@@ -743,6 +762,7 @@ async function createTenantFixture(tx, label, suffix) {
     invitation,
     workspace,
     project,
+    conversationalTask,
     sourceDocument,
     document,
     provider,
@@ -795,6 +815,29 @@ async function runIsolationAssertions(tx, tenantA, tenantB) {
   assert(
     renameForeignProject.length === 0,
     "Tenant A workspace could rename tenant B project.",
+  );
+
+  const foreignConversationalTask = await tx`
+    select id
+    from conversational_tasks
+    where id = ${tenantB.conversationalTask.id}
+      and project_id = ${tenantA.project.id}
+  `;
+  assert(
+    foreignConversationalTask.length === 0,
+    "Tenant A project could read tenant B conversational task.",
+  );
+
+  const updateForeignConversationalTask = await tx`
+    update conversational_tasks
+    set name = 'Cross Tenant Task'
+    where id = ${tenantB.conversationalTask.id}
+      and project_id = ${tenantA.project.id}
+    returning id
+  `;
+  assert(
+    updateForeignConversationalTask.length === 0,
+    "Tenant A project could update tenant B conversational task.",
   );
 
   const deleteForeignSourceDocument = await tx`
@@ -1286,6 +1329,17 @@ async function runIsolationAssertions(tx, tenantA, tenantB) {
     tenantBInvitation[0]?.status === "pending",
     "Tenant B invitation status changed.",
   );
+
+  const tenantBConversationalTask = await tx`
+    select name
+    from conversational_tasks
+    where id = ${tenantB.conversationalTask.id}
+      and project_id = ${tenantB.project.id}
+  `;
+  assert(
+    tenantBConversationalTask[0]?.name === "Task B",
+    "Tenant B conversational task changed.",
+  );
 }
 
 async function main() {
@@ -1302,6 +1356,7 @@ async function main() {
       await runIsolationAssertions(tx, tenantA, tenantB);
       checks.push("project read scoping");
       checks.push("project mutation scoping");
+      checks.push("conversational task read and mutation scoping");
       checks.push("document delete scoping");
       checks.push("action, branch rule, and flow version scoping");
       checks.push("operation provider and attempt scoping");

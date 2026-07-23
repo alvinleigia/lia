@@ -39,6 +39,74 @@ Status: Not started / Pass / Fail / Blocked
 Notes:
 ```
 
+## Incremental Builder Development Acceptance
+
+Use these short checks while the conversational core is being built. Complete
+one slice before development moves to the next slice.
+
+### Phase 1 Of 18 - Slice 1 Of 7 - Task Workspace
+
+Build/commit:
+
+Status: Not started
+
+Tester:
+
+Test date:
+
+- [ ] Run `npx drizzle-kit migrate`.
+  Expected result: The command returns to the prompt without an error.
+  Status:
+  Notes:
+
+- [ ] Start the app and sign in to an active company account with a selected project.
+  Expected result: The signed-in navbar loads and shows `Automation`.
+  Status:
+  Notes:
+
+- [ ] Open `Automation`, then select `Tasks`.
+  Expected result: The Conversational Tasks page opens for the selected project.
+  Status:
+  Notes:
+
+- [ ] Select `New Task`.
+  Expected result: A separate form asks for task name, objective, and optional internal notes.
+  Status:
+  Notes:
+
+- [ ] Create a task named `Book a Spa Service`.
+  Expected result: The task detail page opens and shows `Task created`.
+  Status:
+  Notes:
+
+- [ ] Change the task name or objective and select `Save Changes`.
+  Expected result: The page reloads with `Changes saved` and the updated value remains visible.
+  Status:
+  Notes:
+
+- [ ] Return to the task list and open the task again.
+  Expected result: The saved values remain after navigation and reload.
+  Status:
+  Notes:
+
+- [ ] Archive the task.
+  Expected result: The task moves from the active list to `Archived Tasks`.
+  Status:
+  Notes:
+
+- [ ] Restore the task.
+  Expected result: The task returns as an editable draft.
+  Status:
+  Notes:
+
+- [ ] Switch to another project and open `Automation`, then `Tasks`.
+  Expected result: The task from the first project is not visible.
+  Status:
+  Notes:
+
+Exit gate: create, edit, reload, archive, restore, and project isolation all pass
+without a runtime error.
+
 ## Phase 0 - Environment Readiness
 
 Goal: confirm the UAT environment is safe to test.

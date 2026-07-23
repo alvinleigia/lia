@@ -5,6 +5,10 @@ export default defineConfig({
   projects: [{ name: "contracts" }],
   reporter: [["list"]],
   testDir: "./tests/e2e",
-  testMatch: ["channel-adapter.spec.ts", "channel-certification.spec.ts"],
+  testMatch: [
+    "channel-adapter.spec.ts",
+    "channel-certification.spec.ts",
+    "conversational-task-schema.spec.ts",
+  ],
   timeout: 30_000,
 });

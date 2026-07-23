@@ -160,6 +160,31 @@ export const projects = pgTable(
   ],
 );
 
+export const conversationalTasks = pgTable(
+  "conversational_tasks",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    schemaVersion: integer("schema_version").notNull().default(1),
+    name: text("name").notNull(),
+    objective: text("objective").notNull(),
+    description: text("description"),
+    isArchived: boolean("is_archived").notNull().default(false),
+    archivedAt: timestamp("archived_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversational_tasks_project_idx").on(table.projectId),
+    index("conversational_tasks_project_archived_idx").on(
+      table.projectId,
+      table.isArchived,
+    ),
+  ],
+);
+
 export const projectWidgetKeys = pgTable(
   "project_widget_keys",
   {
@@ -1171,6 +1196,8 @@ export type InsertContactTagAssignment =
   typeof contactTagAssignments.$inferInsert;
 export type SelectContactTagAssignment =
   typeof contactTagAssignments.$inferSelect;
+export type InsertConversationalTask = typeof conversationalTasks.$inferInsert;
+export type SelectConversationalTask = typeof conversationalTasks.$inferSelect;
 export type InsertProject = typeof projects.$inferInsert;
 export type SelectProject = typeof projects.$inferSelect;
 export type InsertCompany = typeof companies.$inferInsert;
