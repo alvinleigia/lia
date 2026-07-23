@@ -1270,6 +1270,30 @@ export async function syncOperationRoutePresets(
   return synced;
 }
 
+export async function syncOperationStepRoutePresets(input: {
+  actionId: number;
+  failureStepId?: number | null;
+  fieldKey?: string | null;
+  projectId: number;
+  sourceStepId: number;
+  stepType: string;
+  successStepId?: number | null;
+}) {
+  if (input.stepType !== "operation") {
+    return [];
+  }
+
+  return syncOperationRoutePresets({
+    actionId: input.actionId,
+    failureStepId: input.failureStepId ?? null,
+    projectId: input.projectId,
+    sourceStepId: input.sourceStepId,
+    statusFieldKey:
+      input.fieldKey?.trim() || `operation_${input.sourceStepId}_status`,
+    successStepId: input.successStepId ?? null,
+  });
+}
+
 export async function validateActionFlowRoutes(
   projectId: number,
   actionId: number,

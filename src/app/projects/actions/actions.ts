@@ -11,8 +11,6 @@ import {
 import { restoreActionFlowDraftFromSnapshot } from "@/lib/action-flow-restore";
 import {
   ACTION_BRANCH_OPERATORS,
-  ACTION_STEP_INPUT_TYPES,
-  ACTION_STEP_TYPES,
   type ActionBranchOperator,
   countBlockingActionFlowIssues,
   createActionFlowBranchRule,
@@ -33,12 +31,18 @@ import {
   setActionFlowStepEnabled,
   setActionFlowStepSortOrder,
   setProjectActionPublishedVersion,
-  syncOperationRoutePresets,
+  syncOperationStepRoutePresets,
   updateActionFlowBranchRule,
   updateActionFlowStep,
   updateProjectAction,
   validateActionFlowRoutes,
 } from "@/lib/action-flows";
+import {
+  actionStepDynamicChoiceSchemaShape,
+  createActionStepSchema,
+  parseActionStepLines,
+  parseActionStepOptions,
+} from "@/lib/action-step-schema";
 import { buildActionStepSettings } from "@/lib/action-step-settings";
 import {
   getActionTemplate,
@@ -106,323 +110,18 @@ const actionDetailsSchema = z
     }
   });
 
-const actionStepSchema = z
-  .object({
-    actionId: z.coerce.number().int().positive(),
-    stepId: z.coerce.number().int().positive().optional(),
+const actionStepSchema = createActionStepSchema(
+  {
+    ...actionStepDynamicChoiceSchemaShape,
     sortOrder: z.coerce.number().int().positive(),
-    stepType: z.enum(ACTION_STEP_TYPES),
-    fieldKey: z.string().trim().max(80).optional(),
-    label: z.string().trim().max(160).optional(),
-    prompt: z.string().trim().max(1000).optional(),
-    inputType: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.enum(ACTION_STEP_INPUT_TYPES).optional(),
-    ),
-    operationId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    operationFailureStepId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
     nextStepId: z.preprocess(
       (value) =>
         typeof value === "string" && value.trim() === "" ? undefined : value,
       z.coerce.number().int().positive().optional(),
     ),
-    operationSuccessStepId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    mediaAssetId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    whatsappTemplateCategory: z
-      .enum(["authentication", "marketing", "utility"])
-      .optional(),
-    whatsappTemplateBody: z.string().trim().max(4000).optional(),
-    whatsappTemplateLanguage: z.string().trim().max(20).optional(),
-    whatsappTemplateName: z.string().trim().max(120).optional(),
-    whatsappTemplateStatus: z
-      .enum(["approved", "draft", "pending", "rejected"])
-      .optional(),
-    whatsappTemplateVariables: z.string().trim().max(2000).optional(),
-    productCatalogId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    productIds: z.array(z.coerce.number().int().positive()).optional(),
-    productDisplayLayout: z.enum(["featured", "grid", "list"]).optional(),
-    productSelectionAllowMultiple: z.coerce.boolean().optional(),
-    productSelectionAllowQuantity: z.coerce.boolean().optional(),
-    sourceType: z.string().trim().max(80).optional(),
-    catalogId: z.string().trim().max(120).optional(),
-    filterByField: z.string().trim().max(80).optional(),
-    choiceDisplayMode: z.enum(["buttons", "list", "text"]).optional(),
-    operationExecutionMode: z.enum(["post_submit", "inline"]).optional(),
-    contactAttributeKey: z.string().trim().max(120).optional(),
-    contactAttributeFieldKey: z.string().trim().max(120).optional(),
-    contactAttributeValue: z.string().trim().max(1000).optional(),
-    contactAttributeValueSource: z.enum(["field", "static"]).optional(),
-    contactTagNames: z.string().trim().max(1000).optional(),
-    connectedActionId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    connectFlowMode: z.enum(["jump", "return"]).optional(),
-    handoffNotifyTeam: z.coerce.boolean().optional(),
-    handoffPriority: z.enum(["high", "low", "normal", "urgent"]).optional(),
-    handoffQueue: z.string().trim().max(120).optional(),
-    waitAmount: z.preprocess(
-      (value) =>
-        value === null || (typeof value === "string" && value.trim() === "")
-          ? undefined
-          : value,
-      z.coerce.number().int().min(1).max(2_592_000).optional(),
-    ),
-    waitUnit: z.preprocess(
-      (value) =>
-        value === null || (typeof value === "string" && value.trim() === "")
-          ? undefined
-          : value,
-      z.enum(["seconds", "minutes", "hours", "days"]).optional(),
-    ),
-    requiredMessage: z.string().trim().max(240).optional(),
-    validationMessage: z.string().trim().max(240).optional(),
-    validationAllowedFileTypes: z.string().trim().max(1000).optional(),
-    validationMaxDate: z.string().trim().max(20).optional(),
-    validationMaxLength: z.coerce.number().int().min(1).max(10000).optional(),
-    validationMaxNumber: z.coerce
-      .number()
-      .min(-1_000_000_000)
-      .max(1_000_000_000)
-      .optional(),
-    validationMinDate: z.string().trim().max(20).optional(),
-    validationMinLength: z.coerce.number().int().min(0).max(10000).optional(),
-    validationMinNumber: z.coerce
-      .number()
-      .min(-1_000_000_000)
-      .max(1_000_000_000)
-      .optional(),
-    validationRegex: z.string().trim().max(500).optional(),
-    isRequired: z.coerce.boolean().optional(),
-    isEnabled: z.coerce.boolean().optional(),
-    options: z.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    const isInputStep = isFlowInputStepType(data.stepType);
-    const isPromptStep =
-      data.stepType === "message" ||
-      data.stepType === "display_result" ||
-      data.stepType === "handoff";
-
-    if (data.stepType === "operation" && !data.operationId) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Operation is required.",
-        path: ["operationId"],
-      });
-    }
-
-    if (isPromptStep && !data.prompt?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Prompt is required.",
-        path: ["prompt"],
-      });
-    }
-
-    if (data.stepType === "choice") {
-      const hasManualOptions = parseLines(data.options).length > 0;
-      const hasDynamicOptions = Boolean(data.sourceType?.trim());
-
-      if (!hasManualOptions && !hasDynamicOptions) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Choice steps need manual options or an option source.",
-          path: ["options"],
-        });
-      }
-    }
-
-    if (data.stepType === "media" && !data.mediaAssetId) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Media asset is required.",
-        path: ["mediaAssetId"],
-      });
-    }
-
-    if (
-      data.stepType === "template_message" &&
-      (!data.whatsappTemplateName?.trim() ||
-        !data.whatsappTemplateLanguage?.trim())
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Template name and language are required.",
-        path: ["whatsappTemplateName"],
-      });
-    }
-
-    if (data.stepType === "catalog_message" && !data.productCatalogId) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Product catalog is required.",
-        path: ["productCatalogId"],
-      });
-    }
-
-    if (
-      data.stepType === "single_product" &&
-      (data.productIds ?? []).length !== 1
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Choose exactly one product.",
-        path: ["productIds"],
-      });
-    }
-
-    if (
-      data.stepType === "multiple_products" &&
-      (data.productIds ?? []).length === 0
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Choose at least one product.",
-        path: ["productIds"],
-      });
-    }
-
-    if (
-      data.stepType === "product_selection" &&
-      !data.productCatalogId &&
-      (data.productIds ?? []).length === 0
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Choose a product catalog or at least one product.",
-        path: ["productIds"],
-      });
-    }
-
-    if (
-      data.stepType === "set_attribute" &&
-      (!data.contactAttributeKey?.trim() ||
-        (data.contactAttributeValueSource === "static"
-          ? !data.contactAttributeValue?.trim()
-          : !data.contactAttributeFieldKey?.trim()))
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Attribute key and value source are required.",
-        path: ["contactAttributeKey"],
-      });
-    }
-
-    if (data.stepType === "add_tag" && !data.contactTagNames?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "At least one tag is required.",
-        path: ["contactTagNames"],
-      });
-    }
-
-    if (data.stepType === "connect_flow" && !data.connectedActionId) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Connected flow is required.",
-        path: ["connectedActionId"],
-      });
-    }
-
-    if (!isInputStep) {
-      return;
-    }
-
-    if (!data.fieldKey?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Field key is required.",
-        path: ["fieldKey"],
-      });
-    }
-
-    if (!data.label?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Label is required.",
-        path: ["label"],
-      });
-    }
-
-    if (!data.prompt?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Prompt is required.",
-        path: ["prompt"],
-      });
-    }
-
-    if (
-      data.validationMinLength !== undefined &&
-      data.validationMaxLength !== undefined &&
-      data.validationMinLength > data.validationMaxLength
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Minimum length cannot be greater than maximum length.",
-        path: ["validationMinLength"],
-      });
-    }
-
-    if (
-      data.validationMinNumber !== undefined &&
-      data.validationMaxNumber !== undefined &&
-      data.validationMinNumber > data.validationMaxNumber
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Minimum number cannot be greater than maximum number.",
-        path: ["validationMinNumber"],
-      });
-    }
-
-    if (
-      data.validationMinDate &&
-      data.validationMaxDate &&
-      data.validationMinDate > data.validationMaxDate
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Minimum date cannot be after maximum date.",
-        path: ["validationMinDate"],
-      });
-    }
-
-    if (data.validationRegex) {
-      try {
-        new RegExp(data.validationRegex);
-      } catch {
-        ctx.addIssue({
-          code: "custom",
-          message: "Regex pattern is invalid.",
-          path: ["validationRegex"],
-        });
-      }
-    }
-  });
+  },
+  { allowDynamicChoiceSource: true },
+);
 
 const branchRuleSchema = z
   .object({
@@ -470,19 +169,6 @@ const stepToggleSchema = z.object({
   stepId: z.coerce.number().int().positive(),
   isEnabled: z.enum(["true", "false"]),
 });
-
-function parseLines(value?: string) {
-  return (
-    value
-      ?.split(/[\n,]/)
-      .map((item) => item.trim())
-      .filter(Boolean) ?? []
-  );
-}
-
-function parseOptions(value?: string) {
-  return parseLines(value).map((label) => ({ label, value: label }));
-}
 
 function buildBranchRuleSettings(
   existingSettings: Record<string, unknown> | undefined,
@@ -549,36 +235,6 @@ function buildActionSettings(input: {
   }
 
   return settings;
-}
-
-function getOperationStatusFieldKey(stepId: number, fieldKey?: string) {
-  return fieldKey?.trim() || `operation_${stepId}_status`;
-}
-
-async function syncOperationStepRoutes(input: {
-  actionId: number;
-  failureStepId?: number;
-  fieldKey?: string;
-  projectId: number;
-  sourceStepId: number;
-  stepType: string;
-  successStepId?: number;
-}) {
-  if (input.stepType !== "operation") {
-    return;
-  }
-
-  await syncOperationRoutePresets({
-    actionId: input.actionId,
-    failureStepId: input.failureStepId ?? null,
-    projectId: input.projectId,
-    sourceStepId: input.sourceStepId,
-    statusFieldKey: getOperationStatusFieldKey(
-      input.sourceStepId,
-      input.fieldKey,
-    ),
-    successStepId: input.successStepId ?? null,
-  });
 }
 
 async function requireConnectedAction(input: {
@@ -939,7 +595,7 @@ async function requireActionStepTarget(
 }
 
 export async function createProjectActionBuilderAction(formData: FormData) {
-  const parsed = actionDetailsSchema.omit({ actionId: true }).safeParse({
+  const parsed = actionDetailsSchema.safeParse({
     projectId: formData.get("projectId"),
     name: formData.get("name"),
     description: formData.get("description"),
@@ -961,7 +617,7 @@ export async function createProjectActionBuilderAction(formData: FormData) {
     name: parsed.data.name,
     description: parsed.data.description || null,
     status: parsed.data.status,
-    triggerPhrases: parseLines(parsed.data.triggerPhrases),
+    triggerPhrases: parseActionStepLines(parsed.data.triggerPhrases),
   });
   await writeAuditLog({
     ...context,
@@ -1148,7 +804,7 @@ export async function updateProjectActionBuilderAction(formData: FormData) {
     name: parsed.data.name,
     description: parsed.data.description || null,
     status: parsed.data.status as ProjectActionStatus,
-    triggerPhrases: parseLines(parsed.data.triggerPhrases),
+    triggerPhrases: parseActionStepLines(parsed.data.triggerPhrases),
     settings: buildActionSettings({
       existingSettings: existingAction.settings,
       experimentEnabled: parsed.data.experimentEnabled,
@@ -1335,7 +991,7 @@ export async function restoreProjectActionVersionDraftAction(
 }
 
 export async function createActionFlowStepAction(formData: FormData) {
-  const parsed = actionStepSchema.omit({ stepId: true }).safeParse({
+  const parsed = actionStepSchema.safeParse({
     actionId: formData.get("actionId"),
     sortOrder: formData.get("sortOrder"),
     stepType: formData.get("stepType"),
@@ -1486,7 +1142,7 @@ export async function createActionFlowStepAction(formData: FormData) {
       nextStepId: parsed.data.nextStepId ?? null,
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled,
-      options: isInputStep ? parseOptions(parsed.data.options) : [],
+      options: isInputStep ? parseActionStepOptions(parsed.data.options) : [],
       settings: buildActionStepSettings({
         ...parsed.data,
         connectedAction,
@@ -1494,7 +1150,7 @@ export async function createActionFlowStepAction(formData: FormData) {
         ...productConfig,
       }),
     });
-    await syncOperationStepRoutes({
+    await syncOperationStepRoutePresets({
       actionId: action.id,
       failureStepId: parsed.data.operationFailureStepId,
       fieldKey: step.fieldKey ?? undefined,
@@ -1694,7 +1350,7 @@ export async function updateActionFlowStepAction(formData: FormData) {
       nextStepId: parsed.data.nextStepId ?? null,
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled,
-      options: isInputStep ? parseOptions(parsed.data.options) : [],
+      options: isInputStep ? parseActionStepOptions(parsed.data.options) : [],
       settings: buildActionStepSettings({
         ...parsed.data,
         connectedAction,
@@ -1703,7 +1359,7 @@ export async function updateActionFlowStepAction(formData: FormData) {
         ...productConfig,
       }),
     });
-    await syncOperationStepRoutes({
+    await syncOperationStepRoutePresets({
       actionId: action.id,
       failureStepId: parsed.data.operationFailureStepId,
       fieldKey: step?.fieldKey ?? undefined,
@@ -1738,7 +1394,7 @@ export async function updateActionFlowStepAction(formData: FormData) {
 }
 
 export async function createActionFlowBranchRuleAction(formData: FormData) {
-  const parsed = branchRuleSchema.omit({ ruleId: true }).safeParse({
+  const parsed = branchRuleSchema.safeParse({
     actionId: formData.get("actionId"),
     sourceStepId: formData.get("sourceStepId"),
     sourceFieldKey: formData.get("sourceFieldKey"),

@@ -7,7 +7,6 @@ import { parseStoredActionFlowConditionGroup } from "@/lib/action-flow-compiler"
 import {
   ACTION_BRANCH_OPERATORS,
   ACTION_STEP_INPUT_TYPES,
-  ACTION_STEP_TYPES,
   type ActionBranchOperator,
   createActionFlowBranchRule,
   createActionFlowStep,
@@ -18,10 +17,14 @@ import {
   listActionFlowSteps,
   setActionFlowStepDefaultRoute,
   setActionFlowStepSettings,
-  syncOperationRoutePresets,
+  syncOperationStepRoutePresets,
   updateActionFlowBranchRule,
   updateActionFlowStep,
 } from "@/lib/action-flows";
+import {
+  createActionStepSchema,
+  parseActionStepOptions,
+} from "@/lib/action-step-schema";
 import { buildActionStepSettings } from "@/lib/action-step-settings";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
@@ -72,302 +75,7 @@ const canvasStepPositionsSchema = z.object({
     .min(1)
     .max(200),
 });
-const canvasStepSchema = z
-  .object({
-    actionId: z.coerce.number().int().positive(),
-    stepId: z.coerce.number().int().positive().optional(),
-    stepType: z.enum(ACTION_STEP_TYPES),
-    fieldKey: z.string().trim().max(80).optional(),
-    label: z.string().trim().max(160).optional(),
-    prompt: z.string().trim().max(1000).optional(),
-    inputType: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.enum(ACTION_STEP_INPUT_TYPES).optional(),
-    ),
-    operationId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    operationExecutionMode: z.enum(["post_submit", "inline"]).optional(),
-    operationFailureStepId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    operationSuccessStepId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    mediaAssetId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    whatsappTemplateCategory: z
-      .enum(["authentication", "marketing", "utility"])
-      .optional(),
-    whatsappTemplateBody: z.string().trim().max(4000).optional(),
-    whatsappTemplateLanguage: z.string().trim().max(20).optional(),
-    whatsappTemplateName: z.string().trim().max(120).optional(),
-    whatsappTemplateStatus: z
-      .enum(["approved", "draft", "pending", "rejected"])
-      .optional(),
-    whatsappTemplateVariables: z.string().trim().max(2000).optional(),
-    productCatalogId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    productIds: z.array(z.coerce.number().int().positive()).optional(),
-    productDisplayLayout: z.enum(["featured", "grid", "list"]).optional(),
-    productSelectionAllowMultiple: z.coerce.boolean().optional(),
-    productSelectionAllowQuantity: z.coerce.boolean().optional(),
-    choiceDisplayMode: z.enum(["buttons", "list", "text"]).optional(),
-    contactAttributeKey: z.string().trim().max(120).optional(),
-    contactAttributeFieldKey: z.string().trim().max(120).optional(),
-    contactAttributeValue: z.string().trim().max(1000).optional(),
-    contactAttributeValueSource: z.enum(["field", "static"]).optional(),
-    contactTagNames: z.string().trim().max(1000).optional(),
-    connectedActionId: z.preprocess(
-      (value) =>
-        typeof value === "string" && value.trim() === "" ? undefined : value,
-      z.coerce.number().int().positive().optional(),
-    ),
-    connectFlowMode: z.enum(["jump", "return"]).optional(),
-    handoffNotifyTeam: z.coerce.boolean().optional(),
-    handoffPriority: z.enum(["high", "low", "normal", "urgent"]).optional(),
-    handoffQueue: z.string().trim().max(120).optional(),
-    waitAmount: optionalValidationNumber(
-      z.coerce.number().int().min(1).max(2_592_000),
-    ),
-    waitUnit: z.preprocess(
-      (value) => (value === "" || value === null ? undefined : value),
-      z.enum(["seconds", "minutes", "hours", "days"]).optional(),
-    ),
-    requiredMessage: z.string().trim().max(240).optional(),
-    validationAllowedFileTypes: z.string().trim().max(1000).optional(),
-    validationMaxDate: z.string().trim().max(20).optional(),
-    validationMaxLength: optionalValidationNumber(
-      z.coerce.number().int().min(1).max(10000),
-    ),
-    validationMaxNumber: optionalValidationNumber(
-      z.coerce.number().min(-1_000_000_000).max(1_000_000_000),
-    ),
-    validationMessage: z.string().trim().max(240).optional(),
-    validationMinDate: z.string().trim().max(20).optional(),
-    validationMinLength: optionalValidationNumber(
-      z.coerce.number().int().min(0).max(10000),
-    ),
-    validationMinNumber: optionalValidationNumber(
-      z.coerce.number().min(-1_000_000_000).max(1_000_000_000),
-    ),
-    validationRegex: z.string().trim().max(500).optional(),
-    isRequired: z.coerce.boolean().optional(),
-    isEnabled: z.coerce.boolean().optional(),
-    options: z.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    const isInputStep = isFlowInputStepType(data.stepType);
-    const isPromptStep =
-      data.stepType === "message" ||
-      data.stepType === "display_result" ||
-      data.stepType === "handoff";
-
-    if (data.stepType === "operation" && !data.operationId) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Operation is required.",
-        path: ["operationId"],
-      });
-    }
-
-    if (isPromptStep && !data.prompt?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Prompt is required.",
-        path: ["prompt"],
-      });
-    }
-
-    if (data.stepType === "choice" && parseLines(data.options).length === 0) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Choice options are required.",
-        path: ["options"],
-      });
-    }
-
-    if (data.stepType === "media" && !data.mediaAssetId) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Media asset is required.",
-        path: ["mediaAssetId"],
-      });
-    }
-
-    if (
-      data.stepType === "template_message" &&
-      (!data.whatsappTemplateName?.trim() ||
-        !data.whatsappTemplateLanguage?.trim())
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Template name and language are required.",
-        path: ["whatsappTemplateName"],
-      });
-    }
-
-    if (data.stepType === "catalog_message" && !data.productCatalogId) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Product catalog is required.",
-        path: ["productCatalogId"],
-      });
-    }
-
-    if (
-      data.stepType === "single_product" &&
-      (data.productIds ?? []).length !== 1
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Choose exactly one product.",
-        path: ["productIds"],
-      });
-    }
-
-    if (
-      data.stepType === "multiple_products" &&
-      (data.productIds ?? []).length === 0
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Choose at least one product.",
-        path: ["productIds"],
-      });
-    }
-
-    if (
-      data.stepType === "product_selection" &&
-      !data.productCatalogId &&
-      (data.productIds ?? []).length === 0
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Choose a product catalog or at least one product.",
-        path: ["productIds"],
-      });
-    }
-
-    if (
-      data.stepType === "set_attribute" &&
-      (!data.contactAttributeKey?.trim() ||
-        (data.contactAttributeValueSource === "static"
-          ? !data.contactAttributeValue?.trim()
-          : !data.contactAttributeFieldKey?.trim()))
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Attribute key and value source are required.",
-        path: ["contactAttributeKey"],
-      });
-    }
-
-    if (data.stepType === "add_tag" && !data.contactTagNames?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "At least one tag is required.",
-        path: ["contactTagNames"],
-      });
-    }
-
-    if (data.stepType === "connect_flow" && !data.connectedActionId) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Connected flow is required.",
-        path: ["connectedActionId"],
-      });
-    }
-
-    if (
-      data.validationMinLength !== undefined &&
-      data.validationMaxLength !== undefined &&
-      data.validationMinLength > data.validationMaxLength
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Minimum length cannot be greater than maximum length.",
-        path: ["validationMinLength"],
-      });
-    }
-
-    if (
-      data.validationMinNumber !== undefined &&
-      data.validationMaxNumber !== undefined &&
-      data.validationMinNumber > data.validationMaxNumber
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Minimum number cannot be greater than maximum number.",
-        path: ["validationMinNumber"],
-      });
-    }
-
-    if (
-      data.validationMinDate &&
-      data.validationMaxDate &&
-      data.validationMinDate > data.validationMaxDate
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Minimum date cannot be after maximum date.",
-        path: ["validationMinDate"],
-      });
-    }
-
-    if (data.validationRegex) {
-      try {
-        new RegExp(data.validationRegex);
-      } catch {
-        ctx.addIssue({
-          code: "custom",
-          message: "Regex pattern is invalid.",
-          path: ["validationRegex"],
-        });
-      }
-    }
-
-    if (!isInputStep) {
-      return;
-    }
-
-    if (!data.fieldKey?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Field key is required.",
-        path: ["fieldKey"],
-      });
-    }
-
-    if (!data.label?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Label is required.",
-        path: ["label"],
-      });
-    }
-
-    if (!data.prompt?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Prompt is required.",
-        path: ["prompt"],
-      });
-    }
-  });
+const canvasStepSchema = createActionStepSchema({});
 const canvasStepBasicsSchema = z.object({
   actionId: z.coerce.number().int().positive(),
   choiceDisplayMode: z.enum(["buttons", "list", "text"]),
@@ -552,49 +260,6 @@ function asSettingsRecord(value: unknown): Record<string, unknown> {
   }
 
   return value as Record<string, unknown>;
-}
-
-function parseLines(value?: string) {
-  return (
-    value
-      ?.split(/[\n,]/)
-      .map((item) => item.trim())
-      .filter(Boolean) ?? []
-  );
-}
-
-function parseOptions(value?: string) {
-  return parseLines(value).map((label) => ({ label, value: label }));
-}
-
-function getOperationStatusFieldKey(stepId: number, fieldKey?: string) {
-  return fieldKey?.trim() || `operation_${stepId}_status`;
-}
-
-async function syncCanvasOperationStepRoutes(input: {
-  actionId: number;
-  failureStepId?: number;
-  fieldKey?: string;
-  projectId: number;
-  sourceStepId: number;
-  stepType: string;
-  successStepId?: number;
-}) {
-  if (input.stepType !== "operation") {
-    return;
-  }
-
-  await syncOperationRoutePresets({
-    actionId: input.actionId,
-    failureStepId: input.failureStepId ?? null,
-    projectId: input.projectId,
-    sourceStepId: input.sourceStepId,
-    statusFieldKey: getOperationStatusFieldKey(
-      input.sourceStepId,
-      input.fieldKey,
-    ),
-    successStepId: input.successStepId ?? null,
-  });
 }
 
 async function requireCanvasConnectedAction(input: {
@@ -914,7 +579,7 @@ export async function createCanvasStepAction(
           : null,
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled ?? true,
-      options: isInputStep ? parseOptions(parsed.data.options) : [],
+      options: isInputStep ? parseActionStepOptions(parsed.data.options) : [],
       settings: buildActionStepSettings({
         stepType: parsed.data.stepType,
         choiceDisplayMode: parsed.data.choiceDisplayMode,
@@ -956,7 +621,7 @@ export async function createCanvasStepAction(
         ...productConfig,
       }),
     });
-    await syncCanvasOperationStepRoutes({
+    await syncOperationStepRoutePresets({
       actionId: action.id,
       failureStepId: parsed.data.operationFailureStepId,
       fieldKey: step.fieldKey ?? undefined,
@@ -1104,7 +769,7 @@ export async function updateCanvasStepAction(
       nextStepId: existingStep.nextStepId,
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled ?? true,
-      options: isInputStep ? parseOptions(parsed.data.options) : [],
+      options: isInputStep ? parseActionStepOptions(parsed.data.options) : [],
       settings: buildActionStepSettings({
         stepType: parsed.data.stepType,
         choiceDisplayMode: parsed.data.choiceDisplayMode,
@@ -1147,7 +812,7 @@ export async function updateCanvasStepAction(
         ...productConfig,
       }),
     });
-    await syncCanvasOperationStepRoutes({
+    await syncOperationStepRoutePresets({
       actionId: action.id,
       failureStepId: parsed.data.operationFailureStepId,
       fieldKey: step?.fieldKey ?? undefined,
@@ -1324,7 +989,7 @@ export async function updateCanvasStepBasicsAction(
   }
 
   if (choiceContent && parsed.data.contentBlocksChanged) {
-    options = parseOptions(choiceContent.options.join("\n"));
+    options = parseActionStepOptions(choiceContent.options.join("\n"));
   } else if (
     existingChoiceContent &&
     !choiceContent &&
@@ -1332,7 +997,7 @@ export async function updateCanvasStepBasicsAction(
   ) {
     options = [];
   } else if (isInputStep && parsed.data.optionsChanged && !hasDynamicOptions) {
-    options = parseOptions(parsed.data.options);
+    options = parseActionStepOptions(parsed.data.options);
   }
 
   if (isInputStep && !parsed.data.label) {
@@ -1428,7 +1093,7 @@ export async function updateCanvasStepBasicsAction(
       return { ok: false, message: "Could not update the step." };
     }
 
-    await syncCanvasOperationStepRoutes({
+    await syncOperationStepRoutePresets({
       actionId: action.id,
       failureStepId: parsed.data.operationFailureStepId,
       fieldKey: step.fieldKey ?? undefined,
@@ -1635,7 +1300,7 @@ export async function clearCanvasDefaultRouteAction(
 export async function createCanvasBranchRuleAction(
   input: unknown,
 ): Promise<CanvasRouteActionResult> {
-  const parsed = canvasBranchRuleSchema.omit({ ruleId: true }).safeParse(input);
+  const parsed = canvasBranchRuleSchema.safeParse(input);
 
   if (!parsed.success) {
     return { ok: false, message: "Please check the branch rule." };
