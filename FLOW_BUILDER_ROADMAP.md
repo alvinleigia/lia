@@ -87,8 +87,10 @@ database, backup, and provider readiness work.
 
 Current implementation target: Priority 1, Phase 1 of 18.
 
-Current delivery slice: Slice 1 of 7, Task Workspace, is implemented and
-awaiting the manual acceptance check in `docs/UAT_TEST_PLAN.md`.
+Completed delivery slice: Slice 1 of 7, Task Workspace, passed local manual
+acceptance on 2026-07-24.
+
+Next delivery slice: Slice 2 of 7, Assistant And Entry Policy.
 
 ## Product Direction
 

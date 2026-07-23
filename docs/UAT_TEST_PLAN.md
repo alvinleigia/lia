@@ -46,63 +46,63 @@ one slice before development moves to the next slice.
 
 ### Phase 1 Of 18 - Slice 1 Of 7 - Task Workspace
 
-Build/commit:
+Build/commit: `9c35c65`
 
-Status: Not started
+Status: Pass
 
-Tester:
+Tester: Alvin
 
-Test date:
+Test date: 2026-07-24
 
-- [ ] Run `npx drizzle-kit migrate`.
+- [x] Run `npx drizzle-kit migrate`.
   Expected result: The command returns to the prompt without an error.
-  Status:
-  Notes:
+  Status: Pass
+  Notes: Migration `0032_conversational_task_workspace` applied locally.
 
-- [ ] Start the app and sign in to an active company account with a selected project.
+- [x] Start the app and sign in to an active company account with a selected project.
   Expected result: The signed-in navbar loads and shows `Automation`.
-  Status:
+  Status: Pass
   Notes:
 
-- [ ] Open `Automation`, then select `Tasks`.
+- [x] Open `Automation`, then select `Tasks`.
   Expected result: The Conversational Tasks page opens for the selected project.
-  Status:
+  Status: Pass
   Notes:
 
-- [ ] Select `New Task`.
+- [x] Select `New Task`.
   Expected result: A separate form asks for task name, objective, and optional internal notes.
-  Status:
+  Status: Pass
   Notes:
 
-- [ ] Create a task named `Book a Spa Service`.
+- [x] Create a task named `Book a Spa Service`.
   Expected result: The task detail page opens and shows `Task created`.
-  Status:
+  Status: Pass
   Notes:
 
-- [ ] Change the task name or objective and select `Save Changes`.
+- [x] Change the task name or objective and select `Save Changes`.
   Expected result: The page reloads with `Changes saved` and the updated value remains visible.
-  Status:
+  Status: Pass
   Notes:
 
-- [ ] Return to the task list and open the task again.
+- [x] Return to the task list and open the task again.
   Expected result: The saved values remain after navigation and reload.
-  Status:
+  Status: Pass
   Notes:
 
-- [ ] Archive the task.
+- [x] Archive the task.
   Expected result: The task moves from the active list to `Archived Tasks`.
-  Status:
+  Status: Pass
   Notes:
 
-- [ ] Restore the task.
+- [x] Restore the task.
   Expected result: The task returns as an editable draft.
-  Status:
+  Status: Pass
   Notes:
 
-- [ ] Switch to another project and open `Automation`, then `Tasks`.
+- [x] Switch to another project and open `Automation`, then `Tasks`.
   Expected result: The task from the first project is not visible.
-  Status:
-  Notes:
+  Status: Pass
+  Notes: Verified between Ewissen Infra `#194` and Ewissen Inc `#195`.
 
 Exit gate: create, edit, reload, archive, restore, and project isolation all pass
 without a runtime error.
