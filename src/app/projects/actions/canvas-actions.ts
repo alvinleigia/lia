@@ -22,13 +22,9 @@ import {
   updateActionFlowBranchRule,
   updateActionFlowStep,
 } from "@/lib/action-flows";
+import { buildActionStepSettings } from "@/lib/action-step-settings";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
-import type {
-  SelectCatalogProduct,
-  SelectMediaAsset,
-  SelectProductCatalog,
-} from "@/lib/db-schema";
 import {
   type FlowContentBlock,
   getFlowChoiceContentBlock,
@@ -571,31 +567,6 @@ function parseOptions(value?: string) {
   return parseLines(value).map((label) => ({ label, value: label }));
 }
 
-function setOptionalStringSetting(
-  settings: Record<string, unknown>,
-  key: string,
-  value: string | undefined,
-) {
-  const trimmed = value?.trim();
-  if (trimmed) {
-    settings[key] = trimmed;
-  } else {
-    delete settings[key];
-  }
-}
-
-function setOptionalNumberSetting(
-  settings: Record<string, unknown>,
-  key: string,
-  value: number | undefined,
-) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    settings[key] = value;
-  } else {
-    delete settings[key];
-  }
-}
-
 function getOperationStatusFieldKey(stepId: number, fieldKey?: string) {
   return fieldKey?.trim() || `operation_${stepId}_status`;
 }
@@ -624,270 +595,6 @@ async function syncCanvasOperationStepRoutes(input: {
     ),
     successStepId: input.successStepId ?? null,
   });
-}
-
-function getChoiceStepSettings(input: {
-  stepType?: string;
-  choiceDisplayMode?: "buttons" | "list" | "text";
-  contactAttributeFieldKey?: string;
-  contactAttributeKey?: string;
-  contactAttributeValue?: string;
-  contactAttributeValueSource?: "field" | "static";
-  contactTagNames?: string;
-  connectedAction?: Awaited<ReturnType<typeof getProjectAction>> | null;
-  connectFlowMode?: "jump" | "return";
-  existingSettings?: unknown;
-  handoffNotifyTeam?: boolean;
-  handoffPriority?: "high" | "low" | "normal" | "urgent";
-  handoffQueue?: string;
-  waitAmount?: number;
-  waitUnit?: "seconds" | "minutes" | "hours" | "days";
-  mediaAsset?: SelectMediaAsset | null;
-  operationExecutionMode?: "post_submit" | "inline";
-  productCatalog?: SelectProductCatalog | null;
-  productDisplayLayout?: "featured" | "grid" | "list";
-  productSelectionAllowMultiple?: boolean;
-  productSelectionAllowQuantity?: boolean;
-  products?: SelectCatalogProduct[];
-  requiredMessage?: string;
-  validationAllowedFileTypes?: string;
-  validationMaxDate?: string;
-  validationMaxLength?: number;
-  validationMaxNumber?: number;
-  validationMessage?: string;
-  validationMinDate?: string;
-  validationMinLength?: number;
-  validationMinNumber?: number;
-  validationRegex?: string;
-  whatsappTemplateCategory?: "authentication" | "marketing" | "utility";
-  whatsappTemplateBody?: string;
-  whatsappTemplateLanguage?: string;
-  whatsappTemplateName?: string;
-  whatsappTemplateStatus?: "approved" | "draft" | "pending" | "rejected";
-  whatsappTemplateVariables?: string;
-}) {
-  const settings: Record<string, unknown> = {
-    ...asSettingsRecord(input.existingSettings),
-    ...(input.choiceDisplayMode
-      ? { choiceDisplayMode: input.choiceDisplayMode }
-      : {}),
-  };
-  const isProductBackedStep = [
-    "catalog_message",
-    "single_product",
-    "multiple_products",
-    "product_selection",
-  ].includes(input.stepType ?? "");
-
-  if (input.operationExecutionMode) {
-    settings.operationExecutionMode = input.operationExecutionMode;
-  }
-
-  setOptionalStringSetting(settings, "requiredMessage", input.requiredMessage);
-  setOptionalStringSetting(
-    settings,
-    "validationMessage",
-    input.validationMessage,
-  );
-  setOptionalNumberSetting(
-    settings,
-    "validationMinLength",
-    input.validationMinLength,
-  );
-  setOptionalNumberSetting(
-    settings,
-    "validationMaxLength",
-    input.validationMaxLength,
-  );
-  setOptionalStringSetting(settings, "validationRegex", input.validationRegex);
-  setOptionalNumberSetting(
-    settings,
-    "validationMinNumber",
-    input.validationMinNumber,
-  );
-  setOptionalNumberSetting(
-    settings,
-    "validationMaxNumber",
-    input.validationMaxNumber,
-  );
-  setOptionalStringSetting(
-    settings,
-    "validationMinDate",
-    input.validationMinDate,
-  );
-  setOptionalStringSetting(
-    settings,
-    "validationMaxDate",
-    input.validationMaxDate,
-  );
-  setOptionalStringSetting(
-    settings,
-    "validationAllowedFileTypes",
-    input.validationAllowedFileTypes,
-  );
-
-  if (input.stepType === "template_message") {
-    const templateBody = input.whatsappTemplateBody?.trim();
-    const templateName = input.whatsappTemplateName?.trim();
-    const templateLanguage = input.whatsappTemplateLanguage?.trim();
-    const templateVariables = parseLines(input.whatsappTemplateVariables);
-
-    if (templateBody) {
-      settings.whatsappTemplateBody = templateBody;
-    } else {
-      delete settings.whatsappTemplateBody;
-    }
-
-    if (templateName) {
-      settings.whatsappTemplateName = templateName;
-    } else {
-      delete settings.whatsappTemplateName;
-    }
-
-    if (templateLanguage) {
-      settings.whatsappTemplateLanguage = templateLanguage;
-    } else {
-      delete settings.whatsappTemplateLanguage;
-    }
-
-    settings.whatsappTemplateCategory =
-      input.whatsappTemplateCategory ?? "utility";
-    settings.whatsappTemplateStatus = input.whatsappTemplateStatus ?? "draft";
-
-    if (templateVariables.length > 0) {
-      settings.whatsappTemplateVariables = templateVariables;
-    } else {
-      delete settings.whatsappTemplateVariables;
-    }
-  } else {
-    delete settings.whatsappTemplateCategory;
-    delete settings.whatsappTemplateBody;
-    delete settings.whatsappTemplateLanguage;
-    delete settings.whatsappTemplateName;
-    delete settings.whatsappTemplateStatus;
-    delete settings.whatsappTemplateVariables;
-  }
-
-  if (isProductBackedStep && input.productDisplayLayout) {
-    settings.productDisplayLayout = input.productDisplayLayout;
-  } else {
-    delete settings.productDisplayLayout;
-  }
-
-  if (
-    input.stepType === "product_selection" &&
-    input.productSelectionAllowMultiple
-  ) {
-    settings.productSelectionAllowMultiple = true;
-  } else {
-    delete settings.productSelectionAllowMultiple;
-  }
-
-  if (
-    input.stepType === "product_selection" &&
-    input.productSelectionAllowQuantity
-  ) {
-    settings.productSelectionAllowQuantity = true;
-  } else {
-    delete settings.productSelectionAllowQuantity;
-  }
-
-  if (input.productCatalog) {
-    settings.productCatalogId = input.productCatalog.id;
-    settings.productCatalog = {
-      externalId: input.productCatalog.externalId,
-      id: input.productCatalog.id,
-      name: input.productCatalog.name,
-      providerType: input.productCatalog.providerType,
-    };
-  } else {
-    delete settings.productCatalogId;
-    delete settings.productCatalog;
-  }
-
-  if (input.products && input.products.length > 0) {
-    settings.productIds = input.products.map((product) => product.id);
-    settings.products = input.products.map((product) => ({
-      currency: product.currency,
-      description: product.description,
-      id: product.id,
-      imageUrl: product.imageUrl,
-      name: product.name,
-      priceAmount: product.priceAmount,
-      productUrl: product.productUrl,
-      sku: product.sku,
-      whatsappRetailerId:
-        typeof product.metadata.whatsappRetailerId === "string"
-          ? product.metadata.whatsappRetailerId
-          : null,
-    }));
-  } else {
-    delete settings.productIds;
-    delete settings.products;
-  }
-
-  if (input.mediaAsset) {
-    settings.mediaAssetId = input.mediaAsset.id;
-    settings.mediaAsset = {
-      id: input.mediaAsset.id,
-      mediaType: input.mediaAsset.mediaType,
-      mimeType: input.mediaAsset.mimeType,
-      originalName: input.mediaAsset.originalName,
-      publicPath: input.mediaAsset.publicPath,
-    };
-  } else if (settings.mediaAssetId || settings.mediaAsset) {
-    delete settings.mediaAssetId;
-    delete settings.mediaAsset;
-  }
-
-  if (input.contactAttributeKey?.trim()) {
-    settings.contactAttributeKey = input.contactAttributeKey.trim();
-    settings.contactAttributeValueSource =
-      input.contactAttributeValueSource ?? "field";
-    settings.contactAttributeFieldKey =
-      input.contactAttributeFieldKey?.trim() || undefined;
-    settings.contactAttributeValue =
-      input.contactAttributeValue?.trim() || undefined;
-  }
-
-  if (input.contactTagNames?.trim()) {
-    settings.contactTagNames = input.contactTagNames.trim();
-  }
-
-  if (input.stepType === "connect_flow" && input.connectedAction) {
-    settings.connectedActionId = input.connectedAction.id;
-    settings.connectedActionName = input.connectedAction.name;
-    settings.connectFlowMode = input.connectFlowMode ?? "jump";
-  } else {
-    delete settings.connectedActionId;
-    delete settings.connectedActionName;
-    delete settings.connectFlowMode;
-  }
-
-  if (input.stepType === "handoff") {
-    settings.handoffNotifyTeam = input.handoffNotifyTeam !== false;
-    settings.handoffPriority = input.handoffPriority ?? "normal";
-
-    if (input.handoffQueue?.trim()) {
-      settings.handoffQueue = input.handoffQueue.trim();
-    } else {
-      delete settings.handoffQueue;
-    }
-  } else {
-    delete settings.handoffNotifyTeam;
-    delete settings.handoffPriority;
-    delete settings.handoffQueue;
-  }
-
-  if (input.stepType === "wait") {
-    settings.waitAmount = input.waitAmount ?? 1;
-    settings.waitUnit = input.waitUnit ?? "minutes";
-  } else {
-    delete settings.waitAmount;
-    delete settings.waitUnit;
-  }
-
-  return settings;
 }
 
 async function requireCanvasConnectedAction(input: {
@@ -1208,7 +915,7 @@ export async function createCanvasStepAction(
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled ?? true,
       options: isInputStep ? parseOptions(parsed.data.options) : [],
-      settings: getChoiceStepSettings({
+      settings: buildActionStepSettings({
         stepType: parsed.data.stepType,
         choiceDisplayMode: parsed.data.choiceDisplayMode,
         contactAttributeFieldKey: parsed.data.contactAttributeFieldKey,
@@ -1398,7 +1105,7 @@ export async function updateCanvasStepAction(
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled ?? true,
       options: isInputStep ? parseOptions(parsed.data.options) : [],
-      settings: getChoiceStepSettings({
+      settings: buildActionStepSettings({
         stepType: parsed.data.stepType,
         choiceDisplayMode: parsed.data.choiceDisplayMode,
         contactAttributeFieldKey: parsed.data.contactAttributeFieldKey,
@@ -1667,7 +1374,7 @@ export async function updateCanvasStepBasicsAction(
   }
 
   if (isActionStep) {
-    settings = getChoiceStepSettings({
+    settings = buildActionStepSettings({
       contactAttributeFieldKey: parsed.data.contactAttributeFieldKey,
       contactAttributeKey: parsed.data.contactAttributeKey,
       contactAttributeValue: parsed.data.contactAttributeValue,

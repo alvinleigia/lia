@@ -39,6 +39,7 @@ import {
   updateProjectAction,
   validateActionFlowRoutes,
 } from "@/lib/action-flows";
+import { buildActionStepSettings } from "@/lib/action-step-settings";
 import {
   getActionTemplate,
   isProjectActionTemplate,
@@ -46,11 +47,6 @@ import {
 } from "@/lib/action-templates";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
-import type {
-  SelectCatalogProduct,
-  SelectMediaAsset,
-  SelectProductCatalog,
-} from "@/lib/db-schema";
 import { getFlowInputType, isFlowInputStepType } from "@/lib/flow-input-editor";
 import { getProjectMediaAsset } from "@/lib/media-assets";
 import {
@@ -488,27 +484,6 @@ function parseOptions(value?: string) {
   return parseLines(value).map((label) => ({ label, value: label }));
 }
 
-function setOptionalStringSetting(
-  settings: Record<string, unknown>,
-  key: string,
-  value: string | undefined,
-) {
-  const trimmed = value?.trim();
-  if (trimmed) {
-    settings[key] = trimmed;
-  }
-}
-
-function setOptionalNumberSetting(
-  settings: Record<string, unknown>,
-  key: string,
-  value: number | undefined,
-) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    settings[key] = value;
-  }
-}
-
 function buildBranchRuleSettings(
   existingSettings: Record<string, unknown> | undefined,
   branchLabel: string | undefined,
@@ -604,244 +579,6 @@ async function syncOperationStepRoutes(input: {
     ),
     successStepId: input.successStepId ?? null,
   });
-}
-
-function buildStepSettings(input: {
-  stepType?: string;
-  sourceType?: string;
-  catalogId?: string;
-  choiceDisplayMode?: "buttons" | "list" | "text";
-  contactAttributeKey?: string;
-  contactAttributeFieldKey?: string;
-  contactAttributeValue?: string;
-  contactAttributeValueSource?: "field" | "static";
-  contactTagNames?: string;
-  connectedAction?: Awaited<ReturnType<typeof getProjectAction>> | null;
-  connectedActionId?: number;
-  connectFlowMode?: "jump" | "return";
-  handoffNotifyTeam?: boolean;
-  handoffPriority?: "high" | "low" | "normal" | "urgent";
-  handoffQueue?: string;
-  waitAmount?: number;
-  waitUnit?: "seconds" | "minutes" | "hours" | "days";
-  filterByField?: string;
-  mediaAsset?: SelectMediaAsset | null;
-  mediaAssetId?: number;
-  operationExecutionMode?: "post_submit" | "inline";
-  productCatalog?: SelectProductCatalog | null;
-  productDisplayLayout?: "featured" | "grid" | "list";
-  productSelectionAllowMultiple?: boolean;
-  productSelectionAllowQuantity?: boolean;
-  products?: SelectCatalogProduct[];
-  productIds?: number[];
-  requiredMessage?: string;
-  validationAllowedFileTypes?: string;
-  validationMaxDate?: string;
-  validationMaxLength?: number;
-  validationMaxNumber?: number;
-  validationMinDate?: string;
-  validationMinLength?: number;
-  validationMinNumber?: number;
-  validationMessage?: string;
-  validationRegex?: string;
-  whatsappTemplateCategory?: "authentication" | "marketing" | "utility";
-  whatsappTemplateBody?: string;
-  whatsappTemplateLanguage?: string;
-  whatsappTemplateName?: string;
-  whatsappTemplateStatus?: "approved" | "draft" | "pending" | "rejected";
-  whatsappTemplateVariables?: string;
-}) {
-  const sourceType = input.sourceType?.trim();
-  const requiredMessage = input.requiredMessage?.trim();
-  const validationMessage = input.validationMessage?.trim();
-  const settings: Record<string, unknown> = {};
-  const isProductBackedStep = [
-    "catalog_message",
-    "single_product",
-    "multiple_products",
-    "product_selection",
-  ].includes(input.stepType ?? "");
-
-  if (input.choiceDisplayMode) {
-    settings.choiceDisplayMode = input.choiceDisplayMode;
-  }
-
-  if (input.mediaAsset) {
-    settings.mediaAssetId = input.mediaAsset.id;
-    settings.mediaAsset = {
-      id: input.mediaAsset.id,
-      mediaType: input.mediaAsset.mediaType,
-      mimeType: input.mediaAsset.mimeType,
-      originalName: input.mediaAsset.originalName,
-      publicPath: input.mediaAsset.publicPath,
-    };
-  }
-
-  if (input.operationExecutionMode) {
-    settings.operationExecutionMode = input.operationExecutionMode;
-  }
-
-  if (input.stepType === "template_message") {
-    const templateBody = input.whatsappTemplateBody?.trim();
-    const templateName = input.whatsappTemplateName?.trim();
-    const templateLanguage = input.whatsappTemplateLanguage?.trim();
-    const templateVariables = parseLines(input.whatsappTemplateVariables);
-
-    if (templateBody) {
-      settings.whatsappTemplateBody = templateBody;
-    }
-
-    if (templateName) {
-      settings.whatsappTemplateName = templateName;
-    }
-
-    if (templateLanguage) {
-      settings.whatsappTemplateLanguage = templateLanguage;
-    }
-
-    settings.whatsappTemplateCategory =
-      input.whatsappTemplateCategory ?? "utility";
-    settings.whatsappTemplateStatus = input.whatsappTemplateStatus ?? "draft";
-
-    if (templateVariables.length > 0) {
-      settings.whatsappTemplateVariables = templateVariables;
-    }
-  }
-
-  if (isProductBackedStep && input.productDisplayLayout) {
-    settings.productDisplayLayout = input.productDisplayLayout;
-  }
-
-  if (
-    input.stepType === "product_selection" &&
-    input.productSelectionAllowMultiple
-  ) {
-    settings.productSelectionAllowMultiple = true;
-  }
-
-  if (
-    input.stepType === "product_selection" &&
-    input.productSelectionAllowQuantity
-  ) {
-    settings.productSelectionAllowQuantity = true;
-  }
-
-  if (input.productCatalog) {
-    settings.productCatalogId = input.productCatalog.id;
-    settings.productCatalog = {
-      externalId: input.productCatalog.externalId,
-      id: input.productCatalog.id,
-      name: input.productCatalog.name,
-      providerType: input.productCatalog.providerType,
-    };
-  }
-
-  if (input.products && input.products.length > 0) {
-    settings.productIds = input.products.map((product) => product.id);
-    settings.products = input.products.map((product) => ({
-      currency: product.currency,
-      description: product.description,
-      id: product.id,
-      imageUrl: product.imageUrl,
-      name: product.name,
-      priceAmount: product.priceAmount,
-      productUrl: product.productUrl,
-      sku: product.sku,
-      whatsappRetailerId:
-        typeof product.metadata.whatsappRetailerId === "string"
-          ? product.metadata.whatsappRetailerId
-          : null,
-    }));
-  }
-
-  if (requiredMessage) {
-    settings.requiredMessage = requiredMessage;
-  }
-
-  if (validationMessage) {
-    settings.validationMessage = validationMessage;
-  }
-
-  setOptionalNumberSetting(
-    settings,
-    "validationMinLength",
-    input.validationMinLength,
-  );
-  setOptionalNumberSetting(
-    settings,
-    "validationMaxLength",
-    input.validationMaxLength,
-  );
-  setOptionalStringSetting(settings, "validationRegex", input.validationRegex);
-  setOptionalNumberSetting(
-    settings,
-    "validationMinNumber",
-    input.validationMinNumber,
-  );
-  setOptionalNumberSetting(
-    settings,
-    "validationMaxNumber",
-    input.validationMaxNumber,
-  );
-  setOptionalStringSetting(
-    settings,
-    "validationMinDate",
-    input.validationMinDate,
-  );
-  setOptionalStringSetting(
-    settings,
-    "validationMaxDate",
-    input.validationMaxDate,
-  );
-  setOptionalStringSetting(
-    settings,
-    "validationAllowedFileTypes",
-    input.validationAllowedFileTypes,
-  );
-
-  if (sourceType) {
-    settings.sourceType = sourceType;
-    settings.sourceConfig = {
-      catalogId: input.catalogId?.trim() || undefined,
-      filterByField: input.filterByField?.trim() || undefined,
-    };
-  }
-
-  if (input.contactAttributeKey?.trim()) {
-    settings.contactAttributeKey = input.contactAttributeKey.trim();
-    settings.contactAttributeValueSource =
-      input.contactAttributeValueSource ?? "field";
-    settings.contactAttributeFieldKey =
-      input.contactAttributeFieldKey?.trim() || undefined;
-    settings.contactAttributeValue =
-      input.contactAttributeValue?.trim() || undefined;
-  }
-
-  if (input.contactTagNames?.trim()) {
-    settings.contactTagNames = input.contactTagNames.trim();
-  }
-
-  if (input.stepType === "connect_flow" && input.connectedAction) {
-    settings.connectedActionId = input.connectedAction.id;
-    settings.connectedActionName = input.connectedAction.name;
-    settings.connectFlowMode = input.connectFlowMode ?? "jump";
-  }
-
-  if (input.stepType === "handoff") {
-    settings.handoffNotifyTeam = input.handoffNotifyTeam !== false;
-    settings.handoffPriority = input.handoffPriority ?? "normal";
-
-    if (input.handoffQueue?.trim()) {
-      settings.handoffQueue = input.handoffQueue.trim();
-    }
-  }
-
-  if (input.stepType === "wait") {
-    settings.waitAmount = input.waitAmount ?? 1;
-    settings.waitUnit = input.waitUnit ?? "minutes";
-  }
-
-  return settings;
 }
 
 async function requireConnectedAction(input: {
@@ -1750,7 +1487,7 @@ export async function createActionFlowStepAction(formData: FormData) {
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled,
       options: isInputStep ? parseOptions(parsed.data.options) : [],
-      settings: buildStepSettings({
+      settings: buildActionStepSettings({
         ...parsed.data,
         connectedAction,
         mediaAsset,
@@ -1860,6 +1597,14 @@ export async function updateActionFlowStepAction(formData: FormData) {
 
   const context = await resolveActionForCurrentProject(parsed.data.actionId);
   const { project, action } = context;
+  const existingStep = await getActionFlowStep(
+    project.id,
+    action.id,
+    parsed.data.stepId,
+  );
+  if (!existingStep) {
+    redirect(`/projects/actions/${action.id}?error=Step%20not%20found.`);
+  }
   const isInputStep = isFlowInputStepType(parsed.data.stepType);
   const canStoreFieldKey = isInputStep || parsed.data.stepType === "operation";
   const inputType = getFlowInputType(
@@ -1950,9 +1695,10 @@ export async function updateActionFlowStepAction(formData: FormData) {
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled,
       options: isInputStep ? parseOptions(parsed.data.options) : [],
-      settings: buildStepSettings({
+      settings: buildActionStepSettings({
         ...parsed.data,
         connectedAction,
+        existingSettings: existingStep.settings,
         mediaAsset,
         ...productConfig,
       }),
