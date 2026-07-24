@@ -2,6 +2,7 @@ import {
   Archive,
   ArchiveRestore,
   ArrowLeft,
+  Bot,
   ListTodo,
   Save,
 } from "lucide-react";
@@ -121,6 +122,14 @@ export default async function TaskDetailsPage({
             </form>
 
             <div className="border-t pt-4">
+              {!task.isArchived && (
+                <Button className="mb-4" asChild>
+                  <Link href={`/projects/tasks/${task.id}/configure/assistant`}>
+                    <Bot className="h-4 w-4" />
+                    Configure Conversation
+                  </Link>
+                </Button>
+              )}
               {task.isArchived ? (
                 <form action={unarchiveConversationalTaskAction}>
                   <input

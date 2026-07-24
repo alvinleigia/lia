@@ -230,21 +230,21 @@ control business behavior.
 Goal: define the universal task model before implementing model-driven runtime
 behavior.
 
-- [ ] Define `ConversationalTaskV1` as a versioned, channel-independent contract.
-- [ ] Define `KnowledgeConversationV1` as the versioned, channel-independent contract for grounded ordinary Q&A.
-- [ ] Define `ConversationEntryPolicyV1` for knowledge-first, task-first, or deterministic-node entry using published configuration.
-- [ ] Define `ConversationIdentityV1` for project-scoped anonymous visitors, sessions, channel identities, and verified contact association.
-- [ ] Require an explicit verified rule before identities or conversation state can be linked across channels.
+- [x] Define `ConversationalTaskV1` as a versioned, channel-independent contract.
+- [x] Define `KnowledgeConversationV1` as the versioned, channel-independent contract for grounded ordinary Q&A.
+- [x] Define `ConversationEntryPolicyV1` for knowledge-first, task-first, or deterministic-node entry using published configuration.
+- [x] Define `ConversationIdentityV1` for project-scoped anonymous visitors, sessions, channel identities, and verified contact association.
+- [x] Require an explicit verified rule before identities or conversation state can be linked across channels.
 - [ ] Define `DataHandlingPolicyV1` for field sensitivity, consent, retention, expiry, model/tool/log visibility, export, and deletion.
-- [ ] Define `AssistantPolicyV1` for shared identity, greeting strategy, base behavior, global constraints, and model policy.
-- [ ] Keep assistant policy separate from task-specific objectives, fields, tools, and outcomes.
+- [x] Define `AssistantPolicyV1` for shared identity, greeting strategy, base behavior, global constraints, and model policy.
+- [x] Keep assistant policy separate from task-specific objectives, fields, tools, and outcomes.
 - [x] Give every task a stable ID, name, objective, description, and schema version.
 - [ ] Define `TaskIntentRecommendationV1` so Q&A can recommend only an allowlisted published task and optional candidate field mappings.
 - [ ] Define `ConversationReturnPolicyV1` for completed, cancelled, failed, no-answer, and handoff task outcomes.
 - [ ] Define named knowledge outcomes for answered, task-recommended, no-answer, handoff, and cancelled.
-- [ ] Define one active response-owner rule across knowledge, task, deterministic graph nodes, and authorized humans.
-- [ ] Limit V1 to one active conversational task and prohibit recursive task calls.
-- [ ] Define bounded task-switch, connected-flow, and handoff depth with deterministic cycle fallback.
+- [x] Define one active response-owner rule across knowledge, task, deterministic graph nodes, and authorized humans.
+- [x] Limit V1 to one active conversational task and prohibit recursive task calls.
+- [x] Define bounded task-switch, connected-flow, and handoff depth with deterministic cycle fallback.
 - [ ] Define an explicit field-transfer whitelist with source, validation state, freshness, sensitivity, and provenance requirements.
 - [ ] Define a versioned task-field contract with a stable field ID and field key.
 - [ ] Keep visitor-facing labels separate from field keys and canonical values.

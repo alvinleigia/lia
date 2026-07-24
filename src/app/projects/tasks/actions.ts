@@ -7,6 +7,14 @@ import { assertPermission } from "@/lib/access-control";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveStrictUserAndProject } from "@/lib/auth-project";
 import {
+  conversationProjectPolicyV1Schema,
+  normalizeConversationProjectPolicy,
+} from "@/lib/conversation-contracts";
+import {
+  getConversationProjectPolicy,
+  saveConversationProjectPolicy,
+} from "@/lib/conversation-project-policies";
+import {
   conversationalTaskDetailsSchema,
   conversationalTaskIdSchema,
 } from "@/lib/conversational-task-schema";
@@ -167,4 +175,66 @@ export async function unarchiveConversationalTaskAction(formData: FormData) {
   revalidatePath("/projects/tasks");
   revalidatePath(`/projects/tasks/${task.id}`);
   redirect(`/projects/tasks/${task.id}?restored=1`);
+}
+
+export async function updateConversationProjectPolicyAction(
+  formData: FormData,
+) {
+  const projectId = projectIdSchema.safeParse(formData.get("projectId"));
+  const taskId = conversationalTaskIdSchema.safeParse(formData.get("taskId"));
+  if (!projectId.success || !taskId.success) {
+    redirect("/projects/tasks?error=Task%20not%20found.");
+  }
+
+  const context = await resolveStrictUserAndProject(projectId.data);
+  assertPermission(context.membership, "company.project.manage");
+  const task = await getProjectConversationalTask(
+    context.project.id,
+    taskId.data,
+  );
+  if (!task || task.isArchived) {
+    redirect("/projects/tasks?error=Task%20not%20found.");
+  }
+
+  const current = await getConversationProjectPolicy(context.project.id);
+  const parsed = conversationProjectPolicyV1Schema.safeParse({
+    ...normalizeConversationProjectPolicy(current),
+    assistant: {
+      ...current.assistant,
+      baseInstructions: formData.get("baseInstructions") || null,
+      greeting: formData.get("greeting") || null,
+      greetingStrategy: formData.get("greetingStrategy"),
+      language: formData.get("language"),
+    },
+    entry: {
+      ...current.entry,
+      allowTaskRecommendation: formData.get("allowTaskRecommendation") === "on",
+      mode: formData.get("entryMode"),
+    },
+    identity: {
+      ...current.identity,
+      crossChannelLinkRule: formData.get("crossChannelLinkRule"),
+      sessionMode: formData.get("sessionMode"),
+    },
+    knowledge: {
+      ...current.knowledge,
+      noAnswerBehavior: formData.get("noAnswerBehavior"),
+    },
+  });
+
+  const destination = `/projects/tasks/${task.id}/configure/assistant`;
+  if (!parsed.success) {
+    redirect(`${destination}?error=Please%20check%20the%20policy.`);
+  }
+
+  await saveConversationProjectPolicy(context.project.id, parsed.data);
+  await writeAuditLog({
+    ...context,
+    action: "conversation_project_policy.updated",
+    targetType: "conversation_project_policy",
+    targetId: context.project.id,
+    metadata: { schemaVersion: parsed.data.schemaVersion },
+  });
+  revalidatePath(destination);
+  redirect(`${destination}?saved=1`);
 }

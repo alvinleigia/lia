@@ -160,6 +160,28 @@ export const projects = pgTable(
   ],
 );
 
+export const conversationProjectPolicies = pgTable(
+  "conversation_project_policies",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    schemaVersion: integer("schema_version").notNull().default(1),
+    definition: jsonb("definition")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("conversation_project_policies_project_unique").on(
+      table.projectId,
+    ),
+  ],
+);
+
 export const conversationalTasks = pgTable(
   "conversational_tasks",
   {
@@ -171,6 +193,10 @@ export const conversationalTasks = pgTable(
     name: text("name").notNull(),
     objective: text("objective").notNull(),
     description: text("description"),
+    definition: jsonb("definition")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
     isArchived: boolean("is_archived").notNull().default(false),
     archivedAt: timestamp("archived_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -181,6 +207,33 @@ export const conversationalTasks = pgTable(
     index("conversational_tasks_project_archived_idx").on(
       table.projectId,
       table.isArchived,
+    ),
+  ],
+);
+
+export const conversationalTaskVersions = pgTable(
+  "conversational_task_versions",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => conversationalTasks.id),
+    versionNumber: integer("version_number").notNull(),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull(),
+    publishedByUserId: integer("published_by_user_id").references(
+      () => users.id,
+    ),
+    publishedAt: timestamp("published_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversational_task_versions_project_idx").on(table.projectId),
+    index("conversational_task_versions_task_idx").on(table.taskId),
+    uniqueIndex("conversational_task_versions_task_version_unique").on(
+      table.taskId,
+      table.versionNumber,
     ),
   ],
 );
@@ -1198,6 +1251,14 @@ export type SelectContactTagAssignment =
   typeof contactTagAssignments.$inferSelect;
 export type InsertConversationalTask = typeof conversationalTasks.$inferInsert;
 export type SelectConversationalTask = typeof conversationalTasks.$inferSelect;
+export type InsertConversationalTaskVersion =
+  typeof conversationalTaskVersions.$inferInsert;
+export type SelectConversationalTaskVersion =
+  typeof conversationalTaskVersions.$inferSelect;
+export type InsertConversationProjectPolicy =
+  typeof conversationProjectPolicies.$inferInsert;
+export type SelectConversationProjectPolicy =
+  typeof conversationProjectPolicies.$inferSelect;
 export type InsertProject = typeof projects.$inferInsert;
 export type SelectProject = typeof projects.$inferSelect;
 export type InsertCompany = typeof companies.$inferInsert;
