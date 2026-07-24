@@ -235,12 +235,12 @@ behavior.
 - [x] Define `ConversationEntryPolicyV1` for knowledge-first, task-first, or deterministic-node entry using published configuration.
 - [x] Define `ConversationIdentityV1` for project-scoped anonymous visitors, sessions, channel identities, and verified contact association.
 - [x] Require an explicit verified rule before identities or conversation state can be linked across channels.
-- [ ] Define `DataHandlingPolicyV1` for field sensitivity, consent, retention, expiry, model/tool/log visibility, export, and deletion.
+- [x] Define `DataHandlingPolicyV1` for field sensitivity, consent, retention, expiry, model/tool/log visibility, export, and deletion.
 - [x] Define `AssistantPolicyV1` for shared identity, greeting strategy, base behavior, global constraints, and model policy.
 - [x] Keep assistant policy separate from task-specific objectives, fields, tools, and outcomes.
 - [x] Give every task a stable ID, name, objective, description, and schema version.
 - [ ] Define `TaskIntentRecommendationV1` so Q&A can recommend only an allowlisted published task and optional candidate field mappings.
-- [ ] Define `ConversationReturnPolicyV1` for completed, cancelled, failed, no-answer, and handoff task outcomes.
+- [x] Define `ConversationReturnPolicyV1` for completed, cancelled, failed, no-answer, and handoff task outcomes.
 - [ ] Define named knowledge outcomes for answered, task-recommended, no-answer, handoff, and cancelled.
 - [x] Define one active response-owner rule across knowledge, task, deterministic graph nodes, and authorized humans.
 - [x] Limit V1 to one active conversational task and prohibit recursive task calls.
@@ -260,12 +260,12 @@ behavior.
 - [x] Define `ToolDefinitionRefV1` and `ToolBindingV1` so tasks reference stable versioned tools instead of embedding provider configuration.
 - [x] Define allowed read tools and allowed write operations separately.
 - [x] Define default-deny tool permissions at assistant, task, and conversational-stage boundaries.
-- [ ] Define task-level wording, brevity, language, fallback, and handoff policies.
-- [ ] Define a degraded-mode policy for model, retrieval, business-tool, and outbound-channel unavailability.
-- [ ] Define model policy separately from business task data.
-- [ ] Define named task outcomes and stable output ports.
-- [ ] Define deterministic task completion and cancellation conditions.
-- [ ] Define the order of extraction, validation, lookup, clarification, confirmation, operation, and routing.
+- [x] Define task-level wording, brevity, language, fallback, and handoff policies.
+- [x] Define a degraded-mode policy for model, retrieval, business-tool, and outbound-channel unavailability.
+- [x] Define model policy separately from business task data.
+- [x] Define named task outcomes and stable output ports.
+- [x] Define deterministic task completion and cancellation conditions.
+- [x] Define the order of extraction, validation, lookup, clarification, confirmation, operation, and routing.
 - [ ] Embed the complete task contract in immutable published versions.
 - [ ] Pin assistant policy, context definitions, tool versions, and bindings in immutable published versions.
 - [ ] Keep existing V1 deterministic flow definitions readable and executable.

@@ -11,6 +11,7 @@ import {
   conversationProjectPolicyV1Schema,
   normalizeConversationProjectPolicy,
   taskFieldV1Schema,
+  taskOutcomeV1Schema,
   toolBindingV1Schema,
 } from "@/lib/conversation-contracts";
 import {
@@ -447,4 +448,159 @@ export async function unbindConversationalTaskToolAction(formData: FormData) {
   );
   revalidatePath(destination);
   redirect(`${destination}?unbound=1`);
+}
+
+export async function addConversationalTaskOutcomeAction(formData: FormData) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/outcomes`;
+  const parsed = taskOutcomeV1Schema.safeParse({
+    id: crypto.randomUUID(),
+    key: formData.get("key"),
+    label: formData.get("label"),
+    type: formData.get("type"),
+    condition: formData.get("condition") || null,
+    outputPort: formData.get("outputPort"),
+  });
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  if (
+    !parsed.success ||
+    context.task.isArchived ||
+    definition.outcomes.some(
+      (outcome) =>
+        outcome.key === parsed.data.key ||
+        outcome.outputPort === parsed.data.outputPort,
+    )
+  ) {
+    redirect(`${destination}?error=Use%20a%20unique%20outcome%20and%20port.`);
+  }
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    { ...definition, outcomes: [...definition.outcomes, parsed.data] },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?outcomeAdded=1`);
+}
+
+export async function removeConversationalTaskOutcomeAction(
+  formData: FormData,
+) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/outcomes`;
+  const outcomeId = z.string().uuid().safeParse(formData.get("outcomeId"));
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  if (
+    !outcomeId.success ||
+    context.task.isArchived ||
+    definition.outcomes.length <= 1
+  ) {
+    redirect(
+      `${destination}?error=At%20least%20one%20outcome%20is%20required.`,
+    );
+  }
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      outcomes: definition.outcomes.filter(
+        (outcome) => outcome.id !== outcomeId.data,
+      ),
+    },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?outcomeRemoved=1`);
+}
+
+export async function updateConversationalTaskSafetyAction(formData: FormData) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/outcomes`;
+  if (context.task.isArchived) {
+    redirect(`${destination}?error=Restore%20the%20task%20before%20editing.`);
+  }
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  const parsed = z
+    .object({
+      responseLength: z.enum(["short", "balanced", "detailed"]),
+      language: z.string().trim().min(2).max(40),
+      fallbackMessage: z.string().trim().max(1000).nullable(),
+      handoffMessage: z.string().trim().max(1000).nullable(),
+      completed: z.enum(["return_to_knowledge", "end"]),
+      cancelled: z.enum(["return_to_knowledge", "end"]),
+      failed: z.enum(["return_to_knowledge", "handoff", "end"]),
+      noAnswer: z.enum(["return_to_knowledge", "handoff", "end"]),
+      handoff: z.enum(["suspend", "end"]),
+      model: z.enum(["deterministic_fallback", "handoff", "fail"]),
+      retrieval: z.enum(["clarify", "handoff", "fail"]),
+      tool: z.enum(["retry", "handoff", "fail"]),
+      outboundChannel: z.enum(["retry", "fail"]),
+      fieldRetentionDays: z.coerce.number().int().min(1).max(3650),
+      messageRetentionDays: z.coerce.number().int().min(1).max(3650),
+      consentRequired: z.boolean(),
+      exportAllowed: z.boolean(),
+    })
+    .safeParse({
+      responseLength: formData.get("responseLength"),
+      language: formData.get("language"),
+      fallbackMessage: formData.get("fallbackMessage") || null,
+      handoffMessage: formData.get("handoffMessage") || null,
+      completed: formData.get("completed"),
+      cancelled: formData.get("cancelled"),
+      failed: formData.get("failed"),
+      noAnswer: formData.get("noAnswer"),
+      handoff: formData.get("handoff"),
+      model: formData.get("model"),
+      retrieval: formData.get("retrieval"),
+      tool: formData.get("tool"),
+      outboundChannel: formData.get("outboundChannel"),
+      fieldRetentionDays: formData.get("fieldRetentionDays"),
+      messageRetentionDays: formData.get("messageRetentionDays"),
+      consentRequired: formData.get("consentRequired") === "on",
+      exportAllowed: formData.get("exportAllowed") === "on",
+    });
+  if (!parsed.success) {
+    redirect(`${destination}?error=Please%20check%20the%20policy%20values.`);
+  }
+
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      taskPolicy: {
+        fallbackMessage: parsed.data.fallbackMessage,
+        handoffMessage: parsed.data.handoffMessage,
+        language: parsed.data.language,
+        responseLength: parsed.data.responseLength,
+      },
+      returnPolicy: {
+        schemaVersion: 1,
+        completed: parsed.data.completed,
+        cancelled: parsed.data.cancelled,
+        failed: parsed.data.failed,
+        handoff: parsed.data.handoff,
+        noAnswer: parsed.data.noAnswer,
+      },
+      degradedMode: {
+        model: parsed.data.model,
+        outboundChannel: parsed.data.outboundChannel,
+        retrieval: parsed.data.retrieval,
+        tool: parsed.data.tool,
+      },
+    },
+  );
+
+  const projectPolicy = await getConversationProjectPolicy(context.project.id);
+  await saveConversationProjectPolicy(context.project.id, {
+    ...projectPolicy,
+    dataHandling: {
+      ...projectPolicy.dataHandling,
+      consentRequired: parsed.data.consentRequired,
+      exportAllowed: parsed.data.exportAllowed,
+      fieldRetentionDays: parsed.data.fieldRetentionDays,
+      messageRetentionDays: parsed.data.messageRetentionDays,
+    },
+  });
+  revalidatePath(destination);
+  redirect(`${destination}?saved=1`);
 }
