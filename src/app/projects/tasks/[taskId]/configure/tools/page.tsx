@@ -129,6 +129,9 @@ export default async function TaskToolsPage({
             ) : (
               <ActionStateForm
                 action={bindConversationalTaskToolAction}
+                resetKey={definition.tools
+                  .map(({ tool }) => `${tool.id}@${tool.version}`)
+                  .join(":")}
                 className="space-y-4 rounded-md border p-4"
               >
                 <h3 className="font-semibold">Allow a Tool</h3>

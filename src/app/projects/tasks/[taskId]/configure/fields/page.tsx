@@ -135,6 +135,7 @@ export default async function TaskFieldsPage({
 
             <ActionStateForm
               action={addConversationalTaskFieldAction}
+              resetKey={definition.fields.map((field) => field.id).join(":")}
               className="space-y-4 rounded-md border p-4"
             >
               <h3 className="font-semibold">Add Field</h3>
@@ -287,6 +288,9 @@ export default async function TaskFieldsPage({
             )}
             <ActionStateForm
               action={addTaskContextVariableAction}
+              resetKey={definition.contextVariables
+                .map((variable) => variable.key)
+                .join(":")}
               className="space-y-4 rounded-md border p-4"
             >
               <h3 className="font-semibold">Add Context Variable</h3>

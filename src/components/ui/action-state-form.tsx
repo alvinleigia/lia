@@ -3,6 +3,7 @@
 import {
   type ComponentProps,
   createContext,
+  type Key,
   type ReactNode,
   useActionState,
   useContext,
@@ -20,6 +21,7 @@ type ActionStateFormAction = (
 type ActionStateFormProps = Omit<ComponentProps<"form">, "action" | "ref"> & {
   action: ActionStateFormAction;
   children: ReactNode;
+  resetKey?: Key;
 };
 
 const FormStateContext = createContext<ActionFormState>({});
@@ -131,12 +133,16 @@ function restoreFormControls(
   }
 }
 
-export function ActionStateForm({
+export function ActionStateForm({ resetKey, ...props }: ActionStateFormProps) {
+  return <StatefulActionStateForm key={resetKey} {...props} />;
+}
+
+function StatefulActionStateForm({
   action,
   children,
   onSubmit,
   ...props
-}: ActionStateFormProps) {
+}: Omit<ActionStateFormProps, "resetKey">) {
   const [state, formAction] = useActionState(action, {});
   const formRef = useRef<HTMLFormElement>(null);
   const snapshotRef = useRef<ControlSnapshot[]>([]);

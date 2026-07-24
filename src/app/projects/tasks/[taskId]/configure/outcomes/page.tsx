@@ -110,6 +110,9 @@ export default async function TaskOutcomesPage({
             </div>
             <ActionStateForm
               action={addConversationalTaskOutcomeAction}
+              resetKey={definition.outcomes
+                .map((outcome) => outcome.id)
+                .join(":")}
               className="grid gap-4 rounded-md border p-4 md:grid-cols-5"
             >
               <ActionFormError className="md:col-span-5" />
