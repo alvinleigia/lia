@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 import {
+  evaluateContextVariableRemoval,
+  findContextVariableDependencies,
+  isProtectedContextVariable,
+} from "../../src/lib/context-variable-dependencies";
+import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
 } from "../../src/lib/conversation-contract-fixtures";
@@ -111,4 +116,120 @@ test("publish validation catches missing dependencies and terminal outcomes", ()
   expect(result.issues).toContain(
     "Service Category depends on missing field missingField.",
   );
+});
+
+test("context dependencies are explicit and identify their usage", () => {
+  const definition = {
+    ...REFERENCE_BOOKING_TASK_DEFINITION,
+    taskPolicy: {
+      ...REFERENCE_BOOKING_TASK_DEFINITION.taskPolicy,
+      fallbackMessage: "Timezone: {{context.lia_timezone}}",
+    },
+  };
+
+  expect(findContextVariableDependencies(definition, "lia_timezone")).toEqual([
+    {
+      key: "lia_timezone",
+      location: "Fallback message",
+      path: "taskPolicy.fallbackMessage",
+    },
+  ]);
+  expect(findContextVariableDependencies(definition, "guestName")).toEqual([]);
+});
+
+test("publish validation blocks missing context references", () => {
+  const definition = {
+    ...REFERENCE_BOOKING_TASK_DEFINITION,
+    contextVariables: [],
+    taskPolicy: {
+      ...REFERENCE_BOOKING_TASK_DEFINITION.taskPolicy,
+      fallbackMessage: "Timezone: {{context.lia_timezone}}",
+    },
+  };
+  const result = validateConversationalTaskForPublish({
+    definition,
+    projectPolicy: REFERENCE_BOOKING_PROJECT_POLICY,
+  });
+
+  expect(result.ready).toBe(false);
+  expect(result.issues).toContain(
+    "Fallback message references missing context lia_timezone.",
+  );
+});
+
+test("system-owned context variables are protected", () => {
+  expect(
+    isProtectedContextVariable({
+      key: "lia_timezone",
+      source: "system",
+    }),
+  ).toBe(true);
+  expect(
+    isProtectedContextVariable({
+      key: "campaignCode",
+      source: "project",
+    }),
+  ).toBe(false);
+});
+
+test("context removal is blocked for protected and referenced variables", () => {
+  expect(
+    evaluateContextVariableRemoval(
+      REFERENCE_BOOKING_TASK_DEFINITION,
+      "lia_timezone",
+    ),
+  ).toMatchObject({
+    allowed: false,
+    protected: true,
+  });
+
+  const referenced = {
+    ...REFERENCE_BOOKING_TASK_DEFINITION,
+    contextVariables: [
+      ...REFERENCE_BOOKING_TASK_DEFINITION.contextVariables,
+      {
+        key: "campaignCode",
+        type: "text" as const,
+        source: "project" as const,
+        defaultValue: null,
+        sensitivity: "standard" as const,
+        expiresAfterMinutes: null,
+        modelVisible: true,
+        toolVisible: true,
+      },
+    ],
+    taskPolicy: {
+      ...REFERENCE_BOOKING_TASK_DEFINITION.taskPolicy,
+      fallbackMessage: "Campaign: {{context.campaignCode}}",
+    },
+  };
+  expect(
+    evaluateContextVariableRemoval(referenced, "campaignCode"),
+  ).toMatchObject({
+    allowed: false,
+    dependencies: [
+      {
+        location: "Fallback message",
+      },
+    ],
+    protected: false,
+  });
+
+  expect(
+    evaluateContextVariableRemoval(
+      {
+        ...referenced,
+        taskPolicy: {
+          ...referenced.taskPolicy,
+          fallbackMessage: null,
+        },
+      },
+      "campaignCode",
+    ),
+  ).toEqual({
+    allowed: true,
+    dependencies: [],
+    protected: false,
+    reason: null,
+  });
 });

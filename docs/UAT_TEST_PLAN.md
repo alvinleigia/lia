@@ -314,8 +314,8 @@ Use this test context:
 - [ ] Try to add the context.
 
   Expected result: The value is rejected because non-system context cannot use
-  the reserved `lia_` prefix. The error appears inside the `Add Context
-  Variable` form and the entered key, source, and type remain unchanged.
+  the reserved `lia_` prefix. The form shows `The lia_ prefix is reserved for
+  system context.` and the entered key, source, and type remain unchanged.
 
 - [ ] Replace the values with:
 
@@ -337,10 +337,40 @@ Use this test context:
   Text
   ```
 
-- [ ] Add the context, reload the page, and then remove `uatCampaign`.
+- [ ] Add the context and reload the page.
 
-  Expected result: The valid context persists after reload and can be removed.
-  The booking starter's `lia_timezone` context remains present.
+  Expected result: The valid context persists after reload. The booking
+  starter's `lia_timezone` context shows `System protected` and has no edit or
+  delete controls.
+
+- [ ] Edit `uatCampaign`, change its source to `Project`, and save.
+
+  Expected result: The source changes to `project`. The key is displayed as
+  fixed and cannot be edited.
+
+- [ ] Open `Outcomes`. In `Fallback Message`, enter:
+
+  ```text
+  Campaign {{context.uatCampaign}} could not be completed.
+  ```
+
+- [ ] Save the policy, return to `Fields`, and find `uatCampaign`.
+
+  Expected result: The variable shows `Used by: Fallback message`. Its delete
+  control is disabled, while its edit control remains available. No dependent
+  configuration is removed or rewritten.
+
+- [ ] Return to `Outcomes` and restore `Fallback Message` to:
+
+  ```text
+  I could not complete that booking request. Let me connect you with the team.
+  ```
+
+- [ ] Save the policy, return to `Fields`, and remove `uatCampaign`.
+
+  Expected result: The usage message is gone, deletion is available, and the
+  unreferenced variable can be removed. The protected `lia_timezone` variable
+  remains present.
   Status:
   Notes:
 

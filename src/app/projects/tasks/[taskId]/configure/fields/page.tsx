@@ -2,6 +2,7 @@ import { ArrowLeft, Braces, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TaskConfigurationNav } from "@/components/task-configuration-nav";
+import { TaskContextVariableRow } from "@/components/task-context-variable-row";
 import {
   ActionFormError,
   ActionStateForm,
@@ -11,7 +12,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FIELD_TYPES } from "@/lib/conversation-contracts";
+import { evaluateContextVariableRemoval } from "@/lib/context-variable-dependencies";
+import {
+  CUSTOM_CONTEXT_SOURCES,
+  FIELD_TYPES,
+} from "@/lib/conversation-contracts";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
 import {
   getProjectConversationalTask,
@@ -27,6 +32,7 @@ import {
   applyReferenceBookingTaskAction,
   removeConversationalTaskFieldAction,
   removeTaskContextVariableAction,
+  updateTaskContextVariableAction,
 } from "../../../actions";
 
 type PageProps = {
@@ -254,36 +260,24 @@ export default async function TaskFieldsPage({
           <CardContent className="space-y-5">
             {definition.contextVariables.length > 0 && (
               <div className="divide-y rounded-md border">
-                {definition.contextVariables.map((variable) => (
-                  <div
-                    key={variable.key}
-                    className="flex items-center justify-between gap-4 px-4 py-3"
-                  >
-                    <div>
-                      <p className="font-medium">{variable.key}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {variable.source} · {variable.type}
-                      </p>
-                    </div>
-                    <form action={removeTaskContextVariableAction}>
-                      <input
-                        type="hidden"
-                        name="projectId"
-                        value={context.project.id}
-                      />
-                      <input type="hidden" name="taskId" value={task.id} />
-                      <input
-                        type="hidden"
-                        name="contextKey"
-                        value={variable.key}
-                      />
-                      <Button type="submit" size="icon" variant="ghost">
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Remove {variable.key}</span>
-                      </Button>
-                    </form>
-                  </div>
-                ))}
+                {definition.contextVariables.map((variable) => {
+                  const removal = evaluateContextVariableRemoval(
+                    definition,
+                    variable.key,
+                  );
+
+                  return (
+                    <TaskContextVariableRow
+                      key={`${variable.key}:${variable.source}:${variable.type}`}
+                      projectId={context.project.id}
+                      taskId={task.id}
+                      variable={variable}
+                      removal={removal}
+                      updateAction={updateTaskContextVariableAction}
+                      removeAction={removeTaskContextVariableAction}
+                    />
+                  );
+                })}
               </div>
             )}
             <ActionStateForm
@@ -318,15 +312,7 @@ export default async function TaskFieldsPage({
                     name="contextSource"
                     className={selectClass}
                   >
-                    {[
-                      "system",
-                      "tenant",
-                      "project",
-                      "contact",
-                      "channel",
-                      "webhook",
-                      "default",
-                    ].map((source) => (
+                    {CUSTOM_CONTEXT_SOURCES.map((source) => (
                       <option key={source} value={source}>
                         {source}
                       </option>

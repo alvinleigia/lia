@@ -95,6 +95,20 @@ The chatbot must not invent live business data. If a user asks about live
 availability, booking status, pricing, cancellation state, or similar dynamic
 data, the app should run an operation or hand off gracefully.
 
+## Trusted Context Safety
+
+Trusted context is task configuration supplied by Lia, the tenant, project,
+contact, channel, webhook, or an approved default. It is separate from visitor
+answers.
+
+- Use `{{context.variableKey}}` for explicit trusted-context references.
+- Keep context keys immutable after creation.
+- Reserve `lia_` and system-sourced variables for Lia-managed context.
+- Show where a context variable is referenced before allowing removal.
+- Block deletion while references exist.
+- Never cascade-delete or rewrite dependent task configuration.
+- Block publication when a context reference cannot be resolved.
+
 ## Operations
 
 Prefer a generic `operation` abstraction over one-off step types like only

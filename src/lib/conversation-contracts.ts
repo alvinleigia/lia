@@ -26,14 +26,18 @@ export const FIELD_TYPES = [
   "project_resource",
 ] as const;
 
-export const CONTEXT_SOURCE_PRECEDENCE = [
-  "system",
+export const CUSTOM_CONTEXT_SOURCES = [
   "tenant",
   "project",
   "contact",
   "channel",
   "webhook",
   "default",
+] as const;
+
+export const CONTEXT_SOURCE_PRECEDENCE = [
+  "system",
+  ...CUSTOM_CONTEXT_SOURCES,
 ] as const;
 
 export const assistantPolicyV1Schema = z.object({
@@ -179,15 +183,7 @@ export const taskFieldV1Schema = z.object({
 export const contextVariableDefinitionV1Schema = z.object({
   key: stableKey,
   type: z.enum(FIELD_TYPES),
-  source: z.enum([
-    "system",
-    "tenant",
-    "project",
-    "contact",
-    "channel",
-    "webhook",
-    "default",
-  ]),
+  source: z.enum(CONTEXT_SOURCE_PRECEDENCE),
   defaultValue: optionalText,
   sensitivity: z.enum(["standard", "personal", "sensitive"]),
   expiresAfterMinutes: z.number().int().positive().nullable(),

@@ -1,6 +1,6 @@
 # Beta Readiness Checklist
 
-Status date: 2026-07-23
+Status date: 2026-07-24
 
 This checklist turns `LEIGIA_BLUEPRINT_ALIGNMENT_AUDIT.md` into a practical
 beta-readiness track. Use it before putting real customers or production-like
@@ -188,6 +188,11 @@ Subdomain note:
 - [x] Shared server-action form handling keeps validation errors beside the
   relevant form and preserves non-file user input across account, project,
   channel, catalog, operation, builder, and task configuration screens.
+- [x] Trusted context uses immutable keys, explicit references, protected
+  system variables, visible dependency locations, blocked referenced-variable
+  deletion, and no automatic cascading changes.
+- [x] Conversational-task publication rejects unresolved trusted-context
+  references.
 - [ ] Pass the `Cross-Cutting Form UX Regression` in
   `docs/UAT_TEST_PLAN.md` against the release candidate.
 - [ ] Complete Priority 1, Phases 1-8 in `FLOW_BUILDER_ROADMAP.md`.

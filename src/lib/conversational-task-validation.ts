@@ -1,3 +1,4 @@
+import { listContextVariableDependencies } from "@/lib/context-variable-dependencies";
 import {
   type ConversationalTaskDefinitionV1,
   type ConversationProjectPolicyV1,
@@ -45,6 +46,17 @@ export function validateConversationalTaskForPublish(input: {
   for (const rule of input.definition.fieldTransferWhitelist) {
     if (!fieldKeys.has(rule.fieldKey)) {
       issues.push(`Transfer field ${rule.fieldKey} is not defined.`);
+    }
+  }
+
+  const contextKeys = new Set(
+    input.definition.contextVariables.map((variable) => variable.key),
+  );
+  for (const dependency of listContextVariableDependencies(input.definition)) {
+    if (!contextKeys.has(dependency.key)) {
+      issues.push(
+        `${dependency.location} references missing context ${dependency.key}.`,
+      );
     }
   }
 

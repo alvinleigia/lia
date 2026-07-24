@@ -8,12 +8,18 @@ import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveStrictUserAndProject } from "@/lib/auth-project";
 import {
+  evaluateContextVariableRemoval,
+  isProtectedContextVariable,
+} from "@/lib/context-variable-dependencies";
+import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
 } from "@/lib/conversation-contract-fixtures";
 import {
+  CUSTOM_CONTEXT_SOURCES,
   contextVariableDefinitionV1Schema,
   conversationProjectPolicyV1Schema,
+  FIELD_TYPES,
   normalizeConversationProjectPolicy,
   taskFieldV1Schema,
   taskOutcomeV1Schema,
@@ -333,6 +339,9 @@ export async function addTaskContextVariableAction(
 ): Promise<ActionFormState> {
   const context = await resolveTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  if (formData.get("contextSource") === "system") {
+    return { error: "System context is managed by Lia." };
+  }
   const expires = String(formData.get("expiresAfterMinutes") ?? "").trim();
   const parsed = contextVariableDefinitionV1Schema.safeParse({
     key: formData.get("contextKey"),
@@ -346,13 +355,11 @@ export async function addTaskContextVariableAction(
   });
 
   const definition = readConversationalTaskDefinition(context.task.definition);
-  const invalidSystemKey =
-    parsed.success &&
-    parsed.data.key.startsWith("lia_") &&
-    parsed.data.source !== "system";
+  if (parsed.success && parsed.data.key.startsWith("lia_")) {
+    return { error: "The lia_ prefix is reserved for system context." };
+  }
   if (
     !parsed.success ||
-    invalidSystemKey ||
     context.task.isArchived ||
     definition.contextVariables.some(
       (variable) => variable.key === parsed.data.key,
@@ -373,6 +380,61 @@ export async function addTaskContextVariableAction(
   redirect(`${destination}?contextAdded=1`);
 }
 
+export async function updateTaskContextVariableAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  const parsed = z
+    .object({
+      key: z.string().trim().min(1).max(80),
+      source: z.enum(CUSTOM_CONTEXT_SOURCES),
+      type: z.enum(FIELD_TYPES),
+    })
+    .safeParse({
+      key: formData.get("contextKey"),
+      source: formData.get("contextSource"),
+      type: formData.get("contextType"),
+    });
+  if (!parsed.success || context.task.isArchived) {
+    return { error: "Please check the context variable." };
+  }
+
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  const variable = definition.contextVariables.find(
+    (candidate) => candidate.key === parsed.data.key,
+  );
+  if (!variable) {
+    return { error: "Context variable not found." };
+  }
+  if (isProtectedContextVariable(variable)) {
+    return { error: "System context is managed by Lia." };
+  }
+
+  const updated = contextVariableDefinitionV1Schema.safeParse({
+    ...variable,
+    source: parsed.data.source,
+    type: parsed.data.type,
+  });
+  if (!updated.success) {
+    return { error: "Please check the context variable." };
+  }
+
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      contextVariables: definition.contextVariables.map((candidate) =>
+        candidate.key === parsed.data.key ? updated.data : candidate,
+      ),
+    },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?contextUpdated=1`);
+}
+
 export async function removeTaskContextVariableAction(formData: FormData) {
   const context = await resolveTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/fields`;
@@ -382,6 +444,11 @@ export async function removeTaskContextVariableAction(formData: FormData) {
   }
 
   const definition = readConversationalTaskDefinition(context.task.definition);
+  const removal = evaluateContextVariableRemoval(definition, key.data);
+  if (!removal.allowed) {
+    redirect(`${destination}?error=${encodeURIComponent(removal.reason)}`);
+  }
+
   await updateProjectConversationalTaskDefinition(
     context.project.id,
     context.task.id,

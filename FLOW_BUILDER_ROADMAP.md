@@ -252,6 +252,13 @@ behavior.
 - [x] Reserve a `lia_` namespace for system context such as channel, current time, conversation ID, project, locale, and timezone.
 - [x] Distinguish trusted initialization context from visitor-collected task fields and transient model output.
 - [x] Define deterministic precedence for system, tenant, project, contact, channel, webhook, and default context sources.
+- [x] Keep context-variable keys immutable after creation while allowing user-managed source and type metadata to be edited.
+- [x] Use explicit `{{context.variableKey}}` references so trusted context cannot be confused with visitor fields or WhatsApp positional variables.
+- [x] Centralize context dependency discovery for task messages, field rules, and outcome conditions.
+- [x] Show every discovered dependency beside the context variable in the task editor.
+- [x] Protect `lia_` and system-sourced context from user editing and deletion.
+- [x] Block deletion of referenced context without cascading changes into dependent configuration.
+- [x] Block publication when a task contains an unresolved context reference.
 - [x] Support text, email, phone, integer, decimal, boolean, date, time, date range, address, location, media, enum, and project-resource field types.
 - [x] Define required and conditionally required fields.
 - [x] Define field validation, normalization, sensitivity, and confirmation policies.
