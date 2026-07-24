@@ -7,8 +7,10 @@ import { assertPermission } from "@/lib/access-control";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveStrictUserAndProject } from "@/lib/auth-project";
 import {
+  contextVariableDefinitionV1Schema,
   conversationProjectPolicyV1Schema,
   normalizeConversationProjectPolicy,
+  taskFieldV1Schema,
 } from "@/lib/conversation-contracts";
 import {
   getConversationProjectPolicy,
@@ -21,8 +23,10 @@ import {
 import {
   createProjectConversationalTask,
   getProjectConversationalTask,
+  readConversationalTaskDefinition,
   setProjectConversationalTaskArchived,
   updateProjectConversationalTask,
+  updateProjectConversationalTaskDefinition,
 } from "@/lib/conversational-tasks";
 
 const projectIdSchema = z.coerce.number().int().positive();
@@ -237,4 +241,144 @@ export async function updateConversationProjectPolicyAction(
   });
   revalidatePath(destination);
   redirect(`${destination}?saved=1`);
+}
+
+export async function addConversationalTaskFieldAction(formData: FormData) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  if (context.task.isArchived) {
+    redirect(`${destination}?error=Restore%20the%20task%20before%20editing.`);
+  }
+
+  const parsed = taskFieldV1Schema.safeParse({
+    id: crypto.randomUUID(),
+    key: formData.get("key"),
+    label: formData.get("label"),
+    type: formData.get("type"),
+    required: formData.get("required") === "on",
+    requiredWhen: formData.get("requiredWhen") || null,
+    validation: formData.get("validation") || null,
+    normalization: formData.get("normalization") || null,
+    sensitivity: formData.get("sensitivity"),
+    confirmation: formData.get("confirmation"),
+    sourcePriority: ["visitor", "profile", "project_resource", "tool"],
+    dependsOn: String(formData.get("dependsOn") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  });
+
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  if (
+    !parsed.success ||
+    definition.fields.some((field) => field.key === parsed.data.key)
+  ) {
+    redirect(`${destination}?error=Use%20a%20valid%2C%20unique%20field%20key.`);
+  }
+
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      fields: [...definition.fields, parsed.data],
+    },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?fieldAdded=1`);
+}
+
+export async function removeConversationalTaskFieldAction(formData: FormData) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  const fieldId = z.string().uuid().safeParse(formData.get("fieldId"));
+  if (!fieldId.success || context.task.isArchived) {
+    redirect(`${destination}?error=Field%20not%20found.`);
+  }
+
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      fieldTransferWhitelist: definition.fieldTransferWhitelist.filter(
+        (key) =>
+          !definition.fields.some(
+            (field) => field.id === fieldId.data && field.key === key,
+          ),
+      ),
+      fields: definition.fields.filter((field) => field.id !== fieldId.data),
+    },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?fieldRemoved=1`);
+}
+
+export async function addTaskContextVariableAction(formData: FormData) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  const expires = String(formData.get("expiresAfterMinutes") ?? "").trim();
+  const parsed = contextVariableDefinitionV1Schema.safeParse({
+    key: formData.get("contextKey"),
+    type: formData.get("contextType"),
+    source: formData.get("contextSource"),
+    defaultValue: formData.get("defaultValue") || null,
+    sensitivity: formData.get("contextSensitivity"),
+    expiresAfterMinutes: expires ? Number(expires) : null,
+    modelVisible: formData.get("modelVisible") === "on",
+    toolVisible: formData.get("toolVisible") === "on",
+  });
+
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  const invalidSystemKey =
+    parsed.success &&
+    parsed.data.key.startsWith("lia_") &&
+    parsed.data.source !== "system";
+  if (
+    !parsed.success ||
+    invalidSystemKey ||
+    context.task.isArchived ||
+    definition.contextVariables.some(
+      (variable) => variable.key === parsed.data.key,
+    )
+  ) {
+    redirect(
+      `${destination}?error=Use%20a%20valid%2C%20unique%20context%20key.`,
+    );
+  }
+
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      contextVariables: [...definition.contextVariables, parsed.data],
+    },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?contextAdded=1`);
+}
+
+export async function removeTaskContextVariableAction(formData: FormData) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  const key = z.string().min(1).safeParse(formData.get("contextKey"));
+  if (!key.success || context.task.isArchived) {
+    redirect(`${destination}?error=Context%20variable%20not%20found.`);
+  }
+
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      contextVariables: definition.contextVariables.filter(
+        (variable) => variable.key !== key.data,
+      ),
+    },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?contextRemoved=1`);
 }

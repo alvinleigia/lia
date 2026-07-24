@@ -245,18 +245,18 @@ behavior.
 - [x] Define one active response-owner rule across knowledge, task, deterministic graph nodes, and authorized humans.
 - [x] Limit V1 to one active conversational task and prohibit recursive task calls.
 - [x] Define bounded task-switch, connected-flow, and handoff depth with deterministic cycle fallback.
-- [ ] Define an explicit field-transfer whitelist with source, validation state, freshness, sensitivity, and provenance requirements.
-- [ ] Define a versioned task-field contract with a stable field ID and field key.
-- [ ] Keep visitor-facing labels separate from field keys and canonical values.
-- [ ] Define `ContextVariableDefinitionV1` with a stable key, type, source, default, sensitivity, expiry, and model/tool visibility.
-- [ ] Reserve a `lia_` namespace for system context such as channel, current time, conversation ID, project, locale, and timezone.
-- [ ] Distinguish trusted initialization context from visitor-collected task fields and transient model output.
-- [ ] Define deterministic precedence for system, tenant, project, contact, channel, webhook, and default context sources.
-- [ ] Support text, email, phone, integer, decimal, boolean, date, time, date range, address, location, media, enum, and project-resource field types.
-- [ ] Define required and conditionally required fields.
-- [ ] Define field validation, normalization, sensitivity, and confirmation policies.
-- [ ] Define field source priority for visitor input, trusted profile data, project resources, and tool results.
-- [ ] Define field dependencies such as category before service and service before availability.
+- [x] Define an explicit field-transfer whitelist with source, validation state, freshness, sensitivity, and provenance requirements.
+- [x] Define a versioned task-field contract with a stable field ID and field key.
+- [x] Keep visitor-facing labels separate from field keys and canonical values.
+- [x] Define `ContextVariableDefinitionV1` with a stable key, type, source, default, sensitivity, expiry, and model/tool visibility.
+- [x] Reserve a `lia_` namespace for system context such as channel, current time, conversation ID, project, locale, and timezone.
+- [x] Distinguish trusted initialization context from visitor-collected task fields and transient model output.
+- [x] Define deterministic precedence for system, tenant, project, contact, channel, webhook, and default context sources.
+- [x] Support text, email, phone, integer, decimal, boolean, date, time, date range, address, location, media, enum, and project-resource field types.
+- [x] Define required and conditionally required fields.
+- [x] Define field validation, normalization, sensitivity, and confirmation policies.
+- [x] Define field source priority for visitor input, trusted profile data, project resources, and tool results.
+- [x] Define field dependencies such as category before service and service before availability.
 - [ ] Define `ToolDefinitionRefV1` and `ToolBindingV1` so tasks reference stable versioned tools instead of embedding provider configuration.
 - [ ] Define allowed read tools and allowed write operations separately.
 - [ ] Define default-deny tool permissions at assistant, task, and conversational-stage boundaries.
