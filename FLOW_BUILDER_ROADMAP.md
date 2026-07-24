@@ -257,9 +257,9 @@ behavior.
 - [x] Define field validation, normalization, sensitivity, and confirmation policies.
 - [x] Define field source priority for visitor input, trusted profile data, project resources, and tool results.
 - [x] Define field dependencies such as category before service and service before availability.
-- [ ] Define `ToolDefinitionRefV1` and `ToolBindingV1` so tasks reference stable versioned tools instead of embedding provider configuration.
-- [ ] Define allowed read tools and allowed write operations separately.
-- [ ] Define default-deny tool permissions at assistant, task, and conversational-stage boundaries.
+- [x] Define `ToolDefinitionRefV1` and `ToolBindingV1` so tasks reference stable versioned tools instead of embedding provider configuration.
+- [x] Define allowed read tools and allowed write operations separately.
+- [x] Define default-deny tool permissions at assistant, task, and conversational-stage boundaries.
 - [ ] Define task-level wording, brevity, language, fallback, and handoff policies.
 - [ ] Define a degraded-mode policy for model, retrieval, business-tool, and outbound-channel unavailability.
 - [ ] Define model policy separately from business task data.

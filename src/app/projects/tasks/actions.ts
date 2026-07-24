@@ -11,6 +11,7 @@ import {
   conversationProjectPolicyV1Schema,
   normalizeConversationProjectPolicy,
   taskFieldV1Schema,
+  toolBindingV1Schema,
 } from "@/lib/conversation-contracts";
 import {
   getConversationProjectPolicy,
@@ -28,6 +29,7 @@ import {
   updateProjectConversationalTask,
   updateProjectConversationalTaskDefinition,
 } from "@/lib/conversational-tasks";
+import { getProjectOperation } from "@/lib/operations";
 
 const projectIdSchema = z.coerce.number().int().positive();
 
@@ -381,4 +383,68 @@ export async function removeTaskContextVariableAction(formData: FormData) {
   );
   revalidatePath(destination);
   redirect(`${destination}?contextRemoved=1`);
+}
+
+export async function bindConversationalTaskToolAction(formData: FormData) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/tools`;
+  const operationId = z.coerce
+    .number()
+    .int()
+    .positive()
+    .safeParse(formData.get("operationId"));
+  if (!operationId.success || context.task.isArchived) {
+    redirect(`${destination}?error=Operation%20not%20found.`);
+  }
+  const operation = await getProjectOperation(
+    context.project.id,
+    operationId.data,
+  );
+  const parsed = toolBindingV1Schema.safeParse({
+    tool: { id: `operation:${operationId.data}`, version: 1 },
+    access: formData.get("access"),
+    allowedStages: ["extraction", "lookup", "confirmation", "operation"].filter(
+      (stage) => formData.get(`stage_${stage}`) === "on",
+    ),
+  });
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  if (
+    !operation ||
+    operation.operation.status !== "active" ||
+    !parsed.success ||
+    parsed.data.allowedStages.length === 0 ||
+    definition.tools.some((binding) => binding.tool.id === parsed.data.tool.id)
+  ) {
+    redirect(`${destination}?error=Choose%20an%20active%2C%20unbound%20tool.`);
+  }
+
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    { ...definition, tools: [...definition.tools, parsed.data] },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?bound=1`);
+}
+
+export async function unbindConversationalTaskToolAction(formData: FormData) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/tools`;
+  const toolId = z.string().min(1).safeParse(formData.get("toolId"));
+  if (!toolId.success || context.task.isArchived) {
+    redirect(`${destination}?error=Tool%20binding%20not%20found.`);
+  }
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      tools: definition.tools.filter(
+        (binding) => binding.tool.id !== toolId.data,
+      ),
+    },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?unbound=1`);
 }
