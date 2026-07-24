@@ -40,7 +40,22 @@ export const assistantPolicyV1Schema = z.object({
 export const knowledgeConversationV1Schema = z.object({
   schemaVersion,
   noAnswerBehavior: z.enum(["fallback", "handoff", "task_recommendation"]),
+  outcomes: z.array(
+    z.enum([
+      "answered",
+      "task_recommended",
+      "no_answer",
+      "handoff",
+      "cancelled",
+    ]),
+  ),
   responseOwner: z.enum(["knowledge", "task", "deterministic", "human"]),
+});
+
+export const taskIntentRecommendationV1Schema = z.object({
+  schemaVersion,
+  taskId: z.number().int().positive(),
+  candidateFieldMappings: z.record(z.string(), z.unknown()),
 });
 
 export const conversationEntryPolicyV1Schema = z.object({
@@ -113,6 +128,13 @@ export const DEFAULT_CONVERSATION_PROJECT_POLICY: ConversationProjectPolicyV1 =
     knowledge: {
       schemaVersion: 1,
       noAnswerBehavior: "fallback",
+      outcomes: [
+        "answered",
+        "task_recommended",
+        "no_answer",
+        "handoff",
+        "cancelled",
+      ],
       responseOwner: "knowledge",
     },
   };

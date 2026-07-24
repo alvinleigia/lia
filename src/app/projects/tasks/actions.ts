@@ -22,9 +22,11 @@ import {
   conversationalTaskDetailsSchema,
   conversationalTaskIdSchema,
 } from "@/lib/conversational-task-schema";
+import { validateConversationalTaskForPublish } from "@/lib/conversational-task-validation";
 import {
   createProjectConversationalTask,
   getProjectConversationalTask,
+  publishConversationalTask,
   readConversationalTaskDefinition,
   setProjectConversationalTaskArchived,
   updateProjectConversationalTask,
@@ -603,4 +605,42 @@ export async function updateConversationalTaskSafetyAction(formData: FormData) {
   });
   revalidatePath(destination);
   redirect(`${destination}?saved=1`);
+}
+
+export async function publishConversationalTaskAction(formData: FormData) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/review`;
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  const projectPolicy = await getConversationProjectPolicy(context.project.id);
+  const validation = validateConversationalTaskForPublish({
+    definition,
+    projectPolicy,
+  });
+  if (!validation.ready || context.task.isArchived) {
+    redirect(
+      `${destination}?error=Resolve%20the%20publish%20blockers%20first.`,
+    );
+  }
+  const version = await publishConversationalTask({
+    projectId: context.project.id,
+    taskId: context.task.id,
+    userId: context.user.id,
+    projectPolicy,
+  });
+  if (!version) {
+    redirect(`${destination}?error=Task%20could%20not%20be%20published.`);
+  }
+  await writeAuditLog({
+    ...context,
+    action: "conversational_task.published",
+    targetType: "conversational_task_version",
+    targetId: version.id,
+    metadata: {
+      taskId: context.task.id,
+      versionNumber: version.versionNumber,
+    },
+  });
+  revalidatePath(destination);
+  revalidatePath(`/projects/tasks/${context.task.id}`);
+  redirect(`${destination}?published=${version.versionNumber}`);
 }

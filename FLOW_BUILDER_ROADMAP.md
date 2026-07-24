@@ -239,9 +239,9 @@ behavior.
 - [x] Define `AssistantPolicyV1` for shared identity, greeting strategy, base behavior, global constraints, and model policy.
 - [x] Keep assistant policy separate from task-specific objectives, fields, tools, and outcomes.
 - [x] Give every task a stable ID, name, objective, description, and schema version.
-- [ ] Define `TaskIntentRecommendationV1` so Q&A can recommend only an allowlisted published task and optional candidate field mappings.
+- [x] Define `TaskIntentRecommendationV1` so Q&A can recommend only an allowlisted published task and optional candidate field mappings.
 - [x] Define `ConversationReturnPolicyV1` for completed, cancelled, failed, no-answer, and handoff task outcomes.
-- [ ] Define named knowledge outcomes for answered, task-recommended, no-answer, handoff, and cancelled.
+- [x] Define named knowledge outcomes for answered, task-recommended, no-answer, handoff, and cancelled.
 - [x] Define one active response-owner rule across knowledge, task, deterministic graph nodes, and authorized humans.
 - [x] Limit V1 to one active conversational task and prohibit recursive task calls.
 - [x] Define bounded task-switch, connected-flow, and handoff depth with deterministic cycle fallback.
@@ -266,9 +266,9 @@ behavior.
 - [x] Define named task outcomes and stable output ports.
 - [x] Define deterministic task completion and cancellation conditions.
 - [x] Define the order of extraction, validation, lookup, clarification, confirmation, operation, and routing.
-- [ ] Embed the complete task contract in immutable published versions.
-- [ ] Pin assistant policy, context definitions, tool versions, and bindings in immutable published versions.
-- [ ] Keep existing V1 deterministic flow definitions readable and executable.
+- [x] Embed the complete task contract in immutable published versions.
+- [x] Pin assistant policy, context definitions, tool versions, and bindings in immutable published versions.
+- [x] Keep existing V1 deterministic flow definitions readable and executable.
 - [ ] Add assistant-policy, task, field, context, tool-binding, and outcome fixtures.
 - [ ] Add focused schema and compatibility tests.
 
