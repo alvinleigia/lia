@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveStrictUserAndProject } from "@/lib/auth-project";
 import {
@@ -70,14 +71,15 @@ async function resolveTaskMutation(formData: FormData) {
   return { ...context, task };
 }
 
-export async function createConversationalTaskAction(formData: FormData) {
+export async function createConversationalTaskAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const projectId = projectIdSchema.safeParse(formData.get("projectId"));
   const details = parseTaskDetails(formData);
 
   if (!projectId.success || !details.success) {
-    redirect(
-      "/projects/tasks/new?error=Please%20check%20the%20task%20details.",
-    );
+    return { error: "Please check the task details." };
   }
 
   const context = await resolveStrictUserAndProject(projectId.data);
@@ -99,22 +101,19 @@ export async function createConversationalTaskAction(formData: FormData) {
   redirect(`/projects/tasks/${task.id}?created=1`);
 }
 
-export async function updateConversationalTaskAction(formData: FormData) {
+export async function updateConversationalTaskAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const details = parseTaskDetails(formData);
 
   if (!details.success) {
-    const taskId = conversationalTaskIdSchema.safeParse(formData.get("taskId"));
-    const destination = taskId.success
-      ? `/projects/tasks/${taskId.data}`
-      : "/projects/tasks";
-    redirect(`${destination}?error=Please%20check%20the%20task%20details.`);
+    return { error: "Please check the task details." };
   }
 
   const context = await resolveTaskMutation(formData);
   if (context.task.isArchived) {
-    redirect(
-      `/projects/tasks/${context.task.id}?error=Restore%20the%20task%20before%20editing%20it.`,
-    );
+    return { error: "Restore the task before editing it." };
   }
 
   const task = await updateProjectConversationalTask(
@@ -191,8 +190,9 @@ export async function unarchiveConversationalTaskAction(formData: FormData) {
 }
 
 export async function updateConversationProjectPolicyAction(
+  _previousState: ActionFormState,
   formData: FormData,
-) {
+): Promise<ActionFormState> {
   const projectId = projectIdSchema.safeParse(formData.get("projectId"));
   const taskId = conversationalTaskIdSchema.safeParse(formData.get("taskId"));
   if (!projectId.success || !taskId.success) {
@@ -237,7 +237,7 @@ export async function updateConversationProjectPolicyAction(
 
   const destination = `/projects/tasks/${task.id}/configure/assistant`;
   if (!parsed.success) {
-    redirect(`${destination}?error=Please%20check%20the%20policy.`);
+    return { error: "Please check the policy." };
   }
 
   await saveConversationProjectPolicy(context.project.id, parsed.data);
@@ -252,11 +252,14 @@ export async function updateConversationProjectPolicyAction(
   redirect(`${destination}?saved=1`);
 }
 
-export async function addConversationalTaskFieldAction(formData: FormData) {
+export async function addConversationalTaskFieldAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const context = await resolveTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/fields`;
   if (context.task.isArchived) {
-    redirect(`${destination}?error=Restore%20the%20task%20before%20editing.`);
+    return { error: "Restore the task before editing." };
   }
 
   const parsed = taskFieldV1Schema.safeParse({
@@ -282,7 +285,7 @@ export async function addConversationalTaskFieldAction(formData: FormData) {
     !parsed.success ||
     definition.fields.some((field) => field.key === parsed.data.key)
   ) {
-    redirect(`${destination}?error=Use%20a%20valid%2C%20unique%20field%20key.`);
+    return { error: "Use a valid, unique field key." };
   }
 
   await updateProjectConversationalTaskDefinition(
@@ -324,7 +327,10 @@ export async function removeConversationalTaskFieldAction(formData: FormData) {
   redirect(`${destination}?fieldRemoved=1`);
 }
 
-export async function addTaskContextVariableAction(formData: FormData) {
+export async function addTaskContextVariableAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const context = await resolveTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/fields`;
   const expires = String(formData.get("expiresAfterMinutes") ?? "").trim();
@@ -352,9 +358,7 @@ export async function addTaskContextVariableAction(formData: FormData) {
       (variable) => variable.key === parsed.data.key,
     )
   ) {
-    redirect(
-      `${destination}?error=Use%20a%20valid%2C%20unique%20context%20key.`,
-    );
+    return { error: "Use a valid, unique context key." };
   }
 
   await updateProjectConversationalTaskDefinition(
@@ -392,7 +396,10 @@ export async function removeTaskContextVariableAction(formData: FormData) {
   redirect(`${destination}?contextRemoved=1`);
 }
 
-export async function bindConversationalTaskToolAction(formData: FormData) {
+export async function bindConversationalTaskToolAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const context = await resolveTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/tools`;
   const operationId = z.coerce
@@ -401,7 +408,7 @@ export async function bindConversationalTaskToolAction(formData: FormData) {
     .positive()
     .safeParse(formData.get("operationId"));
   if (!operationId.success || context.task.isArchived) {
-    redirect(`${destination}?error=Operation%20not%20found.`);
+    return { error: "Operation not found." };
   }
   const operation = await getProjectOperation(
     context.project.id,
@@ -422,7 +429,7 @@ export async function bindConversationalTaskToolAction(formData: FormData) {
     parsed.data.allowedStages.length === 0 ||
     definition.tools.some((binding) => binding.tool.id === parsed.data.tool.id)
   ) {
-    redirect(`${destination}?error=Choose%20an%20active%2C%20unbound%20tool.`);
+    return { error: "Choose an active, unbound tool." };
   }
 
   await updateProjectConversationalTaskDefinition(
@@ -456,7 +463,10 @@ export async function unbindConversationalTaskToolAction(formData: FormData) {
   redirect(`${destination}?unbound=1`);
 }
 
-export async function addConversationalTaskOutcomeAction(formData: FormData) {
+export async function addConversationalTaskOutcomeAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const context = await resolveTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/outcomes`;
   const parsed = taskOutcomeV1Schema.safeParse({
@@ -477,7 +487,7 @@ export async function addConversationalTaskOutcomeAction(formData: FormData) {
         outcome.outputPort === parsed.data.outputPort,
     )
   ) {
-    redirect(`${destination}?error=Use%20a%20unique%20outcome%20and%20port.`);
+    return { error: "Use a unique outcome and port." };
   }
   await updateProjectConversationalTaskDefinition(
     context.project.id,
@@ -518,11 +528,14 @@ export async function removeConversationalTaskOutcomeAction(
   redirect(`${destination}?outcomeRemoved=1`);
 }
 
-export async function updateConversationalTaskSafetyAction(formData: FormData) {
+export async function updateConversationalTaskSafetyAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const context = await resolveTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/outcomes`;
   if (context.task.isArchived) {
-    redirect(`${destination}?error=Restore%20the%20task%20before%20editing.`);
+    return { error: "Restore the task before editing." };
   }
   const definition = readConversationalTaskDefinition(context.task.definition);
   const parsed = z
@@ -565,7 +578,7 @@ export async function updateConversationalTaskSafetyAction(formData: FormData) {
       exportAllowed: formData.get("exportAllowed") === "on",
     });
   if (!parsed.success) {
-    redirect(`${destination}?error=Please%20check%20the%20policy%20values.`);
+    return { error: "Please check the policy values." };
   }
 
   await updateProjectConversationalTaskDefinition(

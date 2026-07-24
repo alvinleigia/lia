@@ -9,6 +9,10 @@ import {
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ConversationalTaskDetailsFields } from "@/components/conversational-task-details-fields";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -117,7 +121,11 @@ export default async function TaskDetailsPage({
               </form>
             )}
 
-            <form action={updateConversationalTaskAction} className="space-y-5">
+            <ActionStateForm
+              action={updateConversationalTaskAction}
+              className="space-y-5"
+            >
+              <ActionFormError />
               <input
                 type="hidden"
                 name="projectId"
@@ -158,7 +166,7 @@ export default async function TaskDetailsPage({
                   }
                 />
               )}
-            </form>
+            </ActionStateForm>
 
             {task.isArchived && (
               <FormActionBar

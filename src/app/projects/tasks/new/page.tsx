@@ -2,6 +2,10 @@ import { ArrowLeft, Plus } from "lucide-react";
 import Link from "next/link";
 import { ConversationalTaskDetailsFields } from "@/components/conversational-task-details-fields";
 import { NoProjectState } from "@/components/no-project-state";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import {
@@ -54,7 +58,11 @@ export default async function NewTaskPage({ searchParams }: NewTaskPageProps) {
               </p>
             )}
 
-            <form action={createConversationalTaskAction} className="space-y-4">
+            <ActionStateForm
+              action={createConversationalTaskAction}
+              className="space-y-4"
+            >
+              <ActionFormError />
               <input
                 type="hidden"
                 name="projectId"
@@ -66,7 +74,7 @@ export default async function NewTaskPage({ searchParams }: NewTaskPageProps) {
                 pendingLabel="Creating..."
                 icon={<Plus className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
       </div>

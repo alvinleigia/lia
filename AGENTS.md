@@ -117,6 +117,10 @@ above.
   composition or a local `className` is sufficient.
 - Preserve the accessibility, keyboard, focus, disabled, loading, and
   responsive behavior supplied by the shared primitive.
+- Forms with user-entered values must report validation errors inside the
+  relevant form and preserve entered values after a failed submission. Reuse
+  `ActionStateForm` and `ActionFormError` for server-action forms instead of
+  redirecting validation failures through page-level query parameters.
 
 ### Make surgical changes
 

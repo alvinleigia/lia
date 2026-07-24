@@ -279,7 +279,8 @@ Use this test context:
 
 - [ ] Try to add the same `specialRequest` field key again.
 
-  Expected result: The duplicate field key is rejected.
+  Expected result: The duplicate field key is rejected. The error appears
+  inside the `Add Field` form and all entered field values remain unchanged.
 
 - [ ] Remove the temporary `Special Request` field.
 
@@ -313,7 +314,8 @@ Use this test context:
 - [ ] Try to add the context.
 
   Expected result: The value is rejected because non-system context cannot use
-  the reserved `lia_` prefix.
+  the reserved `lia_` prefix. The error appears inside the `Add Context
+  Variable` form and the entered key, source, and type remain unchanged.
 
 - [ ] Replace the values with:
 

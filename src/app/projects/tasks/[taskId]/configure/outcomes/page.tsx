@@ -2,6 +2,10 @@ import { ArrowLeft, ListChecks, Plus, Save, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TaskConfigurationNav } from "@/components/task-configuration-nav";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
@@ -104,10 +108,11 @@ export default async function TaskOutcomesPage({
                 </div>
               ))}
             </div>
-            <form
+            <ActionStateForm
               action={addConversationalTaskOutcomeAction}
               className="grid gap-4 rounded-md border p-4 md:grid-cols-5"
             >
+              <ActionFormError className="md:col-span-5" />
               <input
                 type="hidden"
                 name="projectId"
@@ -135,7 +140,7 @@ export default async function TaskOutcomesPage({
                 pendingLabel="Adding..."
                 icon={<Plus className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
 
@@ -144,10 +149,11 @@ export default async function TaskOutcomesPage({
             <CardTitle className="text-xl">Behavior and Safety</CardTitle>
           </CardHeader>
           <CardContent>
-            <form
+            <ActionStateForm
               action={updateConversationalTaskSafetyAction}
               className="space-y-6"
             >
+              <ActionFormError />
               <input
                 type="hidden"
                 name="projectId"
@@ -276,7 +282,7 @@ export default async function TaskOutcomesPage({
                 pendingLabel="Saving..."
                 icon={<Save className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
       </div>
