@@ -5,6 +5,7 @@ import {
   updateActionFlowBranchRuleAction,
 } from "@/app/projects/actions/actions";
 import { ACTION_BRANCH_OPERATORS } from "@/lib/action-flows";
+import { ActionFormError, ActionStateForm } from "./ui/action-state-form";
 import { FormSubmitButton } from "./ui/form-submit-button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -183,10 +184,11 @@ export function ActionBranchRulesForm({
         <div className="space-y-3">
           {rules.map((rule) => (
             <div key={rule.id} className="rounded-md border bg-white p-3">
-              <form
+              <ActionStateForm
                 action={updateActionFlowBranchRuleAction}
                 className="space-y-3"
               >
+                <ActionFormError />
                 <input type="hidden" name="actionId" value={actionId} />
                 <BranchRuleFields
                   defaultSourceFieldKey={defaultSourceFieldKey}
@@ -202,7 +204,7 @@ export function ActionBranchRulesForm({
                     icon={<Save className="h-4 w-4" />}
                   />
                 </div>
-              </form>
+              </ActionStateForm>
               <form action={deleteActionFlowBranchRuleAction} className="mt-2">
                 <input type="hidden" name="actionId" value={actionId} />
                 <input type="hidden" name="ruleId" value={rule.id} />
@@ -219,7 +221,11 @@ export function ActionBranchRulesForm({
         </div>
       )}
 
-      <form action={createActionFlowBranchRuleAction} className="space-y-3">
+      <ActionStateForm
+        action={createActionFlowBranchRuleAction}
+        className="space-y-3"
+      >
+        <ActionFormError />
         <input type="hidden" name="actionId" value={actionId} />
         <BranchRuleFields
           defaultSourceFieldKey={defaultSourceFieldKey}
@@ -238,7 +244,7 @@ export function ActionBranchRulesForm({
           disabled={!canCreateRule}
           icon={<Plus className="h-4 w-4" />}
         />
-      </form>
+      </ActionStateForm>
     </div>
   );
 }

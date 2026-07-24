@@ -1,5 +1,9 @@
 import { ArrowLeft, Bot, Plus, Workflow } from "lucide-react";
 import Link from "next/link";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -113,10 +117,11 @@ export default async function NewActionPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form
+            <ActionStateForm
               action={createProjectActionBuilderAction}
               className="space-y-4"
             >
+              <ActionFormError />
               <input type="hidden" name="projectId" value={project.id} />
 
               <div className="space-y-2">
@@ -154,7 +159,7 @@ export default async function NewActionPage({
                 pendingLabel="Creating..."
                 icon={<Bot className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
       </div>

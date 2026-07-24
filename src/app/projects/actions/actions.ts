@@ -37,6 +37,7 @@ import {
   updateProjectAction,
   validateActionFlowRoutes,
 } from "@/lib/action-flows";
+import type { ActionFormState } from "@/lib/action-form-state";
 import {
   actionStepDynamicChoiceSchemaShape,
   createActionStepSchema,
@@ -548,12 +549,6 @@ async function applyProjectActionTemplate(input: {
   redirect(`/projects/actions/${action.id}?created=1`);
 }
 
-function getImportSourcePath(value?: FormDataEntryValue | null) {
-  return value === "/projects/actions/import"
-    ? "/projects/actions/import"
-    : "/projects/actions";
-}
-
 function isUploadedFile(value: FormDataEntryValue | null): value is File {
   return (
     typeof value === "object" &&
@@ -594,7 +589,10 @@ async function requireActionStepTarget(
   return step;
 }
 
-export async function createProjectActionBuilderAction(formData: FormData) {
+export async function createProjectActionBuilderAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = actionDetailsSchema.safeParse({
     projectId: formData.get("projectId"),
     name: formData.get("name"),
@@ -604,9 +602,7 @@ export async function createProjectActionBuilderAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect(
-      "/projects/actions/new?error=Please%20check%20the%20action%20details.",
-    );
+    return { error: "Please check the action details." };
   }
 
   const context = await resolveUserAndProject(parsed.data.projectId);
@@ -690,15 +686,17 @@ export async function saveProjectActionAsTemplateAction(formData: FormData) {
   redirect(`/projects/actions/${action.id}?templateSaved=1`);
 }
 
-export async function importActionFlowBuilderAction(formData: FormData) {
-  const sourcePath = getImportSourcePath(formData.get("sourcePath"));
+export async function importActionFlowBuilderAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const file = formData.get("flowFile");
   const rawNameOverride = formData.get("nameOverride");
   const nameOverride =
     typeof rawNameOverride === "string" ? rawNameOverride : undefined;
 
   if (!isUploadedFile(file) || file.size === 0) {
-    redirect(`${sourcePath}?error=Choose%20an%20exported%20JSON%20file.`);
+    return { error: "Choose an exported JSON file." };
   }
 
   const context = await resolveUserAndProject();
@@ -715,7 +713,7 @@ export async function importActionFlowBuilderAction(formData: FormData) {
       projectId: project.id,
     });
   } catch {
-    redirect(`${sourcePath}?error=Could%20not%20import%20that%20flow%20file.`);
+    return { error: "Could not import that flow file." };
   }
 
   await writeAuditLog({
@@ -772,7 +770,10 @@ export async function applyActionTemplateAction(formData: FormData) {
   redirect(`${sourcePath}?error=Template%20not%20found.`);
 }
 
-export async function updateProjectActionBuilderAction(formData: FormData) {
+export async function updateProjectActionBuilderAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = actionDetailsSchema.safeParse({
     actionId: formData.get("actionId"),
     name: formData.get("name"),
@@ -788,12 +789,7 @@ export async function updateProjectActionBuilderAction(formData: FormData) {
   });
 
   if (!parsed.success || !parsed.data.actionId) {
-    const actionId = actionIdSchema.safeParse(formData.get("actionId"));
-    redirect(
-      actionId.success
-        ? `/projects/actions/${actionId.data}/settings?error=Please%20check%20the%20action%20details.`
-        : "/projects/actions?error=Please%20check%20the%20action%20details.",
-    );
+    return { error: "Please check the action details." };
   }
 
   const context = await resolveActionForCurrentProject(parsed.data.actionId);
@@ -817,7 +813,7 @@ export async function updateProjectActionBuilderAction(formData: FormData) {
   });
 
   if (!action) {
-    redirect("/projects/actions?error=Action%20not%20found.");
+    return { error: "Action not found." };
   }
   await writeAuditLog({
     ...context,
@@ -990,7 +986,10 @@ export async function restoreProjectActionVersionDraftAction(
   redirect(`/projects/actions/${action.id}?versionRestored=1`);
 }
 
-export async function createActionFlowStepAction(formData: FormData) {
+export async function createActionFlowStepAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = actionStepSchema.safeParse({
     actionId: formData.get("actionId"),
     sortOrder: formData.get("sortOrder"),
@@ -1050,12 +1049,7 @@ export async function createActionFlowStepAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    const actionId = actionIdSchema.safeParse(formData.get("actionId"));
-    redirect(
-      actionId.success
-        ? `/projects/actions/${actionId.data}/steps/new?error=Field%20key,%20label,%20and%20prompt%20are%20required.`
-        : "/projects/actions?error=Please%20check%20the%20step%20details.",
-    );
+    return { error: "Field key, label, and prompt are required." };
   }
 
   const context = await resolveActionForCurrentProject(parsed.data.actionId);
@@ -1085,9 +1079,7 @@ export async function createActionFlowStepAction(formData: FormData) {
   });
 
   if (parsed.data.stepType === "media" && !mediaAsset) {
-    redirect(
-      `/projects/actions/${action.id}/steps/new?error=Media%20asset%20must%20belong%20to%20this%20project.`,
-    );
+    return { error: "Media asset must belong to this project." };
   }
 
   if (
@@ -1096,24 +1088,20 @@ export async function createActionFlowStepAction(formData: FormData) {
     ) &&
     (!productConfig.productCatalog || productConfig.products.length === 0)
   ) {
-    redirect(
-      `/projects/actions/${action.id}/steps/new?error=Product%20selection%20must%20belong%20to%20this%20project.`,
-    );
+    return { error: "Product selection must belong to this project." };
   }
 
   if (
     parsed.data.stepType === "product_selection" &&
     productConfig.products.length === 0
   ) {
-    redirect(
-      `/projects/actions/${action.id}/steps/new?error=Product%20selection%20must%20belong%20to%20this%20project.`,
-    );
+    return { error: "Product selection must belong to this project." };
   }
 
   if (parsed.data.stepType === "connect_flow" && !connectedAction) {
-    redirect(
-      `/projects/actions/${action.id}/steps/new?error=Connected%20flow%20must%20be%20an%20active%20flow%20in%20this%20project.`,
-    );
+    return {
+      error: "Connected flow must be an active flow in this project.",
+    };
   }
 
   try {
@@ -1123,9 +1111,7 @@ export async function createActionFlowStepAction(formData: FormData) {
       parsed.data.nextStepId,
     );
   } catch {
-    redirect(
-      `/projects/actions/${action.id}/steps/new?error=Default%20next%20step%20must%20belong%20to%20this%20action.`,
-    );
+    return { error: "Default next step must belong to this action." };
   }
 
   try {
@@ -1172,16 +1158,17 @@ export async function createActionFlowStepAction(formData: FormData) {
       },
     });
   } catch {
-    redirect(
-      `/projects/actions/${action.id}/steps/new?error=Step%20order%20must%20be%20unique.`,
-    );
+    return { error: "Step order must be unique." };
   }
 
   revalidatePath(`/projects/actions/${action.id}`);
   redirect(`/projects/actions/${action.id}?stepCreated=1`);
 }
 
-export async function updateActionFlowStepAction(formData: FormData) {
+export async function updateActionFlowStepAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = actionStepSchema.safeParse({
     actionId: formData.get("actionId"),
     stepId: formData.get("stepId"),
@@ -1242,13 +1229,7 @@ export async function updateActionFlowStepAction(formData: FormData) {
   });
 
   if (!parsed.success || !parsed.data.stepId) {
-    const actionId = actionIdSchema.safeParse(formData.get("actionId"));
-    const stepId = actionIdSchema.safeParse(formData.get("stepId"));
-    redirect(
-      actionId.success && stepId.success
-        ? `/projects/actions/${actionId.data}/steps/${stepId.data}?error=Field%20key,%20label,%20and%20prompt%20are%20required.`
-        : "/projects/actions?error=Please%20check%20the%20step%20details.",
-    );
+    return { error: "Field key, label, and prompt are required." };
   }
 
   const context = await resolveActionForCurrentProject(parsed.data.actionId);
@@ -1259,7 +1240,7 @@ export async function updateActionFlowStepAction(formData: FormData) {
     parsed.data.stepId,
   );
   if (!existingStep) {
-    redirect(`/projects/actions/${action.id}?error=Step%20not%20found.`);
+    return { error: "Step not found." };
   }
   const isInputStep = isFlowInputStepType(parsed.data.stepType);
   const canStoreFieldKey = isInputStep || parsed.data.stepType === "operation";
@@ -1286,9 +1267,7 @@ export async function updateActionFlowStepAction(formData: FormData) {
   });
 
   if (parsed.data.stepType === "media" && !mediaAsset) {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.stepId}?error=Media%20asset%20must%20belong%20to%20this%20project.`,
-    );
+    return { error: "Media asset must belong to this project." };
   }
 
   if (
@@ -1297,30 +1276,24 @@ export async function updateActionFlowStepAction(formData: FormData) {
     ) &&
     (!productConfig.productCatalog || productConfig.products.length === 0)
   ) {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.stepId}?error=Product%20selection%20must%20belong%20to%20this%20project.`,
-    );
+    return { error: "Product selection must belong to this project." };
   }
 
   if (
     parsed.data.stepType === "product_selection" &&
     productConfig.products.length === 0
   ) {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.stepId}?error=Product%20selection%20must%20belong%20to%20this%20project.`,
-    );
+    return { error: "Product selection must belong to this project." };
   }
 
   if (parsed.data.stepType === "connect_flow" && !connectedAction) {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.stepId}?error=Connected%20flow%20must%20be%20an%20active%20flow%20in%20this%20project.`,
-    );
+    return {
+      error: "Connected flow must be an active flow in this project.",
+    };
   }
 
   if (parsed.data.nextStepId === parsed.data.stepId) {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.stepId}?error=Default%20next%20step%20cannot%20point%20to%20itself.`,
-    );
+    return { error: "Default next step cannot point to itself." };
   }
 
   try {
@@ -1330,9 +1303,7 @@ export async function updateActionFlowStepAction(formData: FormData) {
       parsed.data.nextStepId,
     );
   } catch {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.stepId}?error=Default%20next%20step%20must%20belong%20to%20this%20action.`,
-    );
+    return { error: "Default next step must belong to this action." };
   }
 
   try {
@@ -1383,9 +1354,7 @@ export async function updateActionFlowStepAction(formData: FormData) {
       });
     }
   } catch {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.stepId}?error=Step%20order%20must%20be%20unique.`,
-    );
+    return { error: "Step order must be unique." };
   }
 
   revalidatePath(`/projects/actions/${action.id}`);
@@ -1393,7 +1362,10 @@ export async function updateActionFlowStepAction(formData: FormData) {
   redirect(`/projects/actions/${action.id}?stepUpdated=1`);
 }
 
-export async function createActionFlowBranchRuleAction(formData: FormData) {
+export async function createActionFlowBranchRuleAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = branchRuleSchema.safeParse({
     actionId: formData.get("actionId"),
     sourceStepId: formData.get("sourceStepId"),
@@ -1407,13 +1379,7 @@ export async function createActionFlowBranchRuleAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    const actionId = actionIdSchema.safeParse(formData.get("actionId"));
-    const sourceStepId = actionIdSchema.safeParse(formData.get("sourceStepId"));
-    redirect(
-      actionId.success && sourceStepId.success
-        ? `/projects/actions/${actionId.data}/steps/${sourceStepId.data}?error=Please%20check%20the%20branch%20rule.`
-        : "/projects/actions?error=Please%20check%20the%20branch%20rule.",
-    );
+    return { error: "Please check the branch rule." };
   }
 
   const context = await resolveActionForCurrentProject(parsed.data.actionId);
@@ -1425,9 +1391,7 @@ export async function createActionFlowBranchRuleAction(formData: FormData) {
       requireActionStepTarget(project.id, action.id, parsed.data.targetStepId),
     ]);
   } catch {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.sourceStepId}?error=Branch%20steps%20must%20belong%20to%20this%20action.`,
-    );
+    return { error: "Branch steps must belong to this action." };
   }
 
   try {
@@ -1456,9 +1420,7 @@ export async function createActionFlowBranchRuleAction(formData: FormData) {
       },
     });
   } catch {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.sourceStepId}?error=Branch%20rule%20order%20must%20be%20unique%20for%20this%20step.`,
-    );
+    return { error: "Branch rule order must be unique for this step." };
   }
 
   revalidatePath(`/projects/actions/${action.id}`);
@@ -1470,7 +1432,10 @@ export async function createActionFlowBranchRuleAction(formData: FormData) {
   );
 }
 
-export async function updateActionFlowBranchRuleAction(formData: FormData) {
+export async function updateActionFlowBranchRuleAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = branchRuleSchema.safeParse({
     actionId: formData.get("actionId"),
     ruleId: formData.get("ruleId"),
@@ -1485,13 +1450,7 @@ export async function updateActionFlowBranchRuleAction(formData: FormData) {
   });
 
   if (!parsed.success || !parsed.data.ruleId) {
-    const actionId = actionIdSchema.safeParse(formData.get("actionId"));
-    const sourceStepId = actionIdSchema.safeParse(formData.get("sourceStepId"));
-    redirect(
-      actionId.success && sourceStepId.success
-        ? `/projects/actions/${actionId.data}/steps/${sourceStepId.data}?error=Please%20check%20the%20branch%20rule.`
-        : "/projects/actions?error=Please%20check%20the%20branch%20rule.",
-    );
+    return { error: "Please check the branch rule." };
   }
 
   const context = await resolveActionForCurrentProject(parsed.data.actionId);
@@ -1503,9 +1462,7 @@ export async function updateActionFlowBranchRuleAction(formData: FormData) {
   );
 
   if (!existingRule) {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.sourceStepId}?error=Branch%20rule%20not%20found.`,
-    );
+    return { error: "Branch rule not found." };
   }
 
   try {
@@ -1514,9 +1471,7 @@ export async function updateActionFlowBranchRuleAction(formData: FormData) {
       requireActionStepTarget(project.id, action.id, parsed.data.targetStepId),
     ]);
   } catch {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.sourceStepId}?error=Branch%20steps%20must%20belong%20to%20this%20action.`,
-    );
+    return { error: "Branch steps must belong to this action." };
   }
 
   try {
@@ -1551,9 +1506,7 @@ export async function updateActionFlowBranchRuleAction(formData: FormData) {
       });
     }
   } catch {
-    redirect(
-      `/projects/actions/${action.id}/steps/${parsed.data.sourceStepId}?error=Branch%20rule%20order%20must%20be%20unique%20for%20this%20step.`,
-    );
+    return { error: "Branch rule order must be unique for this step." };
   }
 
   revalidatePath(`/projects/actions/${action.id}`);

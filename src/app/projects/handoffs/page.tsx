@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { NoProjectState } from "@/components/no-project-state";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -287,7 +291,11 @@ export default async function HandoffsPage({
                 No handoffs match this queue view.
               </div>
             ) : (
-              <form action={updateHandoffQueueAction} className="space-y-4">
+              <ActionStateForm
+                action={updateHandoffQueueAction}
+                className="space-y-4"
+              >
+                <ActionFormError />
                 <div className="flex flex-wrap items-center gap-2 rounded-md border bg-white p-3">
                   <span className="mr-2 text-sm font-medium">
                     Selected rows
@@ -462,7 +470,7 @@ export default async function HandoffsPage({
                     </div>
                   ))}
                 </div>
-              </form>
+              </ActionStateForm>
             )}
 
             <Link

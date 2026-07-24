@@ -9,6 +9,7 @@ import {
   getFlowComponentLabel,
   listEnabledStepFlowComponents,
 } from "@/lib/flow-components";
+import { ActionFormError, ActionStateForm } from "./ui/action-state-form";
 import { FormSubmitButton } from "./ui/form-submit-button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -294,10 +295,11 @@ export function ActionStepForm({
   const reusableFieldSuggestions = reusableFields.slice(0, 8);
 
   return (
-    <form
+    <ActionStateForm
       action={isEdit ? updateActionFlowStepAction : createActionFlowStepAction}
       className="space-y-4"
     >
+      <ActionFormError />
       <input type="hidden" name="actionId" value={actionId} />
       {step && <input type="hidden" name="stepId" value={step.id} />}
 
@@ -1038,6 +1040,6 @@ export function ActionStepForm({
           isEdit ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />
         }
       />
-    </form>
+    </ActionStateForm>
   );
 }

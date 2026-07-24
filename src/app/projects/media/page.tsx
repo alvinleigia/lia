@@ -5,6 +5,10 @@ import {
   uploadMediaAssetAction,
 } from "@/app/projects/media/actions";
 import { NoProjectState } from "@/components/no-project-state";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
@@ -121,7 +125,11 @@ export default async function ProjectMediaPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={uploadMediaAssetAction} className="space-y-4">
+            <ActionStateForm
+              action={uploadMediaAssetAction}
+              className="space-y-4"
+            >
+              <ActionFormError />
               <input type="hidden" name="projectId" value={project.id} />
               <div className="space-y-2">
                 <label htmlFor="media" className="text-sm font-medium">
@@ -136,7 +144,8 @@ export default async function ProjectMediaPage({
                 />
                 <p className="text-xs text-muted-foreground">
                   Supported: image, video, audio, PDF, text, CSV, JSON, and
-                  common Office files up to {maxUploadMb} MB.
+                  common Office files up to {maxUploadMb} MB. Choose the file
+                  again after a validation error.
                 </p>
               </div>
               <FormSubmitButton
@@ -144,7 +153,7 @@ export default async function ProjectMediaPage({
                 pendingLabel="Uploading..."
                 icon={<UploadCloud className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
 

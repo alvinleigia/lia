@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
 import {
@@ -19,29 +20,32 @@ function redirectWithError(message: string): never {
   redirect(`/projects/media?error=${encodeURIComponent(message)}`);
 }
 
-export async function uploadMediaAssetAction(formData: FormData) {
+export async function uploadMediaAssetAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const context = await resolveUserAndProject(formData.get("projectId"));
   assertPermission(context.membership, "company.documents.manage");
 
   const fileValue = formData.get("media");
   if (!(fileValue instanceof File)) {
-    redirectWithError("Please choose a media file.");
+    return { error: "Please choose a media file." };
   }
   const file = fileValue;
 
   if (file.size <= 0) {
-    redirectWithError("Uploaded file is empty.");
+    return { error: "Uploaded file is empty." };
   }
 
   if (file.size > MAX_MEDIA_UPLOAD_BYTES) {
-    redirectWithError("File is too large. Max size is 16 MB.");
+    return { error: "File is too large. Max size is 16 MB." };
   }
 
   const mimeType = file.type || "application/octet-stream";
   const originalName = file.name || "uploaded-file";
   const mediaType = inferMediaType(mimeType, originalName);
   if (!mediaType) {
-    redirectWithError("Unsupported media type.");
+    return { error: "Unsupported media type." };
   }
 
   const asset = await saveProjectMediaFileUpload({

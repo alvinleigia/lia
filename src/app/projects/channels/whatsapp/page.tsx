@@ -1,5 +1,9 @@
 import { MessageCircle, Save, Send, ShieldCheck } from "lucide-react";
 import { NoProjectState } from "@/components/no-project-state";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -153,7 +157,11 @@ export default async function WhatsAppChannelPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={updateWhatsAppChannelAction} className="space-y-4">
+            <ActionStateForm
+              action={updateWhatsAppChannelAction}
+              className="space-y-4"
+            >
+              <ActionFormError />
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="name">Channel Name</Label>
@@ -262,7 +270,7 @@ export default async function WhatsAppChannelPage({
                 pendingLabel="Saving..."
                 icon={<Save className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
 
@@ -274,7 +282,11 @@ export default async function WhatsAppChannelPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={sendWhatsAppTestMessageAction} className="space-y-4">
+            <ActionStateForm
+              action={sendWhatsAppTestMessageAction}
+              className="space-y-4"
+            >
+              <ActionFormError />
               <div className="space-y-2">
                 <Label htmlFor="to">Recipient WhatsApp Number</Label>
                 <Input id="to" name="to" placeholder="919876543210" required />
@@ -295,7 +307,7 @@ export default async function WhatsAppChannelPage({
                 icon={<Send className="h-4 w-4" />}
                 disabled={status !== "active" || !config.accessToken}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
       </div>

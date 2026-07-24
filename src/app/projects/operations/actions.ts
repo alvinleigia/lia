@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
 import {
@@ -103,13 +104,20 @@ function parseJsonObject(value: string | undefined, label: string) {
       return parsed as Record<string, unknown>;
     }
   } catch {
-    redirectWithError(`${label} must be valid JSON.`);
+    throw new Error(`${label} must be valid JSON.`);
   }
 
-  redirectWithError(`${label} must be a JSON object.`);
+  throw new Error(`${label} must be a JSON object.`);
 }
 
-export async function createIntegrationProviderAction(formData: FormData) {
+function getActionError(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+export async function createIntegrationProviderAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = providerDetailsSchema.safeParse({
     name: formData.get("name"),
     providerType: formData.get("providerType"),
@@ -117,17 +125,24 @@ export async function createIntegrationProviderAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError("Please check the provider details.");
+    return { error: "Please check the provider details." };
   }
 
   const context = await resolveUserAndProject();
   assertPermission(context.membership, "company.operations.manage");
 
+  let config: Record<string, unknown>;
+  try {
+    config = parseJsonObject(parsed.data.config, "Provider config");
+  } catch (error) {
+    return { error: getActionError(error, "Invalid provider config.") };
+  }
+
   const provider = await createIntegrationProvider({
     projectId: context.project.id,
     name: parsed.data.name,
     providerType: parsed.data.providerType,
-    config: parseJsonObject(parsed.data.config, "Provider config"),
+    config,
   });
 
   await writeAuditLog({
@@ -146,7 +161,10 @@ export async function createIntegrationProviderAction(formData: FormData) {
   redirect("/projects/operations?providerCreated=1");
 }
 
-export async function createOperationAction(formData: FormData) {
+export async function createOperationAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = operationDetailsSchema.safeParse({
     name: formData.get("name"),
     operationType: formData.get("operationType"),
@@ -158,11 +176,25 @@ export async function createOperationAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError("Please check the operation details.");
+    return { error: "Please check the operation details." };
   }
 
   const context = await resolveUserAndProject();
   assertPermission(context.membership, "company.operations.manage");
+
+  let inputMapping: Record<string, unknown>;
+  let outputMapping: Record<string, unknown>;
+  let settings: Record<string, unknown>;
+  try {
+    inputMapping = parseJsonObject(parsed.data.inputMapping, "Input mapping");
+    outputMapping = parseJsonObject(
+      parsed.data.outputMapping,
+      "Output mapping",
+    );
+    settings = parseJsonObject(parsed.data.settings, "Settings");
+  } catch (error) {
+    return { error: getActionError(error, "Invalid operation configuration.") };
+  }
 
   let operation: Awaited<ReturnType<typeof createOperation>>;
   try {
@@ -172,15 +204,12 @@ export async function createOperationAction(formData: FormData) {
       name: parsed.data.name,
       operationType: parsed.data.operationType,
       status: parsed.data.status,
-      inputMapping: parseJsonObject(parsed.data.inputMapping, "Input mapping"),
-      outputMapping: parseJsonObject(
-        parsed.data.outputMapping,
-        "Output mapping",
-      ),
-      settings: parseJsonObject(parsed.data.settings, "Settings"),
+      inputMapping,
+      outputMapping,
+      settings,
     });
   } catch {
-    redirectWithError("Provider not found for this project.");
+    return { error: "Provider not found for this project." };
   }
 
   await writeAuditLog({
@@ -201,7 +230,10 @@ export async function createOperationAction(formData: FormData) {
   redirect("/projects/operations?operationCreated=1");
 }
 
-export async function createApiRequestOperationAction(formData: FormData) {
+export async function createApiRequestOperationAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = apiRequestOperationSchema.safeParse({
     autoRetryDelayMinutes: formData.get("autoRetryDelayMinutes") || 5,
     autoRetryEnabled: formData.get("autoRetryEnabled") === "on",
@@ -217,11 +249,23 @@ export async function createApiRequestOperationAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError("Please check the API request details.");
+    return { error: "Please check the API request details." };
   }
 
   const context = await resolveUserAndProject();
   assertPermission(context.membership, "company.operations.manage");
+
+  let inputMapping: Record<string, unknown>;
+  let outputMapping: Record<string, unknown>;
+  try {
+    inputMapping = parseJsonObject(parsed.data.inputMapping, "Input mapping");
+    outputMapping = parseJsonObject(
+      parsed.data.outputMapping,
+      "Output mapping",
+    );
+  } catch (error) {
+    return { error: getActionError(error, "Invalid API request mapping.") };
+  }
 
   const provider = await createIntegrationProvider({
     projectId: context.project.id,
@@ -243,8 +287,8 @@ export async function createApiRequestOperationAction(formData: FormData) {
     name: parsed.data.name,
     operationType: "api_request",
     status: "active",
-    inputMapping: parseJsonObject(parsed.data.inputMapping, "Input mapping"),
-    outputMapping: parseJsonObject(parsed.data.outputMapping, "Output mapping"),
+    inputMapping,
+    outputMapping,
     settings: {
       operationKind: "api_request",
     },
@@ -302,7 +346,10 @@ export async function processOperationRetryQueueAction() {
   );
 }
 
-export async function createMetaConversionOperationAction(formData: FormData) {
+export async function createMetaConversionOperationAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = metaConversionOperationSchema.safeParse({
     accessToken: formData.get("accessToken"),
     actionSource: formData.get("actionSource") || "website",
@@ -316,11 +363,18 @@ export async function createMetaConversionOperationAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError("Please check the Meta Conversions details.");
+    return { error: "Please check the Meta Conversions details." };
   }
 
   const context = await resolveUserAndProject();
   assertPermission(context.membership, "company.operations.manage");
+
+  let inputMapping: Record<string, unknown>;
+  try {
+    inputMapping = parseJsonObject(parsed.data.inputMapping, "Input mapping");
+  } catch (error) {
+    return { error: getActionError(error, "Invalid Meta input mapping.") };
+  }
 
   const provider = await createIntegrationProvider({
     projectId: context.project.id,
@@ -347,7 +401,7 @@ export async function createMetaConversionOperationAction(formData: FormData) {
     name: parsed.data.name,
     operationType: "meta_conversions_api",
     status: "active",
-    inputMapping: parseJsonObject(parsed.data.inputMapping, "Input mapping"),
+    inputMapping,
     outputMapping: {},
     settings: {
       operationKind: "meta_conversions_api",
@@ -452,26 +506,36 @@ export async function updateOperationStatusAction(formData: FormData) {
   redirect("/projects/operations?operationUpdated=1");
 }
 
-export async function previewOperationAction(formData: FormData) {
+export async function previewOperationAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = operationPreviewSchema.safeParse({
     fields: formData.get("fields"),
     operationId: formData.get("operationId"),
   });
 
   if (!parsed.success) {
-    redirectWithError("Please check the preview details.");
+    return { error: "Please check the preview details." };
   }
 
   const context = await resolveUserAndProject();
   assertPermission(context.membership, "company.operations.manage");
+  let fields: Record<string, unknown>;
+  try {
+    fields = parseJsonObject(parsed.data.fields, "Preview fields");
+  } catch (error) {
+    return { error: getActionError(error, "Invalid preview fields.") };
+  }
+
   const preview = await runOperationPreview({
-    fields: parseJsonObject(parsed.data.fields, "Preview fields"),
+    fields,
     operationId: parsed.data.operationId,
     projectId: context.project.id,
   });
 
   if (!preview) {
-    redirectWithError("Operation or provider is not active.");
+    return { error: "Operation or provider is not active." };
   }
 
   await writeAuditLog({

@@ -1,6 +1,10 @@
 import { Activity, PlugZap, Plus, Workflow } from "lucide-react";
 import Link from "next/link";
 import { NoProjectState } from "@/components/no-project-state";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
@@ -392,7 +396,11 @@ export default async function OperationsPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form action={previewOperationAction} className="space-y-4">
+            <ActionStateForm
+              action={previewOperationAction}
+              className="space-y-4"
+            >
+              <ActionFormError />
               <div className="space-y-2">
                 <Label htmlFor="previewOperationId">Operation</Label>
                 <select
@@ -432,7 +440,7 @@ export default async function OperationsPage({
                 pendingLabel="Running..."
                 icon={<Workflow className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
 
             {previewAttempt && (
               <div className="space-y-3 border-t pt-4">
@@ -686,10 +694,11 @@ export default async function OperationsPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form
+            <ActionStateForm
               action={createApiRequestOperationAction}
               className="space-y-4"
             >
+              <ActionFormError />
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="apiRequestName">Name</Label>
@@ -838,7 +847,7 @@ export default async function OperationsPage({
                 pendingLabel="Creating..."
                 icon={<Plus className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
 
@@ -850,10 +859,11 @@ export default async function OperationsPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form
+            <ActionStateForm
               action={createMetaConversionOperationAction}
               className="space-y-4"
             >
+              <ActionFormError />
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="metaConversionName">Name</Label>
@@ -967,7 +977,7 @@ export default async function OperationsPage({
                 pendingLabel="Creating..."
                 icon={<Plus className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
 
@@ -1033,10 +1043,11 @@ export default async function OperationsPage({
                 )}
               </div>
 
-              <form
+              <ActionStateForm
                 action={createIntegrationProviderAction}
                 className="space-y-4 border-t pt-4"
               >
+                <ActionFormError />
                 <div className="space-y-2">
                   <Label htmlFor="providerName">Provider Name</Label>
                   <Input
@@ -1084,7 +1095,7 @@ export default async function OperationsPage({
                   pendingLabel="Creating..."
                   icon={<Plus className="h-4 w-4" />}
                 />
-              </form>
+              </ActionStateForm>
             </CardContent>
           </Card>
 
@@ -1096,7 +1107,11 @@ export default async function OperationsPage({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form action={createOperationAction} className="space-y-4">
+              <ActionStateForm
+                action={createOperationAction}
+                className="space-y-4"
+              >
+                <ActionFormError />
                 <div className="space-y-2">
                   <Label htmlFor="operationName">Operation Name</Label>
                   <Input
@@ -1179,7 +1194,7 @@ export default async function OperationsPage({
                   pendingLabel="Creating..."
                   icon={<Plus className="h-4 w-4" />}
                 />
-              </form>
+              </ActionStateForm>
             </CardContent>
           </Card>
         </div>

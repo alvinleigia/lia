@@ -14,6 +14,7 @@ import {
   setActionSubmissionStatus,
   updateActionSubmission,
 } from "@/lib/action-flows";
+import type { ActionFormState } from "@/lib/action-form-state";
 import {
   buildStepAnswerResult,
   getActionStepOptions,
@@ -429,11 +430,14 @@ export async function updateHandoffAssignmentAction(formData: FormData) {
   );
 }
 
-export async function updateHandoffQueueAction(formData: FormData) {
+export async function updateHandoffQueueAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const command = parseHandoffQueueCommand(formData);
 
   if (!command || command.submissionIds.length === 0) {
-    redirect("/projects/handoffs?error=Select%20at%20least%20one%20handoff.");
+    return { error: "Select at least one handoff." };
   }
 
   const { project, user } = await resolveUserAndProject();

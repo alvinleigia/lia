@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
 import {
@@ -69,7 +70,10 @@ function parsePriceToMinorUnits(value: string | undefined) {
   return Number(wholePart) * 100 + Number(decimalPart.padEnd(2, "0"));
 }
 
-export async function createCatalogAction(formData: FormData) {
+export async function createCatalogAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const context = await resolveUserAndProject(formData.get("projectId"));
   assertPermission(context.membership, "company.project.manage");
 
@@ -80,7 +84,7 @@ export async function createCatalogAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError("Catalog name is required.");
+    return { error: "Catalog name is required." };
   }
 
   const catalog = await createProjectCatalog({
@@ -135,13 +139,16 @@ export async function archiveCatalogAction(formData: FormData) {
   redirect("/projects/catalog?catalogArchived=1");
 }
 
-export async function updateCatalogWhatsAppSettingsAction(formData: FormData) {
+export async function updateCatalogWhatsAppSettingsAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = whatsappCatalogConfigSchema.safeParse({
     catalogId: formData.get("catalogId"),
     whatsappCatalogId: formData.get("whatsappCatalogId"),
   });
   if (!parsed.success) {
-    redirectWithError("Invalid WhatsApp catalog settings.");
+    return { error: "Invalid WhatsApp catalog settings." };
   }
 
   const context = await resolveUserAndProject(formData.get("projectId"));
@@ -153,7 +160,7 @@ export async function updateCatalogWhatsAppSettingsAction(formData: FormData) {
   });
 
   if (!catalog) {
-    redirectWithError("Catalog not found.");
+    return { error: "Catalog not found." };
   }
 
   await writeAuditLog({
@@ -171,7 +178,10 @@ export async function updateCatalogWhatsAppSettingsAction(formData: FormData) {
   redirect("/projects/catalog?catalogUpdated=1");
 }
 
-export async function createProductAction(formData: FormData) {
+export async function createProductAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const context = await resolveUserAndProject(formData.get("projectId"));
   assertPermission(context.membership, "company.project.manage");
 
@@ -188,7 +198,7 @@ export async function createProductAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError("Product name and catalog are required.");
+    return { error: "Product name and catalog are required." };
   }
 
   const catalog = await getProjectCatalog(
@@ -196,16 +206,16 @@ export async function createProductAction(formData: FormData) {
     parsed.data.catalogId,
   );
   if (!catalog) {
-    redirectWithError("Catalog not found.");
+    return { error: "Catalog not found." };
   }
 
   let priceAmount: number | null = null;
   try {
     priceAmount = parsePriceToMinorUnits(parsed.data.price);
   } catch (error) {
-    redirectWithError(
-      error instanceof Error ? error.message : "Invalid product price.",
-    );
+    return {
+      error: error instanceof Error ? error.message : "Invalid product price.",
+    };
   }
 
   const currency = normalizeOptionalText(parsed.data.currency)?.toUpperCase();
@@ -241,13 +251,16 @@ export async function createProductAction(formData: FormData) {
   redirect("/projects/catalog?productCreated=1");
 }
 
-export async function updateProductWhatsAppSettingsAction(formData: FormData) {
+export async function updateProductWhatsAppSettingsAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = whatsappProductConfigSchema.safeParse({
     productId: formData.get("productId"),
     whatsappRetailerId: formData.get("whatsappRetailerId"),
   });
   if (!parsed.success) {
-    redirectWithError("Invalid WhatsApp product settings.");
+    return { error: "Invalid WhatsApp product settings." };
   }
 
   const context = await resolveUserAndProject(formData.get("projectId"));
@@ -259,7 +272,7 @@ export async function updateProductWhatsAppSettingsAction(formData: FormData) {
   });
 
   if (!product) {
-    redirectWithError("Product not found.");
+    return { error: "Product not found." };
   }
 
   await writeAuditLog({

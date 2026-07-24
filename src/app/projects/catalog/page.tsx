@@ -1,5 +1,9 @@
 import { Archive, PackagePlus, ShoppingBag } from "lucide-react";
 import { NoProjectState } from "@/components/no-project-state";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -145,7 +149,11 @@ export default async function ProjectCatalogPage({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form action={createCatalogAction} className="space-y-4">
+              <ActionStateForm
+                action={createCatalogAction}
+                className="space-y-4"
+              >
+                <ActionFormError />
                 <input type="hidden" name="projectId" value={project.id} />
                 <div className="space-y-2">
                   <Label htmlFor="catalog-name">Catalog Name</Label>
@@ -180,7 +188,7 @@ export default async function ProjectCatalogPage({
                   pendingLabel="Creating..."
                   icon={<PackagePlus className="h-4 w-4" />}
                 />
-              </form>
+              </ActionStateForm>
             </CardContent>
           </Card>
 
@@ -192,7 +200,11 @@ export default async function ProjectCatalogPage({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form action={createProductAction} className="space-y-4">
+              <ActionStateForm
+                action={createProductAction}
+                className="space-y-4"
+              >
+                <ActionFormError />
                 <input type="hidden" name="projectId" value={project.id} />
                 <div className="space-y-2">
                   <Label htmlFor="catalog-id">Catalog</Label>
@@ -294,7 +306,7 @@ export default async function ProjectCatalogPage({
                   disabled={catalogs.length === 0}
                   icon={<PackagePlus className="h-4 w-4" />}
                 />
-              </form>
+              </ActionStateForm>
             </CardContent>
           </Card>
         </div>
@@ -327,7 +339,7 @@ export default async function ProjectCatalogPage({
                             WhatsApp catalog: {catalog.externalId}
                           </p>
                         )}
-                        <form
+                        <ActionStateForm
                           action={updateCatalogWhatsAppSettingsAction}
                           className="mt-3 flex max-w-md flex-col gap-2 sm:flex-row"
                         >
@@ -351,7 +363,8 @@ export default async function ProjectCatalogPage({
                             pendingLabel="Saving..."
                             variant="outline"
                           />
-                        </form>
+                          <ActionFormError className="sm:basis-full" />
+                        </ActionStateForm>
                       </div>
                       <form action={archiveCatalogAction}>
                         <input
@@ -426,7 +439,7 @@ export default async function ProjectCatalogPage({
                             {product.imageUrl || product.productUrl}
                           </p>
                         )}
-                        <form
+                        <ActionStateForm
                           action={updateProductWhatsAppSettingsAction}
                           className="mt-3 flex max-w-md flex-col gap-2 sm:flex-row"
                         >
@@ -452,7 +465,8 @@ export default async function ProjectCatalogPage({
                             pendingLabel="Saving..."
                             variant="outline"
                           />
-                        </form>
+                          <ActionFormError className="sm:basis-full" />
+                        </ActionStateForm>
                       </div>
                       <form action={archiveProductAction}>
                         <input

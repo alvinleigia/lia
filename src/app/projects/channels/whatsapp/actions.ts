@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
 import {
@@ -29,11 +30,10 @@ const testMessageSchema = z.object({
   message: z.string().trim().min(1).max(1000),
 });
 
-function redirectWithError(message: string): never {
-  redirect(`/projects/channels/whatsapp?error=${encodeURIComponent(message)}`);
-}
-
-export async function updateWhatsAppChannelAction(formData: FormData) {
+export async function updateWhatsAppChannelAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = whatsappSettingsSchema.safeParse({
     name: formData.get("name"),
     status: formData.get("status"),
@@ -47,7 +47,7 @@ export async function updateWhatsAppChannelAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError("Please check the WhatsApp settings.");
+    return { error: "Please check the WhatsApp settings." };
   }
 
   const context = await resolveUserAndProject();
@@ -87,14 +87,19 @@ export async function updateWhatsAppChannelAction(formData: FormData) {
   redirect("/projects/channels/whatsapp?updated=1");
 }
 
-export async function sendWhatsAppTestMessageAction(formData: FormData) {
+export async function sendWhatsAppTestMessageAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = testMessageSchema.safeParse({
     to: formData.get("to"),
     message: formData.get("message"),
   });
 
   if (!parsed.success) {
-    redirectWithError("Please enter a valid WhatsApp recipient and message.");
+    return {
+      error: "Please enter a valid WhatsApp recipient and message.",
+    };
   }
 
   const context = await resolveUserAndProject();
@@ -102,7 +107,7 @@ export async function sendWhatsAppTestMessageAction(formData: FormData) {
   const channel = await getProjectWhatsAppChannel(context.project.id);
 
   if (!channel || channel.status !== "active") {
-    redirectWithError("Enable and save the WhatsApp channel first.");
+    return { error: "Enable and save the WhatsApp channel first." };
   }
 
   try {
@@ -112,9 +117,10 @@ export async function sendWhatsAppTestMessageAction(formData: FormData) {
       text: parsed.data.message,
     });
   } catch (error) {
-    redirectWithError(
-      error instanceof Error ? error.message : "WhatsApp test send failed.",
-    );
+    return {
+      error:
+        error instanceof Error ? error.message : "WhatsApp test send failed.",
+    };
   }
 
   await writeAuditLog({
