@@ -12,6 +12,7 @@ import { ConversationalTaskDetailsFields } from "@/components/conversational-tas
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormActionBar } from "@/components/ui/form-action-bar";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
 import { getProjectConversationalTask } from "@/lib/conversational-tasks";
@@ -102,63 +103,82 @@ export default async function TaskDetailsPage({
               </p>
             )}
 
-            <form action={updateConversationalTaskAction} className="space-y-4">
+            {!task.isArchived && (
+              <form
+                id="archive-task-form"
+                action={archiveConversationalTaskAction}
+              >
+                <input
+                  type="hidden"
+                  name="projectId"
+                  value={context.project.id}
+                />
+                <input type="hidden" name="taskId" value={task.id} />
+              </form>
+            )}
+
+            <form action={updateConversationalTaskAction} className="space-y-5">
               <input
                 type="hidden"
                 name="projectId"
                 value={context.project.id}
               />
               <input type="hidden" name="taskId" value={task.id} />
-              <fieldset disabled={task.isArchived} className="space-y-4">
+              <fieldset disabled={task.isArchived}>
                 <ConversationalTaskDetailsFields defaultValues={task} />
-                {!task.isArchived && (
-                  <FormSubmitButton
-                    label="Save Changes"
-                    pendingLabel="Saving..."
-                    icon={<Save className="h-4 w-4" />}
-                  />
-                )}
               </fieldset>
+              {!task.isArchived && (
+                <FormActionBar
+                  primaryAction={
+                    <FormSubmitButton
+                      label="Save Changes"
+                      pendingLabel="Saving..."
+                      icon={<Save className="h-4 w-4" />}
+                    />
+                  }
+                  secondaryActions={
+                    <>
+                      <Button variant="outline" asChild>
+                        <Link
+                          href={`/projects/tasks/${task.id}/configure/assistant`}
+                        >
+                          <Bot className="h-4 w-4" />
+                          Configure Conversation
+                        </Link>
+                      </Button>
+                      <Button
+                        type="submit"
+                        form="archive-task-form"
+                        variant="outline"
+                      >
+                        <Archive className="h-4 w-4" />
+                        Archive Task
+                      </Button>
+                    </>
+                  }
+                />
+              )}
             </form>
 
-            <div className="border-t pt-4">
-              {!task.isArchived && (
-                <Button className="mb-4" asChild>
-                  <Link href={`/projects/tasks/${task.id}/configure/assistant`}>
-                    <Bot className="h-4 w-4" />
-                    Configure Conversation
-                  </Link>
-                </Button>
-              )}
-              {task.isArchived ? (
-                <form action={unarchiveConversationalTaskAction}>
-                  <input
-                    type="hidden"
-                    name="projectId"
-                    value={context.project.id}
-                  />
-                  <input type="hidden" name="taskId" value={task.id} />
-                  <FormSubmitButton
-                    label="Restore Task"
-                    pendingLabel="Restoring..."
-                    icon={<ArchiveRestore className="h-4 w-4" />}
-                  />
-                </form>
-              ) : (
-                <form action={archiveConversationalTaskAction}>
-                  <input
-                    type="hidden"
-                    name="projectId"
-                    value={context.project.id}
-                  />
-                  <input type="hidden" name="taskId" value={task.id} />
-                  <Button type="submit" variant="outline">
-                    <Archive className="h-4 w-4" />
-                    Archive Task
-                  </Button>
-                </form>
-              )}
-            </div>
+            {task.isArchived && (
+              <FormActionBar
+                secondaryActions={
+                  <form action={unarchiveConversationalTaskAction}>
+                    <input
+                      type="hidden"
+                      name="projectId"
+                      value={context.project.id}
+                    />
+                    <input type="hidden" name="taskId" value={task.id} />
+                    <FormSubmitButton
+                      label="Restore Task"
+                      pendingLabel="Restoring..."
+                      icon={<ArchiveRestore className="h-4 w-4" />}
+                    />
+                  </form>
+                }
+              />
+            )}
           </CardContent>
         </Card>
       </div>
