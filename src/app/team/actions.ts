@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndWorkspace } from "@/lib/auth-project";
 import { COMPANY_ROLES } from "@/lib/company-roles";
@@ -31,13 +32,16 @@ const membershipRoleSchema = z.object({
   role: z.enum(COMPANY_ROLES),
 });
 
-export async function createTeamInvitationAction(formData: FormData) {
+export async function createTeamInvitationAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = createInvitationSchema.safeParse({
     email: formData.get("email"),
   });
 
   if (!parsed.success) {
-    redirect("/team/invite?error=Please%20enter%20a%20valid%20email.");
+    return { error: "Please enter a valid email." };
   }
 
   const context = await resolveUserAndWorkspace();
@@ -177,21 +181,24 @@ export async function updateTeamMemberStatusAction(formData: FormData) {
   redirect("/team?memberUpdated=1");
 }
 
-export async function updateTeamMemberRoleAction(formData: FormData) {
+export async function updateTeamMemberRoleAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = membershipRoleSchema.safeParse({
     membershipId: formData.get("membershipId"),
     role: formData.get("role"),
   });
 
   if (!parsed.success) {
-    redirect("/team?error=Invalid%20member%20role.");
+    return { error: "Invalid member role." };
   }
 
   const context = await resolveUserAndWorkspace();
   assertPermission(context.membership, "company.members.manage");
 
   if (parsed.data.membershipId === context.membership.id) {
-    redirect("/team?error=You%20cannot%20change%20your%20own%20role.");
+    return { error: "You cannot change your own role." };
   }
 
   const members = await listCompanyMembers(context.company.id);
@@ -200,7 +207,7 @@ export async function updateTeamMemberRoleAction(formData: FormData) {
   );
 
   if (!targetMember) {
-    redirect("/team?error=Member%20not%20found.");
+    return { error: "Member not found." };
   }
 
   if (
@@ -209,9 +216,7 @@ export async function updateTeamMemberRoleAction(formData: FormData) {
     parsed.data.role !== "COMPANY_OWNER" &&
     (await getActiveCompanyOwnerCount(context.company.id)) <= 1
   ) {
-    redirect(
-      "/team?error=At%20least%20one%20active%20company%20owner%20is%20required.",
-    );
+    return { error: "At least one active company owner is required." };
   }
 
   const member = await updateCompanyMembershipRole({
@@ -221,7 +226,7 @@ export async function updateTeamMemberRoleAction(formData: FormData) {
   });
 
   if (!member) {
-    redirect("/team?error=Member%20not%20found.");
+    return { error: "Member not found." };
   }
 
   await writeAuditLog({

@@ -3,6 +3,7 @@
 import { hash } from "bcryptjs";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { consumePasswordResetToken } from "@/lib/password-reset";
 import { updateUserPassword } from "@/lib/users";
@@ -13,7 +14,10 @@ const resetPasswordSchema = z.object({
   confirmPassword: z.string().min(8),
 });
 
-export async function resetPassword(formData: FormData) {
+export async function resetPassword(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = resetPasswordSchema.safeParse({
     token: formData.get("token"),
     password: formData.get("password"),
@@ -21,22 +25,17 @@ export async function resetPassword(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect("/reset-password?error=Please%20check%20your%20input.");
+    return { error: "Please check your input." };
   }
 
   if (parsed.data.password !== parsed.data.confirmPassword) {
-    const token = encodeURIComponent(parsed.data.token);
-    redirect(
-      `/reset-password?token=${token}&error=Passwords%20do%20not%20match.`,
-    );
+    return { error: "Passwords do not match." };
   }
 
   const resetToken = await consumePasswordResetToken(parsed.data.token);
 
   if (!resetToken) {
-    redirect(
-      "/reset-password?error=This%20reset%20link%20is%20invalid%20or%20expired.",
-    );
+    return { error: "This reset link is invalid or expired." };
   }
 
   const passwordHash = await hash(parsed.data.password, 12);

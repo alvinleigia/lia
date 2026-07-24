@@ -1,5 +1,9 @@
 import { ArrowLeft, Copy, UserPlus } from "lucide-react";
 import Link from "next/link";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
@@ -68,7 +72,11 @@ export default async function InviteTeamPage({
             )}
 
             {canManageMembers ? (
-              <form action={createTeamInvitationAction} className="space-y-4">
+              <ActionStateForm
+                action={createTeamInvitationAction}
+                className="space-y-4"
+              >
+                <ActionFormError />
                 <div className="space-y-2">
                   <Label htmlFor="inviteEmail">Invite Email</Label>
                   <Input
@@ -85,7 +93,7 @@ export default async function InviteTeamPage({
                   pendingLabel="Creating..."
                   icon={<UserPlus className="h-4 w-4" />}
                 />
-              </form>
+              </ActionStateForm>
             ) : (
               <p className="text-sm text-muted-foreground">
                 You do not have permission to invite members.

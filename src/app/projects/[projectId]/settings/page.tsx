@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -125,7 +129,8 @@ export default async function ProjectSettingsPage({
               </p>
             )}
 
-            <form action={renameProjectAction} className="space-y-4">
+            <ActionStateForm action={renameProjectAction} className="space-y-4">
+              <ActionFormError />
               <input type="hidden" name="projectId" value={project.id} />
               <div className="space-y-2">
                 <Label htmlFor="project-name">Project Name</Label>
@@ -141,7 +146,7 @@ export default async function ProjectSettingsPage({
                 pendingLabel="Saving..."
                 icon={<Save className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
 
@@ -153,7 +158,11 @@ export default async function ProjectSettingsPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={updateProjectAiSettingsAction} className="space-y-4">
+            <ActionStateForm
+              action={updateProjectAiSettingsAction}
+              className="space-y-4"
+            >
+              <ActionFormError />
               <input type="hidden" name="projectId" value={project.id} />
 
               <div className="space-y-2">
@@ -322,7 +331,7 @@ export default async function ProjectSettingsPage({
                 pendingLabel="Saving..."
                 icon={<Save className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
 

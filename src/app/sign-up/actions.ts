@@ -3,6 +3,7 @@
 import { hash } from "bcryptjs";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { ActionFormState } from "@/lib/action-form-state";
 import {
   acceptCompanyInvitation,
   getCompanyInvitationByToken,
@@ -18,7 +19,10 @@ const signUpSchema = z.object({
   inviteToken: z.string().trim().optional(),
 });
 
-export async function signUpWithCredentials(formData: FormData) {
+export async function signUpWithCredentials(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = signUpSchema.safeParse({
     name: formData.get("name") || undefined,
     email: formData.get("email"),
@@ -28,16 +32,16 @@ export async function signUpWithCredentials(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirect("/sign-up?error=Please%20check%20your%20input.");
+    return { error: "Please check your input." };
   }
 
   if (parsed.data.password !== parsed.data.confirmPassword) {
-    redirect("/sign-up?error=Passwords%20do%20not%20match.");
+    return { error: "Passwords do not match." };
   }
 
   const existingUser = await getUserByEmail(parsed.data.email);
   if (existingUser) {
-    redirect("/sign-up?error=Email%20is%20already%20registered.");
+    return { error: "Email is already registered." };
   }
 
   const inviteToken = parsed.data.inviteToken?.trim();
@@ -51,7 +55,7 @@ export async function signUpWithCredentials(formData: FormData) {
       inviteContext.invitation.expiresAt <= new Date() ||
       inviteContext.invitation.email !== normalizedEmail
     ) {
-      redirect("/sign-up?error=Invitation%20is%20not%20valid.");
+      return { error: "Invitation is not valid." };
     }
   }
 

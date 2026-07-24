@@ -1,5 +1,9 @@
 import { ArrowLeft, Plus } from "lucide-react";
 import Link from "next/link";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +51,8 @@ export default async function NewProjectPage({
               </p>
             )}
 
-            <form action={createProjectAction} className="space-y-4">
+            <ActionStateForm action={createProjectAction} className="space-y-4">
+              <ActionFormError />
               <div className="space-y-2">
                 <Label htmlFor="projectName">Project Name</Label>
                 <Input
@@ -62,7 +67,7 @@ export default async function NewProjectPage({
                 pendingLabel="Creating..."
                 icon={<Plus className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
       </div>

@@ -1,11 +1,11 @@
 "use server";
 
 import { compare } from "bcryptjs";
-import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { z } from "zod";
 import { signIn } from "@/auth";
 import { isUserBlockedFromSignIn } from "@/lib/account-status";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { getUserByEmail } from "@/lib/users";
 
 const credentialsSchema = z.object({
@@ -30,20 +30,24 @@ async function isDisabledAccountCredential(input: {
   return isUserBlockedFromSignIn(user.id);
 }
 
-export async function signInWithCredentials(formData: FormData) {
+export async function signInWithCredentials(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = credentialsSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
 
   if (!parsed.success) {
-    redirect(
-      "/sign-in?error=Please%20enter%20a%20valid%20email%20and%20password.",
-    );
+    return { error: "Please enter a valid email and password." };
   }
 
   if (await isDisabledAccountCredential(parsed.data)) {
-    redirect("/sign-in?accountDisabled=1");
+    return {
+      error:
+        "This account is currently disabled. Contact the platform administrator to restore access.",
+    };
   }
 
   try {
@@ -52,9 +56,10 @@ export async function signInWithCredentials(formData: FormData) {
       password: parsed.data.password,
       redirectTo: "/post-login",
     });
+    return {};
   } catch (error) {
     if (error instanceof AuthError) {
-      redirect("/sign-in?error=Invalid%20email%20or%20password.");
+      return { error: "Invalid email or password." };
     }
     throw error;
   }

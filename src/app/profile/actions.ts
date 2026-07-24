@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { canAccess } from "@/lib/access-control";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import {
   clearActiveProjectCookie,
@@ -61,14 +62,17 @@ export async function selectCompanyFromHeaderAction(formData: FormData) {
   revalidatePath("/projects");
 }
 
-export async function updateProfileAction(formData: FormData) {
+export async function updateProfileAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = profileSchema.safeParse({
     name: formData.get("name") ?? "",
     companyName: formData.get("companyName"),
   });
 
   if (!parsed.success) {
-    redirect("/profile?error=Please%20enter%20valid%20profile%20details.");
+    return { error: "Please enter valid profile details." };
   }
 
   const context = await resolveUserAndWorkspace();
@@ -87,7 +91,7 @@ export async function updateProfileAction(formData: FormData) {
   });
 
   if (!updatedUser) {
-    redirect("/profile?error=Profile%20not%20found.");
+    return { error: "Profile not found." };
   }
 
   const updatedCompany =
@@ -99,7 +103,7 @@ export async function updateProfileAction(formData: FormData) {
         });
 
   if (!updatedCompany) {
-    redirect("/profile?error=Account%20not%20found.");
+    return { error: "Account not found." };
   }
 
   await writeAuditLog({

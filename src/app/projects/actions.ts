@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getActiveProjectIdCookie,
@@ -94,15 +95,16 @@ function redirectWithProjectMutationSuccess(
   redirect(`${returnPath}?${key}=1`);
 }
 
-export async function createProjectAction(formData: FormData) {
+export async function createProjectAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = createProjectSchema.safeParse({
     name: formData.get("name"),
   });
 
   if (!parsed.success) {
-    redirect(
-      "/projects/new?error=Please%20provide%20a%20valid%20project%20name.",
-    );
+    return { error: "Please provide a valid project name." };
   }
 
   const context = await resolveUserAndWorkspace();
@@ -128,19 +130,17 @@ export async function createProjectAction(formData: FormData) {
   redirect(`/projects/${project.id}?created=1`);
 }
 
-export async function renameProjectAction(formData: FormData) {
+export async function renameProjectAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = renameProjectSchema.safeParse({
     projectId: formData.get("projectId"),
     name: formData.get("name"),
   });
 
   if (!parsed.success) {
-    const projectId = projectIdSchema.safeParse(formData.get("projectId"));
-    redirect(
-      projectId.success
-        ? `/projects/${projectId.data}/settings?error=Please%20provide%20a%20valid%20project%20name.`
-        : "/projects?error=Please%20provide%20a%20valid%20project%20name.",
-    );
+    return { error: "Please provide a valid project name." };
   }
 
   const context = await resolveUserAndWorkspace();
@@ -152,7 +152,7 @@ export async function renameProjectAction(formData: FormData) {
   );
 
   if (!project) {
-    redirect("/projects?error=Project%20not%20found.");
+    return { error: "Project not found." };
   }
 
   await writeAuditLog({
@@ -171,7 +171,10 @@ export async function renameProjectAction(formData: FormData) {
   redirect(`/projects/${project.id}/settings?renamed=1`);
 }
 
-export async function updateProjectAiSettingsAction(formData: FormData) {
+export async function updateProjectAiSettingsAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = updateProjectAiSettingsSchema.safeParse({
     answerGuidance: formData.get("answerGuidance"),
     projectId: formData.get("projectId"),
@@ -188,15 +191,8 @@ export async function updateProjectAiSettingsAction(formData: FormData) {
     responsePreset: formData.get("responsePreset"),
   });
 
-  const fallbackProjectId = projectIdSchema.safeParse(
-    formData.get("projectId"),
-  );
-  const errorPath = fallbackProjectId.success
-    ? `/projects/${fallbackProjectId.data}/settings`
-    : "/projects";
-
   if (!parsed.success) {
-    redirect(`${errorPath}?error=Please%20check%20the%20AI%20settings.`);
+    return { error: "Please check the AI settings." };
   }
 
   const context = await resolveUserAndWorkspace();
@@ -224,7 +220,7 @@ export async function updateProjectAiSettingsAction(formData: FormData) {
   );
 
   if (!project) {
-    redirect(`${errorPath}?error=Project%20not%20found.`);
+    return { error: "Project not found." };
   }
 
   await writeAuditLog({

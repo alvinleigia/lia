@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { getRequiredAppBaseUrl, sendEmail } from "@/lib/email";
 import {
@@ -14,13 +15,16 @@ const forgotPasswordSchema = z.object({
   email: z.string().email(),
 });
 
-export async function requestPasswordReset(formData: FormData) {
+export async function requestPasswordReset(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
   const parsed = forgotPasswordSchema.safeParse({
     email: formData.get("email"),
   });
 
   if (!parsed.success) {
-    redirect("/forgot-password?error=Please%20enter%20a%20valid%20email.");
+    return { error: "Please enter a valid email." };
   }
 
   const email = parsed.data.email.trim().toLowerCase();

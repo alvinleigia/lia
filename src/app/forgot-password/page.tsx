@@ -1,5 +1,9 @@
 import { ArrowLeft, Mail } from "lucide-react";
 import Link from "next/link";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +45,11 @@ export default async function ForgotPasswordPage({
               </p>
             )}
 
-            <form action={requestPasswordReset} className="space-y-4">
+            <ActionStateForm
+              action={requestPasswordReset}
+              className="space-y-4"
+            >
+              <ActionFormError />
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" name="email" type="email" required />
@@ -53,7 +61,7 @@ export default async function ForgotPasswordPage({
                 pendingLabel="Sending..."
                 icon={<Mail className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
 
             <p className="text-sm text-muted-foreground">
               <Link href="/sign-in" className="underline underline-offset-4">

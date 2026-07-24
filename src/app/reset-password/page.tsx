@@ -1,5 +1,9 @@
 import { ArrowLeft, KeyRound } from "lucide-react";
 import Link from "next/link";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +52,8 @@ export default async function ResetPasswordPage({
             )}
 
             {isTokenValid ? (
-              <form action={resetPassword} className="space-y-4">
+              <ActionStateForm action={resetPassword} className="space-y-4">
+                <ActionFormError />
                 <input type="hidden" name="token" value={token} />
 
                 <div className="space-y-2">
@@ -77,7 +82,7 @@ export default async function ResetPasswordPage({
                   pendingLabel="Updating..."
                   icon={<KeyRound className="h-4 w-4" />}
                 />
-              </form>
+              </ActionStateForm>
             ) : (
               <Link
                 href="/forgot-password"

@@ -1,4 +1,8 @@
 import { UserCircle } from "lucide-react";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -75,7 +79,8 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 Profile updated.
               </p>
             )}
-            <form action={updateProfileAction} className="space-y-4">
+            <ActionStateForm action={updateProfileAction} className="space-y-4">
+              <ActionFormError />
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="profileName">Display Name</Label>
@@ -139,7 +144,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 pendingLabel="Saving..."
                 className="w-full sm:w-auto"
               />
-            </form>
+            </ActionStateForm>
           </CardContent>
         </Card>
       </div>

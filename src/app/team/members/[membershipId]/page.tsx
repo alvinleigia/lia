@@ -1,6 +1,10 @@
 import { ArrowLeft, UserCog } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
@@ -85,7 +89,11 @@ export default async function TeamMemberPage({ params }: TeamMemberPageProps) {
 
             {canManageMembers && !isSelf ? (
               <div className="space-y-4">
-                <form action={updateTeamMemberRoleAction} className="space-y-2">
+                <ActionStateForm
+                  action={updateTeamMemberRoleAction}
+                  className="space-y-2"
+                >
+                  <ActionFormError />
                   <input
                     type="hidden"
                     name="membershipId"
@@ -113,7 +121,7 @@ export default async function TeamMemberPage({ params }: TeamMemberPageProps) {
                       variant="outline"
                     />
                   </div>
-                </form>
+                </ActionStateForm>
 
                 <form action={updateTeamMemberStatusAction}>
                   <input

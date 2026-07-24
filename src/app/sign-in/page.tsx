@@ -1,5 +1,9 @@
 import { KeyRound, LogIn, Mail, UserPlus } from "lucide-react";
 import Link from "next/link";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +65,11 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
               </p>
             )}
 
-            <form action={signInWithCredentials} className="space-y-4">
+            <ActionStateForm
+              action={signInWithCredentials}
+              className="space-y-4"
+            >
+              <ActionFormError />
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" name="email" type="email" required />
@@ -86,7 +94,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
                 pendingLabel="Signing in..."
                 icon={<Mail className="h-4 w-4" />}
               />
-            </form>
+            </ActionStateForm>
 
             <form action={signInWithGoogle}>
               <FormSubmitButton
