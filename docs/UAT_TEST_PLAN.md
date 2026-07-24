@@ -107,6 +107,96 @@ Test date: 2026-07-24
 Exit gate: create, edit, reload, archive, restore, and project isolation all pass
 without a runtime error.
 
+### Phase 1 Of 18 - Slices 2-7 - Complete Task Contract
+
+Build/commit: pending final Slice 7 commit
+
+Status: Not started
+
+Tester:
+
+Test date:
+
+- [ ] Run `npx drizzle-kit migrate` once.
+  Expected result: Migration `0033_conversation_contract_foundation` applies
+  and the command returns without an error.
+  Status:
+  Notes:
+
+- [ ] Open the existing `Book a Spa Service` task and select
+  `Configure Conversation`.
+  Expected result: Assistant, Fields, Tools, Outcomes, and Review navigation is
+  visible without a runtime error.
+  Status:
+  Notes:
+
+- [ ] In Assistant, save a greeting strategy, default language, entry mode,
+  no-answer behavior, visitor identity, and cross-channel linking rule.
+  Expected result: `Conversation policy saved` appears and values remain after
+  reload.
+  Status:
+  Notes:
+
+- [ ] In Fields, select `Apply Booking Starter`.
+  Expected result: Seven booking fields, trusted `lia_timezone` context, and
+  field dependencies appear.
+  Status:
+  Notes:
+
+- [ ] Add one temporary field and one temporary context variable, then remove
+  both.
+  Expected result: Each add/remove succeeds; duplicate keys and a non-system
+  `lia_` key are rejected.
+  Status:
+  Notes:
+
+- [ ] Open Tools.
+  Expected result: No operation is permitted by default. Active project
+  operations can be bound with read/write permission and allowed stages; an
+  operation from another project is never shown.
+  Status:
+  Notes:
+
+- [ ] Bind an available test operation, reload, then remove it.
+  Expected result: The versioned `operation:<id>` binding persists and can be
+  removed without changing the underlying operation.
+  Status:
+  Notes:
+
+- [ ] Open Outcomes and review named outcomes, response policy, return
+  behavior, retention, consent, and export settings.
+  Expected result: Booking starter outcomes include completed, cancelled,
+  handoff, and failed; saved policy values remain after reload.
+  Status:
+  Notes:
+
+- [ ] Open Review.
+  Expected result: Fields, context, tools, and outcomes are summarized. The
+  page is either ready or lists precise blockers.
+  Status:
+  Notes:
+
+- [ ] Resolve any listed blockers and select `Publish New Version`.
+  Expected result: Version 1 appears in Version History.
+  Status:
+  Notes:
+
+- [ ] Change one draft value and publish again.
+  Expected result: Version 2 is added without modifying Version 1.
+  Status:
+  Notes:
+
+- [ ] Switch projects and try the task URL from the first project.
+  Expected result: The task and its versions are not accessible from the
+  second project.
+  Status:
+  Notes:
+
+Exit gate: the reference booking task validates and publishes immutable
+versions that pin the project policy, task fields, context, tool bindings,
+outcomes, return behavior, safety, and data policy without channel- or
+provider-specific configuration.
+
 ## Phase 0 - Environment Readiness
 
 Goal: confirm the UAT environment is safe to test.

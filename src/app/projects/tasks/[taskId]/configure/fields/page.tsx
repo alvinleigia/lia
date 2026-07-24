@@ -20,6 +20,7 @@ import {
 import {
   addConversationalTaskFieldAction,
   addTaskContextVariableAction,
+  applyReferenceBookingTaskAction,
   removeConversationalTaskFieldAction,
   removeTaskContextVariableAction,
 } from "../../../actions";
@@ -80,9 +81,22 @@ export default async function TaskFieldsPage({
           </CardHeader>
           <CardContent className="space-y-5">
             {definition.fields.length === 0 ? (
-              <p className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
-                No fields configured yet.
-              </p>
+              <div className="flex flex-col gap-3 rounded-md border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  No fields configured yet.
+                </p>
+                <form action={applyReferenceBookingTaskAction}>
+                  <input
+                    type="hidden"
+                    name="projectId"
+                    value={context.project.id}
+                  />
+                  <input type="hidden" name="taskId" value={task.id} />
+                  <Button type="submit" variant="outline">
+                    Apply Booking Starter
+                  </Button>
+                </form>
+              </div>
             ) : (
               <div className="divide-y rounded-md border">
                 {definition.fields.map((field) => (

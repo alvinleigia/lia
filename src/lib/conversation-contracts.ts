@@ -26,6 +26,16 @@ export const FIELD_TYPES = [
   "project_resource",
 ] as const;
 
+export const CONTEXT_SOURCE_PRECEDENCE = [
+  "system",
+  "tenant",
+  "project",
+  "contact",
+  "channel",
+  "webhook",
+  "default",
+] as const;
+
 export const assistantPolicyV1Schema = z.object({
   schemaVersion,
   baseInstructions: optionalText,
@@ -76,9 +86,13 @@ export const conversationIdentityV1Schema = z.object({
 export const dataHandlingPolicyV1Schema = z.object({
   schemaVersion,
   consentRequired: z.boolean(),
+  deletionMode: z.enum(["on_request", "automatic"]),
   exportAllowed: z.boolean(),
   fieldRetentionDays: z.number().int().min(1).max(3650),
+  sensitiveLogVisibility: z.literal("redacted"),
+  sensitiveModelVisibility: z.enum(["denied", "task_only"]),
   messageRetentionDays: z.number().int().min(1).max(3650),
+  toolVisibility: z.enum(["binding_only", "denied"]),
 });
 
 export const conversationProjectPolicyV1Schema = z.object({
@@ -108,9 +122,13 @@ export const DEFAULT_CONVERSATION_PROJECT_POLICY: ConversationProjectPolicyV1 =
     dataHandling: {
       schemaVersion: 1,
       consentRequired: false,
+      deletionMode: "on_request",
       exportAllowed: true,
       fieldRetentionDays: 365,
+      sensitiveLogVisibility: "redacted",
+      sensitiveModelVisibility: "task_only",
       messageRetentionDays: 90,
+      toolVisibility: "binding_only",
     },
     entry: {
       schemaVersion: 1,
@@ -190,6 +208,17 @@ export const toolBindingV1Schema = z.object({
   ),
 });
 
+export const fieldTransferRuleV1Schema = z.object({
+  fieldKey: stableKey,
+  allowedSources: z.array(
+    z.enum(["visitor", "profile", "project_resource", "tool"]),
+  ),
+  minimumValidationState: z.enum(["candidate", "valid", "confirmed"]),
+  maximumAgeMinutes: z.number().int().positive().nullable(),
+  allowSensitive: z.boolean(),
+  requireProvenance: z.boolean(),
+});
+
 export const taskOutcomeV1Schema = z.object({
   id: z.string().uuid(),
   key: stableKey,
@@ -228,7 +257,7 @@ export const conversationalTaskDefinitionV1Schema = z.object({
       "routing",
     ]),
   ),
-  fieldTransferWhitelist: z.array(stableKey),
+  fieldTransferWhitelist: z.array(fieldTransferRuleV1Schema),
   fields: z.array(taskFieldV1Schema),
   outcomes: z.array(taskOutcomeV1Schema),
   returnPolicy: conversationReturnPolicyV1Schema,

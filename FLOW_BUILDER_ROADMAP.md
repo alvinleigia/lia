@@ -269,8 +269,8 @@ behavior.
 - [x] Embed the complete task contract in immutable published versions.
 - [x] Pin assistant policy, context definitions, tool versions, and bindings in immutable published versions.
 - [x] Keep existing V1 deterministic flow definitions readable and executable.
-- [ ] Add assistant-policy, task, field, context, tool-binding, and outcome fixtures.
-- [ ] Add focused schema and compatibility tests.
+- [x] Add assistant-policy, task, field, context, tool-binding, and outcome fixtures.
+- [x] Add focused schema and compatibility tests.
 
 Phase 1 exit gate: the versioned contracts can describe the complete reference
 booking task, grounded Q&A entry, approved task recommendation, return

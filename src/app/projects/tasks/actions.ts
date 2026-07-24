@@ -7,6 +7,10 @@ import { assertPermission } from "@/lib/access-control";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveStrictUserAndProject } from "@/lib/auth-project";
 import {
+  REFERENCE_BOOKING_PROJECT_POLICY,
+  REFERENCE_BOOKING_TASK_DEFINITION,
+} from "@/lib/conversation-contract-fixtures";
+import {
   contextVariableDefinitionV1Schema,
   conversationProjectPolicyV1Schema,
   normalizeConversationProjectPolicy,
@@ -308,9 +312,9 @@ export async function removeConversationalTaskFieldAction(formData: FormData) {
     {
       ...definition,
       fieldTransferWhitelist: definition.fieldTransferWhitelist.filter(
-        (key) =>
+        (rule) =>
           !definition.fields.some(
-            (field) => field.id === fieldId.data && field.key === key,
+            (field) => field.id === fieldId.data && field.key === rule.fieldKey,
           ),
       ),
       fields: definition.fields.filter((field) => field.id !== fieldId.data),
@@ -643,4 +647,32 @@ export async function publishConversationalTaskAction(formData: FormData) {
   revalidatePath(destination);
   revalidatePath(`/projects/tasks/${context.task.id}`);
   redirect(`${destination}?published=${version.versionNumber}`);
+}
+
+export async function applyReferenceBookingTaskAction(formData: FormData) {
+  const context = await resolveTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  if (context.task.isArchived) {
+    redirect(`${destination}?error=Restore%20the%20task%20before%20editing.`);
+  }
+  await Promise.all([
+    updateProjectConversationalTaskDefinition(
+      context.project.id,
+      context.task.id,
+      REFERENCE_BOOKING_TASK_DEFINITION,
+    ),
+    saveConversationProjectPolicy(
+      context.project.id,
+      REFERENCE_BOOKING_PROJECT_POLICY,
+    ),
+  ]);
+  await writeAuditLog({
+    ...context,
+    action: "conversational_task.reference_booking_applied",
+    targetType: "conversational_task",
+    targetId: context.task.id,
+    metadata: { schemaVersion: 1 },
+  });
+  revalidatePath(`/projects/tasks/${context.task.id}`, "layout");
+  redirect(`${destination}?templateApplied=1`);
 }

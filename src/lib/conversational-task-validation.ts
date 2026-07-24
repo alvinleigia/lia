@@ -42,9 +42,9 @@ export function validateConversationalTaskForPublish(input: {
       }
     }
   }
-  for (const key of input.definition.fieldTransferWhitelist) {
-    if (!fieldKeys.has(key)) {
-      issues.push(`Transfer field ${key} is not defined.`);
+  for (const rule of input.definition.fieldTransferWhitelist) {
+    if (!fieldKeys.has(rule.fieldKey)) {
+      issues.push(`Transfer field ${rule.fieldKey} is not defined.`);
     }
   }
 

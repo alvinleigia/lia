@@ -17,7 +17,9 @@ const requiredTables = [
   "company_invitations",
   "workspaces",
   "projects",
+  "conversation_project_policies",
   "conversational_tasks",
+  "conversational_task_versions",
   "source_documents",
   "documents",
   "integration_providers",
@@ -162,6 +164,34 @@ async function createTenantFixture(tx, label, suffix) {
         ${`Task ${label}`},
         ${`Complete goal ${label}`},
         ${`Task notes ${label}`}
+      )
+      returning id
+    `,
+  );
+
+  const conversationProjectPolicy = await insertOne(
+    tx`
+      insert into conversation_project_policies (project_id, definition)
+      values (${project.id}, ${tx.json({ schemaVersion: 1, fixture: label })})
+      returning id
+    `,
+  );
+
+  const conversationalTaskVersion = await insertOne(
+    tx`
+      insert into conversational_task_versions (
+        project_id,
+        task_id,
+        version_number,
+        snapshot,
+        published_by_user_id
+      )
+      values (
+        ${project.id},
+        ${conversationalTask.id},
+        1,
+        ${tx.json({ schemaVersion: 1, fixture: label })},
+        ${user.id}
       )
       returning id
     `,
@@ -762,7 +792,9 @@ async function createTenantFixture(tx, label, suffix) {
     invitation,
     workspace,
     project,
+    conversationProjectPolicy,
     conversationalTask,
+    conversationalTaskVersion,
     sourceDocument,
     document,
     provider,
@@ -838,6 +870,29 @@ async function runIsolationAssertions(tx, tenantA, tenantB) {
   assert(
     updateForeignConversationalTask.length === 0,
     "Tenant A project could update tenant B conversational task.",
+  );
+
+  const foreignConversationPolicy = await tx`
+    select id
+    from conversation_project_policies
+    where id = ${tenantB.conversationProjectPolicy.id}
+      and project_id = ${tenantA.project.id}
+  `;
+  assert(
+    foreignConversationPolicy.length === 0,
+    "Tenant A project could read tenant B conversation policy.",
+  );
+
+  const foreignConversationalTaskVersion = await tx`
+    select id
+    from conversational_task_versions
+    where id = ${tenantB.conversationalTaskVersion.id}
+      and project_id = ${tenantA.project.id}
+      and task_id = ${tenantA.conversationalTask.id}
+  `;
+  assert(
+    foreignConversationalTaskVersion.length === 0,
+    "Tenant A project could read tenant B conversational task version.",
   );
 
   const deleteForeignSourceDocument = await tx`
@@ -1340,6 +1395,29 @@ async function runIsolationAssertions(tx, tenantA, tenantB) {
     tenantBConversationalTask[0]?.name === "Task B",
     "Tenant B conversational task changed.",
   );
+
+  const tenantBConversationPolicy = await tx`
+    select definition
+    from conversation_project_policies
+    where id = ${tenantB.conversationProjectPolicy.id}
+      and project_id = ${tenantB.project.id}
+  `;
+  assert(
+    tenantBConversationPolicy[0]?.definition?.fixture === "B",
+    "Tenant B conversation policy changed.",
+  );
+
+  const tenantBTaskVersion = await tx`
+    select snapshot
+    from conversational_task_versions
+    where id = ${tenantB.conversationalTaskVersion.id}
+      and project_id = ${tenantB.project.id}
+      and task_id = ${tenantB.conversationalTask.id}
+  `;
+  assert(
+    tenantBTaskVersion[0]?.snapshot?.fixture === "B",
+    "Tenant B conversational task version changed.",
+  );
 }
 
 async function main() {
@@ -1357,6 +1435,7 @@ async function main() {
       checks.push("project read scoping");
       checks.push("project mutation scoping");
       checks.push("conversational task read and mutation scoping");
+      checks.push("conversation policy and task version scoping");
       checks.push("document delete scoping");
       checks.push("action, branch rule, and flow version scoping");
       checks.push("operation provider and attempt scoping");
