@@ -109,7 +109,7 @@ without a runtime error.
 
 ### Phase 1 Of 18 - Slices 2-7 - Complete Task Contract
 
-Build/commit: pending final Slice 7 commit
+Build/commit: `98dfb67`
 
 Status: Not started
 
