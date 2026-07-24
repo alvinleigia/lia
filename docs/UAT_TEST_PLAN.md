@@ -109,7 +109,7 @@ without a runtime error.
 
 ### Phase 1 Of 18 - Slices 2-7 - Complete Task Contract
 
-Build/commit: `98dfb67`
+Build/commit: `e477f24`
 
 Status: Not started
 
@@ -117,78 +117,446 @@ Tester:
 
 Test date:
 
-- [ ] Run `npx drizzle-kit migrate` once.
-  Expected result: Migration `0033_conversation_contract_foundation` applies
-  and the command returns without an error.
+Use this test context:
+
+- Primary project: `Ewissen Infra (#194)`
+- Isolation project: `Ewissen Inc (#195)`
+- Task: `Book a Spa Service`
+- Use only the sample content below. Do not enter real customer information.
+
+#### Step 1 - Confirm The Database Migration
+
+- [ ] If this database has not received this build, stop the development server
+  and run:
+
+  ```powershell
+  npx drizzle-kit migrate
+  ```
+
+  For the current local database, the migration has already been applied. Mark
+  this check as passed and do not rerun it only for UAT.
+
+  Expected result: Migration `0033_conversation_contract_foundation` is applied
+  once and the command returns to the prompt without an error.
   Status:
   Notes:
 
-- [ ] Open the existing `Book a Spa Service` task and select
-  `Configure Conversation`.
+#### Step 2 - Open The Conversation Configuration
+
+- [ ] Sign in, select `Ewissen Infra (#194)`, and open `Automation`, then
+  `Tasks`.
+
+- [ ] Open `Book a Spa Service`, then select `Configure Conversation`.
+
   Expected result: Assistant, Fields, Tools, Outcomes, and Review navigation is
   visible without a runtime error.
   Status:
   Notes:
 
-- [ ] In Assistant, save a greeting strategy, default language, entry mode,
-  no-answer behavior, visitor identity, and cross-channel linking rule.
+#### Step 3 - Configure The Assistant
+
+- [ ] Open `Assistant` and enter these values:
+
+  Greeting:
+
+  ```text
+  Use exact greeting
+  ```
+
+  Default Language:
+
+  ```text
+  English
+  ```
+
+  Greeting Text:
+
+  ```text
+  Hello! I can help you choose a spa service and request an appointment.
+  ```
+
+  Shared Instructions:
+
+  ```text
+  Help visitors choose a spa service and request an appointment.
+  Ask only for information that is still missing.
+  Confirm the service, preferred date and time, guest name, email, and phone number before any booking operation.
+  Answer brief side questions, then return to the booking task.
+  Do not claim that a booking is confirmed until an approved write operation succeeds.
+  ```
+
+  Conversation Entry:
+
+  ```text
+  Knowledge first
+  ```
+
+  When no answer exists:
+
+  ```text
+  Use fallback
+  ```
+
+  Visitor Identity:
+
+  ```text
+  Project-scoped visitor
+  ```
+
+  Cross-channel linking:
+
+  ```text
+  Verified contacts only
+  ```
+
+- [ ] Enable `Allow knowledge answers to recommend published tasks`, then save
+  the assistant settings and reload the page.
+
   Expected result: `Conversation policy saved` appears and values remain after
   reload.
   Status:
   Notes:
 
-- [ ] In Fields, select `Apply Booking Starter`.
+#### Step 4 - Apply And Verify Booking Fields
+
+- [ ] Open `Fields`.
+
+- [ ] If no task fields are present, select `Apply Booking Starter`. If the
+  starter was already applied, do not apply it again.
+
   Expected result: Seven booking fields, trusted `lia_timezone` context, and
-  field dependencies appear.
+  these dependencies appear:
+
+  - `serviceCategoryId`
+  - `serviceId`, dependent on `serviceCategoryId`
+  - `preferredDate`, dependent on `serviceId`
+  - `preferredTime`, dependent on `preferredDate`
+  - `guestName`
+  - `guestEmail`
+  - `guestPhone`, normalized as E.164
+
   Status:
   Notes:
 
-- [ ] Add one temporary field and one temporary context variable, then remove
-  both.
-  Expected result: Each add/remove succeeds; duplicate keys and a non-system
-  `lia_` key are rejected.
+#### Step 5 - Test A Temporary Field
+
+- [ ] In `Add Field`, enter these values:
+
+  Visitor Label:
+
+  ```text
+  Special Request
+  ```
+
+  Field Key:
+
+  ```text
+  specialRequest
+  ```
+
+  Type:
+
+  ```text
+  Text
+  ```
+
+  Sensitivity:
+
+  ```text
+  Standard
+  ```
+
+  Confirmation:
+
+  ```text
+  When changed
+  ```
+
+  Leave `Depends On`, `Validation Rule`, and `Normalization` empty. Leave
+  `Required` unchecked.
+
+- [ ] Add the field, reload the page, and confirm it remains visible.
+
+- [ ] Try to add the same `specialRequest` field key again.
+
+  Expected result: The duplicate field key is rejected.
+
+- [ ] Remove the temporary `Special Request` field.
+
+  Expected result: The field is removed without affecting the seven booking
+  fields.
   Status:
   Notes:
 
-- [ ] Open Tools.
+#### Step 6 - Test Trusted Context
+
+- [ ] In `Add Context`, first enter:
+
+  Key:
+
+  ```text
+  lia_campaignCode
+  ```
+
+  Source:
+
+  ```text
+  Project
+  ```
+
+  Type:
+
+  ```text
+  Text
+  ```
+
+- [ ] Try to add the context.
+
+  Expected result: The value is rejected because non-system context cannot use
+  the reserved `lia_` prefix.
+
+- [ ] Replace the values with:
+
+  Key:
+
+  ```text
+  uatCampaign
+  ```
+
+  Source:
+
+  ```text
+  Default
+  ```
+
+  Type:
+
+  ```text
+  Text
+  ```
+
+- [ ] Add the context, reload the page, and then remove `uatCampaign`.
+
+  Expected result: The valid context persists after reload and can be removed.
+  The booking starter's `lia_timezone` context remains present.
+  Status:
+  Notes:
+
+#### Step 7 - Verify Tool Permissions
+
+- [ ] Open `Tools`.
+
   Expected result: No operation is permitted by default. Active project
-  operations can be bound with read/write permission and allowed stages; an
-  operation from another project is never shown.
+  operations can be selected, but operations from another project are never
+  shown.
   Status:
   Notes:
 
-- [ ] Bind an available test operation, reload, then remove it.
+- [ ] If an active test operation is available, select it and use:
+
+  Permission:
+
+  ```text
+  Read data
+  ```
+
+  Allowed stage:
+
+  ```text
+  Lookup
+  ```
+
+  Leave the other stages unchecked, bind the operation, and reload the page.
+
   Expected result: The versioned `operation:<id>` binding persists and can be
-  removed without changing the underlying operation.
+  removed without changing the underlying project operation.
+
+- [ ] Remove the temporary binding.
+
+  If no active operation is available, record `No active project operation
+  available` in Notes and mark only the binding subtest as `Blocked`. Confirm
+  that the page remains default-deny; do not create a provider operation only
+  for this Phase 1 test.
+
   Status:
   Notes:
 
-- [ ] Open Outcomes and review named outcomes, response policy, return
-  behavior, retention, consent, and export settings.
-  Expected result: Booking starter outcomes include completed, cancelled,
-  handoff, and failed; saved policy values remain after reload.
+#### Step 8 - Verify And Extend Outcomes
+
+- [ ] Open `Outcomes`.
+
+  Expected result: The booking starter includes:
+
+  - `Completed`
+  - `Cancelled`
+  - `Needs Team Help`
+  - `Booking Failed`
+
+- [ ] Add this temporary outcome:
+
+  Label:
+
+  ```text
+  No Availability
+  ```
+
+  Key:
+
+  ```text
+  noAvailability
+  ```
+
+  Type:
+
+  ```text
+  No answer
+  ```
+
+  Output Port:
+
+  ```text
+  noAvailability
+  ```
+
+- [ ] Reload the page, confirm the outcome remains, and then remove it.
+
+  Expected result: Named outcomes can be added, persisted, and removed without
+  changing the four booking starter outcomes.
   Status:
   Notes:
 
-- [ ] Open Review.
+#### Step 9 - Configure Behavior And Safety
+
+- [ ] In `Behavior and Safety`, enter these values:
+
+  Task Language:
+
+  ```text
+  English
+  ```
+
+  Response Length:
+
+  ```text
+  Short
+  ```
+
+  Fallback Message:
+
+  ```text
+  I could not confirm availability. Please choose another date or ask for help from the spa team.
+  ```
+
+  Handoff Message:
+
+  ```text
+  I will connect you with the spa team for further help.
+  ```
+
+  Completed return behavior:
+
+  ```text
+  Return to knowledge
+  ```
+
+  Cancelled return behavior:
+
+  ```text
+  Return to knowledge
+  ```
+
+  Failed return behavior:
+
+  ```text
+  Handoff
+  ```
+
+  No Answer return behavior:
+
+  ```text
+  Return to knowledge
+  ```
+
+  Handoff return behavior:
+
+  ```text
+  Suspend
+  ```
+
+  Field retention days:
+
+  ```text
+  365
+  ```
+
+  Message retention days:
+
+  ```text
+  90
+  ```
+
+- [ ] Enable `Consent required` and `Export allowed`, save the policy, and
+  reload the page.
+
+  Expected result: The saved behavior, retention, consent, and export settings
+  remain unchanged after reload.
+  Status:
+  Notes:
+
+#### Step 10 - Review The Draft
+
+- [ ] Open `Review`.
+
   Expected result: Fields, context, tools, and outcomes are summarized. The
-  page is either ready or lists precise blockers.
+  clean test state shows seven fields, one trusted context variable, four
+  outcomes, and no temporary tool binding. The page is either ready to publish
+  or lists a precise blocker that identifies what must be corrected.
   Status:
   Notes:
 
-- [ ] Resolve any listed blockers and select `Publish New Version`.
+#### Step 11 - Publish Version 1
+
+- [ ] Resolve any listed blocker, then select `Publish New Version`.
+
   Expected result: Version 1 appears in Version History.
   Status:
   Notes:
 
-- [ ] Change one draft value and publish again.
-  Expected result: Version 2 is added without modifying Version 1.
+#### Step 12 - Prove Versioned Publishing
+
+- [ ] Return to `Assistant` and add this final line to `Shared Instructions`:
+
+  ```text
+  When the visitor changes a detail, use the latest confirmed value.
+  ```
+
+- [ ] Save the assistant policy, return to `Review`, and publish another
+  version.
+
+  Expected result: Version 2 is added and Version 1 remains listed in Version
+  History. Publishing creates a new immutable version instead of replacing the
+  previous version.
   Status:
   Notes:
 
-- [ ] Switch projects and try the task URL from the first project.
+#### Step 13 - Verify Project Isolation
+
+- [ ] Copy or note the task ID from the current task URL.
+
+- [ ] Switch to `Ewissen Inc (#195)` and open `Automation`, then `Tasks`.
+
+- [ ] Try to open the `Ewissen Infra (#194)` task URL while project `#195` is
+  selected.
+
   Expected result: The task and its versions are not accessible from the
-  second project.
+  second project. The application returns to a safe task view or shows that the
+  task was not found; it must not display the first project's configuration.
+
+- [ ] Switch back to `Ewissen Infra (#194)` and reopen the task's `Review`
+  page.
+
+  Expected result: Both published versions remain visible in the correct
+  project.
   Status:
   Notes:
 
