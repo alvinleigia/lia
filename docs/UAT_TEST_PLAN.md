@@ -567,6 +567,174 @@ versions that pin the project policy, task fields, context, tool bindings,
 outcomes, return behavior, safety, and data policy without channel- or
 provider-specific configuration.
 
+## Cross-Cutting Form UX Regression
+
+Run these checks once per release candidate. They verify the shared form
+behavior used across authentication, account management, project settings,
+catalogs, channels, operations, flow steps, branch rules, and conversational
+tasks.
+
+### Check 1 - Project Form Values Survive Validation
+
+- [ ] Open `Projects`, select `New Project`, and enter:
+
+  Project Name:
+
+  ```text
+  UAT Project Name That Is Intentionally Longer Than One Hundred And Twenty Characters To Trigger Server Validation Without Clearing The Entered Value
+  ```
+
+- [ ] Select `Create Project`.
+
+  Expected result: A validation message appears inside the New Project form.
+  The page does not navigate to an error query string and the entered value
+  remains in the field.
+  Status:
+  Notes:
+
+### Check 2 - Catalog Product Values Survive Validation
+
+- [ ] Open `Projects`, `Product Catalog`, and enter:
+
+  Product Name:
+
+  ```text
+  UAT Invalid Price Product
+  ```
+
+  SKU:
+
+  ```text
+  UAT-PRICE-001
+  ```
+
+  Price:
+
+  ```text
+  12.345
+  ```
+
+  Currency:
+
+  ```text
+  INR
+  ```
+
+- [ ] Select `Add Product`.
+
+  Expected result: `Price must be a valid amount with up to 2 decimals`
+  appears inside the Add Product form. Product name, SKU, price, currency, and
+  selected catalog remain unchanged. No product is created.
+  Status:
+  Notes:
+
+### Check 3 - Operation JSON Is Validated Before Side Effects
+
+- [ ] Open `Automation`, `Operations`, then find `Create API Request`.
+
+- [ ] Enter:
+
+  Name:
+
+  ```text
+  UAT Invalid Mapping
+  ```
+
+  Provider:
+
+  ```text
+  Webhook
+  ```
+
+  Endpoint URL:
+
+  ```text
+  https://example.com/uat-invalid-mapping
+  ```
+
+  Input Mapping:
+
+  ```text
+  {"guestEmail":
+  ```
+
+- [ ] Keep the remaining defaults and select `Create API Request`.
+
+  Expected result: The JSON error appears inside the Create API Request form,
+  all entered values remain, and no provider or operation named `UAT Invalid
+  Mapping` is created.
+  Status:
+  Notes:
+
+### Check 4 - Flow Step Form Values Survive Validation
+
+- [ ] Open a draft action and create or edit a step.
+
+- [ ] Enter:
+
+  Label:
+
+  ```text
+  UAT Contact Preference
+  ```
+
+  Field Key:
+
+  ```text
+  uatContactPreference
+  ```
+
+  Prompt:
+
+  ```text
+  How would you prefer us to contact you?
+  ```
+
+- [ ] Set an invalid or duplicate step order and save.
+
+  Expected result: The step-order error appears inside the step form and the
+  label, field key, prompt, selected behavior, and advanced settings remain
+  unchanged.
+  Status:
+  Notes:
+
+### Check 5 - Bulk Handoff Validation Stays Local
+
+- [ ] Open `Automation`, `Handoffs`.
+
+- [ ] Without selecting a handoff, select `Claim`.
+
+  Expected result: `Select at least one handoff` appears inside the handoff
+  queue form. The current queue and filter remain unchanged.
+  Status:
+  Notes:
+
+### Check 6 - Upload Errors Explain Browser Reselection
+
+- [ ] Open `Projects`, `Media Library`.
+
+- [ ] Try an unsupported or empty test file.
+
+  Expected result: The error appears inside the Upload Media form. The page
+  explains that the file must be selected again. No asset is created.
+  Status:
+  Notes:
+
+### Check 7 - Sensitive Values Stay Out Of The URL
+
+- [ ] Open `Projects`, `WhatsApp`, enter disposable invalid settings, and save.
+
+  Expected result: Validation appears inside the Channel Settings form. No
+  token, app secret, verify token, recipient number, or message content appears
+  in the browser URL.
+  Status:
+  Notes:
+
+Exit gate: validation errors are local, non-file values remain available for
+correction, sensitive values never enter query strings, command forms still
+complete normally, and uploads clearly communicate the browser-enforced file
+reselection requirement.
+
 ## Phase 0 - Environment Readiness
 
 Goal: confirm the UAT environment is safe to test.

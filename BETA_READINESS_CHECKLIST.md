@@ -185,6 +185,11 @@ Subdomain note:
 
 - [x] Existing deterministic product baseline has completed its historical
   smoke test.
+- [x] Shared server-action form handling keeps validation errors beside the
+  relevant form and preserves non-file user input across account, project,
+  channel, catalog, operation, builder, and task configuration screens.
+- [ ] Pass the `Cross-Cutting Form UX Regression` in
+  `docs/UAT_TEST_PLAN.md` against the release candidate.
 - [ ] Complete Priority 1, Phases 1-8 in `FLOW_BUILDER_ROADMAP.md`.
 - [ ] Complete Priority 2, Phases 9-14 in `FLOW_BUILDER_ROADMAP.md`.
 - [ ] Update `docs/UAT_TEST_PLAN.md` for every completed roadmap capability.
