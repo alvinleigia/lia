@@ -85,12 +85,11 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 2 of 18. Phase 1 completed all 55
-implementation items, the original 13 manual UAT steps, and the focused
-four-step closure addendum on 2026-07-25.
+Current phase: Priority 1, Phase 3 of 18. Phases 1 and 2 completed their
+implementation and manual UAT gates on 2026-07-25.
 
-Current implementation target: Priority 1, Phase 2 of 18, Durable Task State
-And Field Lifecycle.
+Current implementation target: Priority 1, Phase 3 of 18, Structured LLM Turn
+Engine.
 
 ## Product Direction
 
@@ -338,8 +337,8 @@ one active task, answer a side question, and resume, correct, cancel, or
 complete the task without losing values or applying duplicate, stale, or
 out-of-order updates.
 
-Phase 2 implementation status: Complete. Manual UAT is pending as of
-2026-07-25.
+Phase 2 status: Complete. All 33 implementation items and all ten manual UAT
+steps passed on 2026-07-25.
 
 ## Phase 3: Structured LLM Turn Engine
 
