@@ -21,6 +21,7 @@ import {
   conversationProjectPolicyV1Schema,
   FIELD_TYPES,
   normalizeConversationProjectPolicy,
+  TURN_MODEL_STAGES,
   taskFieldV1Schema,
   taskOutcomeV1Schema,
   toolBindingV1Schema,
@@ -225,6 +226,23 @@ export async function updateConversationProjectPolicyAction(
   }
 
   const current = await getConversationProjectPolicy(context.project.id);
+  const stageOverrides = TURN_MODEL_STAGES.flatMap((stage) => {
+    const modelId = String(formData.get(`stageModelId:${stage}`) ?? "").trim();
+    if (!modelId) {
+      return [];
+    }
+
+    const fallbackModelId = String(
+      formData.get(`stageFallbackModelId:${stage}`) ?? "",
+    ).trim();
+    return [
+      {
+        stage,
+        modelId,
+        fallbackModelId: fallbackModelId || null,
+      },
+    ];
+  });
   const parsed = conversationProjectPolicyV1Schema.safeParse({
     ...normalizeConversationProjectPolicy(current),
     assistant: {
@@ -246,6 +264,7 @@ export async function updateConversationProjectPolicyAction(
         maxHistoryMessages: Number(formData.get("maxHistoryMessages")),
         maxTurnsPerMinute: Number(formData.get("maxTurnsPerMinute")),
         maxCostUnitsPerTurn: Number(formData.get("maxCostUnitsPerTurn")),
+        stageOverrides,
       },
     },
     entry: {

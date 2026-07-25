@@ -17,6 +17,7 @@ import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TURN_MODEL_STAGES } from "@/lib/conversation-contracts";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
 import { getProjectConversationalTask } from "@/lib/conversational-tasks";
@@ -32,6 +33,15 @@ type PageProps = {
 };
 
 const selectClass = "h-9 w-full rounded-md border bg-white px-3 text-sm";
+const stageLabels: Record<(typeof TURN_MODEL_STAGES)[number], string> = {
+  knowledge: "Knowledge answers",
+  extraction: "Field extraction",
+  clarification: "Clarification",
+  lookup: "Data lookup",
+  confirmation: "Confirmation",
+  operation: "Tool operation",
+  routing: "Task routing",
+};
 
 export default async function AssistantPolicyPage({
   params,
@@ -52,6 +62,12 @@ export default async function AssistantPolicyPage({
   if (!task) {
     redirect("/projects/tasks?error=Task%20not%20found.");
   }
+  const stageOverrides = new Map(
+    policy.assistant.modelPolicy.stageOverrides.map((override) => [
+      override.stage,
+      override,
+    ]),
+  );
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10">
@@ -270,6 +286,57 @@ export default async function AssistantPolicyPage({
                           }
                           placeholder="No fallback"
                         />
+                      </div>
+                    </div>
+                    <div className="space-y-3 rounded-md border p-4">
+                      <div>
+                        <p className="text-sm font-medium">
+                          Stage Model Overrides
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Leave a model blank to inherit the primary and
+                          fallback models above.
+                        </p>
+                      </div>
+                      <div className="space-y-3">
+                        {TURN_MODEL_STAGES.map((stage) => {
+                          const override = stageOverrides.get(stage);
+
+                          return (
+                            <div
+                              key={stage}
+                              className="grid gap-3 rounded-md border p-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-end"
+                            >
+                              <p className="pb-2 text-sm font-medium">
+                                {stageLabels[stage]}
+                              </p>
+                              <div className="space-y-2">
+                                <Label htmlFor={`stageModelId:${stage}`}>
+                                  Model
+                                </Label>
+                                <Input
+                                  id={`stageModelId:${stage}`}
+                                  name={`stageModelId:${stage}`}
+                                  defaultValue={override?.modelId ?? ""}
+                                  placeholder="Inherit primary"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label
+                                  htmlFor={`stageFallbackModelId:${stage}`}
+                                >
+                                  Fallback
+                                </Label>
+                                <Input
+                                  id={`stageFallbackModelId:${stage}`}
+                                  name={`stageFallbackModelId:${stage}`}
+                                  defaultValue={override?.fallbackModelId ?? ""}
+                                  placeholder="Inherit fallback"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                     <div className="grid gap-4 md:grid-cols-4">
