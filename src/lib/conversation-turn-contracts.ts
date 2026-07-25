@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TOOL_STAGES } from "@/lib/conversation-contracts";
+import { TOOL_STAGES, TURN_MODEL_STAGES } from "@/lib/conversation-contracts";
 import { TASK_FIELD_STATES } from "@/lib/conversational-task-runtime-contracts";
 
 export const STRUCTURED_TURN_SCHEMA_VERSION = 1 as const;
@@ -173,6 +173,24 @@ export const turnMessageV1Schema = z
   .strict();
 
 export type TurnMessageV1 = z.infer<typeof turnMessageV1Schema>;
+
+export const structuredTurnRequestV1Schema = z
+  .object({
+    activeTaskId: z.number().int().positive().nullable().default(null),
+    assistantIntroduced: z.boolean().default(false),
+    channel: z
+      .enum(["project_chat", "widget", "whatsapp"])
+      .default("project_chat"),
+    history: z.array(turnMessageV1Schema).max(50).default([]),
+    projectId: z.number().int().positive(),
+    stage: z.enum(TURN_MODEL_STAGES).default("knowledge"),
+    visitorMessage: z.string().trim().min(1).max(32_000),
+  })
+  .strict();
+
+export type StructuredTurnRequestV1 = z.infer<
+  typeof structuredTurnRequestV1Schema
+>;
 
 export const turnFieldStateV1Schema = z
   .object({

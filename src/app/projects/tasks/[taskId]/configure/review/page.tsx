@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   CircleAlert,
+  MessagesSquare,
   Send,
 } from "lucide-react";
 import Link from "next/link";
@@ -132,6 +133,26 @@ export default async function TaskReviewPage({
                 icon={<Send className="h-4 w-4" />}
               />
             </form>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <MessagesSquare className="h-5 w-5" />
+              Structured Conversation Test
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Verify grounded answers and recommendation-only model decisions
+              before they reach the durable task runtime.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href={`/projects/tasks/${task.id}/configure/review/turn`}>
+                <MessagesSquare className="h-4 w-4" />
+                Open Conversation Test
+              </Link>
+            </Button>
           </CardContent>
         </Card>
         <Card>
