@@ -1,9 +1,9 @@
+import { buildKnowledgeChatSystemPrompt } from "@/lib/ai-guardrails";
 import type {
   ConversationalTaskSnapshotV1,
   ConversationProjectPolicyV1,
   TURN_MODEL_STAGES,
 } from "@/lib/conversation-contracts";
-import { buildKnowledgeChatSystemPrompt } from "@/lib/ai-guardrails";
 import {
   type TurnContextValueV1,
   type TurnFieldStateV1,

@@ -97,11 +97,16 @@ export function StructuredTurnTest({
       }
 
       setResult(payload);
-      setHistory((current) => [
-        ...current,
-        { role: "user", content: visitorMessage },
-        { role: "assistant", content: payload.execution.proposal.reply },
-      ]);
+      setHistory((current) =>
+        [
+          ...current,
+          { role: "user" as const, content: visitorMessage },
+          {
+            role: "assistant" as const,
+            content: payload.execution.proposal.reply,
+          },
+        ].slice(-48),
+      );
       setMessage("");
     } catch (caught) {
       setError(
@@ -123,6 +128,9 @@ export function StructuredTurnTest({
   }
 
   const proposal = result?.execution.proposal;
+  const recommendedTask = tasks.find(
+    ({ id }) => id === proposal?.taskRecommendation?.taskId,
+  );
 
   return (
     <div className="space-y-6">
@@ -130,7 +138,15 @@ export function StructuredTurnTest({
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="turnTask">Conversation Context</Label>
-            <Select value={activeTaskId} onValueChange={setActiveTaskId}>
+            <Select
+              value={activeTaskId}
+              onValueChange={(value) => {
+                setActiveTaskId(value);
+                setError(null);
+                setHistory([]);
+                setResult(null);
+              }}
+            >
               <SelectTrigger id="turnTask" className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -260,7 +276,7 @@ export function StructuredTurnTest({
                 <dt className="text-muted-foreground">Safety</dt>
                 <dd>{proposal.safety.decision}</dd>
                 <dt className="text-muted-foreground">Reason</dt>
-                <dd>{proposal.safety.reasonCode}</dd>
+                <dd>{proposal.safety.reasonCode ?? "None"}</dd>
               </dl>
             </div>
 
@@ -313,7 +329,7 @@ export function StructuredTurnTest({
                 <dt className="text-sm text-muted-foreground">Task</dt>
                 <dd className="mt-1 break-words">
                   {proposal.taskRecommendation
-                    ? `Task #${proposal.taskRecommendation.taskId} (${Math.round(
+                    ? `${recommendedTask?.name ?? `Task #${proposal.taskRecommendation.taskId}`} (${Math.round(
                         proposal.taskRecommendation.confidence * 100,
                       )}% confidence)`
                     : "None"}
