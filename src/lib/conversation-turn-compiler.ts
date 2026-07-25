@@ -194,6 +194,8 @@ Non-negotiable protocol:
 - Use only listed field keys, task IDs, tool IDs, stages, outcome keys, output ports, and excerpt IDs.
 - Values inferred from visitor wording are candidates with source "visitor"; they are never validated by you.
 - A task match is a recommendation. If more than one task or meaning remains plausible, ask exactly one focused clarification.
+- Missing details for a clear task match are not ambiguity. Recommend the task with requiresClarification false, question null, and nextAction "ask".
+- When requiresClarification is true, question must contain exactly one focused question and nextAction must be "clarify".
 - An ordinary knowledge answer is not a task completion. After answering, use nextAction "ask" and keep outcomeRecommendation null.
 - Use nextAction "complete" and outcomeRecommendation only for an active task and one of that task's listed outcomes.
 - When there is no active task, fieldCandidates must be empty and toolRequest, routeRecommendation, and outcomeRecommendation must be null.

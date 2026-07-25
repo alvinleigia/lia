@@ -74,7 +74,7 @@ export const turnToolRequestProposalV1Schema = z
   })
   .strict();
 
-export const turnResultV1Schema = z
+export const turnResultV1ProviderSchema = z
   .object({
     schemaVersion: z.literal(STRUCTURED_TURN_SCHEMA_VERSION),
     turnKind: z.enum(TURN_KINDS),
@@ -117,8 +117,10 @@ export const turnResultV1Schema = z
       .strict(),
     decisionSummary: z.string().trim().min(1).max(500),
   })
-  .strict()
-  .superRefine((result, context) => {
+  .strict();
+
+export const turnResultV1Schema = turnResultV1ProviderSchema.superRefine(
+  (result, context) => {
     if (
       result.ambiguity.requiresClarification &&
       (!result.ambiguity.question || result.nextAction !== "clarify")
@@ -159,7 +161,8 @@ export const turnResultV1Schema = z
         path: ["grounding", "excerptIds"],
       });
     }
-  });
+  },
+);
 
 export type TurnResultV1 = z.infer<typeof turnResultV1Schema>;
 export type TurnNextAction = (typeof TURN_NEXT_ACTIONS)[number];

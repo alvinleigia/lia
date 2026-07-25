@@ -2,7 +2,7 @@ import { openai } from "@ai-sdk/openai";
 import { generateText, Output } from "ai";
 import {
   type TurnMessageV1,
-  turnResultV1Schema,
+  turnResultV1ProviderSchema,
 } from "@/lib/conversation-turn-contracts";
 
 export const PLATFORM_DEFAULT_MODEL_ID = "gpt-5-mini";
@@ -66,12 +66,21 @@ export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
         name: "StructuredTurnV1",
         description:
           "A proposal-only structured conversational turn for server validation.",
-        schema: turnResultV1Schema,
+        schema: turnResultV1ProviderSchema,
       }),
       system: input.system,
       messages: input.messages,
       maxOutputTokens: input.maxOutputTokens,
       maxRetries: input.maxRetries,
+      providerOptions: input.modelId.startsWith("gpt-5")
+        ? {
+            openai: {
+              reasoningEffort: "low",
+              strictJsonSchema: true,
+              textVerbosity: "low",
+            },
+          }
+        : undefined,
       timeout: input.timeoutMs,
     });
     const inputTokens = readTokenCount(result.usage, [
