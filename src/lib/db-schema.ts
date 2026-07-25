@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -791,6 +792,328 @@ export const channelMessages = pgTable(
     index("channel_messages_conversation_idx").on(table.conversationId),
     index("channel_messages_direction_idx").on(table.direction),
     index("channel_messages_created_at_idx").on(table.createdAt),
+  ],
+);
+
+export const conversationalTaskRuns = pgTable(
+  "conversational_task_runs",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    conversationId: integer("conversation_id")
+      .notNull()
+      .references(() => channelConversations.id),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => conversationalTasks.id),
+    taskVersionId: integer("task_version_id")
+      .notNull()
+      .references(() => conversationalTaskVersions.id),
+    status: text("status").notNull().default("active"),
+    currentStage: text("current_stage").notNull().default("extraction"),
+    outcomeKey: text("outcome_key"),
+    lastRequestedFieldKey: text("last_requested_field_key"),
+    suspendedReturnTarget: jsonb("suspended_return_target").$type<
+      Record<string, unknown>
+    >(),
+    revision: integer("revision").notNull().default(0),
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    pausedAt: timestamp("paused_at"),
+    resumeAt: timestamp("resume_at"),
+    expiresAt: timestamp("expires_at"),
+    completedAt: timestamp("completed_at"),
+    cancelledAt: timestamp("cancelled_at"),
+    abandonedAt: timestamp("abandoned_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversational_task_runs_project_idx").on(table.projectId),
+    index("conversational_task_runs_conversation_idx").on(table.conversationId),
+    index("conversational_task_runs_task_idx").on(table.taskId),
+    index("conversational_task_runs_version_idx").on(table.taskVersionId),
+    index("conversational_task_runs_status_idx").on(table.status),
+    index("conversational_task_runs_expires_idx").on(table.expiresAt),
+    uniqueIndex("conversational_task_runs_active_unique")
+      .on(table.projectId, table.conversationId)
+      .where(
+        sql`${table.status} in ('active', 'paused', 'waiting', 'handoff')`,
+      ),
+  ],
+);
+
+export const conversationExecutionStates = pgTable(
+  "conversation_execution_states",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    conversationId: integer("conversation_id")
+      .notNull()
+      .references(() => channelConversations.id),
+    responseOwner: text("response_owner").notNull().default("knowledge"),
+    executionMode: text("execution_mode").notNull().default("knowledge"),
+    activeTaskRunId: integer("active_task_run_id").references(
+      () => conversationalTaskRuns.id,
+    ),
+    activeTaskVersionId: integer("active_task_version_id").references(
+      () => conversationalTaskVersions.id,
+    ),
+    activeNodeId: text("active_node_id"),
+    suspendedReturnTarget: jsonb("suspended_return_target").$type<
+      Record<string, unknown>
+    >(),
+    anonymousVisitorId: text("anonymous_visitor_id"),
+    sessionId: text("session_id").notNull(),
+    identityKind: text("identity_kind").notNull().default("anonymous"),
+    channelIdentity: jsonb("channel_identity")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    verifiedContactId: integer("verified_contact_id").references(
+      () => contacts.id,
+    ),
+    authenticatedUserId: integer("authenticated_user_id").references(
+      () => users.id,
+    ),
+    sessionExpiresAt: timestamp("session_expires_at"),
+    sessionRotatedAt: timestamp("session_rotated_at"),
+    lastProviderSequence: integer("last_provider_sequence"),
+    lastEventOccurredAt: timestamp("last_event_occurred_at"),
+    status: text("status").notNull().default("active"),
+    revision: integer("revision").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversation_execution_states_project_idx").on(table.projectId),
+    index("conversation_execution_states_conversation_idx").on(
+      table.conversationId,
+    ),
+    index("conversation_execution_states_active_run_idx").on(
+      table.activeTaskRunId,
+    ),
+    index("conversation_execution_states_owner_idx").on(table.responseOwner),
+    index("conversation_execution_states_session_expires_idx").on(
+      table.sessionExpiresAt,
+    ),
+    uniqueIndex("conversation_execution_states_conversation_unique").on(
+      table.projectId,
+      table.conversationId,
+    ),
+  ],
+);
+
+export const conversationalTaskFieldValues = pgTable(
+  "conversational_task_field_values",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    taskRunId: integer("task_run_id")
+      .notNull()
+      .references(() => conversationalTaskRuns.id),
+    fieldId: text("field_id").notNull(),
+    fieldKey: text("field_key").notNull(),
+    fieldType: text("field_type").notNull(),
+    state: text("state").notNull().default("missing"),
+    isRequired: boolean("is_required").notNull().default(false),
+    sensitivity: text("sensitivity").notNull().default("standard"),
+    naturalValue: jsonb("natural_value").$type<unknown>(),
+    canonicalValue: jsonb("canonical_value").$type<unknown>(),
+    candidates: jsonb("candidates").$type<unknown[]>().notNull().default([]),
+    provenance: jsonb("provenance")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    validation: jsonb("validation")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    revision: integer("revision").notNull().default(0),
+    lastRequestedAt: timestamp("last_requested_at"),
+    validatedAt: timestamp("validated_at"),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversational_task_fields_project_idx").on(table.projectId),
+    index("conversational_task_fields_run_idx").on(table.taskRunId),
+    index("conversational_task_fields_state_idx").on(table.state),
+    index("conversational_task_fields_expires_idx").on(table.expiresAt),
+    uniqueIndex("conversational_task_fields_run_key_unique").on(
+      table.taskRunId,
+      table.fieldKey,
+    ),
+  ],
+);
+
+export const conversationalTaskContextValues = pgTable(
+  "conversational_task_context_values",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    taskRunId: integer("task_run_id")
+      .notNull()
+      .references(() => conversationalTaskRuns.id),
+    key: text("key").notNull(),
+    type: text("type").notNull(),
+    source: text("source").notNull(),
+    value: jsonb("value").$type<unknown>(),
+    sensitivity: text("sensitivity").notNull().default("standard"),
+    modelVisible: boolean("model_visible").notNull().default(false),
+    toolVisible: boolean("tool_visible").notNull().default(false),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversational_task_context_project_idx").on(table.projectId),
+    index("conversational_task_context_run_idx").on(table.taskRunId),
+    index("conversational_task_context_expires_idx").on(table.expiresAt),
+    uniqueIndex("conversational_task_context_run_key_unique").on(
+      table.taskRunId,
+      table.key,
+    ),
+  ],
+);
+
+export const conversationInboundEvents = pgTable(
+  "conversation_inbound_events",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    conversationId: integer("conversation_id")
+      .notNull()
+      .references(() => channelConversations.id),
+    taskRunId: integer("task_run_id").references(
+      () => conversationalTaskRuns.id,
+    ),
+    eventId: text("event_id").notNull(),
+    eventType: text("event_type").notNull(),
+    channelType: text("channel_type").notNull(),
+    channelIdentity: jsonb("channel_identity")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    providerSequence: integer("provider_sequence"),
+    payloadHash: text("payload_hash").notNull(),
+    payload: jsonb("payload")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    authentication: jsonb("authentication").$type<Record<string, unknown>>(),
+    status: text("status").notNull().default("processing"),
+    expectedRevision: integer("expected_revision"),
+    appliedRevision: integer("applied_revision"),
+    quarantineReason: text("quarantine_reason"),
+    occurredAt: timestamp("occurred_at").notNull(),
+    receivedAt: timestamp("received_at").defaultNow().notNull(),
+    processedAt: timestamp("processed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversation_inbound_events_project_idx").on(table.projectId),
+    index("conversation_inbound_events_conversation_idx").on(
+      table.conversationId,
+    ),
+    index("conversation_inbound_events_run_idx").on(table.taskRunId),
+    index("conversation_inbound_events_status_idx").on(table.status),
+    index("conversation_inbound_events_received_idx").on(table.receivedAt),
+    uniqueIndex("conversation_inbound_events_scope_unique").on(
+      table.projectId,
+      table.conversationId,
+      table.eventId,
+    ),
+  ],
+);
+
+export const conversationalTaskToolRequests = pgTable(
+  "conversational_task_tool_requests",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    taskRunId: integer("task_run_id")
+      .notNull()
+      .references(() => conversationalTaskRuns.id),
+    taskVersionId: integer("task_version_id")
+      .notNull()
+      .references(() => conversationalTaskVersions.id),
+    requestId: text("request_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    toolId: text("tool_id").notNull(),
+    stage: text("stage").notNull(),
+    status: text("status").notNull().default("pending"),
+    input: jsonb("input")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    result: jsonb("result").$type<Record<string, unknown>>(),
+    errorCode: text("error_code"),
+    requestedAt: timestamp("requested_at").defaultNow().notNull(),
+    timeoutAt: timestamp("timeout_at"),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversational_task_tools_project_idx").on(table.projectId),
+    index("conversational_task_tools_run_idx").on(table.taskRunId),
+    index("conversational_task_tools_status_idx").on(table.status),
+    index("conversational_task_tools_timeout_idx").on(table.timeoutAt),
+    uniqueIndex("conversational_task_tools_request_unique").on(
+      table.projectId,
+      table.requestId,
+    ),
+    uniqueIndex("conversational_task_tools_idempotency_unique").on(
+      table.projectId,
+      table.idempotencyKey,
+    ),
+  ],
+);
+
+export const conversationalTaskAuditEvents = pgTable(
+  "conversational_task_audit_events",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    conversationId: integer("conversation_id")
+      .notNull()
+      .references(() => channelConversations.id),
+    taskRunId: integer("task_run_id").references(
+      () => conversationalTaskRuns.id,
+    ),
+    inboundEventId: integer("inbound_event_id").references(
+      () => conversationInboundEvents.id,
+    ),
+    eventType: text("event_type").notNull(),
+    summary: jsonb("summary")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversational_task_audit_project_idx").on(table.projectId),
+    index("conversational_task_audit_conversation_idx").on(
+      table.conversationId,
+    ),
+    index("conversational_task_audit_run_idx").on(table.taskRunId),
+    index("conversational_task_audit_created_idx").on(table.createdAt),
   ],
 );
 
