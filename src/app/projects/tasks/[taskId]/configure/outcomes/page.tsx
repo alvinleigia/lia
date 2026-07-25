@@ -122,27 +122,57 @@ export default async function TaskOutcomesPage({
                 value={context.project.id}
               />
               <input type="hidden" name="taskId" value={task.id} />
-              <Input name="label" placeholder="Booked" required />
-              <Input name="key" placeholder="booked" required />
-              <select name="type" className={selectClass}>
-                {[
-                  "completed",
-                  "cancelled",
-                  "failed",
-                  "no_answer",
-                  "handoff",
-                ].map((type) => (
-                  <option key={type} value={type}>
-                    {type.replaceAll("_", " ")}
-                  </option>
-                ))}
-              </select>
-              <Input name="outputPort" placeholder="booked" required />
-              <FormSubmitButton
-                label="Add"
-                pendingLabel="Adding..."
-                icon={<Plus className="h-4 w-4" />}
-              />
+              <div className="space-y-2">
+                <Label htmlFor="outcomeLabel">Outcome Name</Label>
+                <Input
+                  id="outcomeLabel"
+                  name="label"
+                  placeholder="Booked"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="outcomeKey">Outcome Key</Label>
+                <Input
+                  id="outcomeKey"
+                  name="key"
+                  placeholder="booked"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="outcomeType">Result Type</Label>
+                <select id="outcomeType" name="type" className={selectClass}>
+                  {[
+                    "completed",
+                    "cancelled",
+                    "failed",
+                    "no_answer",
+                    "handoff",
+                  ].map((type) => (
+                    <option key={type} value={type}>
+                      {type.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="outcomeOutputPort">Output Port</Label>
+                <Input
+                  id="outcomeOutputPort"
+                  name="outputPort"
+                  placeholder="booked"
+                  required
+                />
+              </div>
+              <div className="flex items-end">
+                <FormSubmitButton
+                  className="w-full"
+                  label="Add"
+                  pendingLabel="Adding..."
+                  icon={<Plus className="h-4 w-4" />}
+                />
+              </div>
             </ActionStateForm>
           </CardContent>
         </Card>

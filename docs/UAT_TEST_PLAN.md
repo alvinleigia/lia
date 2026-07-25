@@ -426,19 +426,19 @@ Use this test context:
 
 - [ ] Add this temporary outcome:
 
-  Label:
+  Outcome Name:
 
   ```text
   No Availability
   ```
 
-  Key:
+  Outcome Key:
 
   ```text
   noAvailability
   ```
 
-  Type:
+  Result Type:
 
   ```text
   No answer
