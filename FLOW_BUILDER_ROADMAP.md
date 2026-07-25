@@ -299,44 +299,47 @@ Phase 1 status: Complete. Manual UAT and the closure addendum passed on
 Goal: persist everything needed to collect, validate, correct, confirm, pause,
 and resume a conversational task safely.
 
-- [ ] Add project-scoped task-run state pinned to the active published version.
-- [ ] Persist the active conversation owner and mode as knowledge, task, deterministic graph node, or authorized human.
-- [ ] Persist the active node, active task, suspended return target, and published version as one coherent execution position.
-- [ ] Persist anonymous visitor, session, channel identity, and verified contact references without silently merging them.
-- [ ] Apply session expiry and rotation without losing an active durable task that policy allows to resume.
-- [ ] Define `InboundEventV1` with a stable event ID, channel identity, conversation ID, occurred time, received time, and provider sequence when available.
-- [ ] Persist a resolved initialization-context snapshot separately from task fields and conversation messages.
-- [ ] Store task field values separately from transient model messages.
-- [ ] Track each field as missing, candidate, valid, invalid, confirmed, or cleared.
-- [ ] Track value provenance without exposing hidden model reasoning.
-- [ ] Track validation results, update time, attempt count, and last requested field.
-- [ ] Accept several field candidates from one visitor message.
-- [ ] Support explicit and contextual corrections.
-- [ ] Support clearing a previously collected value.
-- [ ] Revalidate dependent fields when an upstream value changes.
-- [ ] Recalculate conditionally required fields after every valid update.
-- [ ] Preserve canonical values while allowing natural visitor wording.
-- [ ] Support cancellation, restart, pause, no-reply, and resume.
-- [ ] Support answering a bounded side question and resuming the same task without losing its requested field.
-- [ ] Support explicit task cancellation or switching according to the published return policy.
-- [ ] Ensure only the active response owner can consume and mutate state for an inbound turn.
-- [ ] Preserve task state through Wait and connected-flow boundaries where permitted.
-- [ ] Track pending synchronous and asynchronous tool requests against the current task run and published version.
-- [ ] Accept authenticated typed external-result events without allowing arbitrary system-prompt injection.
-- [ ] Prevent duplicate inbound events from applying the same update twice.
-- [ ] Prevent stale concurrent turns from overwriting newer state.
-- [ ] Serialize state mutation per conversation and handle delayed or out-of-order events deterministically.
-- [ ] Quarantine or safely ignore events that cannot be reconciled with the active version and execution position.
-- [ ] Redact sensitive values from routine logs and diagnostics.
-- [ ] Enforce configured field and message expiry, export, and deletion without breaking tenant isolation.
-- [ ] Record a readable, tenant-scoped task audit trail.
-- [ ] Add migration and cleanup behavior for abandoned task runs.
-- [ ] Add database-backed task-state isolation and concurrency tests.
+- [x] Add project-scoped task-run state pinned to the active published version.
+- [x] Persist the active conversation owner and mode as knowledge, task, deterministic graph node, or authorized human.
+- [x] Persist the active node, active task, suspended return target, and published version as one coherent execution position.
+- [x] Persist anonymous visitor, session, channel identity, and verified contact references without silently merging them.
+- [x] Apply session expiry and rotation without losing an active durable task that policy allows to resume.
+- [x] Define `InboundEventV1` with a stable event ID, channel identity, conversation ID, occurred time, received time, and provider sequence when available.
+- [x] Persist a resolved initialization-context snapshot separately from task fields and conversation messages.
+- [x] Store task field values separately from transient model messages.
+- [x] Track each field as missing, candidate, valid, invalid, confirmed, or cleared.
+- [x] Track value provenance without exposing hidden model reasoning.
+- [x] Track validation results, update time, attempt count, and last requested field.
+- [x] Accept several field candidates from one visitor message.
+- [x] Support explicit and contextual corrections.
+- [x] Support clearing a previously collected value.
+- [x] Revalidate dependent fields when an upstream value changes.
+- [x] Recalculate conditionally required fields after every valid update.
+- [x] Preserve canonical values while allowing natural visitor wording.
+- [x] Support cancellation, restart, pause, no-reply, and resume.
+- [x] Support answering a bounded side question and resuming the same task without losing its requested field.
+- [x] Support explicit task cancellation or switching according to the published return policy.
+- [x] Ensure only the active response owner can consume and mutate state for an inbound turn.
+- [x] Preserve task state through Wait and connected-flow boundaries where permitted.
+- [x] Track pending synchronous and asynchronous tool requests against the current task run and published version.
+- [x] Accept authenticated typed external-result events without allowing arbitrary system-prompt injection.
+- [x] Prevent duplicate inbound events from applying the same update twice.
+- [x] Prevent stale concurrent turns from overwriting newer state.
+- [x] Serialize state mutation per conversation and handle delayed or out-of-order events deterministically.
+- [x] Quarantine or safely ignore events that cannot be reconciled with the active version and execution position.
+- [x] Redact sensitive values from routine logs and diagnostics.
+- [x] Enforce configured field and message expiry, export, and deletion without breaking tenant isolation.
+- [x] Record a readable, tenant-scoped task audit trail.
+- [x] Add migration and cleanup behavior for abandoned task runs.
+- [x] Add database-backed task-state isolation and concurrency tests.
 
 Phase 2 exit gate: an isolated conversation can move between grounded Q&A and
 one active task, answer a side question, and resume, correct, cancel, or
 complete the task without losing values or applying duplicate, stale, or
 out-of-order updates.
+
+Phase 2 implementation status: Complete. Manual UAT is pending as of
+2026-07-25.
 
 ## Phase 3: Structured LLM Turn Engine
 

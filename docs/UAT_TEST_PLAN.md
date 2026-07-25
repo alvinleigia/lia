@@ -1,607 +1,328 @@
 # Lia AI UAT Test Plan
 
 This document contains manual acceptance tests only for the development phase
-that has just finished.
-
-Do not add future phases in advance. When a development phase is complete:
-
-1. Add that phase's copy-ready manual test instructions here.
-2. Complete manual testing before starting the next development phase.
-3. Record failures in the Issue Log.
-4. Commit the accepted test evidence.
-5. Replace or extend this document only when the next phase is ready for UAT.
-
-The previous full 18-phase draft is preserved in Git commit `625d2ae`.
+that has just finished. Earlier accepted UAT evidence remains available in Git
+history.
 
 ## Document Authority
 
 - `FLOW_BUILDER_ROADMAP.md` controls development scope and phase completion.
-- This file controls manual test instructions and test evidence for the current
+- This file controls manual test instructions and evidence for the current
   completed phase.
 - `BETA_READINESS_CHECKLIST.md` controls the final beta release decision.
-- Passing UAT does not mark unfinished roadmap work complete.
 
 ## UAT Environment
 
-- UAT URL:
-- Build/commit: `790b44d`
-- Database/environment:
+- UAT URL: `http://localhost:3000`
+- Implementation commits: `2bbeed7`, `a319026`, `da339cd`, `018e8a1`,
+  `736ba60`
+- Database migration: `0034_conversational_task_runtime`
 - Tester: Alvin
-- Test date: 2026-07-25
+- Test date:
 
 ## Test Rules
 
 - Test one step at a time.
-- Do not use real customer information.
-- Stop and record a Critical or High issue if data integrity, tenant isolation,
-  publication, or a core workflow fails.
-- Capture a screenshot and the exact route when a test fails.
-- Use `Status: Pass`, `Fail`, or `Blocked`.
-- Do not move to Phase 2 until the Phase 1 exit gate passes.
+- Use the exact sample values below; do not use real customer information.
+- Record each step as `Pass`, `Fail`, or `Blocked`.
+- Capture the route and a screenshot for every failure.
+- Stop on a Critical or High data-integrity, tenant-isolation, or lifecycle
+  failure.
+- Do not start Phase 3 until the Phase 2 exit gate passes.
 
 ## Shared Test Fixture
 
 - Primary project: `Ewissen Infra (#194)`
 - Isolation project: `Ewissen Inc (#195)`
-- Task: `Book a Spa Service`
-- Visitor name: `UAT Guest`
-- Visitor email: `uat.guest@example.com`
-- Visitor phone: `+919876543210`
+- Primary task: `Book a Spa Service`
+- Switch target: any different active task with at least one published version
 - Service category: `Massage`
 - Service: `Deep Tissue Massage`
 - Preferred date: `2026-08-15`
 - Preferred time: `15:00`
-- Timezone: `Asia/Kolkata`
+- Guest name: `UAT Guest`
+- Guest email: `uat.guest@example.com`
+- Guest phone: `+919876543210`
 
-## Phase 1 Of 18 - Versioned Conversational Task Contract
+## Phase 2 Of 18 - Durable Task State And Field Lifecycle
 
-Goal: verify that a project-scoped conversational task can be created,
-configured, validated, versioned, archived, restored, and isolated without
-embedding channel- or provider-specific settings.
+Goal: verify that a published conversational task can collect, correct,
+pause, resume, switch, cancel, and complete durable project-scoped state
+without duplicate or cross-project mutation.
 
-Roadmap implementation: 55 of 55 Phase 1 items complete.
+Roadmap implementation: 33 of 33 Phase 2 items complete.
 
-UAT status: Pass. The original 13-step suite and four-step closure addendum
-passed.
+UAT status: Pending.
 
-Completed checkpoint: original Step 13 of 13; closure Step 4 of 4.
+Completed checkpoint: Step 0 of 10.
 
-### Accepted Task Workspace Tests
+### Step 1 Of 10 - Open The Runtime Test
 
-Build/commit: `9c35c65`
+1. Sign in and select `Ewissen Infra (#194)`.
+2. Open `Automation`, then `Tasks`.
+3. Open `Book a Spa Service`.
+4. Select `Configure Conversation`, then `Review`.
+5. Confirm at least one published version is listed.
+6. Select `Open Runtime Test`.
 
-Status: Pass
+Expected result:
 
-Test date: 2026-07-24
+- The page opens without a runtime error.
+- The header says `Runtime Lifecycle Test`.
+- `Start Test Run` is enabled.
+- No customer field values are shown before a run starts.
 
-- [x] Applied migration `0032_conversational_task_workspace`.
-- [x] Opened `Automation`, then `Tasks`.
-- [x] Opened the separate New Task form.
-- [x] Created `Book a Spa Service`.
-- [x] Updated and saved the task objective.
-- [x] Reopened the task and confirmed values persisted.
-- [x] Archived the task.
-- [x] Restored the task as an editable draft.
-- [x] Confirmed project isolation between `Ewissen Infra (#194)` and
-  `Ewissen Inc (#195)`.
-
-Accepted result: task creation, editing, persistence, archive, restore, and
-project isolation passed without a runtime error.
-
-### Step 1 Of 13 - Confirm The Database Migration
-
-- [x] Confirm migration `0033_conversation_contract_foundation` has been
-  applied.
-
-If it has not been applied to the current database, stop the development server
-and run:
-
-```powershell
-npx drizzle-kit migrate
-```
-
-Do not rerun the migration only for UAT when it has already been applied.
-
-Expected result: the migration is applied once and the command returns to the
-prompt without an error.
-
-Status: Pass
+Status: Pending
 
 Notes:
 
-### Step 2 Of 13 - Open Conversation Configuration
+### Step 2 Of 10 - Start A Version-Pinned Run
 
-- [x] Sign in and select `Ewissen Infra (#194)`.
-- [x] Open `Automation`, then `Tasks`.
-- [x] Open `Book a Spa Service`.
-- [x] Select `Configure Conversation`.
+1. Select `Start Test Run`.
+2. Note the `Pinned Version` number.
+3. Reload the page.
 
-Expected result: `Assistant`, `Fields`, `Tools`, `Outcomes`, and `Review`
-navigation is visible without a runtime error.
+Expected result:
 
-Status: Pass
+- `Active test run` is shown.
+- Run Status is `active`.
+- Response Owner is `Conversational Task`.
+- The pinned version remains unchanged after reload.
+- Every published task field begins as `missing`.
+- The Safe Audit Trail contains `task.started`.
 
-Notes:
-
-### Step 3 Of 13 - Configure The Assistant
-
-- [x] Open `Assistant`.
-- [x] Enter the following values.
-
-Greeting:
-
-```text
-Use exact greeting
-```
-
-Default Language:
-
-```text
-English
-```
-
-Greeting Text:
-
-```text
-Hello! I can help you choose a spa service and request an appointment.
-```
-
-Shared Instructions:
-
-```text
-Help visitors choose a spa service and request an appointment.
-Ask only for information that is still missing.
-Confirm the service, preferred date and time, guest name, email, and phone number before any booking operation.
-Answer brief side questions, then return to the booking task.
-Do not claim that a booking is confirmed until an approved write operation succeeds.
-```
-
-Conversation Entry:
-
-```text
-Knowledge first
-```
-
-When No Answer Exists:
-
-```text
-Use fallback
-```
-
-Visitor Identity:
-
-```text
-Project-scoped visitor
-```
-
-Cross-Channel Linking:
-
-```text
-Verified contacts only
-```
-
-- [x] Enable `Allow knowledge answers to recommend published tasks`.
-- [x] Save and reload the page.
-
-Expected result: `Conversation policy saved` appears and every value remains
-after reload.
-
-Status: Pass
+Status: Pending
 
 Notes:
 
-### Step 4 Of 13 - Apply And Verify Booking Fields
+### Step 3 Of 10 - Reject Premature Completion
 
-- [x] Open `Fields`.
-- [x] Select `Apply Booking Starter` only if no task fields are present.
+1. Before adding all required values, select `Complete`.
 
-Expected result: these seven fields are visible:
+Expected result:
 
-- `serviceCategoryId`
-- `serviceId`, dependent on `serviceCategoryId`
-- `preferredDate`, dependent on `serviceId`
-- `preferredTime`, dependent on `preferredDate`
-- `guestName`
-- `guestEmail`
-- `guestPhone`, normalized as E.164
+- Completion is rejected with `required_fields_incomplete`.
+- The run remains active.
+- Existing field state is not cleared.
 
-Expected result: trusted context contains `lia_timezone`.
-
-Status: Pass
+Status: Pending
 
 Notes:
 
-### Step 5 Of 13 - Test A Temporary Field
+### Step 4 Of 10 - Collect And Persist Values
 
-- [x] In `Add Field`, enter the following values.
+In `Save or Correct a Value`, add each value separately.
 
-Visitor Label:
-
-```text
-Special Request
-```
-
-Field Key:
+1. Select `Service Category`, enter:
 
 ```text
-specialRequest
+Massage
 ```
 
-Type:
+2. Select `Save Value`.
+3. Repeat for the remaining fields:
 
 ```text
-Text
+Service: Deep Tissue Massage
+Preferred Date: 2026-08-15
+Preferred Time: 15:00
+Guest Name: UAT Guest
+Guest Email: uat.guest@example.com
+Guest Phone: +919876543210
 ```
 
-Sensitivity:
+4. Reload the page.
 
-```text
-Standard
-```
+Expected result:
 
-Confirmation:
+- Every value remains after reload.
+- Each saved field is `valid`.
+- Natural values are readable and no field is stored in a chat message.
+- The attempt count increases only for the field being saved.
 
-```text
-When changed
-```
-
-- [x] Leave `Depends On`, `Validation Rule`, and `Normalization` empty.
-- [x] Leave `Required` unchecked.
-- [x] Add the field and reload the page.
-- [x] Try to add `specialRequest` again.
-
-Expected result: the duplicate key is rejected inside the Add Field form and
-the entered values remain available for correction.
-
-- [x] Remove the temporary `Special Request` field.
-
-Expected result: the temporary field is removed without affecting the seven
-booking fields. The Add Field form and stale error state are cleared after the
-successful collection change.
-
-Status: Pass
+Status: Pending
 
 Notes:
 
-### Step 6 Of 13 - Test Trusted Context
+### Step 5 Of 10 - Correct And Clear A Dependent Value
 
-- [x] In `Add Context`, first enter:
-
-Key:
-
-```text
-lia_campaignCode
-```
-
-Source:
+1. Select `Service Category`.
+2. Enter:
 
 ```text
-Project
+Facial
 ```
 
-Type:
+3. Select `Save Value`.
+4. Inspect `Service`.
+
+Expected result: `Service Category` changes to `Facial`. The dependent
+`Service` value is marked for revalidation instead of being silently reused.
+
+5. Select `Clear` beside `Service`.
+6. Save this replacement:
 
 ```text
-Text
+Classic Facial
 ```
 
-- [x] Try to add the context.
+Expected result: the old service is cleared, the replacement is valid, and the
+audit trail records the lifecycle events without displaying field values.
 
-Expected result: the form shows `The lia_ prefix is reserved for system
-context.` The entered values remain unchanged.
-
-- [x] Replace the values with:
-
-Key:
-
-```text
-uatCampaign
-```
-
-Source:
-
-```text
-Default
-```
-
-Type:
-
-```text
-Text
-```
-
-- [x] Add the context and reload the page.
-
-Expected result: `uatCampaign` persists. `lia_timezone` shows `System
-protected` and has no edit or delete controls.
-
-- [x] Edit `uatCampaign`, change Source to `Project`, and save.
-
-Expected result: the source changes to `project`; the context key remains fixed
-and cannot be edited.
-
-- [x] Open `Outcomes`.
-- [x] Set Fallback Message to:
-
-```text
-Campaign {{context.uatCampaign}} could not be completed.
-```
-
-- [x] Save, return to `Fields`, and find `uatCampaign`.
-
-Expected result: the variable shows `Used by: Fallback message`. Delete is
-disabled while Edit remains available.
-
-- [x] Restore Fallback Message to:
-
-```text
-I could not complete that booking request. Let me connect you with the team.
-```
-
-- [x] Save, return to `Fields`, and remove `uatCampaign`.
-
-Expected result: the unreferenced variable can be removed. The protected
-`lia_timezone` variable remains present.
-
-Status: Pass
+Status: Pending
 
 Notes:
 
-### Step 7 Of 13 - Verify Tool Permissions
+### Step 6 Of 10 - Pause, Rotate, And Resume
 
-- [x] Open `Tools`.
+1. Select `Pause`.
+2. Reload the page.
 
-Expected result: no operation is permitted by default. Active operations from
-the current project may be selected. Operations from another project are not
-shown.
+Expected result:
 
-If an active test operation is available:
+- Run Status is `paused`.
+- Collected values remain visible.
+- Save, Request, Clear, and Complete controls are unavailable while paused.
 
-- [x] Select the operation.
-- [x] Set Permission to `Read data`.
-- [x] Enable only the `Lookup` stage.
-- [x] Bind the operation and reload the page.
+3. Select `Rotate Session`.
+4. Select `Resume`.
 
-Expected result: a versioned `operation:<id>` binding persists without copying
-provider credentials into the task.
+Expected result:
 
-- [x] Remove the temporary binding.
+- Session rotation does not clear the task or its values.
+- Run Status returns to `active`.
+- Response Owner returns to `Conversational Task`.
 
-If no active operation is available, record `No active project operation
-available` below and mark only the binding subtest as `Blocked`. Do not create
-an operation only for this Phase 1 test.
-
-Status: Pass
+Status: Pending
 
 Notes:
 
-### Step 8 Of 13 - Verify And Extend Outcomes
+### Step 7 Of 10 - Answer A Side Question And Return
 
-- [x] Open `Outcomes`.
+1. Select `Request` beside `Preferred Date`.
+2. Select `Ask Side Question`.
 
-Expected result: the booking starter includes:
+Expected result:
 
-- `Completed`
-- `Cancelled`
-- `Needs Team Help`
-- `Booking Failed`
+- Response Owner changes to `Knowledge Q&A`.
+- Field mutation controls are unavailable.
+- The requested field remains `Preferred Date`.
 
-- [x] Add this temporary outcome.
+3. Select `Return to Task`.
 
-Outcome Name:
+Expected result:
 
-```text
-No Availability
-```
+- Response Owner returns to `Conversational Task`.
+- `Preferred Date` is still marked as the requested field.
+- All collected values remain unchanged.
 
-Outcome Key:
-
-```text
-noAvailability
-```
-
-Result Type:
-
-```text
-No answer
-```
-
-Output Port:
-
-```text
-noAvailability
-```
-
-- [x] Reload and confirm the outcome remains.
-- [x] Remove `No Availability`.
-
-Expected result: the temporary outcome persists and can be removed without
-changing the four booking starter outcomes. Every outcome form control has a
-visible label.
-
-Status: Pass
+Status: Pending
 
 Notes:
 
-### Step 9 Of 13 - Configure Behavior And Safety
+### Step 8 Of 10 - Switch The Active Task
 
-- [x] In `Behavior and Safety`, enter the following values.
-
-Task Language:
-
-```text
-English
-```
-
-Response Length:
+Use any second active task with a published version. If none exists, create a
+temporary task with:
 
 ```text
-Short
+Task Name: Phase 2 Switch Target
+Objective: Collect a temporary service request for runtime switching UAT.
 ```
 
-Fallback Message:
+Apply the booking starter, resolve any Review blocker, and publish Version 1.
 
-```text
-I could not confirm availability. Please choose another date or ask for help from the spa team.
-```
+1. Return to the primary task's Runtime Lifecycle Test.
+2. Under `Switch Active Task`, select the different published task.
+3. Select `Switch Task`.
 
-Handoff Message:
+Expected result:
 
-```text
-I will connect you with the spa team for further help.
-```
+- The previous run becomes `cancelled`.
+- The new task becomes the active task.
+- The new run is pinned to the selected task's published version.
+- The conversation session remains intact.
+- An unpublished or archived task is not available as a target.
 
-Completed Return Behavior:
-
-```text
-Return to knowledge
-```
-
-Cancelled Return Behavior:
-
-```text
-Return to knowledge
-```
-
-Failed Return Behavior:
-
-```text
-Handoff
-```
-
-No Answer Return Behavior:
-
-```text
-Return to knowledge
-```
-
-Handoff Return Behavior:
-
-```text
-Suspend
-```
-
-Field Retention Days:
-
-```text
-365
-```
-
-Message Retention Days:
-
-```text
-90
-```
-
-- [x] Enable `Consent required`.
-- [x] Enable `Export allowed`.
-- [x] Save and reload.
-
-Expected result: behavior, return policies, retention, consent, and export
-settings remain unchanged after reload.
-
-Status: Pass
+Status: Pending
 
 Notes:
 
-### Step 10 Of 13 - Review The Draft
+### Step 9 Of 10 - Restart, Cancel, And Complete
 
-- [x] Confirm the temporary Step 7 tool binding has been removed.
-- [x] Open `Review`.
+1. Select `Restart`.
 
-Expected result: the clean test state shows:
+Expected result: values for the active task are reset and the run remains
+active.
 
-- Seven task fields.
-- One trusted context variable: `lia_timezone`.
-- Four booking starter outcomes.
-- No temporary tool binding.
+2. Add all required values using the sample fixture.
+3. Select `Complete`.
 
-Expected result: the page is ready to publish or shows a precise blocker that
-identifies what must be corrected.
+Expected result:
 
-Status: Pass
+- Run Status becomes `completed`.
+- The completed outcome is recorded.
+- Response Owner returns to `Knowledge Q&A`.
 
-Notes:
+4. Select `Start Test Run` to create a new run.
+5. Select `Cancel`.
 
-### Step 11 Of 13 - Publish Version 1
+Expected result:
 
-- [x] Resolve any listed blocker.
-- [x] Select `Publish New Version`.
+- The new run becomes `cancelled`.
+- Response Owner returns to `Knowledge Q&A`.
+- The completed run remains in durable history and is not overwritten.
 
-Expected result: Version 1 appears in Version History and contains the current
-task contract.
-
-Status: Pass
+Status: Pending
 
 Notes:
 
-### Step 12 Of 13 - Prove Immutable Versioning
+### Step 10 Of 10 - Reset And Verify Project Isolation
 
-- [x] Return to `Assistant`.
-- [x] Add this final line to Shared Instructions:
+1. Select `Reset Test Data`.
 
-```text
-When the visitor changes a detail, use the latest confirmed value.
-```
+Expected result: the isolated UAT runtime data is removed and `Start Test Run`
+is shown again.
 
-- [x] Save the assistant policy.
-- [x] Return to `Review`.
-- [x] Publish another version.
+2. Copy the Runtime Lifecycle Test URL.
+3. Switch to `Ewissen Inc (#195)`.
+4. Open the copied URL.
 
-Expected result: Version 2 is added and Version 1 remains visible. Publishing
-creates a new immutable version instead of replacing Version 1.
+Expected result:
 
-Status: Pass
+- Project `#195` cannot read or mutate project `#194` task runtime data.
+- The app returns to a safe task view or reports that the task was not found.
+- No field value, audit event, task version, or response owner from project
+  `#194` is displayed.
 
-Notes:
+5. Switch back to `Ewissen Infra (#194)`.
+6. Archive the temporary `Phase 2 Switch Target` task if one was created.
 
-### Step 13 Of 13 - Verify Project Isolation
-
-- [x] Note the task ID from the current URL.
-- [x] Switch to `Ewissen Inc (#195)`.
-- [x] Open `Automation`, then `Tasks`.
-- [x] Try to open the `Ewissen Infra (#194)` task URL.
-
-Expected result: the task and its versions are not accessible from project
-`#195`. The app returns to a safe task view or shows that the task was not
-found. It must not display project `#194` configuration.
-
-- [x] Switch back to `Ewissen Infra (#194)`.
-- [x] Reopen the task's `Review` page.
-
-Expected result: Versions 1 and 2 remain visible in the correct project.
-
-Status: Pass
+Status: Pending
 
 Notes:
 
-## Original Phase 1 Exit Gate
+## Phase 2 Exit Gate
 
-Phase 1 passes only when:
+Phase 2 passes only when:
 
-- [x] Every Phase 1 test is Pass or has an explicitly accepted non-blocking
-  limitation.
-- [x] The task contract contains the expected assistant policy, seven fields,
-  protected context, default-deny tool bindings, four outcomes, return
-  behavior, safety, and data policy.
-- [x] Publishing creates immutable Versions 1 and 2.
-- [x] Project isolation passes.
-- [x] No Critical or High Phase 1 issue remains unresolved.
-- [x] The accepted test evidence is committed before Phase 2 development
-  begins.
+- [ ] Steps 1 through 10 pass.
+- [ ] The run remains pinned to an immutable published version.
+- [ ] Corrections and dependency invalidation do not reuse stale values.
+- [ ] Pause, session rotation, side questions, and task switching preserve the
+  expected execution position.
+- [ ] Premature completion is rejected.
+- [ ] Completion and cancellation return control according to policy.
+- [ ] Project isolation passes.
+- [ ] No Critical or High Phase 2 issue remains unresolved.
 
-Final Phase 1 status: Pass
-
-Final notes: Alvin completed all 13 Phase 1 manual UAT steps. No unresolved
-Critical or High Phase 1 issue was reported.
+Final Phase 2 status: Pending
 
 ## Issue Log
 
-Use this format for each issue:
-
 ```text
 ID:
-Phase: 1
+Phase: 2
 Step:
 Severity: Critical / High / Medium / Low
 Summary:
@@ -612,242 +333,11 @@ Status:
 Notes:
 ```
 
-Severity guide:
-
-- Critical: tenant isolation, data integrity, publication, or sign-in is broken.
-- High: the task cannot be configured, reviewed, or versioned.
-- Medium: a workaround exists but the workflow is confusing or unreliable.
-- Low: cosmetic or minor copy issue.
-
-## Original Phase 1 Sign-Off
-
-Product owner:
-
-- Name:
-- Date:
-- Approved:
-- Notes:
-
-Technical owner:
-
-- Name:
-- Date:
-- Approved:
-- Notes:
+## Phase 2 Sign-Off
 
 UAT tester:
 
 - Name: Alvin
-- Date: 2026-07-25
-- Approved: Yes
-- Notes: Phase 1 manual UAT completed.
-
-## Phase 1 Closure Addendum
-
-Goal: verify the industry-neutral settings added by the Phase 1 closure audit
-without repeating the 13 accepted tests above.
-
-Closure implementation commit: `93ba276`
-
-Closure tested build/commit: `790b44d`
-
-Closure UAT status: Pass
-
-Completed checkpoint: Step 4 of 4
-
-### Closure Step 1 - Advanced Assistant And Identity Policy
-
-1. Switch to `Ewissen Infra (#194)`.
-2. Open `Automation`, `Tasks`, and the existing `Book a Spa Service` task.
-3. Select `Configure Conversation`, then `Assistant`.
-4. Confirm `Visitor Identity` contains:
-   - `Project-scoped visitor`
-   - `Verified contact`
-   - `Authenticated user`
-5. Confirm `Cross-channel linking` contains:
-   - `Never link`
-   - `Verified contacts only`
-   - `Authenticated users only`
-6. Leave `Visitor Identity` as `Project-scoped visitor`.
-7. Leave `Cross-channel linking` as `Verified contacts only`.
-8. Expand `Advanced model and transition limits`.
-9. Enter these values:
-
-```text
-Model Policy: Use platform default
-Maximum Task Switches: 2
-Connected Flow Depth: 3
-Handoff Depth: 1
-```
-
-10. Select `Save Policy`.
-11. Reload the page and expand the advanced section again.
-
-Expected result: all saved selections remain visible. No provider, WhatsApp,
-or industry-specific setting appears in the task contract.
-
-Status: Pass
-
-Notes:
-
-### Closure Step 2 - Repeatable And Resource-Backed Fields
-
-1. Open `Automation`, then `Tasks`.
-2. Create a task with:
-
-```text
-Task Name: Phase 1 Contract Closure
-Objective: Collect one or more service interests and prepare a project-scoped enquiry.
-Internal Notes: Temporary UAT task for the Phase 1 contract closure.
-```
-
-3. Open `Configure Conversation`, then `Fields`.
-4. Add the first field with:
-
-```text
-Visitor Label: Preferred Treatments
-Field Key: preferredTreatments
-Type: enum
-Visitor Prompt: Which treatments are you interested in?
-Answers Allowed: Multiple answers
-Sensitivity: Standard
-Confirmation: When changed
-Required: checked
-Choice Source: Static choices
-Static Choices:
-massage|Massage
-facial|Facial
-body_treatment|Body Treatment
-```
-
-5. Add the second field with:
-
-```text
-Visitor Label: Service
-Field Key: serviceId
-Type: project resource
-Visitor Prompt: Which service would you like?
-Answers Allowed: One answer
-Sensitivity: Standard
-Confirmation: When changed
-Required: checked
-Depends On: preferredTreatments
-Choice Source: Project resource
-Resource Type: service
-Collection Key: serviceCatalog
-Filter By Field: preferredTreatments
-```
-
-Expected result: both fields are added without losing entered values. The first
-field is shown as `multiple`; both choice sources remain part of the saved task
-definition.
-
-Status: Pass
-
-Notes:
-
-### Closure Step 3 - Trusted Context Privacy And Expiry
-
-1. Remain on the closure task's `Fields` page.
-2. Add this context variable:
-
-```text
-Key: campaignCode
-Source: project
-Type: text
-Default Value: uat-closure
-Sensitivity: Personal
-Expires After (minutes): 720
-Visible to the assistant: checked
-Visible to allowed tools: checked
-```
-
-3. Select the edit icon beside `campaignCode`.
-4. Change `Expires After (minutes)` to `1440`.
-5. Clear `Visible to allowed tools`.
-6. Save the edit.
-
-Expected result: the stable key remains `campaignCode`; the row shows
-`project / text / personal / expires in 1440 minutes`. Reopening the editor
-shows the saved default, visibility, sensitivity, and expiry values.
-
-Status: Pass
-
-Notes:
-
-### Closure Step 4 - Outcome, Safety, Dependency, And Publication
-
-1. Open the closure task's `Outcomes` page.
-2. Add this outcome:
-
-```text
-Outcome Name: Qualified Follow Up
-Outcome Key: qualifiedFollowUp
-Result Type: handoff
-Output Port: qualifiedFollowUp
-Completion Condition: {{context.campaignCode}} is present
-```
-
-3. In `Behavior and Safety`, enter:
-
-```text
-Task Language: English
-Response Length: Short
-Visitor Identity: Verified contact required
-Task Consent: Always require consent
-Task Instructions: Use {{context.campaignCode}} only for internal routing. Never reveal it unless the visitor supplied it.
-Fallback Message: I could not complete that request.
-Handoff Message: I will connect you with the team.
-```
-
-4. Expand `Unavailable-service behavior` and confirm model, retrieval, tool,
-   and outbound-channel fallbacks are configurable.
-5. Expand `Project data handling` and use:
-
-```text
-Field Retention: 365
-Message Retention: 90
-Deletion: On request
-Sensitive Data in Model: Current task only
-Sensitive Data in Tools: Allowed bindings only
-Require consent for all project conversations: unchecked
-Allow data export: checked
-```
-
-6. Save the policies.
-7. Return to `Fields`.
-8. Confirm `campaignCode` shows usage by the task instructions and outcome
-   condition.
-9. Confirm its delete control is disabled.
-10. Open `Review`.
-11. Confirm there are no publish blockers.
-12. Publish a new version.
-
-Expected result: the task publishes an immutable version containing the
-advanced task contract and the current project AI behavior. The referenced
-context variable cannot be deleted. Automated tests separately verify
-duplicate-key, cyclic-dependency, malformed-choice, tool-stage, lifecycle, and
-legacy-compatibility blockers.
-
-Status: Pass
-
-Notes:
-
-After this step passes, archive the temporary `Phase 1 Contract Closure` task.
-
-## Phase 1 Closure Gate
-
-- [x] Closure Steps 1 through 4 pass.
-- [x] The published closure task has no contract blockers.
-- [x] Referenced context deletion remains blocked.
-- [x] No Critical or High closure issue remains unresolved.
-
-Final Phase 1 closure status: Pass
-
-Closure UAT tester:
-
-- Name: Alvin
-- Date: 2026-07-25
-- Approved: Yes
-- Notes: Phase 1 closure manual UAT completed with no unresolved Critical or
-  High issue reported.
+- Date:
+- Approved:
+- Notes:
