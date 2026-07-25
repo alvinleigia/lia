@@ -77,19 +77,19 @@ database, backup, and provider readiness work.
 - [x] Shared channel adapters declare native, conditional, fallback, and unsupported delivery.
 - [x] A 108-cell matrix covers 27 step types across project chat, widget, WhatsApp, and the reference future adapter.
 - [x] Twenty-three focused editor/compiler tests and eleven channel contract tests passed on 2026-07-23.
-- [ ] A first-class goal-driven Conversational Task does not yet exist.
-- [ ] Durable conversational field collection, correction, and confirmation do not yet exist.
-- [ ] The LLM does not yet have a constrained turn-planning and tool-request protocol.
+- [x] A first-class goal-driven Conversational Task exists.
+- [x] Durable conversational field collection, correction, and confirmation exist.
+- [x] The LLM has a constrained, proposal-only turn and tool-request protocol.
 - [ ] Grounded Q&A cannot yet enter a bounded task and return to Q&A within one version-pinned conversation.
 - [ ] Full rich-content parity with `docs/Flow Builder v2.pdf` is not complete.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 3 of 18. Phases 1 and 2 completed their
-implementation and manual UAT gates on 2026-07-25.
+Current phase: Priority 1, Phase 3 of 18 manual UAT. Phases 1 and 2 completed
+their implementation and manual UAT gates on 2026-07-25.
 
-Current implementation target: Priority 1, Phase 3 of 18, Structured LLM Turn
-Engine.
+Current target: complete the Phase 3 Structured LLM Turn Engine manual UAT
+before starting Phase 4.
 
 ## Product Direction
 
@@ -345,44 +345,47 @@ steps passed on 2026-07-25.
 Goal: let an LLM interpret and continue a task through a narrow, validated
 protocol rather than unrestricted agent behavior.
 
-- [ ] Define one server-owned model-provider interface.
-- [ ] Compile model instructions from the versioned assistant policy, active task or stage, allowed tools, resolved context, and current validated state.
-- [ ] Define a strict turn-result schema for grounded reply, field candidates, task-intent recommendation, requested tool, next action, and outcome recommendation.
-- [ ] Restrict next actions to ask, clarify, lookup, confirm, complete, cancel, handoff, or fail.
-- [ ] Build model instructions from the published task contract and current validated state.
-- [ ] Ground ordinary Q&A through the existing project retrieval interface and the published answer and no-answer policy.
-- [ ] Treat every task-intent result as a recommendation that the server validates against published, reachable, and allowed task IDs.
-- [ ] Require deterministic confirmation or one focused clarification before an ambiguous semantic task switch.
-- [ ] Treat values inferred during Q&A as candidates until the target task validates and accepts them.
-- [ ] During an active task, distinguish a field answer or correction from a side question, cancellation, or explicit task switch.
-- [ ] Support wait-for-visitor, exact configured greeting, and policy-generated greeting modes.
-- [ ] Define versioned default-model and fallback-model behavior with bounded time and cost.
-- [ ] Keep per-stage model overrides in advanced configuration and pin them to the published version.
-- [ ] Send only the task context and tenant data required for the current turn.
-- [ ] Keep system and task policy above visitor, document, and tool content.
-- [ ] Treat retrieved text as untrusted knowledge content that cannot start a task, grant a tool, or change graph policy.
-- [ ] Apply published input and output safety policy before visitor content reaches the model and before generated content is delivered.
-- [ ] Define deterministic refuse, clarify, safe-fallback, and human-handoff behavior for blocked content.
-- [ ] Apply project and platform abuse, turn-rate, token, and cost limits before model or tool execution.
-- [ ] Ensure moderation and abuse decisions cannot silently mutate task fields, invoke tools, or advance routes.
-- [ ] Validate every model result before applying any field or action.
-- [ ] Reject unknown fields, tools, actions, outputs, and resource identifiers.
-- [ ] Add bounded repair attempts for malformed structured output.
-- [ ] Add confidence and ambiguity handling without trusting confidence as validation.
-- [ ] Treat semantic route recommendations as proposals that require server validation before the graph advances.
-- [ ] Ask one focused clarification when several interpretations remain valid.
-- [ ] Support multilingual visitor messages while retaining canonical field values.
-- [ ] Prevent the assistant from repeatedly introducing itself during one conversation.
-- [ ] Keep responses concise and avoid unsolicited offers or contact details.
-- [ ] Add deterministic wording fallbacks when model generation fails.
-- [ ] Add model timeout, retry, rate, token, cost, and latency controls.
-- [ ] Store safe decision summaries rather than private chain-of-thought.
-- [ ] Add adversarial prompt-injection and malformed-output tests.
-- [ ] Add model-independent fixtures so core runtime tests do not require a live provider.
+- [x] Define one server-owned model-provider interface.
+- [x] Compile model instructions from the versioned assistant policy, active task or stage, allowed tools, resolved context, and current validated state.
+- [x] Define a strict turn-result schema for grounded reply, field candidates, task-intent recommendation, requested tool, next action, and outcome recommendation.
+- [x] Restrict next actions to ask, clarify, lookup, confirm, complete, cancel, handoff, or fail.
+- [x] Build model instructions from the published task contract and current validated state.
+- [x] Ground ordinary Q&A through the existing project retrieval interface and the published answer and no-answer policy.
+- [x] Treat every task-intent result as a recommendation that the server validates against published, reachable, and allowed task IDs.
+- [x] Require deterministic confirmation or one focused clarification before an ambiguous semantic task switch.
+- [x] Treat values inferred during Q&A as candidates until the target task validates and accepts them.
+- [x] During an active task, distinguish a field answer or correction from a side question, cancellation, or explicit task switch.
+- [x] Support wait-for-visitor, exact configured greeting, and policy-generated greeting modes.
+- [x] Define versioned default-model and fallback-model behavior with bounded time and cost.
+- [x] Keep per-stage model overrides in advanced configuration and pin them to the published version.
+- [x] Send only the task context and tenant data required for the current turn.
+- [x] Keep system and task policy above visitor, document, and tool content.
+- [x] Treat retrieved text as untrusted knowledge content that cannot start a task, grant a tool, or change graph policy.
+- [x] Apply published input and output safety policy before visitor content reaches the model and before generated content is delivered.
+- [x] Define deterministic refuse, clarify, safe-fallback, and human-handoff behavior for blocked content.
+- [x] Apply project and platform abuse, turn-rate, token, and cost limits before model or tool execution.
+- [x] Ensure moderation and abuse decisions cannot silently mutate task fields, invoke tools, or advance routes.
+- [x] Validate every model result before applying any field or action.
+- [x] Reject unknown fields, tools, actions, outputs, and resource identifiers.
+- [x] Add bounded repair attempts for malformed structured output.
+- [x] Add confidence and ambiguity handling without trusting confidence as validation.
+- [x] Treat semantic route recommendations as proposals that require server validation before the graph advances.
+- [x] Ask one focused clarification when several interpretations remain valid.
+- [x] Support multilingual visitor messages while retaining canonical field values.
+- [x] Prevent the assistant from repeatedly introducing itself during one conversation.
+- [x] Keep responses concise and avoid unsolicited offers or contact details.
+- [x] Add deterministic wording fallbacks when model generation fails.
+- [x] Add model timeout, retry, rate, token, cost, and latency controls.
+- [x] Store safe decision summaries rather than private chain-of-thought.
+- [x] Add adversarial prompt-injection and malformed-output tests.
+- [x] Add model-independent fixtures so core runtime tests do not require a live provider.
 
 Phase 3 exit gate: the model can answer grounded Q&A and propose a safe task
 transition or conversational turn but cannot change state, call a tool, or
 route the graph without server approval.
+
+Phase 3 status: Implementation complete. Fifty-six contract and channel tests,
+type checking, and lint passed on 2026-07-25. Manual UAT is pending.
 
 ## Phase 4: Deterministic Validation And Business Tools
 
