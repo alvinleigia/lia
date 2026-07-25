@@ -51,6 +51,20 @@ export function ProjectSelectorModal({
     );
   }, [projects, query]);
 
+  const refreshAfterProjectSelection = () => {
+    const currentUrl = new URL(window.location.href);
+    if (!currentUrl.searchParams.has("error")) {
+      router.refresh();
+      return;
+    }
+
+    currentUrl.searchParams.delete("error");
+    const queryString = currentUrl.searchParams.toString();
+    router.replace(
+      `${currentUrl.pathname}${queryString ? `?${queryString}` : ""}${currentUrl.hash}`,
+    );
+  };
+
   const selectProject = (projectId: number) => {
     setError("");
     startTransition(async () => {
@@ -59,7 +73,7 @@ export function ProjectSelectorModal({
         formData.append("projectId", String(projectId));
         await selectProjectFromHeaderAction(formData);
         setOpen(false);
-        router.refresh();
+        refreshAfterProjectSelection();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to select project.");
       }
