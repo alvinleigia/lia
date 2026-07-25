@@ -646,7 +646,7 @@ UAT tester:
 Goal: verify the industry-neutral settings added by the Phase 1 closure audit
 without repeating the 13 accepted tests above.
 
-Closure build/commit:
+Closure build/commit: `93ba276`
 
 Closure UAT status: Pending
 
