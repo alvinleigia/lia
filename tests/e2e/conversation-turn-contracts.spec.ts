@@ -4,8 +4,18 @@ import {
   REFERENCE_BOOKING_TASK_DEFINITION,
 } from "../../src/lib/conversation-contract-fixtures";
 import { conversationalTaskSnapshotV1Schema } from "../../src/lib/conversation-contracts";
-import { compileStructuredTurn } from "../../src/lib/conversation-turn-compiler";
-import { turnResultV1Schema } from "../../src/lib/conversation-turn-contracts";
+import {
+  compileStructuredTurn,
+  type StructuredTurnValidationContext,
+} from "../../src/lib/conversation-turn-compiler";
+import {
+  structuredTurnRequestV1Schema,
+  turnResultV1Schema,
+} from "../../src/lib/conversation-turn-contracts";
+import {
+  TurnProposalValidationError,
+  validateStructuredTurnProposal,
+} from "../../src/lib/conversation-turn-validator";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 const snapshot = conversationalTaskSnapshotV1Schema.parse({
@@ -48,6 +58,28 @@ function validTurn() {
     },
     decisionSummary: "Answered from one retrieved business-hours excerpt.",
   };
+}
+
+function validationContext(): StructuredTurnValidationContext {
+  return {
+    activeTaskId: 95,
+    allowedExcerptIds: new Set(["document:12"]),
+    allowedFieldKeys: new Set(["serviceCategoryId"]),
+    allowedOutcomeKeys: new Set(["booked"]),
+    allowedOutputPorts: new Set(["booked"]),
+    allowedTaskIds: new Set([95, 96]),
+    allowedTools: new Map([["operation:204", new Set(["operation"])]]),
+  };
+}
+
+function validationCodes(value: unknown) {
+  try {
+    validateStructuredTurnProposal(value, validationContext());
+    return [];
+  } catch (error) {
+    expect(error).toBeInstanceOf(TurnProposalValidationError);
+    return (error as TurnProposalValidationError).codes;
+  }
 }
 
 test("structured turns reject unknown properties and inconsistent ambiguity", () => {
@@ -140,4 +172,169 @@ test("compiler exposes only allowed task contracts and model-visible context", (
   expect(compiled.validation.allowedExcerptIds).toEqual(
     new Set(["document:12"]),
   );
+});
+
+test("request boundary rejects forged properties and invalid stages", () => {
+  const request = {
+    activeTaskId: 95,
+    assistantIntroduced: false,
+    channel: "project_chat",
+    history: [],
+    projectId: 194,
+    stage: "knowledge",
+    visitorMessage: "When are you open?",
+  };
+
+  expect(structuredTurnRequestV1Schema.safeParse(request).success).toBe(true);
+  expect(
+    structuredTurnRequestV1Schema.safeParse({
+      ...request,
+      executeImmediately: true,
+    }).success,
+  ).toBe(false);
+  expect(
+    structuredTurnRequestV1Schema.safeParse({
+      ...request,
+      stage: "admin",
+    }).success,
+  ).toBe(false);
+});
+
+test("validator rejects every proposal identifier outside server allowlists", () => {
+  const codes = validationCodes({
+    ...validTurn(),
+    grounding: { status: "grounded", excerptIds: ["document:999"] },
+    fieldCandidates: [
+      {
+        fieldKey: "inventedField",
+        naturalValue: "unsafe",
+        confidence: 0.99,
+        source: "visitor",
+      },
+    ],
+    taskRecommendation: {
+      taskId: 999,
+      confidence: 0.99,
+      reason: "Invented task",
+    },
+    toolRequest: {
+      toolId: "operation:999",
+      stage: "operation",
+      arguments: [],
+    },
+    routeRecommendation: {
+      outputPort: "inventedRoute",
+      confidence: 0.99,
+    },
+    outcomeRecommendation: {
+      outcomeKey: "inventedOutcome",
+      confidence: 0.99,
+    },
+  });
+
+  expect(codes).toEqual(
+    expect.arrayContaining([
+      "unknown_excerpt",
+      "unknown_field",
+      "unknown_or_disallowed_task",
+      "unknown_or_disallowed_tool",
+      "unknown_output_port",
+      "unknown_outcome",
+    ]),
+  );
+});
+
+test("validator rejects disallowed stages and unsafe blocked-turn payloads", () => {
+  expect(
+    validationCodes({
+      ...validTurn(),
+      toolRequest: {
+        toolId: "operation:204",
+        stage: "lookup",
+        arguments: [],
+      },
+    }),
+  ).toContain("disallowed_tool_stage");
+
+  expect(
+    validationCodes({
+      ...validTurn(),
+      fieldCandidates: [
+        {
+          fieldKey: "serviceCategoryId",
+          naturalValue: "Facial",
+          confidence: 0.99,
+          source: "visitor",
+        },
+      ],
+      safety: {
+        decision: "refuse",
+        reasonCode: "unsafe_request",
+      },
+    }),
+  ).toEqual(
+    expect.arrayContaining([
+      "blocked_turn_contains_proposals",
+      "blocked_turn_action_mismatch",
+    ]),
+  );
+});
+
+test("validator requires explicit targets for switching and completion", () => {
+  expect(
+    validationCodes({
+      ...validTurn(),
+      turnKind: "task_switch",
+      taskRecommendation: {
+        taskId: 95,
+        confidence: 0.99,
+        reason: "Same task",
+      },
+    }),
+  ).toContain("task_switch_target_required");
+
+  expect(
+    validationCodes({
+      ...validTurn(),
+      nextAction: "complete",
+    }),
+  ).toContain("completion_outcome_required");
+});
+
+test("compiler with denied visibility excludes personal field values", () => {
+  const projectPolicy = {
+    ...REFERENCE_BOOKING_PROJECT_POLICY,
+    dataHandling: {
+      ...REFERENCE_BOOKING_PROJECT_POLICY.dataHandling,
+      sensitiveModelVisibility: "denied" as const,
+    },
+  };
+  const compiled = compileStructuredTurn({
+    activeTask: snapshot,
+    assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
+    assistantIntroduced: false,
+    channel: "project_chat",
+    companyName: "Ewissen Infra",
+    context: [],
+    fieldState: [
+      {
+        fieldKey: "guestEmail",
+        label: "Guest Email",
+        state: "valid",
+        required: true,
+        sensitivity: "personal",
+        value: "private@example.com",
+      },
+    ],
+    history: [],
+    projectPolicy,
+    projectName: "Ewissen Infra",
+    publishedTasks: [],
+    retrieval: [],
+    stage: "knowledge",
+    visitorMessage: "Hello",
+  });
+
+  expect(compiled.system).not.toContain("private@example.com");
+  expect(compiled.system).toContain("Assistant already introduced: false");
 });
