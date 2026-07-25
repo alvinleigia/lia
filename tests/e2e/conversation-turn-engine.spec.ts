@@ -9,6 +9,7 @@ import {
   StructuredTurnEngine,
   type TurnKnowledgeRetriever,
 } from "../../src/lib/conversation-turn-engine";
+import { buildSafeTurnDecisionSummary } from "../../src/lib/conversation-turn-safety";
 import type {
   StructuredTurnProvider,
   StructuredTurnProviderInput,
@@ -268,4 +269,154 @@ test("accepted field candidates never mutate server task state", async () => {
   expect(snapshot.task.definition.fields[0]?.key).toBe(
     REFERENCE_BOOKING_TASK_DEFINITION.fields[0]?.key,
   );
+});
+
+test("opening conversations wait without invoking the model when configured", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const engine = new StructuredTurnEngine({ provider });
+  const {
+    stage: _stage,
+    visitorMessage: _visitorMessage,
+    ...input
+  } = engineInput();
+
+  const result = await engine.open(input);
+
+  expect(result).toBeNull();
+  expect(provider.calls).toHaveLength(0);
+});
+
+test("exact opening greetings are returned without invoking the model", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const engine = new StructuredTurnEngine({ provider });
+  const {
+    stage: _stage,
+    visitorMessage: _visitorMessage,
+    ...input
+  } = engineInput();
+
+  const result = await engine.open({
+    ...input,
+    projectPolicy: {
+      ...input.projectPolicy,
+      assistant: {
+        ...input.projectPolicy.assistant,
+        greeting: "Welcome to Ewissen Infra.",
+        greetingStrategy: "exact",
+      },
+    },
+  });
+
+  expect(result?.source).toBe("deterministic");
+  expect(result?.proposal.turnKind).toBe("greeting");
+  expect(result?.proposal.reply).toBe("Welcome to Ewissen Infra.");
+  expect(provider.calls).toHaveLength(0);
+});
+
+test("generated opening greetings use the structured model boundary", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      turnKind: "greeting",
+      reply: "Welcome. How can I help?",
+      grounding: { status: "not_needed", excerptIds: [] },
+      fieldCandidates: [],
+    }),
+  ]);
+  const engine = new StructuredTurnEngine({ provider });
+  const {
+    stage: _stage,
+    visitorMessage: _visitorMessage,
+    ...input
+  } = engineInput();
+
+  const result = await engine.open({
+    ...input,
+    projectPolicy: {
+      ...input.projectPolicy,
+      assistant: {
+        ...input.projectPolicy.assistant,
+        greetingStrategy: "generated",
+      },
+    },
+  });
+
+  expect(result?.source).toBe("model");
+  expect(result?.proposal.turnKind).toBe("greeting");
+  expect(provider.calls).toHaveLength(1);
+  expect(provider.calls[0]?.system).toContain("Opening turn: true");
+});
+
+test("audit summaries exclude replies, field values, and private reasoning", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const engine = new StructuredTurnEngine({ provider });
+  const result = await engine.execute(engineInput());
+
+  const summary = buildSafeTurnDecisionSummary(result);
+  const serialized = JSON.stringify(summary);
+
+  expect(summary.fieldCandidateCount).toBe(1);
+  expect(summary.nextAction).toBe("ask");
+  expect(serialized).not.toContain("Facial");
+  expect(serialized).not.toContain(result.proposal.reply);
+  expect(serialized).not.toContain(result.proposal.decisionSummary);
+});
+
+test("multilingual visitor values retain canonical field keys", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      reply: "ज़रूर। आप किस तारीख को आना चाहेंगे?",
+      fieldCandidates: [
+        {
+          fieldKey: "serviceCategoryId",
+          naturalValue: "फेशियल",
+          confidence: 0.95,
+          source: "visitor",
+        },
+      ],
+    }),
+  ]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    visitorMessage: "मुझे फेशियल बुक करना है।",
+  });
+
+  expect(result.proposal.reply).toContain("तारीख");
+  expect(result.proposal.fieldCandidates[0]).toMatchObject({
+    fieldKey: "serviceCategoryId",
+    naturalValue: "फेशियल",
+  });
+  expect(provider.calls[0]?.messages.at(-1)?.content).toBe(
+    "मुझे फेशियल बुक करना है।",
+  );
+});
+
+test("published stage overrides select the configured model", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  await engine.execute({
+    ...engineInput(),
+    projectPolicy: {
+      ...engineInput().projectPolicy,
+      assistant: {
+        ...engineInput().projectPolicy.assistant,
+        modelPolicy: {
+          ...engineInput().projectPolicy.assistant.modelPolicy,
+          mode: "project_override",
+          stageOverrides: [
+            {
+              stage: "extraction",
+              modelId: "stage-model",
+              fallbackModelId: null,
+            },
+          ],
+        },
+      },
+    },
+  });
+
+  expect(provider.calls).toHaveLength(1);
+  expect(provider.calls[0]?.modelId).toBe("stage-model");
 });

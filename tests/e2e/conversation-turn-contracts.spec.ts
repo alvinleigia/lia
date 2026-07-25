@@ -167,6 +167,7 @@ test("compiler exposes only allowed task contracts and model-visible context", (
   expect(compiled.system).toContain("Asia/Kolkata");
   expect(compiled.system).not.toContain("never-send-this");
   expect(compiled.system).toContain("guest@example.com");
+  expect(compiled.system).toContain("Assistant already introduced: true");
   expect(compiled.validation.allowedTaskIds).toEqual(new Set([95]));
   expect(compiled.validation.allowedFieldKeys.has("guestEmail")).toBe(true);
   expect(compiled.validation.allowedExcerptIds).toEqual(

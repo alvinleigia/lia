@@ -1,9 +1,11 @@
+import { writeAuditLog } from "@/lib/audit";
 import {
   isInactiveAccountError,
   resolveStrictUserAndProject,
 } from "@/lib/auth-project";
 import { logChatRequest } from "@/lib/chat-logs";
 import { structuredTurnRequestV1Schema } from "@/lib/conversation-turn-contracts";
+import { buildSafeTurnDecisionSummary } from "@/lib/conversation-turn-safety";
 import {
   executeProjectStructuredTurn,
   PublishedTurnTaskNotFoundError,
@@ -53,6 +55,13 @@ export async function POST(request: Request) {
         result.execution.source === "deterministic"
           ? result.execution.proposal.safety.reasonCode
           : null,
+    });
+    await writeAuditLog({
+      ...context,
+      action: "structured_turn.decided",
+      targetType: result.activeTask ? "conversational_task" : "project",
+      targetId: result.activeTask?.id ?? projectId,
+      metadata: buildSafeTurnDecisionSummary(result.execution),
     });
 
     return Response.json(result);

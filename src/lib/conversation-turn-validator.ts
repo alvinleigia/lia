@@ -36,6 +36,22 @@ export function validateStructuredTurnProposal(
 
   const proposal = parsed.data;
   const issues: string[] = [];
+  const hasActionProposal =
+    proposal.fieldCandidates.length > 0 ||
+    proposal.taskRecommendation !== null ||
+    proposal.toolRequest !== null ||
+    proposal.routeRecommendation !== null ||
+    proposal.outcomeRecommendation !== null;
+
+  if (
+    proposal.turnKind === "greeting" &&
+    (proposal.nextAction !== "ask" ||
+      proposal.grounding.status !== "not_needed" ||
+      proposal.ambiguity.requiresClarification ||
+      hasActionProposal)
+  ) {
+    issues.push("invalid_greeting");
+  }
 
   for (const excerptId of proposal.grounding.excerptIds) {
     if (!allowed.allowedExcerptIds.has(excerptId)) {

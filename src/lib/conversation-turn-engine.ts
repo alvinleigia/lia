@@ -6,6 +6,7 @@ import type {
 import {
   compileStructuredTurn,
   type PublishedTaskOption,
+  planOpeningTurn,
 } from "@/lib/conversation-turn-compiler";
 import {
   type TurnContextValueV1,
@@ -51,6 +52,7 @@ export type ExecuteStructuredTurnInput = {
   context: TurnContextValueV1[];
   fieldState: TurnFieldStateV1[];
   history: TurnMessageV1[];
+  openingTurn?: boolean;
   projectId: number;
   projectPolicy: ConversationProjectPolicyV1;
   projectName: string;
@@ -58,6 +60,11 @@ export type ExecuteStructuredTurnInput = {
   stage: (typeof TURN_MODEL_STAGES)[number];
   visitorMessage: string;
 };
+
+export type OpenStructuredConversationInput = Omit<
+  ExecuteStructuredTurnInput,
+  "openingTurn" | "stage" | "visitorMessage"
+>;
 
 export type StructuredTurnExecution = {
   attempts: number;
@@ -100,12 +107,17 @@ function deterministicProposal(input: {
   nextAction: "ask" | "clarify" | "handoff" | "fail";
   reasonCode: string;
   reply: string;
+  groundingStatus?: TurnResultV1["grounding"]["status"];
+  turnKind?: TurnResultV1["turnKind"];
 }): TurnResultV1 {
   return turnResultV1Schema.parse({
     schemaVersion: 1,
-    turnKind: "ordinary_question",
+    turnKind: input.turnKind ?? "ordinary_question",
     reply: input.reply,
-    grounding: { status: "no_answer", excerptIds: [] },
+    grounding: {
+      status: input.groundingStatus ?? "no_answer",
+      excerptIds: [],
+    },
     fieldCandidates: [],
     taskRecommendation: null,
     toolRequest: null,
@@ -218,6 +230,39 @@ export class StructuredTurnEngine {
     this.retriever = options.retriever ?? null;
   }
 
+  async open(
+    input: OpenStructuredConversationInput,
+  ): Promise<StructuredTurnExecution | null> {
+    const opening = planOpeningTurn(input.projectPolicy);
+    if (opening.mode === "wait") {
+      return null;
+    }
+    if (opening.mode === "exact") {
+      return {
+        attempts: 0,
+        proposal: asValidatedDeterministic(
+          deterministicProposal({
+            nextAction: "ask",
+            reasonCode: "configured_greeting",
+            reply: opening.reply,
+            groundingStatus: "not_needed",
+            turnKind: "greeting",
+          }),
+        ),
+        source: "deterministic",
+        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+      };
+    }
+
+    return this.execute({
+      ...input,
+      assistantIntroduced: false,
+      openingTurn: true,
+      stage: "knowledge",
+      visitorMessage: "Begin the conversation using the published policy.",
+    });
+  }
+
   async execute(
     input: ExecuteStructuredTurnInput,
   ): Promise<StructuredTurnExecution> {
@@ -261,7 +306,7 @@ export class StructuredTurnEngine {
     }
 
     let retrieval: TurnRetrievalExcerptV1[] = [];
-    if (this.retriever) {
+    if (this.retriever && !input.openingTurn) {
       try {
         retrieval = await this.retriever.retrieve({
           projectId: input.projectId,

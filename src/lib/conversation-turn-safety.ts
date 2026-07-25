@@ -1,5 +1,8 @@
 import type { ConversationProjectPolicyV1 } from "@/lib/conversation-contracts";
-import type { TurnMessageV1 } from "@/lib/conversation-turn-contracts";
+import type {
+  TurnMessageV1,
+  ValidatedTurnProposalV1,
+} from "@/lib/conversation-turn-contracts";
 
 export type TurnAdmissionDecision =
   | { allowed: true }
@@ -106,4 +109,27 @@ export function hasUnsafeTurnOutput(reply: string) {
     /\b(?:OPENAI_API_KEY|DATABASE_URL|AUTH_SECRET)\b/.test(reply) ||
     /\bsk-[A-Za-z0-9_-]{20,}\b/.test(reply)
   );
+}
+
+export function buildSafeTurnDecisionSummary(input: {
+  attempts: number;
+  proposal: ValidatedTurnProposalV1;
+  source: "model" | "deterministic";
+}) {
+  return {
+    schemaVersion: 1,
+    source: input.source,
+    attempts: input.attempts,
+    providerModelId: input.proposal.validation.providerModelId,
+    turnKind: input.proposal.turnKind,
+    nextAction: input.proposal.nextAction,
+    groundingStatus: input.proposal.grounding.status,
+    safetyDecision: input.proposal.safety.decision,
+    safetyReasonCode: input.proposal.safety.reasonCode,
+    fieldCandidateCount: input.proposal.fieldCandidates.length,
+    hasTaskRecommendation: input.proposal.taskRecommendation !== null,
+    hasToolRequest: input.proposal.toolRequest !== null,
+    hasRouteRecommendation: input.proposal.routeRecommendation !== null,
+    hasOutcomeRecommendation: input.proposal.outcomeRecommendation !== null,
+  };
 }
