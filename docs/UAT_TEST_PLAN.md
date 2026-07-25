@@ -6,7 +6,7 @@ Phase: 2 of 18
 
 Test: Durable Task State and Field Lifecycle
 
-Progress: Step 5 of 10
+Progress: Step 9 of 10
 
 Project: `Ewissen Infra (#194)`
 
@@ -261,36 +261,35 @@ Notes:
 
 ## Step 8 of 10 - Switch to Another Task
 
-The `Published Task` list needs a second active task with a published version.
-
-If the list is empty, create this temporary task:
-
-```text
-Task Name: Phase 2 Switch Target
-Objective: Collect a temporary service request for runtime switching UAT.
-```
-
-Apply the booking starter, resolve any Review blocker, and publish Version 1.
+For this test, use the existing published task `Phase 1 Contract Closure`.
 
 **Do this**
 
-1. Return to the primary task's `Runtime Lifecycle Test`.
-2. Under `Switch Active Task`, choose the temporary published task.
+1. Under `Switch Active Task`, open the `Published Task` list.
+2. Choose `Phase 1 Contract Closure`.
 3. Select `Switch Task`.
 
 **Pass when**
 
-- The previous run becomes `Cancelled`.
-- The temporary task becomes the Active Task.
-- The temporary task is pinned to its published version.
-- The same test conversation continues.
-- Unpublished and archived tasks are not offered in the list.
+- A green message says the conversation switched to the selected task.
+- Active Task is `Phase 1 Contract Closure`.
+- Pinned Version is `v1`.
+- Run Status is `Active`.
+- Response Owner is `Conversational Task`.
+- The fields now belong to the selected task: `Preferred Treatments` and
+  `Service`.
 
-Status: Pending
+Do not enter values or select `Reset Test Data` during this step.
+
+Status: Pass
+
+Evidence: screenshot confirmed on 2026-07-25.
 
 Notes:
 
 ## Step 9 of 10 - Restart, Complete, and Cancel
+
+Remain on the current Runtime Lifecycle Test page.
 
 **Do this**
 
@@ -303,8 +302,14 @@ Notes:
 
 Continue:
 
-1. Save all required values using the Test Values above.
-2. Select `Complete`.
+1. In `Save or Correct a Value`, choose `Preferred Treatments`.
+2. Enter `massage`.
+3. Select `Save Value`.
+4. Choose `Service`.
+5. Enter `Deep Tissue Massage`.
+6. Select `Save Value`.
+7. Confirm both fields show `Valid`.
+8. Select `Complete`.
 
 **Pass when**
 
@@ -354,7 +359,6 @@ Continue:
 Finish:
 
 1. Switch back to `Ewissen Infra (#194)`.
-2. Archive `Phase 2 Switch Target` if you created it.
 
 Status: Pending
 
