@@ -8,6 +8,7 @@ export default defineConfig({
   testMatch: [
     "channel-adapter.spec.ts",
     "channel-certification.spec.ts",
+    "conversation-turn-contracts.spec.ts",
     "conversational-task-runtime.spec.ts",
     "conversational-task-schema.spec.ts",
   ],

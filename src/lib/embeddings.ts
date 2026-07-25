@@ -1,13 +1,13 @@
 // src/lib/embeddings.ts
 
-import { openai } from "@ai-sdk/openai";
 import { embed, embedMany } from "ai";
+import { getPlatformEmbeddingModel } from "@/lib/model-provider";
 
 export async function generateEmbedding(text: string): Promise<number[]> {
   const input = text.replaceAll("\n", " ");
 
   const { embedding } = await embed({
-    model: openai.textEmbeddingModel("text-embedding-3-small"),
+    model: getPlatformEmbeddingModel(),
     value: input,
   });
 
@@ -26,7 +26,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   for (let i = 0; i < inputs.length; i += BATCH_SIZE) {
     const batch = inputs.slice(i, i + BATCH_SIZE);
     const { embeddings } = await embedMany({
-      model: openai.textEmbeddingModel("text-embedding-3-small"),
+      model: getPlatformEmbeddingModel(),
       values: batch,
     });
     allEmbeddings.push(...embeddings);

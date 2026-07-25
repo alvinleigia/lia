@@ -54,6 +54,16 @@ export const TOOL_STAGES = [
   "operation",
 ] as const;
 
+export const TURN_MODEL_STAGES = [
+  "knowledge",
+  "extraction",
+  "clarification",
+  "lookup",
+  "confirmation",
+  "operation",
+  "routing",
+] as const;
+
 export const CUSTOM_CONTEXT_SOURCES = [
   "tenant",
   "project",
@@ -76,6 +86,34 @@ export const assistantPolicyV1Schema = z.object({
   language: z.string().trim().min(2).max(40),
   modelPolicy: z.object({
     mode: z.enum(["platform_default", "project_override"]),
+    primaryModelId: z.string().trim().min(1).max(120).default("gpt-5-mini"),
+    fallbackModelId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .nullable()
+      .default("gpt-4.1-mini"),
+    timeoutMs: z.number().int().min(1_000).max(60_000).default(15_000),
+    maxOutputTokens: z.number().int().min(64).max(4_096).default(900),
+    maxRetries: z.number().int().min(0).max(2).default(1),
+    maxRepairAttempts: z.number().int().min(0).max(2).default(1),
+    stageOverrides: z
+      .array(
+        z.object({
+          stage: z.enum(TURN_MODEL_STAGES),
+          modelId: z.string().trim().min(1).max(120),
+          fallbackModelId: z
+            .string()
+            .trim()
+            .min(1)
+            .max(120)
+            .nullable()
+            .default(null),
+        }),
+      )
+      .max(TURN_MODEL_STAGES.length)
+      .default([]),
   }),
 });
 
@@ -157,7 +195,16 @@ export const DEFAULT_CONVERSATION_PROJECT_POLICY: ConversationProjectPolicyV1 =
       greeting: null,
       greetingStrategy: "wait",
       language: "English",
-      modelPolicy: { mode: "platform_default" },
+      modelPolicy: {
+        mode: "platform_default",
+        primaryModelId: "gpt-5-mini",
+        fallbackModelId: "gpt-4.1-mini",
+        timeoutMs: 15_000,
+        maxOutputTokens: 900,
+        maxRetries: 1,
+        maxRepairAttempts: 1,
+        stageOverrides: [],
+      },
     },
     dataHandling: {
       schemaVersion: 1,

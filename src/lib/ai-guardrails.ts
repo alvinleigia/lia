@@ -3,7 +3,7 @@ import {
   type ProjectAiSettings,
 } from "@/lib/project-ai-settings";
 
-type KnowledgeChatChannel = "project_chat" | "widget_chat";
+type KnowledgeChatChannel = "project_chat" | "widget_chat" | "whatsapp";
 
 type BuildKnowledgeChatSystemPromptInput = {
   channel: KnowledgeChatChannel;
@@ -142,7 +142,13 @@ export function buildKnowledgeChatSystemPrompt({
     formatContextLine("Company", effectiveCompanyName),
     formatContextLine("Project", projectName),
     formatContextLine("Assistant name", settings.assistantName),
-    `Channel: ${channel === "widget_chat" ? "website widget" : "project chat"}`,
+    `Channel: ${
+      channel === "widget_chat"
+        ? "website widget"
+        : channel === "whatsapp"
+          ? "WhatsApp"
+          : "project chat"
+    }`,
   ].filter(Boolean);
 
   const missingKnowledgeRule = hasDocuments

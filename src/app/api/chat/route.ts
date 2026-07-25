@@ -1,6 +1,5 @@
 // src/app/api/chat/route.ts
 
-import { openai } from "@ai-sdk/openai";
 import {
   convertToModelMessages,
   stepCountIs,
@@ -16,6 +15,7 @@ import {
 } from "@/lib/auth-project";
 import { logChatRequest } from "@/lib/chat-logs";
 import { projectHasIndexedDocuments } from "@/lib/documents";
+import { getPlatformLanguageModel } from "@/lib/model-provider";
 import { searchDocuments } from "@/lib/search";
 
 export type ChatMessage = UIMessage;
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     const hasDocuments = await projectHasIndexedDocuments(project.id);
 
     const result = streamText({
-      model: openai("gpt-5-mini"),
+      model: getPlatformLanguageModel(),
       messages: await convertToModelMessages(contextMessages),
       tools: hasDocuments
         ? {
