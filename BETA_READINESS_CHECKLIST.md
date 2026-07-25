@@ -1,6 +1,6 @@
 # Beta Readiness Checklist
 
-Status date: 2026-07-24
+Status date: 2026-07-25
 
 This checklist turns `LEIGIA_BLUEPRINT_ALIGNMENT_AUDIT.md` into a practical
 beta-readiness track. Use it before putting real customers or production-like
@@ -29,8 +29,9 @@ Overall beta status: Not ready for production-like beta traffic.
 
 Authoritative product implementation status:
 
-- Flow roadmap target: Priority 1, Phase 1 of 18.
-- Priority 1, Phases 1-8 remain required for the goal-driven conversational
+- Flow roadmap target: Priority 1, Phase 2 of 18.
+- Priority 1, Phase 1 implementation and manual UAT are complete.
+- Priority 1, Phases 2-8 remain required for the goal-driven conversational
   core.
 - Priority 2, Phases 9-14 remain required for declared non-voice beta
   capability parity, live channel certification, and release approval.

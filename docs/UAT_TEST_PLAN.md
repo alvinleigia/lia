@@ -24,7 +24,7 @@ The previous full 18-phase draft is preserved in Git commit `625d2ae`.
 ## UAT Environment
 
 - UAT URL:
-- Build/commit: `67f9bd7`
+- Build/commit: `790b44d`
 - Database/environment:
 - Tester: Alvin
 - Test date: 2026-07-25
@@ -61,9 +61,10 @@ embedding channel- or provider-specific settings.
 
 Roadmap implementation: 55 of 55 Phase 1 items complete.
 
-UAT status: original 13-step suite passed; closure addendum pending.
+UAT status: Pass. The original 13-step suite and four-step closure addendum
+passed.
 
-Completed checkpoint: original Step 13 of 13; closure Step 0 of 4.
+Completed checkpoint: original Step 13 of 13; closure Step 4 of 4.
 
 ### Accepted Task Workspace Tests
 
@@ -646,11 +647,13 @@ UAT tester:
 Goal: verify the industry-neutral settings added by the Phase 1 closure audit
 without repeating the 13 accepted tests above.
 
-Closure build/commit: `93ba276`
+Closure implementation commit: `93ba276`
 
-Closure UAT status: Pending
+Closure tested build/commit: `790b44d`
 
-Completed checkpoint: Step 0 of 4
+Closure UAT status: Pass
+
+Completed checkpoint: Step 4 of 4
 
 ### Closure Step 1 - Advanced Assistant And Identity Policy
 
@@ -683,7 +686,7 @@ Handoff Depth: 1
 Expected result: all saved selections remain visible. No provider, WhatsApp,
 or industry-specific setting appears in the task contract.
 
-Status: Pending
+Status: Pass
 
 Notes:
 
@@ -739,7 +742,7 @@ Expected result: both fields are added without losing entered values. The first
 field is shown as `multiple`; both choice sources remain part of the saved task
 definition.
 
-Status: Pending
+Status: Pass
 
 Notes:
 
@@ -768,7 +771,7 @@ Expected result: the stable key remains `campaignCode`; the row shows
 `project / text / personal / expires in 1440 minutes`. Reopening the editor
 shows the saved default, visibility, sensitivity, and expiry values.
 
-Status: Pending
+Status: Pass
 
 Notes:
 
@@ -826,7 +829,7 @@ context variable cannot be deleted. Automated tests separately verify
 duplicate-key, cyclic-dependency, malformed-choice, tool-stage, lifecycle, and
 legacy-compatibility blockers.
 
-Status: Pending
+Status: Pass
 
 Notes:
 
@@ -834,9 +837,17 @@ After this step passes, archive the temporary `Phase 1 Contract Closure` task.
 
 ## Phase 1 Closure Gate
 
-- [ ] Closure Steps 1 through 4 pass.
-- [ ] The published closure task has no contract blockers.
-- [ ] Referenced context deletion remains blocked.
-- [ ] No Critical or High closure issue remains unresolved.
+- [x] Closure Steps 1 through 4 pass.
+- [x] The published closure task has no contract blockers.
+- [x] Referenced context deletion remains blocked.
+- [x] No Critical or High closure issue remains unresolved.
 
-Final Phase 1 closure status: Pending
+Final Phase 1 closure status: Pass
+
+Closure UAT tester:
+
+- Name: Alvin
+- Date: 2026-07-25
+- Approved: Yes
+- Notes: Phase 1 closure manual UAT completed with no unresolved Critical or
+  High issue reported.

@@ -85,12 +85,12 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 1 of 18 closure audit. All 55 implementation
-items are complete. The original 13 manual UAT steps passed on 2026-07-25; the
-focused four-step closure addendum is pending.
+Current phase: Priority 1, Phase 2 of 18. Phase 1 completed all 55
+implementation items, the original 13 manual UAT steps, and the focused
+four-step closure addendum on 2026-07-25.
 
-Current implementation target: complete the Phase 1 closure addendum, then
-start Priority 1, Phase 2 of 18, Durable Task State And Field Lifecycle.
+Current implementation target: Priority 1, Phase 2 of 18, Durable Task State
+And Field Lifecycle.
 
 ## Product Direction
 
@@ -290,6 +290,9 @@ Phase 1 exit gate: the versioned contracts can describe the complete reference
 booking task, grounded Q&A entry, approved task recommendation, return
 behavior, identity, data handling, degraded behavior, trusted context, and
 allowed tools without embedding channel or provider-specific logic.
+
+Phase 1 status: Complete. Manual UAT and the closure addendum passed on
+2026-07-25.
 
 ## Phase 2: Durable Task State And Field Lifecycle
 
