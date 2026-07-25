@@ -33,6 +33,16 @@ test.describe.configure({ mode: "serial" });
 
 const startedAt = new Date("2026-07-25T10:00:00.000Z");
 const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const runtimeTaskDefinition = {
+  ...REFERENCE_BOOKING_TASK_DEFINITION,
+  tools: [
+    {
+      access: "read" as const,
+      allowedStages: ["lookup" as const],
+      tool: { id: "availability_lookup", version: 1 },
+    },
+  ],
+};
 
 let fixture:
   | {
@@ -120,19 +130,19 @@ test.beforeAll(async () => {
     .insert(conversationalTasks)
     .values([
       {
-        definition: REFERENCE_BOOKING_TASK_DEFINITION,
+        definition: runtimeTaskDefinition,
         name: "Book a Service",
         objective: "Collect and confirm a service request.",
         projectId: project.id,
       },
       {
-        definition: REFERENCE_BOOKING_TASK_DEFINITION,
+        definition: runtimeTaskDefinition,
         name: "Change a Service",
         objective: "Collect a replacement service request.",
         projectId: project.id,
       },
       {
-        definition: REFERENCE_BOOKING_TASK_DEFINITION,
+        definition: runtimeTaskDefinition,
         name: "Unpublished Service Task",
         objective: "Remain unavailable until published.",
         projectId: project.id,
@@ -151,7 +161,7 @@ test.beforeAll(async () => {
       name: task.name,
       objective: task.objective,
       description: null,
-      definition: REFERENCE_BOOKING_TASK_DEFINITION,
+      definition: runtimeTaskDefinition,
     },
   });
   const targetSnapshot = conversationalTaskSnapshotV1Schema.parse({
@@ -382,8 +392,28 @@ test("suspends for a side question and resumes the requested field", async () =>
     },
   });
 
+  const blockedMutation = await applyConversationalTaskEvent({
+    ...eventEnvelope("side-question-field-mutation", 5),
+    type: "field.candidates",
+    correction: false,
+    candidates: [
+      {
+        fieldKey: "guestName",
+        naturalValue: "Blocked during Q&A",
+        canonicalValue: "Blocked during Q&A",
+        state: "valid",
+        provenance: { source: "visitor", sourceReference: null },
+        validation: { code: null, message: null, valid: true },
+      },
+    ],
+  });
+  expect(blockedMutation).toMatchObject({
+    disposition: "quarantined",
+    reason: "inactive_response_owner",
+  });
+
   const resumed = await applyConversationalTaskEvent({
-    ...eventEnvelope("side-question-resolved", 5),
+    ...eventEnvelope("side-question-resolved", 6),
     type: "task.side_question_resolved",
   });
   activeRevision = resumed.revision as number;
@@ -400,7 +430,7 @@ test("suspends for a side question and resumes the requested field", async () =>
 
 test("corrects dependencies, clears fields, and quarantines stale turns", async () => {
   const corrected = await applyConversationalTaskEvent({
-    ...eventEnvelope("correction", 6),
+    ...eventEnvelope("correction", 7),
     type: "field.candidates",
     correction: true,
     candidates: [
@@ -428,7 +458,7 @@ test("corrects dependencies, clears fields, and quarantines stale turns", async 
   );
 
   const cleared = await applyConversationalTaskEvent({
-    ...eventEnvelope("clear", 7),
+    ...eventEnvelope("clear", 8),
     type: "field.clear",
     fieldKey: "serviceId",
     reason: "visitor_correction",
@@ -447,7 +477,7 @@ test("corrects dependencies, clears fields, and quarantines stale turns", async 
   );
 
   const stale = await applyConversationalTaskEvent({
-    ...eventEnvelope("stale", 8),
+    ...eventEnvelope("stale", 9),
     expectedRevision: activeRevision - 1,
     type: "field.requested",
     fieldKey: "guestName",
@@ -458,7 +488,7 @@ test("corrects dependencies, clears fields, and quarantines stale turns", async 
   });
 
   const outOfOrder = await applyConversationalTaskEvent({
-    ...eventEnvelope("out-of-order", 9),
+    ...eventEnvelope("out-of-order", 10),
     providerSequence: providerSequence - 2,
     type: "field.requested",
     fieldKey: "guestName",
@@ -469,9 +499,103 @@ test("corrects dependencies, clears fields, and quarantines stale turns", async 
   });
 });
 
+test("serializes concurrent turns and records authenticated tool results", async () => {
+  const first = {
+    ...eventEnvelope("concurrent-guest-email", 11),
+    type: "field.candidates" as const,
+    correction: false,
+    candidates: [
+      {
+        fieldKey: "guestEmail",
+        naturalValue: "first@example.com",
+        canonicalValue: "first@example.com",
+        state: "valid" as const,
+        provenance: { source: "visitor" as const, sourceReference: null },
+        validation: { code: null, message: null, valid: true },
+      },
+    ],
+  };
+  const second = {
+    ...eventEnvelope("concurrent-guest-phone", 11),
+    expectedRevision: first.expectedRevision,
+    type: "field.candidates" as const,
+    correction: false,
+    candidates: [
+      {
+        fieldKey: "guestPhone",
+        naturalValue: "+919988776655",
+        canonicalValue: "+919988776655",
+        state: "valid" as const,
+        provenance: { source: "visitor" as const, sourceReference: null },
+        validation: { code: null, message: null, valid: true },
+      },
+    ],
+  };
+  const concurrentResults = await Promise.all([
+    applyConversationalTaskEvent(first),
+    applyConversationalTaskEvent(second),
+  ]);
+  expect(
+    concurrentResults.filter((result) => result.disposition === "applied"),
+  ).toHaveLength(1);
+  expect(
+    concurrentResults.filter(
+      (result) =>
+        result.disposition === "conflict" ||
+        (result.disposition === "quarantined" &&
+          result.reason === "stale_revision"),
+    ),
+  ).toHaveLength(1);
+  const applied = concurrentResults.find(
+    (result) => result.disposition === "applied",
+  );
+  activeRevision = applied?.revision as number;
+
+  const requested = await applyConversationalTaskEvent({
+    ...eventEnvelope("tool-requested", 12),
+    type: "tool.requested",
+    idempotencyKey: `availability-${suffix}`,
+    input: { preferredDate: "2026-08-15" },
+    requestId: `availability-${suffix}`,
+    requestMode: "synchronous",
+    stage: "lookup",
+    timeoutAt: timestamp(20),
+    toolId: "availability_lookup",
+  });
+  activeRevision = requested.revision as number;
+  const completed = await applyConversationalTaskEvent({
+    ...eventEnvelope("tool-result", 13),
+    type: "tool.result",
+    authentication: {
+      keyId: "runtime-db-test",
+      kind: "hmac",
+      principal: "test-provider",
+      verifiedAt: timestamp(13),
+    },
+    errorCode: null,
+    requestId: `availability-${suffix}`,
+    result: { available: true },
+    status: "completed",
+  });
+  activeRevision = completed.revision as number;
+
+  const runtime = await getConversationalTaskRuntime({
+    projectId: fixture?.projectId as number,
+    taskRunId: activeRunId,
+  });
+  expect(runtime?.tools).toContainEqual(
+    expect.objectContaining({
+      requestId: `availability-${suffix}`,
+      status: "completed",
+      taskVersionId: fixture?.taskVersionId,
+      toolId: "availability_lookup",
+    }),
+  );
+});
+
 test("pauses, rotates the session, resumes, and switches tasks", async () => {
   const paused = await applyConversationalTaskEvent({
-    ...eventEnvelope("pause", 10),
+    ...eventEnvelope("pause", 14),
     type: "task.pause",
     boundary: "no_reply",
     reason: "visitor_inactive",
@@ -480,7 +604,7 @@ test("pauses, rotates the session, resumes, and switches tasks", async () => {
   });
   activeRevision = paused.revision as number;
   const blockedMutation = await applyConversationalTaskEvent({
-    ...eventEnvelope("paused-field-mutation", 11),
+    ...eventEnvelope("paused-field-mutation", 15),
     type: "field.candidates",
     correction: false,
     candidates: [
@@ -508,14 +632,14 @@ test("pauses, rotates the session, resumes, and switches tasks", async () => {
   ).toBe("missing");
 
   const rotated = await applyConversationalTaskEvent({
-    ...eventEnvelope("rotate", 12),
+    ...eventEnvelope("rotate", 16),
     type: "session.rotate",
     sessionId: `rotated-${suffix}`,
     sessionExpiresAt: timestamp(120),
   });
   activeRevision = rotated.revision as number;
   const resumed = await applyConversationalTaskEvent({
-    ...eventEnvelope("resume", 13),
+    ...eventEnvelope("resume", 17),
     type: "task.resume",
     reason: "visitor_returned",
   });
@@ -529,9 +653,9 @@ test("pauses, rotates the session, resumes, and switches tasks", async () => {
       currentTaskRunId: activeRunId,
       eventId: `unpublished-switch-${suffix}`,
       initializationContext: { lia_timezone: "Asia/Kolkata" },
-      occurredAt: timestamp(14),
+      occurredAt: timestamp(18),
       projectId: fixture?.projectId as number,
-      receivedAt: timestamp(14),
+      receivedAt: timestamp(18),
       targetTaskId: fixture?.unpublishedTaskId as number,
     }),
   ).rejects.toThrow("The target task has no published version.");
@@ -551,9 +675,9 @@ test("pauses, rotates the session, resumes, and switches tasks", async () => {
     currentTaskRunId: activeRunId,
     eventId: `switch-${suffix}`,
     initializationContext: { lia_timezone: "Asia/Kolkata" },
-    occurredAt: timestamp(15),
+    occurredAt: timestamp(19),
     projectId: fixture?.projectId as number,
-    receivedAt: timestamp(15),
+    receivedAt: timestamp(19),
     targetTaskId: fixture?.targetTaskId as number,
   });
   expect(switched.cancel.disposition).toBe("applied");
@@ -591,7 +715,7 @@ test("keeps runtime reads and writes inside the project boundary", async () => {
 
   await expect(
     applyConversationalTaskEvent({
-      ...eventEnvelope("wrong-project", 13),
+      ...eventEnvelope("wrong-project", 20),
       projectId: fixture?.otherProjectId as number,
       type: "field.requested",
       fieldKey: "guestEmail",

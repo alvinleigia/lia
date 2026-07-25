@@ -58,6 +58,27 @@ export type ConversationalTaskRuntimeResult = {
   taskRunId: number | null;
 };
 
+async function runRuntimeTransaction(
+  taskRunId: number | null,
+  operation: (
+    transaction: RuntimeTransaction,
+  ) => Promise<ConversationalTaskRuntimeResult>,
+) {
+  try {
+    return await db.transaction(operation);
+  } catch (error) {
+    if (error instanceof ConversationalTaskRuntimeConflictError) {
+      return {
+        disposition: "conflict" as const,
+        reason: "revision_conflict",
+        revision: null,
+        taskRunId,
+      };
+    }
+    throw error;
+  }
+}
+
 function sortJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortJson);
   if (value && typeof value === "object") {
@@ -343,7 +364,7 @@ export async function startConversationalTaskRun(
   const occurredAt = new Date(parsed.occurredAt);
   const receivedAt = new Date(parsed.receivedAt);
 
-  return db.transaction(async (tx) => {
+  return runRuntimeTransaction(null, async (tx) => {
     const [conversation] = await tx
       .select()
       .from(channelConversations)
@@ -527,7 +548,10 @@ export async function startConversationalTaskRun(
       .returning();
     if (!run) throw new ConversationalTaskRuntimeConflictError();
 
-    const runtimeFields = initializeRuntimeTaskFields({ expiresAt, snapshot });
+    const runtimeFields = initializeRuntimeTaskFields({
+      expiresAt,
+      snapshot,
+    });
     if (runtimeFields.size > 0) {
       await tx.insert(conversationalTaskFieldValues).values(
         [...runtimeFields.values()].map((field) => ({
@@ -799,7 +823,7 @@ export async function applyConversationalTaskEvent(
   const occurredAt = new Date(event.occurredAt);
   const receivedAt = new Date(event.receivedAt);
 
-  return db.transaction(async (tx) => {
+  return runRuntimeTransaction(event.taskRunId, async (tx) => {
     const [conversation] = await tx
       .select({ id: channelConversations.id })
       .from(channelConversations)
