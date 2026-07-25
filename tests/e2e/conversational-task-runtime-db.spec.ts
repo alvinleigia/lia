@@ -41,6 +41,7 @@ let fixture:
       otherProjectId: number;
       taskId: number;
       targetTaskId: number;
+      unpublishedTaskId: number;
       taskVersionId: number;
       targetVersionId: number;
       userId: number;
@@ -115,7 +116,7 @@ test.beforeAll(async () => {
       },
     ])
     .returning();
-  const [task, targetTask] = await db
+  const [task, targetTask, unpublishedTask] = await db
     .insert(conversationalTasks)
     .values([
       {
@@ -128,6 +129,12 @@ test.beforeAll(async () => {
         definition: REFERENCE_BOOKING_TASK_DEFINITION,
         name: "Change a Service",
         objective: "Collect a replacement service request.",
+        projectId: project.id,
+      },
+      {
+        definition: REFERENCE_BOOKING_TASK_DEFINITION,
+        name: "Unpublished Service Task",
+        objective: "Remain unavailable until published.",
         projectId: project.id,
       },
     ])
@@ -191,6 +198,7 @@ test.beforeAll(async () => {
     targetVersionId: targetVersion.id,
     taskId: task.id,
     taskVersionId: taskVersion.id,
+    unpublishedTaskId: unpublishedTask.id,
     userId: user.id,
     workspaceId: workspace.id,
   };
@@ -282,9 +290,27 @@ test("starts a version-pinned run and replays the same event once", async () => 
   );
 });
 
+test("rejects completion while required fields remain incomplete", async () => {
+  const result = await applyConversationalTaskEvent({
+    ...eventEnvelope("premature-completion", 1),
+    type: "task.complete",
+    outcomeKey: "completed",
+  });
+
+  expect(result).toMatchObject({
+    disposition: "quarantined",
+    reason: "required_fields_incomplete",
+  });
+  const runtime = await getConversationalTaskRuntime({
+    projectId: fixture?.projectId as number,
+    taskRunId: activeRunId,
+  });
+  expect(runtime?.run.status).toBe("active");
+});
+
 test("applies multiple values once and preserves canonical field state", async () => {
   const event = {
-    ...eventEnvelope("field-candidates", 1),
+    ...eventEnvelope("field-candidates", 2),
     type: "field.candidates" as const,
     correction: false,
     candidates: [
@@ -332,13 +358,13 @@ test("applies multiple values once and preserves canonical field state", async (
 
 test("suspends for a side question and resumes the requested field", async () => {
   const requested = await applyConversationalTaskEvent({
-    ...eventEnvelope("field-requested", 2),
+    ...eventEnvelope("field-requested", 3),
     type: "field.requested",
     fieldKey: "preferredDate",
   });
   activeRevision = requested.revision as number;
   const suspended = await applyConversationalTaskEvent({
-    ...eventEnvelope("side-question", 3),
+    ...eventEnvelope("side-question", 4),
     type: "task.side_question",
     category: "business_hours",
   });
@@ -357,7 +383,7 @@ test("suspends for a side question and resumes the requested field", async () =>
   });
 
   const resumed = await applyConversationalTaskEvent({
-    ...eventEnvelope("side-question-resolved", 4),
+    ...eventEnvelope("side-question-resolved", 5),
     type: "task.side_question_resolved",
   });
   activeRevision = resumed.revision as number;
@@ -374,7 +400,7 @@ test("suspends for a side question and resumes the requested field", async () =>
 
 test("corrects dependencies, clears fields, and quarantines stale turns", async () => {
   const corrected = await applyConversationalTaskEvent({
-    ...eventEnvelope("correction", 5),
+    ...eventEnvelope("correction", 6),
     type: "field.candidates",
     correction: true,
     candidates: [
@@ -402,7 +428,7 @@ test("corrects dependencies, clears fields, and quarantines stale turns", async 
   );
 
   const cleared = await applyConversationalTaskEvent({
-    ...eventEnvelope("clear", 6),
+    ...eventEnvelope("clear", 7),
     type: "field.clear",
     fieldKey: "serviceId",
     reason: "visitor_correction",
@@ -421,7 +447,7 @@ test("corrects dependencies, clears fields, and quarantines stale turns", async 
   );
 
   const stale = await applyConversationalTaskEvent({
-    ...eventEnvelope("stale", 7),
+    ...eventEnvelope("stale", 8),
     expectedRevision: activeRevision - 1,
     type: "field.requested",
     fieldKey: "guestName",
@@ -432,7 +458,7 @@ test("corrects dependencies, clears fields, and quarantines stale turns", async 
   });
 
   const outOfOrder = await applyConversationalTaskEvent({
-    ...eventEnvelope("out-of-order", 8),
+    ...eventEnvelope("out-of-order", 9),
     providerSequence: providerSequence - 2,
     type: "field.requested",
     fieldKey: "guestName",
@@ -445,7 +471,7 @@ test("corrects dependencies, clears fields, and quarantines stale turns", async 
 
 test("pauses, rotates the session, resumes, and switches tasks", async () => {
   const paused = await applyConversationalTaskEvent({
-    ...eventEnvelope("pause", 9),
+    ...eventEnvelope("pause", 10),
     type: "task.pause",
     boundary: "no_reply",
     reason: "visitor_inactive",
@@ -453,19 +479,70 @@ test("pauses, rotates the session, resumes, and switches tasks", async () => {
     returnTarget: { fieldKey: "guestName" },
   });
   activeRevision = paused.revision as number;
+  const blockedMutation = await applyConversationalTaskEvent({
+    ...eventEnvelope("paused-field-mutation", 11),
+    type: "field.candidates",
+    correction: false,
+    candidates: [
+      {
+        fieldKey: "guestName",
+        naturalValue: "Blocked while paused",
+        canonicalValue: "Blocked while paused",
+        state: "valid",
+        provenance: { source: "visitor", sourceReference: null },
+        validation: { code: null, message: null, valid: true },
+      },
+    ],
+  });
+  expect(blockedMutation).toMatchObject({
+    disposition: "quarantined",
+    reason: "task_not_active",
+  });
+  expect(
+    (
+      await getConversationalTaskRuntime({
+        projectId: fixture?.projectId as number,
+        taskRunId: activeRunId,
+      })
+    )?.fields.find((field) => field.fieldKey === "guestName")?.state,
+  ).toBe("missing");
+
   const rotated = await applyConversationalTaskEvent({
-    ...eventEnvelope("rotate", 10),
+    ...eventEnvelope("rotate", 12),
     type: "session.rotate",
     sessionId: `rotated-${suffix}`,
     sessionExpiresAt: timestamp(120),
   });
   activeRevision = rotated.revision as number;
   const resumed = await applyConversationalTaskEvent({
-    ...eventEnvelope("resume", 11),
+    ...eventEnvelope("resume", 13),
     type: "task.resume",
     reason: "visitor_returned",
   });
   activeRevision = resumed.revision as number;
+
+  await expect(
+    switchConversationalTaskRun({
+      channelIdentity: { browserSession: "runtime-db-test" },
+      channelType: "project_chat",
+      conversationId: fixture?.conversationId as number,
+      currentTaskRunId: activeRunId,
+      eventId: `unpublished-switch-${suffix}`,
+      initializationContext: { lia_timezone: "Asia/Kolkata" },
+      occurredAt: timestamp(14),
+      projectId: fixture?.projectId as number,
+      receivedAt: timestamp(14),
+      targetTaskId: fixture?.unpublishedTaskId as number,
+    }),
+  ).rejects.toThrow("The target task has no published version.");
+  expect(
+    (
+      await getConversationalTaskRuntime({
+        projectId: fixture?.projectId as number,
+        taskRunId: activeRunId,
+      })
+    )?.run.status,
+  ).toBe("active");
 
   const switched = await switchConversationalTaskRun({
     channelIdentity: { browserSession: "runtime-db-test" },
@@ -474,9 +551,9 @@ test("pauses, rotates the session, resumes, and switches tasks", async () => {
     currentTaskRunId: activeRunId,
     eventId: `switch-${suffix}`,
     initializationContext: { lia_timezone: "Asia/Kolkata" },
-    occurredAt: timestamp(12),
+    occurredAt: timestamp(15),
     projectId: fixture?.projectId as number,
-    receivedAt: timestamp(12),
+    receivedAt: timestamp(15),
     targetTaskId: fixture?.targetTaskId as number,
   });
   expect(switched.cancel.disposition).toBe("applied");

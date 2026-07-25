@@ -29,6 +29,7 @@ import {
   getConversationProjectPolicy,
   saveConversationProjectPolicy,
 } from "@/lib/conversation-project-policies";
+import { resolveConversationalTaskMutation } from "@/lib/conversational-task-access";
 import {
   conversationalTaskDetailsSchema,
   conversationalTaskIdSchema,
@@ -85,28 +86,6 @@ function parseTaskDetails(formData: FormData) {
   });
 }
 
-async function resolveTaskMutation(formData: FormData) {
-  const projectId = projectIdSchema.safeParse(formData.get("projectId"));
-  const taskId = conversationalTaskIdSchema.safeParse(formData.get("taskId"));
-
-  if (!projectId.success || !taskId.success) {
-    redirect("/projects/tasks?error=Task%20not%20found.");
-  }
-
-  const context = await resolveStrictUserAndProject(projectId.data);
-  assertPermission(context.membership, "company.project.manage");
-  const task = await getProjectConversationalTask(
-    context.project.id,
-    taskId.data,
-  );
-
-  if (!task) {
-    redirect("/projects/tasks?error=Task%20not%20found.");
-  }
-
-  return { ...context, task };
-}
-
 export async function createConversationalTaskAction(
   _previousState: ActionFormState,
   formData: FormData,
@@ -147,7 +126,7 @@ export async function updateConversationalTaskAction(
     return { error: "Please check the task details." };
   }
 
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   if (context.task.isArchived) {
     return { error: "Restore the task before editing it." };
   }
@@ -176,7 +155,7 @@ export async function updateConversationalTaskAction(
 }
 
 export async function archiveConversationalTaskAction(formData: FormData) {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const task = await setProjectConversationalTaskArchived(
     context.project.id,
     context.task.id,
@@ -201,7 +180,7 @@ export async function archiveConversationalTaskAction(formData: FormData) {
 }
 
 export async function unarchiveConversationalTaskAction(formData: FormData) {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const task = await setProjectConversationalTaskArchived(
     context.project.id,
     context.task.id,
@@ -298,7 +277,7 @@ export async function addConversationalTaskFieldAction(
   _previousState: ActionFormState,
   formData: FormData,
 ): Promise<ActionFormState> {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/fields`;
   if (context.task.isArchived) {
     return { error: "Restore the task before editing." };
@@ -346,7 +325,7 @@ export async function addConversationalTaskFieldAction(
 }
 
 export async function removeConversationalTaskFieldAction(formData: FormData) {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/fields`;
   const fieldId = z.string().uuid().safeParse(formData.get("fieldId"));
   if (!fieldId.success || context.task.isArchived) {
@@ -394,7 +373,7 @@ export async function addTaskContextVariableAction(
   _previousState: ActionFormState,
   formData: FormData,
 ): Promise<ActionFormState> {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/fields`;
   if (formData.get("contextSource") === "system") {
     return { error: "System context is managed by Lia." };
@@ -441,7 +420,7 @@ export async function updateTaskContextVariableAction(
   _previousState: ActionFormState,
   formData: FormData,
 ): Promise<ActionFormState> {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/fields`;
   const parsed = z
     .object({
@@ -512,7 +491,7 @@ export async function updateTaskContextVariableAction(
 }
 
 export async function removeTaskContextVariableAction(formData: FormData) {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/fields`;
   const key = z.string().min(1).safeParse(formData.get("contextKey"));
   if (!key.success || context.task.isArchived) {
@@ -543,7 +522,7 @@ export async function bindConversationalTaskToolAction(
   _previousState: ActionFormState,
   formData: FormData,
 ): Promise<ActionFormState> {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/tools`;
   const operationId = z.coerce
     .number()
@@ -585,7 +564,7 @@ export async function bindConversationalTaskToolAction(
 }
 
 export async function unbindConversationalTaskToolAction(formData: FormData) {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/tools`;
   const toolId = z.string().min(1).safeParse(formData.get("toolId"));
   if (!toolId.success || context.task.isArchived) {
@@ -610,7 +589,7 @@ export async function addConversationalTaskOutcomeAction(
   _previousState: ActionFormState,
   formData: FormData,
 ): Promise<ActionFormState> {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/outcomes`;
   const parsed = taskOutcomeV1Schema.safeParse({
     id: crypto.randomUUID(),
@@ -644,7 +623,7 @@ export async function addConversationalTaskOutcomeAction(
 export async function removeConversationalTaskOutcomeAction(
   formData: FormData,
 ) {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/outcomes`;
   const outcomeId = z.string().uuid().safeParse(formData.get("outcomeId"));
   const definition = readConversationalTaskDefinition(context.task.definition);
@@ -675,7 +654,7 @@ export async function updateConversationalTaskSafetyAction(
   _previousState: ActionFormState,
   formData: FormData,
 ): Promise<ActionFormState> {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/outcomes`;
   if (context.task.isArchived) {
     return { error: "Restore the task before editing." };
@@ -790,7 +769,7 @@ export async function updateConversationalTaskSafetyAction(
 }
 
 export async function publishConversationalTaskAction(formData: FormData) {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/review`;
   const definition = readConversationalTaskDefinition(context.task.definition);
   const projectPolicy = await getConversationProjectPolicy(context.project.id);
@@ -829,7 +808,7 @@ export async function publishConversationalTaskAction(formData: FormData) {
 }
 
 export async function applyReferenceBookingTaskAction(formData: FormData) {
-  const context = await resolveTaskMutation(formData);
+  const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/fields`;
   if (context.task.isArchived) {
     redirect(`${destination}?error=Restore%20the%20task%20before%20editing.`);

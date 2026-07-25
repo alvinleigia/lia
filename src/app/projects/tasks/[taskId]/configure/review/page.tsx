@@ -1,7 +1,14 @@
-import { ArrowLeft, CheckCircle2, CircleAlert, Send } from "lucide-react";
+import {
+  Activity,
+  ArrowLeft,
+  CheckCircle2,
+  CircleAlert,
+  Send,
+} from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TaskConfigurationNav } from "@/components/task-configuration-nav";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
@@ -125,6 +132,36 @@ export default async function TaskReviewPage({
                 icon={<Send className="h-4 w-4" />}
               />
             </form>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Activity className="h-5 w-5" />
+              Runtime Lifecycle Test
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Verify durable fields, corrections, pause and resume, side
+              questions, task switching, and completion against a published
+              version.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {versions.length > 0 ? (
+              <Button asChild>
+                <Link
+                  href={`/projects/tasks/${task.id}/configure/review/runtime`}
+                >
+                  <Activity className="h-4 w-4" />
+                  Open Runtime Test
+                </Link>
+              </Button>
+            ) : (
+              <Button disabled>
+                <Activity className="h-4 w-4" />
+                Publish Before Testing
+              </Button>
+            )}
           </CardContent>
         </Card>
         <Card>
