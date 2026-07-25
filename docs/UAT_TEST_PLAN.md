@@ -6,7 +6,7 @@ Phase: 2 of 18
 
 Test: Durable Task State and Field Lifecycle
 
-Progress: Step 2 of 10
+Progress: Step 5 of 10
 
 Project: `Ewissen Infra (#194)`
 
@@ -177,8 +177,25 @@ Continue:
 
 - Service shows `Classic Facial`.
 - The new Service value shows `Valid`.
+- Preferred Date and Preferred Time show `Candidate`. Their values are kept,
+  but they require revalidation because an earlier dependent choice changed.
 - The Safe Audit Trail records the changes without displaying the actual
   customer values.
+
+Finish revalidation:
+
+1. Choose `Preferred Date` in the form.
+2. Enter `2026-08-15`.
+3. Select `Save Value`.
+4. Choose `Preferred Time` in the form.
+5. Enter `15:00`.
+6. Select `Save Value`.
+
+**Pass when**
+
+- Preferred Date shows `Valid`.
+- Preferred Time shows `Valid`.
+- All seven required fields now show `Valid`.
 
 Status: Pending
 
