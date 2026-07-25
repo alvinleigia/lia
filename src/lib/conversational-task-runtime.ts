@@ -15,7 +15,9 @@ import {
   type InboundEventV1,
   inboundEventV1Schema,
   type StartConversationalTaskRunV1,
+  type SwitchConversationalTaskRunV1,
   startConversationalTaskRunV1Schema,
+  switchConversationalTaskRunV1Schema,
   type TaskFieldState,
 } from "@/lib/conversational-task-runtime-contracts";
 import { db } from "@/lib/db-config";
@@ -70,6 +72,13 @@ function hashPayload(value: unknown) {
   return createHash("sha256")
     .update(JSON.stringify(sortJson(value)))
     .digest("hex");
+}
+
+function childEventId(eventId: string, suffix: string) {
+  const value = `${eventId}:${suffix}`;
+  return value.length <= 160
+    ? value
+    : `${eventId.slice(0, 80)}:${hashPayload(value)}`;
 }
 
 function addDays(date: Date, days: number) {
@@ -447,6 +456,34 @@ export async function startConversationalTaskRun(
       )
       .limit(1);
     if (!execution) throw new ConversationalTaskRuntimeConflictError();
+    if (
+      parsed.providerSequence !== null &&
+      execution.lastProviderSequence !== null &&
+      parsed.providerSequence <= execution.lastProviderSequence
+    ) {
+      return quarantineEvent(tx, {
+        conversationId: parsed.conversationId,
+        eventDbId: eventRow.id,
+        eventType: "task.started",
+        projectId: parsed.projectId,
+        reason: "out_of_order_provider_sequence",
+        taskRunId: execution.activeTaskRunId,
+      });
+    }
+    if (
+      parsed.providerSequence === null &&
+      execution.lastEventOccurredAt &&
+      occurredAt < execution.lastEventOccurredAt
+    ) {
+      return quarantineEvent(tx, {
+        conversationId: parsed.conversationId,
+        eventDbId: eventRow.id,
+        eventType: "task.started",
+        projectId: parsed.projectId,
+        reason: "out_of_order_occurred_at",
+        taskRunId: execution.activeTaskRunId,
+      });
+    }
     if (execution.activeTaskRunId) {
       await tx
         .update(conversationInboundEvents)
@@ -559,7 +596,8 @@ export async function startConversationalTaskRun(
         executionMode: "task",
         identityKind: parsed.identityKind,
         lastEventOccurredAt: occurredAt,
-        lastProviderSequence: parsed.providerSequence,
+        lastProviderSequence:
+          parsed.providerSequence ?? execution.lastProviderSequence,
         responseOwner: "task",
         revision: sql`${conversationExecutionStates.revision} + 1`,
         sessionExpiresAt: parsed.sessionExpiresAt
@@ -614,6 +652,89 @@ export async function startConversationalTaskRun(
       taskRunId: run.id,
     };
   });
+}
+
+export async function switchConversationalTaskRun(
+  input: SwitchConversationalTaskRunV1,
+) {
+  const parsed = switchConversationalTaskRunV1Schema.parse(input);
+  const [execution] = await db
+    .select()
+    .from(conversationExecutionStates)
+    .where(
+      and(
+        eq(conversationExecutionStates.projectId, parsed.projectId),
+        eq(conversationExecutionStates.conversationId, parsed.conversationId),
+        eq(
+          conversationExecutionStates.activeTaskRunId,
+          parsed.currentTaskRunId,
+        ),
+      ),
+    )
+    .limit(1);
+  if (!execution) {
+    throw new Error("The current task is not active for this conversation.");
+  }
+
+  const cancel = await applyConversationalTaskEvent({
+    authentication: null,
+    channelIdentity: parsed.channelIdentity,
+    channelType: parsed.channelType,
+    conversationId: parsed.conversationId,
+    eventId: childEventId(parsed.eventId, "cancel"),
+    expectedRevision: execution.revision,
+    occurredAt: parsed.occurredAt,
+    projectId: parsed.projectId,
+    providerSequence: null,
+    receivedAt: parsed.receivedAt,
+    schemaVersion: 1,
+    taskRunId: parsed.currentTaskRunId,
+    type: "task.cancel",
+    outcomeKey: null,
+  });
+  if (
+    cancel.disposition === "conflict" ||
+    cancel.disposition === "quarantined"
+  ) {
+    return { cancel, start: null };
+  }
+
+  const [identity] = await db
+    .select()
+    .from(conversationExecutionStates)
+    .where(
+      and(
+        eq(conversationExecutionStates.projectId, parsed.projectId),
+        eq(conversationExecutionStates.conversationId, parsed.conversationId),
+      ),
+    )
+    .limit(1);
+  if (!identity) {
+    throw new ConversationalTaskRuntimeConflictError();
+  }
+  const start = await startConversationalTaskRun({
+    anonymousVisitorId: identity.anonymousVisitorId,
+    authenticatedUserId: identity.authenticatedUserId,
+    channelIdentity: parsed.channelIdentity,
+    channelType: parsed.channelType,
+    conversationId: parsed.conversationId,
+    eventId: childEventId(parsed.eventId, "start"),
+    identityKind: identity.identityKind as
+      | "anonymous"
+      | "authenticated_user"
+      | "verified_contact",
+    initializationContext: parsed.initializationContext,
+    occurredAt: parsed.occurredAt,
+    projectId: parsed.projectId,
+    providerSequence: null,
+    receivedAt: parsed.receivedAt,
+    sessionExpiresAt: identity.sessionExpiresAt?.toISOString() ?? null,
+    sessionId: identity.sessionId,
+    taskId: parsed.targetTaskId,
+    verifiedContactId: identity.verifiedContactId,
+  });
+
+  return { cancel, start };
 }
 
 function eventCanMutate(event: InboundEventV1, responseOwner: string) {

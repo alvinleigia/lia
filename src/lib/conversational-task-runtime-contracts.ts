@@ -248,3 +248,20 @@ export const startConversationalTaskRunV1Schema = z
 export type StartConversationalTaskRunV1 = z.infer<
   typeof startConversationalTaskRunV1Schema
 >;
+
+export const switchConversationalTaskRunV1Schema = z.object({
+  projectId: z.number().int().positive(),
+  conversationId: z.number().int().positive(),
+  currentTaskRunId: z.number().int().positive(),
+  targetTaskId: z.number().int().positive(),
+  eventId: stableId,
+  channelType: z.string().trim().min(1).max(80),
+  channelIdentity: safeRecord.default({}),
+  occurredAt: isoDateTime,
+  receivedAt: isoDateTime,
+  initializationContext: safeRecord.default({}),
+});
+
+export type SwitchConversationalTaskRunV1 = z.infer<
+  typeof switchConversationalTaskRunV1Schema
+>;

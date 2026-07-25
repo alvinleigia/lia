@@ -21,6 +21,7 @@
     "certify:release:fast": "node scripts/certify-release.mjs",
     "test:e2e": "playwright test",
     "test:channel-certification": "playwright test --config=playwright.contract.config.ts",
+    "test:task-runtime": "playwright test --config=playwright.runtime.config.ts",
     "test:tenant-isolation": "node scripts/test-tenant-isolation.mjs",
     "start": "next start",
     "lint": "biome check",
