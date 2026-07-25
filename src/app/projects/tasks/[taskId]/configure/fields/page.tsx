@@ -4,6 +4,12 @@ import { redirect } from "next/navigation";
 import { TaskConfigurationNav } from "@/components/task-configuration-nav";
 import { TaskContextVariableRow } from "@/components/task-context-variable-row";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   ActionFormError,
   ActionStateForm,
 } from "@/components/ui/action-state-form";
@@ -12,9 +18,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { evaluateContextVariableRemoval } from "@/lib/context-variable-dependencies";
 import {
   CUSTOM_CONTEXT_SOURCES,
+  FIELD_CARDINALITIES,
   FIELD_TYPES,
 } from "@/lib/conversation-contracts";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
@@ -117,8 +125,9 @@ export default async function TaskFieldsPage({
                     <div>
                       <p className="font-medium">{field.label}</p>
                       <p className="text-sm text-muted-foreground">
-                        {field.key} · {field.type}
-                        {field.required ? " · required" : ""}
+                        {field.key} / {field.type}
+                        {field.cardinality === "multiple" ? " / multiple" : ""}
+                        {field.required ? " / required" : ""}
                       </p>
                     </div>
                     <form action={removeConversationalTaskFieldAction}>
@@ -182,7 +191,33 @@ export default async function TaskFieldsPage({
                   </select>
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="prompt">Visitor Prompt</Label>
+                <Textarea
+                  id="prompt"
+                  name="prompt"
+                  rows={2}
+                  placeholder="What should Lia ask the visitor?"
+                />
+              </div>
               <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="cardinality">Answers Allowed</Label>
+                  <select
+                    id="cardinality"
+                    name="cardinality"
+                    className={selectClass}
+                    defaultValue="single"
+                  >
+                    {FIELD_CARDINALITIES.map((cardinality) => (
+                      <option key={cardinality} value={cardinality}>
+                        {cardinality === "single"
+                          ? "One answer"
+                          : "Multiple answers"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="sensitivity">Sensitivity</Label>
                   <select
@@ -209,37 +244,115 @@ export default async function TaskFieldsPage({
                     <option value="always">Always</option>
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dependsOn">Depends On</Label>
-                  <Input
-                    id="dependsOn"
-                    name="dependsOn"
-                    placeholder="serviceCategoryId"
-                  />
-                </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="validation">Validation Rule</Label>
-                  <Input
-                    id="validation"
-                    name="validation"
-                    placeholder="Optional business rule"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="normalization">Normalization</Label>
-                  <Input
-                    id="normalization"
-                    name="normalization"
-                    placeholder="e.g. E.164"
-                  />
-                </div>
               </div>
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input type="checkbox" name="required" defaultChecked />
                 Required
               </label>
+              <Accordion
+                type="single"
+                collapsible
+                className="rounded-md border px-4"
+              >
+                <AccordionItem value="advanced">
+                  <AccordionTrigger>
+                    Choices, dependencies, and validation
+                  </AccordionTrigger>
+                  <AccordionContent forceMount className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="requiredWhen">Required When</Label>
+                        <Input
+                          id="requiredWhen"
+                          name="requiredWhen"
+                          placeholder="Optional condition"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="dependsOn">Depends On</Label>
+                        <Input
+                          id="dependsOn"
+                          name="dependsOn"
+                          placeholder="Comma-separated field keys"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="validation">Validation Rule</Label>
+                        <Input
+                          id="validation"
+                          name="validation"
+                          placeholder="Optional business rule"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="normalization">Normalization</Label>
+                        <Input
+                          id="normalization"
+                          name="normalization"
+                          placeholder="e.g. E.164"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="optionSourceKind">Choice Source</Label>
+                      <select
+                        id="optionSourceKind"
+                        name="optionSourceKind"
+                        className={selectClass}
+                        defaultValue="none"
+                      >
+                        <option value="none">No fixed choices</option>
+                        <option value="static">Static choices</option>
+                        <option value="project_resource">
+                          Project resource
+                        </option>
+                      </select>
+                      <p className="text-xs text-muted-foreground">
+                        Use static choices for enum fields and project resources
+                        for catalog-backed fields.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="staticOptions">Static Choices</Label>
+                      <Textarea
+                        id="staticOptions"
+                        name="staticOptions"
+                        rows={4}
+                        placeholder={"massage|Massage\nfacial|Facial"}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Enter one value and label per line, separated by a pipe.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="resourceType">Resource Type</Label>
+                        <Input
+                          id="resourceType"
+                          name="resourceType"
+                          placeholder="service"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="collectionKey">Collection Key</Label>
+                        <Input
+                          id="collectionKey"
+                          name="collectionKey"
+                          placeholder="serviceCatalog"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="filterByField">Filter By Field</Label>
+                        <Input
+                          id="filterByField"
+                          name="filterByField"
+                          placeholder="serviceCategoryId"
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
               <FormSubmitButton
                 label="Add Field"
                 pendingLabel="Adding..."
@@ -334,9 +447,72 @@ export default async function TaskFieldsPage({
                   </select>
                 </div>
               </div>
-              <input type="hidden" name="contextSensitivity" value="standard" />
-              <input type="hidden" name="modelVisible" value="on" />
-              <input type="hidden" name="toolVisible" value="on" />
+              <Accordion
+                type="single"
+                collapsible
+                className="rounded-md border px-4"
+              >
+                <AccordionItem value="advanced">
+                  <AccordionTrigger>
+                    Default, privacy, and expiry
+                  </AccordionTrigger>
+                  <AccordionContent forceMount className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="defaultValue">Default Value</Label>
+                        <Input
+                          id="defaultValue"
+                          name="defaultValue"
+                          placeholder="Optional fallback"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="contextSensitivity">Sensitivity</Label>
+                        <select
+                          id="contextSensitivity"
+                          name="contextSensitivity"
+                          className={selectClass}
+                          defaultValue="standard"
+                        >
+                          <option value="standard">Standard</option>
+                          <option value="personal">Personal</option>
+                          <option value="sensitive">Sensitive</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="expiresAfterMinutes">
+                          Expires After (minutes)
+                        </Label>
+                        <Input
+                          id="expiresAfterMinutes"
+                          name="expiresAfterMinutes"
+                          type="number"
+                          min={1}
+                          placeholder="No expiry"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-6">
+                      <label className="flex items-center gap-2 text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          name="modelVisible"
+                          defaultChecked
+                        />
+                        Visible to the assistant
+                      </label>
+                      <label className="flex items-center gap-2 text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          name="toolVisible"
+                          defaultChecked
+                        />
+                        Visible to allowed tools
+                      </label>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
               <FormSubmitButton
                 label="Add Context"
                 pendingLabel="Adding..."

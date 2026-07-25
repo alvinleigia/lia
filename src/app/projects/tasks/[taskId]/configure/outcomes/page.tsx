@@ -3,6 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TaskConfigurationNav } from "@/components/task-configuration-nav";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   ActionFormError,
   ActionStateForm,
 } from "@/components/ui/action-state-form";
@@ -11,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
 import {
@@ -89,8 +96,13 @@ export default async function TaskOutcomesPage({
                   <div>
                     <p className="font-medium">{outcome.label}</p>
                     <p className="text-sm text-muted-foreground">
-                      {outcome.type} → {outcome.outputPort}
+                      {outcome.type} -&gt; {outcome.outputPort}
                     </p>
+                    {outcome.condition && (
+                      <p className="text-sm text-muted-foreground">
+                        When: {outcome.condition}
+                      </p>
+                    )}
                   </div>
                   <form action={removeConversationalTaskOutcomeAction}>
                     <input
@@ -173,6 +185,16 @@ export default async function TaskOutcomesPage({
                   icon={<Plus className="h-4 w-4" />}
                 />
               </div>
+              <div className="space-y-2 md:col-span-5">
+                <Label htmlFor="outcomeCondition">
+                  Completion Condition (optional)
+                </Label>
+                <Input
+                  id="outcomeCondition"
+                  name="condition"
+                  placeholder="e.g. appointmentRequestId is present"
+                />
+              </div>
             </ActionStateForm>
           </CardContent>
         </Card>
@@ -193,17 +215,19 @@ export default async function TaskOutcomesPage({
                 value={context.project.id}
               />
               <input type="hidden" name="taskId" value={task.id} />
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-4">
                 <div className="space-y-2">
-                  <Label>Task Language</Label>
+                  <Label htmlFor="taskLanguage">Task Language</Label>
                   <Input
+                    id="taskLanguage"
                     name="language"
                     defaultValue={definition.taskPolicy.language}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Response Length</Label>
+                  <Label htmlFor="responseLength">Response Length</Label>
                   <select
+                    id="responseLength"
                     name="responseLength"
                     className={selectClass}
                     defaultValue={definition.taskPolicy.responseLength}
@@ -214,102 +238,250 @@ export default async function TaskOutcomesPage({
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Fallback Message</Label>
+                  <Label htmlFor="identityRequirement">Visitor Identity</Label>
+                  <select
+                    id="identityRequirement"
+                    name="identityRequirement"
+                    className={selectClass}
+                    defaultValue={definition.taskPolicy.identityRequirement}
+                  >
+                    <option value="anonymous">Anonymous allowed</option>
+                    <option value="verified_contact">
+                      Verified contact required
+                    </option>
+                    <option value="authenticated_user">
+                      Signed-in user required
+                    </option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="consentRequirement">Task Consent</Label>
+                  <select
+                    id="consentRequirement"
+                    name="consentRequirement"
+                    className={selectClass}
+                    defaultValue={definition.taskPolicy.consentRequirement}
+                  >
+                    <option value="inherit">Use project policy</option>
+                    <option value="required">Always require consent</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="instructions">Task Instructions</Label>
+                <Textarea
+                  id="instructions"
+                  name="instructions"
+                  rows={3}
+                  defaultValue={definition.taskPolicy.instructions ?? ""}
+                  placeholder="Task-specific behavior and boundaries."
+                />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="fallbackMessage">Fallback Message</Label>
                   <Input
+                    id="fallbackMessage"
                     name="fallbackMessage"
                     defaultValue={definition.taskPolicy.fallbackMessage ?? ""}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Handoff Message</Label>
+                  <Label htmlFor="handoffMessage">Handoff Message</Label>
                   <Input
+                    id="handoffMessage"
                     name="handoffMessage"
                     defaultValue={definition.taskPolicy.handoffMessage ?? ""}
                   />
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-5">
-                {(
-                  [
-                    ["completed", ["return_to_knowledge", "end"]],
-                    ["cancelled", ["return_to_knowledge", "end"]],
-                    ["failed", ["return_to_knowledge", "handoff", "end"]],
-                    ["noAnswer", ["return_to_knowledge", "handoff", "end"]],
-                    ["handoff", ["suspend", "end"]],
-                  ] as const
-                ).map(([key, values]) => (
-                  <div key={key} className="space-y-2">
-                    <Label>{key}</Label>
-                    <select
-                      name={key}
-                      className={selectClass}
-                      defaultValue={definition.returnPolicy[key]}
-                    >
-                      {values.map((value) => (
-                        <option key={value} value={value}>
-                          {value.replaceAll("_", " ")}
-                        </option>
+              <Accordion type="multiple" className="rounded-md border px-4">
+                <AccordionItem value="return">
+                  <AccordionTrigger>Return behavior</AccordionTrigger>
+                  <AccordionContent forceMount>
+                    <div className="grid gap-4 md:grid-cols-5">
+                      {(
+                        [
+                          ["completed", ["return_to_knowledge", "end"]],
+                          ["cancelled", ["return_to_knowledge", "end"]],
+                          ["failed", ["return_to_knowledge", "handoff", "end"]],
+                          [
+                            "noAnswer",
+                            ["return_to_knowledge", "handoff", "end"],
+                          ],
+                          ["handoff", ["suspend", "end"]],
+                        ] as const
+                      ).map(([key, values]) => (
+                        <div key={key} className="space-y-2">
+                          <Label htmlFor={`return-${key}`}>
+                            {key === "noAnswer" ? "No answer" : key}
+                          </Label>
+                          <select
+                            id={`return-${key}`}
+                            name={key}
+                            className={selectClass}
+                            defaultValue={definition.returnPolicy[key]}
+                          >
+                            {values.map((value) => (
+                              <option key={value} value={value}>
+                                {value.replaceAll("_", " ")}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-              <div className="grid gap-4 md:grid-cols-4">
-                <input
-                  type="hidden"
-                  name="model"
-                  value={definition.degradedMode.model}
-                />
-                <input
-                  type="hidden"
-                  name="retrieval"
-                  value={definition.degradedMode.retrieval}
-                />
-                <input
-                  type="hidden"
-                  name="tool"
-                  value={definition.degradedMode.tool}
-                />
-                <input
-                  type="hidden"
-                  name="outboundChannel"
-                  value={definition.degradedMode.outboundChannel}
-                />
-                <div className="space-y-2">
-                  <Label>Field Retention (days)</Label>
-                  <Input
-                    type="number"
-                    name="fieldRetentionDays"
-                    defaultValue={projectPolicy.dataHandling.fieldRetentionDays}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Message Retention (days)</Label>
-                  <Input
-                    type="number"
-                    name="messageRetentionDays"
-                    defaultValue={
-                      projectPolicy.dataHandling.messageRetentionDays
-                    }
-                  />
-                </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    name="consentRequired"
-                    defaultChecked={projectPolicy.dataHandling.consentRequired}
-                  />
-                  Consent required
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    name="exportAllowed"
-                    defaultChecked={projectPolicy.dataHandling.exportAllowed}
-                  />
-                  Export allowed
-                </label>
-              </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="degraded">
+                  <AccordionTrigger>
+                    Unavailable-service behavior
+                  </AccordionTrigger>
+                  <AccordionContent forceMount>
+                    <div className="grid gap-4 md:grid-cols-4">
+                      {(
+                        [
+                          [
+                            "model",
+                            ["deterministic_fallback", "handoff", "fail"],
+                          ],
+                          ["retrieval", ["clarify", "handoff", "fail"]],
+                          ["tool", ["retry", "handoff", "fail"]],
+                          ["outboundChannel", ["retry", "fail"]],
+                        ] as const
+                      ).map(([key, values]) => (
+                        <div key={key} className="space-y-2">
+                          <Label htmlFor={`degraded-${key}`}>
+                            {key === "outboundChannel"
+                              ? "Outbound channel"
+                              : key}
+                          </Label>
+                          <select
+                            id={`degraded-${key}`}
+                            name={key}
+                            className={selectClass}
+                            defaultValue={definition.degradedMode[key]}
+                          >
+                            {values.map((value) => (
+                              <option key={value} value={value}>
+                                {value.replaceAll("_", " ")}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="data">
+                  <AccordionTrigger>Project data handling</AccordionTrigger>
+                  <AccordionContent forceMount className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="fieldRetentionDays">
+                          Field Retention (days)
+                        </Label>
+                        <Input
+                          id="fieldRetentionDays"
+                          type="number"
+                          min={1}
+                          max={3650}
+                          name="fieldRetentionDays"
+                          defaultValue={
+                            projectPolicy.dataHandling.fieldRetentionDays
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="messageRetentionDays">
+                          Message Retention (days)
+                        </Label>
+                        <Input
+                          id="messageRetentionDays"
+                          type="number"
+                          min={1}
+                          max={3650}
+                          name="messageRetentionDays"
+                          defaultValue={
+                            projectPolicy.dataHandling.messageRetentionDays
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="deletionMode">Deletion</Label>
+                        <select
+                          id="deletionMode"
+                          name="deletionMode"
+                          className={selectClass}
+                          defaultValue={projectPolicy.dataHandling.deletionMode}
+                        >
+                          <option value="on_request">On request</option>
+                          <option value="automatic">Automatic</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="sensitiveModelVisibility">
+                          Sensitive Data in Model
+                        </Label>
+                        <select
+                          id="sensitiveModelVisibility"
+                          name="sensitiveModelVisibility"
+                          className={selectClass}
+                          defaultValue={
+                            projectPolicy.dataHandling.sensitiveModelVisibility
+                          }
+                        >
+                          <option value="denied">Denied</option>
+                          <option value="task_only">Current task only</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="toolVisibility">
+                          Sensitive Data in Tools
+                        </Label>
+                        <select
+                          id="toolVisibility"
+                          name="toolVisibility"
+                          className={selectClass}
+                          defaultValue={
+                            projectPolicy.dataHandling.toolVisibility
+                          }
+                        >
+                          <option value="binding_only">
+                            Allowed bindings only
+                          </option>
+                          <option value="denied">Denied</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-6">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="consentRequired"
+                          defaultChecked={
+                            projectPolicy.dataHandling.consentRequired
+                          }
+                        />
+                        Require consent for all project conversations
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="exportAllowed"
+                          defaultChecked={
+                            projectPolicy.dataHandling.exportAllowed
+                          }
+                        />
+                        Allow data export
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Sensitive values are always redacted from logs.
+                    </p>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
               <FormSubmitButton
                 label="Save Policies"
                 pendingLabel="Saving..."

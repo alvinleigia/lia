@@ -1,4 +1,13 @@
 import { z } from "zod";
+import {
+  AI_ANSWER_LENGTHS,
+  AI_ASSISTANT_ROLES,
+  AI_EXTRA_HELP_POLICIES,
+  AI_FOLLOW_UP_POLICIES,
+  AI_RESPONSE_PRESETS,
+  AI_TONES,
+  DEFAULT_PROJECT_AI_SETTINGS,
+} from "@/lib/project-ai-settings";
 
 const schemaVersion = z.literal(1);
 const optionalText = z.string().trim().max(2000).nullable();
@@ -24,6 +33,25 @@ export const FIELD_TYPES = [
   "media",
   "enum",
   "project_resource",
+] as const;
+
+export const FIELD_CARDINALITIES = ["single", "multiple"] as const;
+
+export const TASK_EXECUTION_STAGES = [
+  "extraction",
+  "validation",
+  "lookup",
+  "clarification",
+  "confirmation",
+  "operation",
+  "routing",
+] as const;
+
+export const TOOL_STAGES = [
+  "extraction",
+  "lookup",
+  "confirmation",
+  "operation",
 ] as const;
 
 export const CUSTOM_CONTEXT_SOURCES = [
@@ -83,8 +111,16 @@ export const conversationEntryPolicyV1Schema = z.object({
 
 export const conversationIdentityV1Schema = z.object({
   schemaVersion,
-  crossChannelLinkRule: z.enum(["never", "verified_contact_only"]),
-  sessionMode: z.enum(["project_scoped_anonymous", "verified_contact"]),
+  crossChannelLinkRule: z.enum([
+    "never",
+    "verified_contact_only",
+    "authenticated_identity_only",
+  ]),
+  sessionMode: z.enum([
+    "project_scoped_anonymous",
+    "verified_contact",
+    "authenticated_user",
+  ]),
 });
 
 export const dataHandlingPolicyV1Schema = z.object({
@@ -161,6 +197,24 @@ export const DEFAULT_CONVERSATION_PROJECT_POLICY: ConversationProjectPolicyV1 =
     },
   };
 
+export const taskFieldOptionV1Schema = z.object({
+  value: z.string().trim().min(1).max(240),
+  label: z.string().trim().min(1).max(240),
+});
+
+export const taskFieldOptionSourceV1Schema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("static"),
+    options: z.array(taskFieldOptionV1Schema).min(1).max(200),
+  }),
+  z.object({
+    kind: z.literal("project_resource"),
+    resourceType: stableKey,
+    collectionKey: z.string().trim().min(1).max(120).nullable(),
+    filterByField: stableKey.nullable(),
+  }),
+]);
+
 export const taskFieldV1Schema = z.object({
   id: z.string().uuid(),
   key: stableKey.refine((key) => !key.startsWith("lia_"), {
@@ -168,15 +222,18 @@ export const taskFieldV1Schema = z.object({
   }),
   label: z.string().trim().min(1).max(120),
   type: z.enum(FIELD_TYPES),
+  cardinality: z.enum(FIELD_CARDINALITIES).default("single"),
+  prompt: optionalText.default(null),
+  optionSource: taskFieldOptionSourceV1Schema.nullable().default(null),
   required: z.boolean(),
   requiredWhen: optionalText,
   validation: optionalText,
   normalization: optionalText,
   sensitivity: z.enum(["standard", "personal", "sensitive"]),
   confirmation: z.enum(["never", "when_changed", "always"]),
-  sourcePriority: z.array(
-    z.enum(["visitor", "profile", "project_resource", "tool"]),
-  ),
+  sourcePriority: z
+    .array(z.enum(["visitor", "profile", "project_resource", "tool"]))
+    .min(1),
   dependsOn: z.array(stableKey),
 });
 
@@ -199,9 +256,7 @@ export const toolDefinitionRefV1Schema = z.object({
 export const toolBindingV1Schema = z.object({
   tool: toolDefinitionRefV1Schema,
   access: z.enum(["read", "write"]),
-  allowedStages: z.array(
-    z.enum(["extraction", "lookup", "confirmation", "operation"]),
-  ),
+  allowedStages: z.array(z.enum(TOOL_STAGES)).min(1),
 });
 
 export const fieldTransferRuleV1Schema = z.object({
@@ -242,17 +297,7 @@ export const conversationalTaskDefinitionV1Schema = z.object({
     tool: z.enum(["retry", "handoff", "fail"]),
     outboundChannel: z.enum(["retry", "fail"]),
   }),
-  executionOrder: z.array(
-    z.enum([
-      "extraction",
-      "validation",
-      "lookup",
-      "clarification",
-      "confirmation",
-      "operation",
-      "routing",
-    ]),
-  ),
+  executionOrder: z.array(z.enum(TASK_EXECUTION_STAGES)),
   fieldTransferWhitelist: z.array(fieldTransferRuleV1Schema),
   fields: z.array(taskFieldV1Schema),
   outcomes: z.array(taskOutcomeV1Schema),
@@ -260,6 +305,11 @@ export const conversationalTaskDefinitionV1Schema = z.object({
   taskPolicy: z.object({
     fallbackMessage: optionalText,
     handoffMessage: optionalText,
+    instructions: optionalText.default(null),
+    identityRequirement: z
+      .enum(["anonymous", "verified_contact", "authenticated_user"])
+      .default("anonymous"),
+    consentRequirement: z.enum(["inherit", "required"]).default("inherit"),
     language: z.string().trim().min(2).max(40),
     responseLength: z.enum(["short", "balanced", "detailed"]),
   }),
@@ -280,15 +330,7 @@ export const DEFAULT_CONVERSATIONAL_TASK_DEFINITION: ConversationalTaskDefinitio
       retrieval: "clarify",
       tool: "retry",
     },
-    executionOrder: [
-      "extraction",
-      "validation",
-      "lookup",
-      "clarification",
-      "confirmation",
-      "operation",
-      "routing",
-    ],
+    executionOrder: [...TASK_EXECUTION_STAGES],
     fieldTransferWhitelist: [],
     fields: [],
     outcomes: [
@@ -320,11 +362,50 @@ export const DEFAULT_CONVERSATIONAL_TASK_DEFINITION: ConversationalTaskDefinitio
     taskPolicy: {
       fallbackMessage: null,
       handoffMessage: null,
+      instructions: null,
+      identityRequirement: "anonymous",
+      consentRequirement: "inherit",
       language: "English",
       responseLength: "short",
     },
     tools: [],
   };
+
+export const projectAiBehaviorSnapshotV1Schema = z.object({
+  answerLength: z.enum(AI_ANSWER_LENGTHS),
+  answerGuidance: z.string().trim().max(800).nullable(),
+  assistantName: z.string().trim().max(80).nullable(),
+  businessName: z.string().trim().max(120).nullable(),
+  extraHelpPolicy: z.enum(AI_EXTRA_HELP_POLICIES),
+  fallbackEmail: z.string().trim().max(160).nullable(),
+  fallbackMessage: z.string().trim().max(500).nullable(),
+  fallbackPhone: z.string().trim().max(80).nullable(),
+  followUpPolicy: z.enum(AI_FOLLOW_UP_POLICIES),
+  responsePreset: z.enum(AI_RESPONSE_PRESETS),
+  role: z.enum(AI_ASSISTANT_ROLES),
+  tone: z.enum(AI_TONES),
+});
+
+export const conversationalTaskSnapshotV1Schema = z.object({
+  schemaVersion,
+  assistantBehavior: projectAiBehaviorSnapshotV1Schema.default(
+    DEFAULT_PROJECT_AI_SETTINGS,
+  ),
+  assistantPolicy: assistantPolicyV1Schema,
+  conversationPolicy: conversationProjectPolicyV1Schema,
+  task: z.object({
+    id: z.number().int().positive(),
+    schemaVersion,
+    name: z.string().trim().min(1).max(120),
+    objective: z.string().trim().min(1).max(600),
+    description: z.string().trim().max(2000).nullable(),
+    definition: conversationalTaskDefinitionV1Schema,
+  }),
+});
+
+export type ConversationalTaskSnapshotV1 = z.infer<
+  typeof conversationalTaskSnapshotV1Schema
+>;
 
 export function normalizeConversationProjectPolicy(
   value: unknown,

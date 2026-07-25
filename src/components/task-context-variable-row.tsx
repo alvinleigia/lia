@@ -63,7 +63,10 @@ export function TaskContextVariableRow({
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          {variable.source} / {variable.type}
+          {variable.source} / {variable.type} / {variable.sensitivity}
+          {variable.expiresAfterMinutes
+            ? ` / expires in ${variable.expiresAfterMinutes} minutes`
+            : ""}
         </p>
         {removal.dependencies.length > 0 && (
           <p id={usageId} className="text-sm text-muted-foreground">
@@ -87,7 +90,8 @@ export function TaskContextVariableRow({
               <DialogHeader>
                 <DialogTitle>Edit Context Variable</DialogTitle>
                 <DialogDescription>
-                  Update the trusted source or value type.
+                  Update trusted sourcing, privacy, and expiry without changing
+                  the stable key.
                 </DialogDescription>
               </DialogHeader>
               <ActionStateForm action={updateAction} className="space-y-4">
@@ -130,6 +134,63 @@ export function TaskContextVariableRow({
                       ))}
                     </select>
                   </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor={`default-${variable.key}`}>
+                      Default Value
+                    </Label>
+                    <Input
+                      id={`default-${variable.key}`}
+                      name="defaultValue"
+                      defaultValue={variable.defaultValue ?? ""}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`sensitivity-${variable.key}`}>
+                      Sensitivity
+                    </Label>
+                    <select
+                      id={`sensitivity-${variable.key}`}
+                      name="contextSensitivity"
+                      className={selectClass}
+                      defaultValue={variable.sensitivity}
+                    >
+                      <option value="standard">Standard</option>
+                      <option value="personal">Personal</option>
+                      <option value="sensitive">Sensitive</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`expiry-${variable.key}`}>
+                      Expires After (minutes)
+                    </Label>
+                    <Input
+                      id={`expiry-${variable.key}`}
+                      name="expiresAfterMinutes"
+                      type="number"
+                      min={1}
+                      defaultValue={variable.expiresAfterMinutes ?? ""}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      name="modelVisible"
+                      defaultChecked={variable.modelVisible}
+                    />
+                    Visible to the assistant
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      name="toolVisible"
+                      defaultChecked={variable.toolVisible}
+                    />
+                    Visible to allowed tools
+                  </label>
                 </div>
                 <DialogFooter>
                   <DialogClose asChild>

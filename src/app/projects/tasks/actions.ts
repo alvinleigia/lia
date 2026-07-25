@@ -44,8 +44,38 @@ import {
   updateProjectConversationalTaskDefinition,
 } from "@/lib/conversational-tasks";
 import { getProjectOperation } from "@/lib/operations";
+import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 
 const projectIdSchema = z.coerce.number().int().positive();
+
+function parseFieldOptionSource(formData: FormData) {
+  const kind = formData.get("optionSourceKind");
+  if (kind === "static") {
+    return {
+      kind,
+      options: String(formData.get("staticOptions") ?? "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [value, ...labelParts] = line.split("|");
+          return {
+            value: value.trim(),
+            label: labelParts.join("|").trim() || value.trim(),
+          };
+        }),
+    };
+  }
+  if (kind === "project_resource") {
+    return {
+      kind,
+      resourceType: formData.get("resourceType"),
+      collectionKey: formData.get("collectionKey") || null,
+      filterByField: formData.get("filterByField") || null,
+    };
+  }
+  return null;
+}
 
 function parseTaskDetails(formData: FormData) {
   return conversationalTaskDetailsSchema.safeParse({
@@ -224,10 +254,16 @@ export async function updateConversationProjectPolicyAction(
       greeting: formData.get("greeting") || null,
       greetingStrategy: formData.get("greetingStrategy"),
       language: formData.get("language"),
+      modelPolicy: {
+        mode: formData.get("modelPolicyMode"),
+      },
     },
     entry: {
       ...current.entry,
       allowTaskRecommendation: formData.get("allowTaskRecommendation") === "on",
+      maxConnectedFlowDepth: Number(formData.get("maxConnectedFlowDepth")),
+      maxHandoffDepth: Number(formData.get("maxHandoffDepth")),
+      maxTaskSwitches: Number(formData.get("maxTaskSwitches")),
       mode: formData.get("entryMode"),
     },
     identity: {
@@ -273,6 +309,9 @@ export async function addConversationalTaskFieldAction(
     key: formData.get("key"),
     label: formData.get("label"),
     type: formData.get("type"),
+    cardinality: formData.get("cardinality"),
+    prompt: formData.get("prompt") || null,
+    optionSource: parseFieldOptionSource(formData),
     required: formData.get("required") === "on",
     requiredWhen: formData.get("requiredWhen") || null,
     validation: formData.get("validation") || null,
@@ -287,10 +326,10 @@ export async function addConversationalTaskFieldAction(
   });
 
   const definition = readConversationalTaskDefinition(context.task.definition);
-  if (
-    !parsed.success ||
-    definition.fields.some((field) => field.key === parsed.data.key)
-  ) {
+  if (!parsed.success) {
+    return { error: "Please check the field details and choice source." };
+  }
+  if (definition.fields.some((field) => field.key === parsed.data.key)) {
     return { error: "Use a valid, unique field key." };
   }
 
@@ -315,16 +354,34 @@ export async function removeConversationalTaskFieldAction(formData: FormData) {
   }
 
   const definition = readConversationalTaskDefinition(context.task.definition);
+  const field = definition.fields.find(
+    (candidate) => candidate.id === fieldId.data,
+  );
+  const dependentField = field
+    ? definition.fields.find(
+        (candidate) =>
+          candidate.dependsOn.includes(field.key) ||
+          (candidate.optionSource?.kind === "project_resource" &&
+            candidate.optionSource.filterByField === field.key),
+      )
+    : null;
+  if (!field) {
+    redirect(`${destination}?error=Field%20not%20found.`);
+  }
+  if (dependentField) {
+    redirect(
+      `${destination}?error=${encodeURIComponent(
+        `${field.label} is used by ${dependentField.label}. Remove that dependency first.`,
+      )}`,
+    );
+  }
   await updateProjectConversationalTaskDefinition(
     context.project.id,
     context.task.id,
     {
       ...definition,
       fieldTransferWhitelist: definition.fieldTransferWhitelist.filter(
-        (rule) =>
-          !definition.fields.some(
-            (field) => field.id === fieldId.data && field.key === rule.fieldKey,
-          ),
+        (rule) => rule.fieldKey !== field.key,
       ),
       fields: definition.fields.filter((field) => field.id !== fieldId.data),
     },
@@ -389,12 +446,26 @@ export async function updateTaskContextVariableAction(
   const parsed = z
     .object({
       key: z.string().trim().min(1).max(80),
+      defaultValue: z.string().trim().max(2000).nullable(),
+      expiresAfterMinutes: z.number().int().positive().nullable(),
+      modelVisible: z.boolean(),
+      sensitivity: z.enum(["standard", "personal", "sensitive"]),
       source: z.enum(CUSTOM_CONTEXT_SOURCES),
+      toolVisible: z.boolean(),
       type: z.enum(FIELD_TYPES),
     })
     .safeParse({
       key: formData.get("contextKey"),
+      defaultValue: formData.get("defaultValue") || null,
+      expiresAfterMinutes: String(
+        formData.get("expiresAfterMinutes") ?? "",
+      ).trim()
+        ? Number(formData.get("expiresAfterMinutes"))
+        : null,
+      modelVisible: formData.get("modelVisible") === "on",
+      sensitivity: formData.get("contextSensitivity"),
       source: formData.get("contextSource"),
+      toolVisible: formData.get("toolVisible") === "on",
       type: formData.get("contextType"),
     });
   if (!parsed.success || context.task.isArchived) {
@@ -414,7 +485,12 @@ export async function updateTaskContextVariableAction(
 
   const updated = contextVariableDefinitionV1Schema.safeParse({
     ...variable,
+    defaultValue: parsed.data.defaultValue,
+    expiresAfterMinutes: parsed.data.expiresAfterMinutes,
+    modelVisible: parsed.data.modelVisible,
+    sensitivity: parsed.data.sensitivity,
     source: parsed.data.source,
+    toolVisible: parsed.data.toolVisible,
     type: parsed.data.type,
   });
   if (!updated.success) {
@@ -611,6 +687,13 @@ export async function updateConversationalTaskSafetyAction(
       language: z.string().trim().min(2).max(40),
       fallbackMessage: z.string().trim().max(1000).nullable(),
       handoffMessage: z.string().trim().max(1000).nullable(),
+      instructions: z.string().trim().max(2000).nullable(),
+      identityRequirement: z.enum([
+        "anonymous",
+        "verified_contact",
+        "authenticated_user",
+      ]),
+      consentRequirement: z.enum(["inherit", "required"]),
       completed: z.enum(["return_to_knowledge", "end"]),
       cancelled: z.enum(["return_to_knowledge", "end"]),
       failed: z.enum(["return_to_knowledge", "handoff", "end"]),
@@ -623,13 +706,19 @@ export async function updateConversationalTaskSafetyAction(
       fieldRetentionDays: z.coerce.number().int().min(1).max(3650),
       messageRetentionDays: z.coerce.number().int().min(1).max(3650),
       consentRequired: z.boolean(),
+      deletionMode: z.enum(["on_request", "automatic"]),
       exportAllowed: z.boolean(),
+      sensitiveModelVisibility: z.enum(["denied", "task_only"]),
+      toolVisibility: z.enum(["binding_only", "denied"]),
     })
     .safeParse({
       responseLength: formData.get("responseLength"),
       language: formData.get("language"),
       fallbackMessage: formData.get("fallbackMessage") || null,
       handoffMessage: formData.get("handoffMessage") || null,
+      instructions: formData.get("instructions") || null,
+      identityRequirement: formData.get("identityRequirement"),
+      consentRequirement: formData.get("consentRequirement"),
       completed: formData.get("completed"),
       cancelled: formData.get("cancelled"),
       failed: formData.get("failed"),
@@ -642,7 +731,10 @@ export async function updateConversationalTaskSafetyAction(
       fieldRetentionDays: formData.get("fieldRetentionDays"),
       messageRetentionDays: formData.get("messageRetentionDays"),
       consentRequired: formData.get("consentRequired") === "on",
+      deletionMode: formData.get("deletionMode"),
       exportAllowed: formData.get("exportAllowed") === "on",
+      sensitiveModelVisibility: formData.get("sensitiveModelVisibility"),
+      toolVisibility: formData.get("toolVisibility"),
     });
   if (!parsed.success) {
     return { error: "Please check the policy values." };
@@ -654,8 +746,11 @@ export async function updateConversationalTaskSafetyAction(
     {
       ...definition,
       taskPolicy: {
+        consentRequirement: parsed.data.consentRequirement,
         fallbackMessage: parsed.data.fallbackMessage,
         handoffMessage: parsed.data.handoffMessage,
+        identityRequirement: parsed.data.identityRequirement,
+        instructions: parsed.data.instructions,
         language: parsed.data.language,
         responseLength: parsed.data.responseLength,
       },
@@ -682,9 +777,12 @@ export async function updateConversationalTaskSafetyAction(
     dataHandling: {
       ...projectPolicy.dataHandling,
       consentRequired: parsed.data.consentRequired,
+      deletionMode: parsed.data.deletionMode,
       exportAllowed: parsed.data.exportAllowed,
       fieldRetentionDays: parsed.data.fieldRetentionDays,
       messageRetentionDays: parsed.data.messageRetentionDays,
+      sensitiveModelVisibility: parsed.data.sensitiveModelVisibility,
+      toolVisibility: parsed.data.toolVisibility,
     },
   });
   revalidatePath(destination);
@@ -706,6 +804,7 @@ export async function publishConversationalTaskAction(formData: FormData) {
     );
   }
   const version = await publishConversationalTask({
+    assistantBehavior: normalizeProjectAiSettings(context.project.aiSettings),
     projectId: context.project.id,
     taskId: context.task.id,
     userId: context.user.id,

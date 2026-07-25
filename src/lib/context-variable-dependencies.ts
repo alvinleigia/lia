@@ -62,8 +62,20 @@ export function listContextVariableDependencies(
     "Handoff message",
     "taskPolicy.handoffMessage",
   );
+  collectDependencies(
+    dependencies,
+    definition.taskPolicy.instructions,
+    "Task instructions",
+    "taskPolicy.instructions",
+  );
 
   for (const field of definition.fields) {
+    collectDependencies(
+      dependencies,
+      field.prompt,
+      `${field.label} visitor prompt`,
+      `fields.${field.id}.prompt`,
+    );
     collectDependencies(
       dependencies,
       field.requiredWhen,

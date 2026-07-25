@@ -2,6 +2,7 @@ import { and, asc, desc, eq, max } from "drizzle-orm";
 import type { ConversationProjectPolicyV1 } from "@/lib/conversation-contracts";
 import {
   type ConversationalTaskDefinitionV1,
+  conversationalTaskSnapshotV1Schema,
   DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
   normalizeConversationalTaskDefinition,
 } from "@/lib/conversation-contracts";
@@ -11,6 +12,7 @@ import {
   conversationalTasks,
   conversationalTaskVersions,
 } from "@/lib/db-schema";
+import type { ProjectAiSettings } from "@/lib/project-ai-settings";
 
 export async function listProjectConversationalTasks(projectId: number) {
   return db
@@ -99,6 +101,7 @@ export async function listConversationalTaskVersions(
 }
 
 export async function publishConversationalTask(input: {
+  assistantBehavior: ProjectAiSettings;
   projectId: number;
   taskId: number;
   userId: number;
@@ -132,6 +135,20 @@ export async function publishConversationalTask(input: {
 
     const versionNumber = (latest?.value ?? 0) + 1;
     const definition = normalizeConversationalTaskDefinition(task.definition);
+    const snapshot = conversationalTaskSnapshotV1Schema.parse({
+      schemaVersion: 1,
+      assistantBehavior: input.assistantBehavior,
+      assistantPolicy: input.projectPolicy.assistant,
+      conversationPolicy: input.projectPolicy,
+      task: {
+        id: task.id,
+        schemaVersion: task.schemaVersion,
+        name: task.name,
+        objective: task.objective,
+        description: task.description,
+        definition,
+      },
+    });
     const [version] = await transaction
       .insert(conversationalTaskVersions)
       .values({
@@ -139,19 +156,7 @@ export async function publishConversationalTask(input: {
         taskId: input.taskId,
         versionNumber,
         publishedByUserId: input.userId,
-        snapshot: {
-          schemaVersion: 1,
-          assistantPolicy: input.projectPolicy.assistant,
-          conversationPolicy: input.projectPolicy,
-          task: {
-            id: task.id,
-            schemaVersion: task.schemaVersion,
-            name: task.name,
-            objective: task.objective,
-            description: task.description,
-            definition,
-          },
-        },
+        snapshot,
       })
       .returning();
 

@@ -59,11 +59,11 @@ Goal: verify that a project-scoped conversational task can be created,
 configured, validated, versioned, archived, restored, and isolated without
 embedding channel- or provider-specific settings.
 
-Roadmap implementation: 48 of 48 Phase 1 items complete.
+Roadmap implementation: 55 of 55 Phase 1 items complete.
 
-UAT status: Pass.
+UAT status: original 13-step suite passed; closure addendum pending.
 
-Completed checkpoint: Step 13 of 13.
+Completed checkpoint: original Step 13 of 13; closure Step 0 of 4.
 
 ### Accepted Task Workspace Tests
 
@@ -574,7 +574,7 @@ Status: Pass
 
 Notes:
 
-## Phase 1 Exit Gate
+## Original Phase 1 Exit Gate
 
 Phase 1 passes only when:
 
@@ -618,7 +618,7 @@ Severity guide:
 - Medium: a workaround exists but the workflow is confusing or unreliable.
 - Low: cosmetic or minor copy issue.
 
-## Phase 1 Sign-Off
+## Original Phase 1 Sign-Off
 
 Product owner:
 
@@ -640,3 +640,203 @@ UAT tester:
 - Date: 2026-07-25
 - Approved: Yes
 - Notes: Phase 1 manual UAT completed.
+
+## Phase 1 Closure Addendum
+
+Goal: verify the industry-neutral settings added by the Phase 1 closure audit
+without repeating the 13 accepted tests above.
+
+Closure build/commit:
+
+Closure UAT status: Pending
+
+Completed checkpoint: Step 0 of 4
+
+### Closure Step 1 - Advanced Assistant And Identity Policy
+
+1. Switch to `Ewissen Infra (#194)`.
+2. Open `Automation`, `Tasks`, and the existing `Book a Spa Service` task.
+3. Select `Configure Conversation`, then `Assistant`.
+4. Confirm `Visitor Identity` contains:
+   - `Project-scoped visitor`
+   - `Verified contact`
+   - `Authenticated user`
+5. Confirm `Cross-channel linking` contains:
+   - `Never link`
+   - `Verified contacts only`
+   - `Authenticated users only`
+6. Leave `Visitor Identity` as `Project-scoped visitor`.
+7. Leave `Cross-channel linking` as `Verified contacts only`.
+8. Expand `Advanced model and transition limits`.
+9. Enter these values:
+
+```text
+Model Policy: Use platform default
+Maximum Task Switches: 2
+Connected Flow Depth: 3
+Handoff Depth: 1
+```
+
+10. Select `Save Policy`.
+11. Reload the page and expand the advanced section again.
+
+Expected result: all saved selections remain visible. No provider, WhatsApp,
+or industry-specific setting appears in the task contract.
+
+Status: Pending
+
+Notes:
+
+### Closure Step 2 - Repeatable And Resource-Backed Fields
+
+1. Open `Automation`, then `Tasks`.
+2. Create a task with:
+
+```text
+Task Name: Phase 1 Contract Closure
+Objective: Collect one or more service interests and prepare a project-scoped enquiry.
+Internal Notes: Temporary UAT task for the Phase 1 contract closure.
+```
+
+3. Open `Configure Conversation`, then `Fields`.
+4. Add the first field with:
+
+```text
+Visitor Label: Preferred Treatments
+Field Key: preferredTreatments
+Type: enum
+Visitor Prompt: Which treatments are you interested in?
+Answers Allowed: Multiple answers
+Sensitivity: Standard
+Confirmation: When changed
+Required: checked
+Choice Source: Static choices
+Static Choices:
+massage|Massage
+facial|Facial
+body_treatment|Body Treatment
+```
+
+5. Add the second field with:
+
+```text
+Visitor Label: Service
+Field Key: serviceId
+Type: project resource
+Visitor Prompt: Which service would you like?
+Answers Allowed: One answer
+Sensitivity: Standard
+Confirmation: When changed
+Required: checked
+Depends On: preferredTreatments
+Choice Source: Project resource
+Resource Type: service
+Collection Key: serviceCatalog
+Filter By Field: preferredTreatments
+```
+
+Expected result: both fields are added without losing entered values. The first
+field is shown as `multiple`; both choice sources remain part of the saved task
+definition.
+
+Status: Pending
+
+Notes:
+
+### Closure Step 3 - Trusted Context Privacy And Expiry
+
+1. Remain on the closure task's `Fields` page.
+2. Add this context variable:
+
+```text
+Key: campaignCode
+Source: project
+Type: text
+Default Value: uat-closure
+Sensitivity: Personal
+Expires After (minutes): 720
+Visible to the assistant: checked
+Visible to allowed tools: checked
+```
+
+3. Select the edit icon beside `campaignCode`.
+4. Change `Expires After (minutes)` to `1440`.
+5. Clear `Visible to allowed tools`.
+6. Save the edit.
+
+Expected result: the stable key remains `campaignCode`; the row shows
+`project / text / personal / expires in 1440 minutes`. Reopening the editor
+shows the saved default, visibility, sensitivity, and expiry values.
+
+Status: Pending
+
+Notes:
+
+### Closure Step 4 - Outcome, Safety, Dependency, And Publication
+
+1. Open the closure task's `Outcomes` page.
+2. Add this outcome:
+
+```text
+Outcome Name: Qualified Follow Up
+Outcome Key: qualifiedFollowUp
+Result Type: handoff
+Output Port: qualifiedFollowUp
+Completion Condition: {{context.campaignCode}} is present
+```
+
+3. In `Behavior and Safety`, enter:
+
+```text
+Task Language: English
+Response Length: Short
+Visitor Identity: Verified contact required
+Task Consent: Always require consent
+Task Instructions: Use {{context.campaignCode}} only for internal routing. Never reveal it unless the visitor supplied it.
+Fallback Message: I could not complete that request.
+Handoff Message: I will connect you with the team.
+```
+
+4. Expand `Unavailable-service behavior` and confirm model, retrieval, tool,
+   and outbound-channel fallbacks are configurable.
+5. Expand `Project data handling` and use:
+
+```text
+Field Retention: 365
+Message Retention: 90
+Deletion: On request
+Sensitive Data in Model: Current task only
+Sensitive Data in Tools: Allowed bindings only
+Require consent for all project conversations: unchecked
+Allow data export: checked
+```
+
+6. Save the policies.
+7. Return to `Fields`.
+8. Confirm `campaignCode` shows usage by the task instructions and outcome
+   condition.
+9. Confirm its delete control is disabled.
+10. Open `Review`.
+11. Confirm there are no publish blockers.
+12. Publish a new version.
+
+Expected result: the task publishes an immutable version containing the
+advanced task contract and the current project AI behavior. The referenced
+context variable cannot be deleted. Automated tests separately verify
+duplicate-key, cyclic-dependency, malformed-choice, tool-stage, lifecycle, and
+legacy-compatibility blockers.
+
+Status: Pending
+
+Notes:
+
+After this step passes, archive the temporary `Phase 1 Contract Closure` task.
+
+## Phase 1 Closure Gate
+
+- [ ] Closure Steps 1 through 4 pass.
+- [ ] The published closure task has no contract blockers.
+- [ ] Referenced context deletion remains blocked.
+- [ ] No Critical or High closure issue remains unresolved.
+
+Final Phase 1 closure status: Pending

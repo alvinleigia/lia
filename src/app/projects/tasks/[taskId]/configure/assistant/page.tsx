@@ -3,6 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TaskConfigurationNav } from "@/components/task-configuration-nav";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   ActionFormError,
   ActionStateForm,
 } from "@/components/ui/action-state-form";
@@ -182,6 +188,9 @@ export default async function AssistantPolicyPage({
                       Project-scoped visitor
                     </option>
                     <option value="verified_contact">Verified contact</option>
+                    <option value="authenticated_user">
+                      Authenticated user
+                    </option>
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -198,6 +207,9 @@ export default async function AssistantPolicyPage({
                     <option value="verified_contact_only">
                       Verified contacts only
                     </option>
+                    <option value="authenticated_identity_only">
+                      Authenticated users only
+                    </option>
                   </select>
                 </div>
               </div>
@@ -210,6 +222,77 @@ export default async function AssistantPolicyPage({
                 />
                 Allow knowledge answers to recommend published tasks
               </label>
+              <Accordion
+                type="single"
+                collapsible
+                className="rounded-md border px-4"
+              >
+                <AccordionItem value="advanced">
+                  <AccordionTrigger>
+                    Advanced model and transition limits
+                  </AccordionTrigger>
+                  <AccordionContent forceMount className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="modelPolicyMode">Model Policy</Label>
+                      <select
+                        id="modelPolicyMode"
+                        name="modelPolicyMode"
+                        defaultValue={policy.assistant.modelPolicy.mode}
+                        className={selectClass}
+                      >
+                        <option value="platform_default">
+                          Use platform default
+                        </option>
+                        <option value="project_override">
+                          Use project override
+                        </option>
+                      </select>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="maxTaskSwitches">
+                          Maximum Task Switches
+                        </Label>
+                        <Input
+                          id="maxTaskSwitches"
+                          name="maxTaskSwitches"
+                          type="number"
+                          min={0}
+                          max={10}
+                          defaultValue={policy.entry.maxTaskSwitches}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxConnectedFlowDepth">
+                          Connected Flow Depth
+                        </Label>
+                        <Input
+                          id="maxConnectedFlowDepth"
+                          name="maxConnectedFlowDepth"
+                          type="number"
+                          min={0}
+                          max={10}
+                          defaultValue={policy.entry.maxConnectedFlowDepth}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxHandoffDepth">Handoff Depth</Label>
+                        <Input
+                          id="maxHandoffDepth"
+                          name="maxHandoffDepth"
+                          type="number"
+                          min={0}
+                          max={10}
+                          defaultValue={policy.entry.maxHandoffDepth}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
               <FormSubmitButton
                 label="Save Policy"
                 pendingLabel="Saving..."

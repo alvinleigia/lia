@@ -85,11 +85,12 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Completed phase: Priority 1, Phase 1 of 18. All 48 implementation items are
-complete, and all 13 manual UAT steps passed on 2026-07-25.
+Current phase: Priority 1, Phase 1 of 18 closure audit. All 55 implementation
+items are complete. The original 13 manual UAT steps passed on 2026-07-25; the
+focused four-step closure addendum is pending.
 
-Current implementation target: Priority 1, Phase 2 of 18, Durable Task State
-And Field Lifecycle.
+Current implementation target: complete the Phase 1 closure addendum, then
+start Priority 1, Phase 2 of 18, Durable Task State And Field Lifecycle.
 
 ## Product Direction
 
@@ -259,6 +260,9 @@ behavior.
 - [x] Block deletion of referenced context without cascading changes into dependent configuration.
 - [x] Block publication when a task contains an unresolved context reference.
 - [x] Support text, email, phone, integer, decimal, boolean, date, time, date range, address, location, media, enum, and project-resource field types.
+- [x] Support single-value and repeatable task fields without adding industry-specific field types.
+- [x] Keep an optional visitor-facing prompt separate from the field label, key, and canonical value.
+- [x] Define channel-independent static-choice and project-resource option sources, including dependent resource filtering.
 - [x] Define required and conditionally required fields.
 - [x] Define field validation, normalization, sensitivity, and confirmation policies.
 - [x] Define field source priority for visitor input, trusted profile data, project resources, and tool results.
@@ -267,6 +271,7 @@ behavior.
 - [x] Define allowed read tools and allowed write operations separately.
 - [x] Define default-deny tool permissions at assistant, task, and conversational-stage boundaries.
 - [x] Define task-level wording, brevity, language, fallback, and handoff policies.
+- [x] Define task-level verified-contact, authenticated-user, and consent requirements independently from project defaults.
 - [x] Define a degraded-mode policy for model, retrieval, business-tool, and outbound-channel unavailability.
 - [x] Define model policy separately from business task data.
 - [x] Define named task outcomes and stable output ports.
@@ -274,9 +279,12 @@ behavior.
 - [x] Define the order of extraction, validation, lookup, clarification, confirmation, operation, and routing.
 - [x] Embed the complete task contract in immutable published versions.
 - [x] Pin assistant policy, context definitions, tool versions, and bindings in immutable published versions.
+- [x] Pin normalized project AI behavior in each immutable task version so later project-setting edits cannot change published behavior.
 - [x] Keep existing V1 deterministic flow definitions readable and executable.
 - [x] Add assistant-policy, task, field, context, tool-binding, and outcome fixtures.
 - [x] Add focused schema and compatibility tests.
+- [x] Block publication for duplicate identifiers, invalid choice references, cyclic field dependencies, malformed tool bindings, and invalid lifecycle order.
+- [x] Expose the advanced Phase 1 identity, consent, context, choice, resilience, and data-handling settings without mixing in provider-specific configuration.
 
 Phase 1 exit gate: the versioned contracts can describe the complete reference
 booking task, grounded Q&A entry, approved task recommendation, return

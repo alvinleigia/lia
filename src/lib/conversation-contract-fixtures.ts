@@ -6,18 +6,24 @@ import {
 
 const fieldDefaults: Pick<
   ConversationalTaskDefinitionV1["fields"][number],
+  | "cardinality"
   | "confirmation"
   | "dependsOn"
   | "normalization"
+  | "optionSource"
+  | "prompt"
   | "required"
   | "requiredWhen"
   | "sensitivity"
   | "sourcePriority"
   | "validation"
 > = {
+  cardinality: "single",
   confirmation: "when_changed",
   dependsOn: [],
   normalization: null,
+  optionSource: null,
+  prompt: null,
   required: true,
   requiredWhen: null,
   sensitivity: "standard",
@@ -67,6 +73,13 @@ export const REFERENCE_BOOKING_TASK_DEFINITION: ConversationalTaskDefinitionV1 =
         key: "serviceCategoryId",
         label: "Service Category",
         type: "project_resource",
+        prompt: "Which service category would you like?",
+        optionSource: {
+          kind: "project_resource",
+          resourceType: "serviceCategory",
+          collectionKey: "serviceCatalog",
+          filterByField: null,
+        },
       },
       {
         ...fieldDefaults,
@@ -75,6 +88,13 @@ export const REFERENCE_BOOKING_TASK_DEFINITION: ConversationalTaskDefinitionV1 =
         label: "Service",
         type: "project_resource",
         dependsOn: ["serviceCategoryId"],
+        prompt: "Which service would you like?",
+        optionSource: {
+          kind: "project_resource",
+          resourceType: "service",
+          collectionKey: "serviceCatalog",
+          filterByField: "serviceCategoryId",
+        },
       },
       {
         ...fieldDefaults,
@@ -83,6 +103,7 @@ export const REFERENCE_BOOKING_TASK_DEFINITION: ConversationalTaskDefinitionV1 =
         label: "Preferred Date",
         type: "date",
         dependsOn: ["serviceId"],
+        prompt: "What date would you prefer?",
       },
       {
         ...fieldDefaults,
@@ -91,6 +112,7 @@ export const REFERENCE_BOOKING_TASK_DEFINITION: ConversationalTaskDefinitionV1 =
         label: "Preferred Time",
         type: "time",
         dependsOn: ["preferredDate"],
+        prompt: "What time would you prefer?",
       },
       {
         ...fieldDefaults,
@@ -99,6 +121,7 @@ export const REFERENCE_BOOKING_TASK_DEFINITION: ConversationalTaskDefinitionV1 =
         label: "Guest Name",
         type: "text",
         sensitivity: "personal",
+        prompt: "What name should we use for the request?",
       },
       {
         ...fieldDefaults,
@@ -107,6 +130,7 @@ export const REFERENCE_BOOKING_TASK_DEFINITION: ConversationalTaskDefinitionV1 =
         label: "Guest Email",
         type: "email",
         sensitivity: "personal",
+        prompt: "What email should we use for updates?",
       },
       {
         ...fieldDefaults,
@@ -116,6 +140,7 @@ export const REFERENCE_BOOKING_TASK_DEFINITION: ConversationalTaskDefinitionV1 =
         type: "phone",
         sensitivity: "personal",
         normalization: "E.164",
+        prompt: "What phone number should the team use if needed?",
       },
     ],
     outcomes: [
@@ -138,9 +163,13 @@ export const REFERENCE_BOOKING_TASK_DEFINITION: ConversationalTaskDefinitionV1 =
       },
     ],
     taskPolicy: {
+      consentRequirement: "inherit",
       fallbackMessage:
         "I could not complete that booking request. Let me connect you with the team.",
       handoffMessage: "I will connect you with the booking team.",
+      identityRequirement: "anonymous",
+      instructions:
+        "Collect only missing booking details and confirm canonical values before requesting a write operation.",
       language: "English",
       responseLength: "short",
     },
