@@ -85,12 +85,11 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current implementation target: Priority 1, Phase 1 of 18.
+Completed phase: Priority 1, Phase 1 of 18. All 48 implementation items are
+complete, and all 13 manual UAT steps passed on 2026-07-25.
 
-Completed delivery slice: Slice 1 of 7, Task Workspace, passed local manual
-acceptance on 2026-07-24.
-
-Next delivery slice: Slice 2 of 7, Assistant And Entry Policy.
+Current implementation target: Priority 1, Phase 2 of 18, Durable Task State
+And Field Lifecycle.
 
 ## Product Direction
 

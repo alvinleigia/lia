@@ -61,12 +61,9 @@ embedding channel- or provider-specific settings.
 
 Roadmap implementation: 48 of 48 Phase 1 items complete.
 
-UAT status: In progress.
+UAT status: Pass.
 
-Current checkpoint: Step 8 of 13.
-
-Before completing Step 10, confirm that the temporary tool binding created in
-Step 7 has been removed.
+Completed checkpoint: Step 13 of 13.
 
 ### Accepted Task Workspace Tests
 
@@ -92,7 +89,7 @@ project isolation passed without a runtime error.
 
 ### Step 1 Of 13 - Confirm The Database Migration
 
-- [ ] Confirm migration `0033_conversation_contract_foundation` has been
+- [x] Confirm migration `0033_conversation_contract_foundation` has been
   applied.
 
 If it has not been applied to the current database, stop the development server
@@ -107,28 +104,28 @@ Do not rerun the migration only for UAT when it has already been applied.
 Expected result: the migration is applied once and the command returns to the
 prompt without an error.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 2 Of 13 - Open Conversation Configuration
 
-- [ ] Sign in and select `Ewissen Infra (#194)`.
-- [ ] Open `Automation`, then `Tasks`.
-- [ ] Open `Book a Spa Service`.
-- [ ] Select `Configure Conversation`.
+- [x] Sign in and select `Ewissen Infra (#194)`.
+- [x] Open `Automation`, then `Tasks`.
+- [x] Open `Book a Spa Service`.
+- [x] Select `Configure Conversation`.
 
 Expected result: `Assistant`, `Fields`, `Tools`, `Outcomes`, and `Review`
 navigation is visible without a runtime error.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 3 Of 13 - Configure The Assistant
 
-- [ ] Open `Assistant`.
-- [ ] Enter the following values.
+- [x] Open `Assistant`.
+- [x] Enter the following values.
 
 Greeting:
 
@@ -182,20 +179,20 @@ Cross-Channel Linking:
 Verified contacts only
 ```
 
-- [ ] Enable `Allow knowledge answers to recommend published tasks`.
-- [ ] Save and reload the page.
+- [x] Enable `Allow knowledge answers to recommend published tasks`.
+- [x] Save and reload the page.
 
 Expected result: `Conversation policy saved` appears and every value remains
 after reload.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 4 Of 13 - Apply And Verify Booking Fields
 
-- [ ] Open `Fields`.
-- [ ] Select `Apply Booking Starter` only if no task fields are present.
+- [x] Open `Fields`.
+- [x] Select `Apply Booking Starter` only if no task fields are present.
 
 Expected result: these seven fields are visible:
 
@@ -209,13 +206,13 @@ Expected result: these seven fields are visible:
 
 Expected result: trusted context contains `lia_timezone`.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 5 Of 13 - Test A Temporary Field
 
-- [ ] In `Add Field`, enter the following values.
+- [x] In `Add Field`, enter the following values.
 
 Visitor Label:
 
@@ -247,27 +244,27 @@ Confirmation:
 When changed
 ```
 
-- [ ] Leave `Depends On`, `Validation Rule`, and `Normalization` empty.
-- [ ] Leave `Required` unchecked.
-- [ ] Add the field and reload the page.
-- [ ] Try to add `specialRequest` again.
+- [x] Leave `Depends On`, `Validation Rule`, and `Normalization` empty.
+- [x] Leave `Required` unchecked.
+- [x] Add the field and reload the page.
+- [x] Try to add `specialRequest` again.
 
 Expected result: the duplicate key is rejected inside the Add Field form and
 the entered values remain available for correction.
 
-- [ ] Remove the temporary `Special Request` field.
+- [x] Remove the temporary `Special Request` field.
 
 Expected result: the temporary field is removed without affecting the seven
 booking fields. The Add Field form and stale error state are cleared after the
 successful collection change.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 6 Of 13 - Test Trusted Context
 
-- [ ] In `Add Context`, first enter:
+- [x] In `Add Context`, first enter:
 
 Key:
 
@@ -287,12 +284,12 @@ Type:
 Text
 ```
 
-- [ ] Try to add the context.
+- [x] Try to add the context.
 
 Expected result: the form shows `The lia_ prefix is reserved for system
 context.` The entered values remain unchanged.
 
-- [ ] Replace the values with:
+- [x] Replace the values with:
 
 Key:
 
@@ -312,46 +309,46 @@ Type:
 Text
 ```
 
-- [ ] Add the context and reload the page.
+- [x] Add the context and reload the page.
 
 Expected result: `uatCampaign` persists. `lia_timezone` shows `System
 protected` and has no edit or delete controls.
 
-- [ ] Edit `uatCampaign`, change Source to `Project`, and save.
+- [x] Edit `uatCampaign`, change Source to `Project`, and save.
 
 Expected result: the source changes to `project`; the context key remains fixed
 and cannot be edited.
 
-- [ ] Open `Outcomes`.
-- [ ] Set Fallback Message to:
+- [x] Open `Outcomes`.
+- [x] Set Fallback Message to:
 
 ```text
 Campaign {{context.uatCampaign}} could not be completed.
 ```
 
-- [ ] Save, return to `Fields`, and find `uatCampaign`.
+- [x] Save, return to `Fields`, and find `uatCampaign`.
 
 Expected result: the variable shows `Used by: Fallback message`. Delete is
 disabled while Edit remains available.
 
-- [ ] Restore Fallback Message to:
+- [x] Restore Fallback Message to:
 
 ```text
 I could not complete that booking request. Let me connect you with the team.
 ```
 
-- [ ] Save, return to `Fields`, and remove `uatCampaign`.
+- [x] Save, return to `Fields`, and remove `uatCampaign`.
 
 Expected result: the unreferenced variable can be removed. The protected
 `lia_timezone` variable remains present.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 7 Of 13 - Verify Tool Permissions
 
-- [ ] Open `Tools`.
+- [x] Open `Tools`.
 
 Expected result: no operation is permitted by default. Active operations from
 the current project may be selected. Operations from another project are not
@@ -359,27 +356,27 @@ shown.
 
 If an active test operation is available:
 
-- [ ] Select the operation.
-- [ ] Set Permission to `Read data`.
-- [ ] Enable only the `Lookup` stage.
-- [ ] Bind the operation and reload the page.
+- [x] Select the operation.
+- [x] Set Permission to `Read data`.
+- [x] Enable only the `Lookup` stage.
+- [x] Bind the operation and reload the page.
 
 Expected result: a versioned `operation:<id>` binding persists without copying
 provider credentials into the task.
 
-- [ ] Remove the temporary binding.
+- [x] Remove the temporary binding.
 
 If no active operation is available, record `No active project operation
 available` below and mark only the binding subtest as `Blocked`. Do not create
 an operation only for this Phase 1 test.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 8 Of 13 - Verify And Extend Outcomes
 
-- [ ] Open `Outcomes`.
+- [x] Open `Outcomes`.
 
 Expected result: the booking starter includes:
 
@@ -388,7 +385,7 @@ Expected result: the booking starter includes:
 - `Needs Team Help`
 - `Booking Failed`
 
-- [ ] Add this temporary outcome.
+- [x] Add this temporary outcome.
 
 Outcome Name:
 
@@ -414,20 +411,20 @@ Output Port:
 noAvailability
 ```
 
-- [ ] Reload and confirm the outcome remains.
-- [ ] Remove `No Availability`.
+- [x] Reload and confirm the outcome remains.
+- [x] Remove `No Availability`.
 
 Expected result: the temporary outcome persists and can be removed without
 changing the four booking starter outcomes. Every outcome form control has a
 visible label.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 9 Of 13 - Configure Behavior And Safety
 
-- [ ] In `Behavior and Safety`, enter the following values.
+- [x] In `Behavior and Safety`, enter the following values.
 
 Task Language:
 
@@ -495,21 +492,21 @@ Message Retention Days:
 90
 ```
 
-- [ ] Enable `Consent required`.
-- [ ] Enable `Export allowed`.
-- [ ] Save and reload.
+- [x] Enable `Consent required`.
+- [x] Enable `Export allowed`.
+- [x] Save and reload.
 
 Expected result: behavior, return policies, retention, consent, and export
 settings remain unchanged after reload.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 10 Of 13 - Review The Draft
 
-- [ ] Confirm the temporary Step 7 tool binding has been removed.
-- [ ] Open `Review`.
+- [x] Confirm the temporary Step 7 tool binding has been removed.
+- [x] Open `Review`.
 
 Expected result: the clean test state shows:
 
@@ -521,59 +518,59 @@ Expected result: the clean test state shows:
 Expected result: the page is ready to publish or shows a precise blocker that
 identifies what must be corrected.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 11 Of 13 - Publish Version 1
 
-- [ ] Resolve any listed blocker.
-- [ ] Select `Publish New Version`.
+- [x] Resolve any listed blocker.
+- [x] Select `Publish New Version`.
 
 Expected result: Version 1 appears in Version History and contains the current
 task contract.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 12 Of 13 - Prove Immutable Versioning
 
-- [ ] Return to `Assistant`.
-- [ ] Add this final line to Shared Instructions:
+- [x] Return to `Assistant`.
+- [x] Add this final line to Shared Instructions:
 
 ```text
 When the visitor changes a detail, use the latest confirmed value.
 ```
 
-- [ ] Save the assistant policy.
-- [ ] Return to `Review`.
-- [ ] Publish another version.
+- [x] Save the assistant policy.
+- [x] Return to `Review`.
+- [x] Publish another version.
 
 Expected result: Version 2 is added and Version 1 remains visible. Publishing
 creates a new immutable version instead of replacing Version 1.
 
-Status:
+Status: Pass
 
 Notes:
 
 ### Step 13 Of 13 - Verify Project Isolation
 
-- [ ] Note the task ID from the current URL.
-- [ ] Switch to `Ewissen Inc (#195)`.
-- [ ] Open `Automation`, then `Tasks`.
-- [ ] Try to open the `Ewissen Infra (#194)` task URL.
+- [x] Note the task ID from the current URL.
+- [x] Switch to `Ewissen Inc (#195)`.
+- [x] Open `Automation`, then `Tasks`.
+- [x] Try to open the `Ewissen Infra (#194)` task URL.
 
 Expected result: the task and its versions are not accessible from project
 `#195`. The app returns to a safe task view or shows that the task was not
 found. It must not display project `#194` configuration.
 
-- [ ] Switch back to `Ewissen Infra (#194)`.
-- [ ] Reopen the task's `Review` page.
+- [x] Switch back to `Ewissen Infra (#194)`.
+- [x] Reopen the task's `Review` page.
 
 Expected result: Versions 1 and 2 remain visible in the correct project.
 
-Status:
+Status: Pass
 
 Notes:
 
@@ -581,20 +578,21 @@ Notes:
 
 Phase 1 passes only when:
 
-- [ ] Every Phase 1 test is Pass or has an explicitly accepted non-blocking
+- [x] Every Phase 1 test is Pass or has an explicitly accepted non-blocking
   limitation.
-- [ ] The task contract contains the expected assistant policy, seven fields,
+- [x] The task contract contains the expected assistant policy, seven fields,
   protected context, default-deny tool bindings, four outcomes, return
   behavior, safety, and data policy.
-- [ ] Publishing creates immutable Versions 1 and 2.
-- [ ] Project isolation passes.
-- [ ] No Critical or High Phase 1 issue remains unresolved.
-- [ ] The accepted test evidence is committed before Phase 2 development
+- [x] Publishing creates immutable Versions 1 and 2.
+- [x] Project isolation passes.
+- [x] No Critical or High Phase 1 issue remains unresolved.
+- [x] The accepted test evidence is committed before Phase 2 development
   begins.
 
-Final Phase 1 status:
+Final Phase 1 status: Pass
 
-Final notes:
+Final notes: Alvin completed all 13 Phase 1 manual UAT steps. No unresolved
+Critical or High Phase 1 issue was reported.
 
 ## Issue Log
 
@@ -638,7 +636,7 @@ Technical owner:
 
 UAT tester:
 
-- Name:
-- Date:
-- Approved:
-- Notes:
+- Name: Alvin
+- Date: 2026-07-25
+- Approved: Yes
+- Notes: Phase 1 manual UAT completed.
