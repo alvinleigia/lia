@@ -7,6 +7,7 @@ import {
   normalizeConversationalTaskDefinition,
 } from "@/lib/conversation-contracts";
 import type { ConversationalTaskDetails } from "@/lib/conversational-task-schema";
+import { resolveProjectTaskToolDefinitions } from "@/lib/conversational-task-tools";
 import { db } from "@/lib/db-config";
 import {
   conversationalTasks,
@@ -135,11 +136,16 @@ export async function publishConversationalTask(input: {
 
     const versionNumber = (latest?.value ?? 0) + 1;
     const definition = normalizeConversationalTaskDefinition(task.definition);
+    const toolDefinitions = await resolveProjectTaskToolDefinitions({
+      definition,
+      projectId: input.projectId,
+    });
     const snapshot = conversationalTaskSnapshotV1Schema.parse({
       schemaVersion: 1,
       assistantBehavior: input.assistantBehavior,
       assistantPolicy: input.projectPolicy.assistant,
       conversationPolicy: input.projectPolicy,
+      toolDefinitions,
       task: {
         id: task.id,
         schemaVersion: task.schemaVersion,

@@ -381,7 +381,7 @@ export async function cleanupExpiredConversationRuntime(input: {
       .set({
         completedAt: now,
         errorCode: "timeout",
-        status: "timed_out",
+        status: "timeout",
         updatedAt: now,
       })
       .where(

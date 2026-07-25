@@ -11,11 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Label } from "@/components/ui/label";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
+import { listProjectTaskToolOptions } from "@/lib/conversational-task-tools";
 import {
   getProjectConversationalTask,
   readConversationalTaskDefinition,
 } from "@/lib/conversational-tasks";
-import { listProjectOperations } from "@/lib/operations";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
@@ -41,16 +41,17 @@ export default async function TaskToolsPage({
   if (!route.success || !context) {
     redirect("/projects/tasks?error=Task%20not%20found.");
   }
-  const [task, operationRows] = await Promise.all([
+  const [task, toolOptions] = await Promise.all([
     getProjectConversationalTask(context.project.id, route.data),
-    listProjectOperations(context.project.id),
+    listProjectTaskToolOptions(context.project.id),
   ]);
   if (!task) {
     redirect("/projects/tasks?error=Task%20not%20found.");
   }
   const definition = readConversationalTaskDefinition(task.definition);
-  const operations = operationRows.filter(
-    ({ operation }) => operation.status === "active",
+  const toolOptionsById = new Map(toolOptions.map((tool) => [tool.id, tool]));
+  const availableTools = toolOptions.filter(
+    (tool) => !definition.tools.some((binding) => binding.tool.id === tool.id),
   );
 
   return (
@@ -93,11 +94,22 @@ export default async function TaskToolsPage({
                     className="flex items-center justify-between gap-4 px-4 py-3"
                   >
                     <div>
-                      <p className="font-medium">{binding.tool.id}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {binding.access} · {binding.allowedStages.join(", ")} ·
-                        v{binding.tool.version}
+                      <p className="font-medium">
+                        {toolOptionsById.get(binding.tool.id)?.name ??
+                          binding.tool.id}
                       </p>
+                      <p className="text-sm text-muted-foreground">
+                        {binding.access === "read"
+                          ? "Read data"
+                          : "Take action"}{" "}
+                        / {binding.allowedStages.join(", ")} / v
+                        {binding.tool.version}
+                      </p>
+                      {toolOptionsById.get(binding.tool.id)?.description && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {toolOptionsById.get(binding.tool.id)?.description}
+                        </p>
+                      )}
                     </div>
                     <form action={unbindConversationalTaskToolAction}>
                       <input
@@ -122,9 +134,9 @@ export default async function TaskToolsPage({
                 ))}
               </div>
             )}
-            {operations.length === 0 ? (
+            {availableTools.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Create and enable a project operation before binding a tool.
+                All available project tools are already allowed.
               </p>
             ) : (
               <ActionStateForm
@@ -144,29 +156,24 @@ export default async function TaskToolsPage({
                 <input type="hidden" name="taskId" value={task.id} />
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="operationId">Operation</Label>
+                    <Label htmlFor="toolId">Tool</Label>
                     <select
-                      id="operationId"
-                      name="operationId"
+                      id="toolId"
+                      name="toolId"
                       className="h-9 w-full rounded-md border bg-white px-3 text-sm"
                     >
-                      {operations.map(({ operation, provider }) => (
-                        <option key={operation.id} value={operation.id}>
-                          {operation.name} via {provider.name}
+                      {availableTools.map((tool) => (
+                        <option key={tool.id} value={tool.id}>
+                          {tool.name} ({tool.access})
                         </option>
                       ))}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="access">Permission</Label>
-                    <select
-                      id="access"
-                      name="access"
-                      className="h-9 w-full rounded-md border bg-white px-3 text-sm"
-                    >
-                      <option value="read">Read data</option>
-                      <option value="write">Change external data</option>
-                    </select>
+                    <Label>Permission</Label>
+                    <p className="flex h-9 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">
+                      Set by the versioned tool definition
+                    </p>
                   </div>
                 </div>
                 <fieldset className="space-y-2">

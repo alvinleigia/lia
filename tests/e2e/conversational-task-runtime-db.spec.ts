@@ -4,7 +4,10 @@ import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
 } from "../../src/lib/conversation-contract-fixtures";
-import { conversationalTaskSnapshotV1Schema } from "../../src/lib/conversation-contracts";
+import {
+  conversationalTaskSnapshotV1Schema,
+  type ToolDefinitionV1,
+} from "../../src/lib/conversation-contracts";
 import {
   applyConversationalTaskEvent,
   cleanupExpiredConversationRuntime,
@@ -14,8 +17,10 @@ import {
   startConversationalTaskRun,
   switchConversationalTaskRun,
 } from "../../src/lib/conversational-task-runtime";
+import { resolveProjectTaskToolDefinition } from "../../src/lib/conversational-task-tools";
 import { db } from "../../src/lib/db-config";
 import {
+  catalogProducts,
   channelConversations,
   channelMessages,
   companies,
@@ -23,6 +28,7 @@ import {
   conversationalTasks,
   conversationalTaskVersions,
   conversationInboundEvents,
+  productCatalogs,
   projects,
   users,
   workspaces,
@@ -36,6 +42,11 @@ const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const runtimeTaskDefinition = {
   ...REFERENCE_BOOKING_TASK_DEFINITION,
   tools: [
+    {
+      access: "read" as const,
+      allowedStages: ["lookup" as const],
+      tool: { id: "catalog.service_price", version: 1 },
+    },
     {
       access: "read" as const,
       allowedStages: ["lookup" as const],
@@ -57,6 +68,11 @@ let fixture:
       userId: number;
       companyId: number;
       workspaceId: number;
+      catalogId: number;
+      facialCatalogId: number;
+      serviceProductId: number;
+      otherCatalogId: number;
+      otherProductId: number;
     }
   | undefined;
 let activeRunId: number;
@@ -84,6 +100,43 @@ function eventEnvelope(type: string, offsetMinutes: number) {
     receivedAt: timestamp(offsetMinutes),
     schemaVersion: 1 as const,
     taskRunId: activeRunId,
+  };
+}
+
+function availabilityToolDefinition(projectId: number): ToolDefinitionV1 {
+  return {
+    access: "read",
+    description: "Read a provider-confirmed availability result.",
+    execution: {
+      adapter: "operation",
+      cancellation: "best_effort",
+      handler: "availability_lookup",
+      mode: "synchronous",
+      retryAttempts: 0,
+      retryDelayMs: 0,
+      timeoutMs: 5_000,
+    },
+    id: "availability_lookup",
+    inputSchema: { fields: [] },
+    name: "Availability Lookup",
+    outputSchema: {
+      fields: [{ path: "available", required: true, type: "boolean" }],
+    },
+    projectId,
+    requiredForCompletion: false,
+    resultMappings: [
+      {
+        freshnessMinutes: 5,
+        modelVisible: true,
+        sourcePath: "available",
+        target: "context",
+        targetKey: "serviceAvailable",
+        toolVisible: true,
+        type: "boolean",
+      },
+    ],
+    schemaVersion: 1,
+    version: 1,
   };
 }
 
@@ -126,6 +179,48 @@ test.beforeAll(async () => {
       },
     ])
     .returning();
+  const [catalog, facialCatalog, otherCatalog] = await db
+    .insert(productCatalogs)
+    .values([
+      {
+        name: "Massage",
+        projectId: project.id,
+      },
+      {
+        name: "Facial",
+        projectId: project.id,
+      },
+      {
+        name: `Other Catalog ${suffix}`,
+        projectId: otherProject.id,
+      },
+    ])
+    .returning();
+  const [serviceProduct, otherProduct] = await db
+    .insert(catalogProducts)
+    .values([
+      {
+        catalogId: catalog.id,
+        currency: "INR",
+        description: "A focused massage service.",
+        metadata: {
+          available: true,
+          availabilityStatus: "available",
+          durationMinutes: 75,
+        },
+        name: "Deep Tissue",
+        priceAmount: 150,
+        projectId: project.id,
+      },
+      {
+        catalogId: otherCatalog.id,
+        currency: "INR",
+        name: `Foreign Service ${suffix}`,
+        priceAmount: 999,
+        projectId: otherProject.id,
+      },
+    ])
+    .returning();
   const [task, targetTask, unpublishedTask] = await db
     .insert(conversationalTasks)
     .values([
@@ -150,6 +245,15 @@ test.beforeAll(async () => {
     ])
     .returning();
 
+  const servicePriceTool = await resolveProjectTaskToolDefinition({
+    definition: runtimeTaskDefinition,
+    projectId: project.id,
+    toolId: "catalog.service_price",
+    version: 1,
+  });
+  if (!servicePriceTool) {
+    throw new Error("Could not build the reference service-price tool.");
+  }
   const taskSnapshot = conversationalTaskSnapshotV1Schema.parse({
     schemaVersion: 1,
     assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
@@ -163,6 +267,7 @@ test.beforeAll(async () => {
       description: null,
       definition: runtimeTaskDefinition,
     },
+    toolDefinitions: [servicePriceTool, availabilityToolDefinition(project.id)],
   });
   const targetSnapshot = conversationalTaskSnapshotV1Schema.parse({
     ...taskSnapshot,
@@ -201,9 +306,14 @@ test.beforeAll(async () => {
 
   fixture = {
     companyId: company.id,
+    catalogId: catalog.id,
     conversationId: conversation.id,
+    facialCatalogId: facialCatalog.id,
+    otherCatalogId: otherCatalog.id,
     otherProjectId: otherProject.id,
+    otherProductId: otherProduct.id,
     projectId: project.id,
+    serviceProductId: serviceProduct.id,
     targetTaskId: targetTask.id,
     targetVersionId: targetVersion.id,
     taskId: task.id,
@@ -235,6 +345,18 @@ test.afterAll(async () => {
   await db
     .delete(conversationalTasks)
     .where(eq(conversationalTasks.projectId, fixture.projectId));
+  await db
+    .delete(catalogProducts)
+    .where(eq(catalogProducts.projectId, fixture.projectId));
+  await db
+    .delete(catalogProducts)
+    .where(eq(catalogProducts.projectId, fixture.otherProjectId));
+  await db
+    .delete(productCatalogs)
+    .where(eq(productCatalogs.projectId, fixture.projectId));
+  await db
+    .delete(productCatalogs)
+    .where(eq(productCatalogs.projectId, fixture.otherProjectId));
   await db
     .delete(projects)
     .where(
@@ -327,7 +449,7 @@ test("applies multiple values once and preserves canonical field state", async (
       {
         fieldKey: "serviceCategoryId",
         naturalValue: "Massage",
-        canonicalValue: "massage",
+        canonicalValue: "client-supplied-category",
         state: "valid" as const,
         provenance: { source: "visitor" as const, sourceReference: null },
         validation: { code: null, message: null, valid: true },
@@ -335,7 +457,7 @@ test("applies multiple values once and preserves canonical field state", async (
       {
         fieldKey: "serviceId",
         naturalValue: "Deep Tissue",
-        canonicalValue: "deep_tissue",
+        canonicalValue: "client-supplied-service",
         state: "valid" as const,
         provenance: { source: "visitor" as const, sourceReference: null },
         validation: { code: null, message: null, valid: true },
@@ -358,9 +480,123 @@ test("applies multiple values once and preserves canonical field state", async (
   });
   expect(runtime?.fields).toContainEqual(
     expect.objectContaining({
-      canonicalValue: "deep_tissue",
+      canonicalValue: `product:${fixture?.serviceProductId}`,
       fieldKey: "serviceId",
       naturalValue: "Deep Tissue",
+      state: "valid",
+    }),
+  );
+  expect(runtime?.fields).toContainEqual(
+    expect.objectContaining({
+      canonicalValue: `catalog:${fixture?.catalogId}`,
+      fieldKey: "serviceCategoryId",
+      state: "valid",
+    }),
+  );
+});
+
+test("executes a pinned built-in lookup and stores only approved facts", async () => {
+  const completed = await applyConversationalTaskEvent({
+    ...eventEnvelope("service-price", 3),
+    idempotencyKey: `service-price-${suffix}`,
+    input: {
+      serviceId: `product:${fixture?.serviceProductId}`,
+    },
+    requestId: `service-price-${suffix}`,
+    requestMode: "synchronous",
+    stage: "lookup",
+    timeoutAt: timestamp(30),
+    toolId: "catalog.service_price",
+    type: "tool.requested",
+  });
+  activeRevision = completed.revision as number;
+
+  expect(completed.disposition).toBe("applied");
+  const runtime = await getConversationalTaskRuntime({
+    projectId: fixture?.projectId as number,
+    taskRunId: activeRunId,
+  });
+  expect(runtime?.tools).toContainEqual(
+    expect.objectContaining({
+      input: { serviceId: `product:${fixture?.serviceProductId}` },
+      requestId: `service-price-${suffix}`,
+      result: { amount: 150, currency: "INR" },
+      status: "success",
+      toolId: "catalog.service_price",
+    }),
+  );
+  expect(runtime?.context).toContainEqual(
+    expect.objectContaining({
+      key: "servicePriceAmount",
+      source: "tool",
+      value: 150,
+    }),
+  );
+  expect(runtime?.context).toContainEqual(
+    expect.objectContaining({
+      key: "servicePriceCurrency",
+      source: "tool",
+      value: "INR",
+    }),
+  );
+});
+
+test("rejects a resource owned by another project", async () => {
+  const rejected = await applyConversationalTaskEvent({
+    ...eventEnvelope("foreign-service", 4),
+    candidates: [
+      {
+        canonicalValue: `product:${fixture?.serviceProductId}`,
+        fieldKey: "serviceId",
+        naturalValue: `product:${fixture?.otherProductId}`,
+        provenance: { source: "visitor", sourceReference: null },
+        state: "valid",
+        validation: { code: null, message: null, valid: true },
+      },
+    ],
+    correction: true,
+    type: "field.candidates",
+  });
+  activeRevision = rejected.revision as number;
+  let runtime = await getConversationalTaskRuntime({
+    projectId: fixture?.projectId as number,
+    taskRunId: activeRunId,
+  });
+  expect(runtime?.fields).toContainEqual(
+    expect.objectContaining({
+      canonicalValue: null,
+      fieldKey: "serviceId",
+      state: "invalid",
+      validation: expect.objectContaining({
+        code: "project_resource_not_found",
+      }),
+    }),
+  );
+
+  const restored = await applyConversationalTaskEvent({
+    ...eventEnvelope("restore-service", 5),
+    candidates: [
+      {
+        canonicalValue: "ignored",
+        fieldKey: "serviceId",
+        naturalValue: "Deep Tissue",
+        provenance: { source: "visitor", sourceReference: null },
+        state: "valid",
+        validation: { code: null, message: null, valid: true },
+      },
+    ],
+    correction: true,
+    type: "field.candidates",
+  });
+  activeRevision = restored.revision as number;
+  runtime = await getConversationalTaskRuntime({
+    projectId: fixture?.projectId as number,
+    taskRunId: activeRunId,
+  });
+  expect(runtime?.fields).toContainEqual(
+    expect.objectContaining({
+      canonicalValue: `product:${fixture?.serviceProductId}`,
+      fieldKey: "serviceId",
       state: "valid",
     }),
   );
@@ -555,7 +791,7 @@ test("serializes concurrent turns and records authenticated tool results", async
     ...eventEnvelope("tool-requested", 12),
     type: "tool.requested",
     idempotencyKey: `availability-${suffix}`,
-    input: { preferredDate: "2026-08-15" },
+    input: {},
     requestId: `availability-${suffix}`,
     requestMode: "synchronous",
     stage: "lookup",
@@ -574,7 +810,7 @@ test("serializes concurrent turns and records authenticated tool results", async
     },
     errorCode: null,
     requestId: `availability-${suffix}`,
-    result: { available: true },
+    result: { available: true, providerSecret: "must-not-persist" },
     status: "completed",
   });
   activeRevision = completed.revision as number;
@@ -586,10 +822,91 @@ test("serializes concurrent turns and records authenticated tool results", async
   expect(runtime?.tools).toContainEqual(
     expect.objectContaining({
       requestId: `availability-${suffix}`,
-      status: "completed",
+      result: { available: true },
+      status: "success",
       taskVersionId: fixture?.taskVersionId,
       toolId: "availability_lookup",
     }),
+  );
+  expect(runtime?.context).toContainEqual(
+    expect.objectContaining({
+      key: "serviceAvailable",
+      source: "tool",
+      value: true,
+    }),
+  );
+});
+
+test("records every tool outcome and invalidates an older business fact", async () => {
+  const outcomes = [
+    {
+      errorCode: "no_available_slots",
+      status: "no_result" as const,
+    },
+    {
+      errorCode: "ambiguous_result",
+      status: "rejected" as const,
+    },
+    {
+      errorCode: "tool_timeout",
+      status: "timeout" as const,
+    },
+    {
+      errorCode: "provider_down",
+      status: "provider_failure" as const,
+    },
+    {
+      errorCode: "cancelled_by_user",
+      status: "cancelled" as const,
+    },
+  ];
+
+  for (const [index, outcome] of outcomes.entries()) {
+    const requestId = `availability-${outcome.status}-${suffix}`;
+    const requested = await applyConversationalTaskEvent({
+      ...eventEnvelope(`tool-requested-${outcome.status}`, 13.1 + index / 10),
+      idempotencyKey: requestId,
+      input: {},
+      requestId,
+      requestMode: "synchronous",
+      stage: "lookup",
+      timeoutAt: timestamp(30),
+      toolId: "availability_lookup",
+      type: "tool.requested",
+    });
+    activeRevision = requested.revision as number;
+    const completed = await applyConversationalTaskEvent({
+      ...eventEnvelope(`tool-result-${outcome.status}`, 13.15 + index / 10),
+      authentication: {
+        keyId: "runtime-db-test",
+        kind: "hmac",
+        principal: "test-provider",
+        verifiedAt: timestamp(13.15 + index / 10),
+      },
+      errorCode: outcome.errorCode,
+      requestId,
+      result: { available: true, providerSecret: "must-not-persist" },
+      status: outcome.status,
+      type: "tool.result",
+    });
+    activeRevision = completed.revision as number;
+  }
+
+  const runtime = await getConversationalTaskRuntime({
+    projectId: fixture?.projectId as number,
+    taskRunId: activeRunId,
+  });
+  for (const outcome of outcomes) {
+    expect(runtime?.tools).toContainEqual(
+      expect.objectContaining({
+        errorCode: outcome.errorCode,
+        result: null,
+        status: outcome.status,
+      }),
+    );
+  }
+  expect(runtime?.context.some(({ key }) => key === "serviceAvailable")).toBe(
+    false,
   );
 });
 

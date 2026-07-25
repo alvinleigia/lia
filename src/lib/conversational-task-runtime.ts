@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, or, sql } from "drizzle-orm";
-import { conversationalTaskSnapshotV1Schema } from "@/lib/conversation-contracts";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import {
+  type ConversationalTaskDefinitionV1,
+  conversationalTaskSnapshotV1Schema,
+  type ToolDefinitionV1,
+  type ToolResultMappingV1,
+} from "@/lib/conversation-contracts";
 import {
   applyFieldCandidates,
   clearRuntimeField,
@@ -8,7 +13,11 @@ import {
   type RuntimeTaskField,
   resetRuntimeFields,
 } from "@/lib/conversational-task-field-state";
+import { canonicalizeFieldCandidates } from "@/lib/conversational-task-field-validation";
+import { resolveProjectTaskResource } from "@/lib/conversational-task-project-resources";
 import {
+  type FieldCandidateV1,
+  type InboundEventInputV1,
   type InboundEventV1,
   inboundEventV1Schema,
   type StartConversationalTaskRunV1,
@@ -17,6 +26,11 @@ import {
   switchConversationalTaskRunV1Schema,
   type TaskFieldState,
 } from "@/lib/conversational-task-runtime-contracts";
+import {
+  buildCanonicalToolInput,
+  validateToolResultPayload,
+} from "@/lib/conversational-task-tool-runtime";
+import { executeBuiltInTaskTool } from "@/lib/conversational-task-tools";
 import { db } from "@/lib/db-config";
 import {
   channelConversations,
@@ -214,6 +228,214 @@ function runtimeFieldMap(
       },
     ]),
   );
+}
+
+type RuntimeContextValue = {
+  expiresAt: Date | null;
+  value: unknown;
+};
+
+function mappingExpiry(
+  now: Date,
+  freshnessMinutes: number | null,
+  runExpiresAt: Date | null,
+) {
+  if (!freshnessMinutes) return runExpiresAt;
+  const freshnessExpiry = addMinutes(now, freshnessMinutes);
+  return runExpiresAt && runExpiresAt < freshnessExpiry
+    ? runExpiresAt
+    : freshnessExpiry;
+}
+
+async function applyToolResultMappings(
+  tx: RuntimeTransaction,
+  input: {
+    contextValues: Map<string, unknown>;
+    definition: ConversationalTaskDefinitionV1;
+    eventId: string;
+    fields: Map<string, RuntimeTaskField>;
+    mappings: Array<{ mapping: ToolResultMappingV1; value: unknown }>;
+    now: Date;
+    projectId: number;
+    runExpiresAt: Date | null;
+    taskRunId: number;
+    toolRequestId: string;
+  },
+) {
+  const definitionFields = new Map(
+    input.definition.fields.map((field) => [field.key, field]),
+  );
+  const definitionContext = new Map(
+    input.definition.contextVariables.map((variable) => [
+      variable.key,
+      variable,
+    ]),
+  );
+  const fieldCandidates: FieldCandidateV1[] = [];
+
+  for (const { mapping, value } of input.mappings) {
+    if (mapping.target === "field") {
+      const field = definitionFields.get(mapping.targetKey);
+      if (
+        !field ||
+        field.type !== mapping.type ||
+        !field.sourcePriority.includes("tool")
+      ) {
+        return {
+          error: "tool_result_mapping_not_allowed",
+          updates: new Map<string, RuntimeTaskField>(),
+        };
+      }
+      fieldCandidates.push({
+        fieldKey: mapping.targetKey,
+        naturalValue: value,
+        provenance: {
+          source: "tool" as const,
+          sourceReference: input.toolRequestId,
+        },
+        state: "candidate" as const,
+        validation: { code: null, message: null, valid: false },
+      });
+      continue;
+    }
+
+    const context = definitionContext.get(mapping.targetKey);
+    if (context && context.type !== mapping.type) {
+      return {
+        error: "tool_result_mapping_not_allowed",
+        updates: new Map<string, RuntimeTaskField>(),
+      };
+    }
+  }
+
+  const canonicalCandidates =
+    fieldCandidates.length > 0
+      ? await canonicalizeFieldCandidates({
+          candidates: fieldCandidates,
+          contextValues: input.contextValues,
+          definition: input.definition,
+          fieldValues: new Map(
+            [...input.fields].map(([key, field]) => [
+              key,
+              field.canonicalValue,
+            ]),
+          ),
+          projectId: input.projectId,
+          resolveProjectResource: resolveProjectTaskResource,
+        })
+      : [];
+  if (canonicalCandidates.some(({ state }) => state === "invalid")) {
+    return {
+      error: "tool_result_mapping_invalid",
+      updates: new Map<string, RuntimeTaskField>(),
+    };
+  }
+
+  for (const { mapping, value } of input.mappings) {
+    if (mapping.target !== "context") continue;
+    const context = definitionContext.get(mapping.targetKey);
+    const expiresAt = mappingExpiry(
+      input.now,
+      mapping.freshnessMinutes,
+      input.runExpiresAt,
+    );
+    await tx
+      .insert(conversationalTaskContextValues)
+      .values({
+        expiresAt,
+        key: mapping.targetKey,
+        modelVisible: mapping.modelVisible,
+        projectId: input.projectId,
+        sensitivity: context?.sensitivity ?? "standard",
+        source: "tool",
+        taskRunId: input.taskRunId,
+        toolVisible: mapping.toolVisible,
+        type: mapping.type,
+        value,
+      })
+      .onConflictDoUpdate({
+        target: [
+          conversationalTaskContextValues.taskRunId,
+          conversationalTaskContextValues.key,
+        ],
+        set: {
+          expiresAt,
+          modelVisible: mapping.modelVisible,
+          sensitivity: context?.sensitivity ?? "standard",
+          source: "tool",
+          toolVisible: mapping.toolVisible,
+          type: mapping.type,
+          updatedAt: input.now,
+          value,
+        },
+      });
+    input.contextValues.set(mapping.targetKey, value);
+  }
+
+  const updates =
+    canonicalCandidates.length > 0
+      ? applyFieldCandidates({
+          candidates: canonicalCandidates,
+          definition: input.definition,
+          eventId: input.eventId,
+          fields: input.fields,
+          now: input.now,
+        }).updates
+      : new Map<string, RuntimeTaskField>();
+
+  return { error: null, updates };
+}
+
+async function invalidateToolResultMappings(
+  tx: RuntimeTransaction,
+  input: {
+    definition: ConversationalTaskDefinitionV1;
+    eventId: string;
+    fields: Map<string, RuntimeTaskField>;
+    mappings: ToolResultMappingV1[];
+    now: Date;
+    projectId: number;
+    taskRunId: number;
+  },
+) {
+  const contextKeys = [
+    ...new Set(
+      input.mappings
+        .filter((mapping) => mapping.target === "context")
+        .map((mapping) => mapping.targetKey),
+    ),
+  ];
+  if (contextKeys.length > 0) {
+    await tx
+      .delete(conversationalTaskContextValues)
+      .where(
+        and(
+          eq(conversationalTaskContextValues.projectId, input.projectId),
+          eq(conversationalTaskContextValues.taskRunId, input.taskRunId),
+          inArray(conversationalTaskContextValues.key, contextKeys),
+          eq(conversationalTaskContextValues.source, "tool"),
+        ),
+      );
+  }
+
+  let fields = input.fields;
+  const updates = new Map<string, RuntimeTaskField>();
+  for (const mapping of input.mappings) {
+    if (mapping.target !== "field") continue;
+    const current = fields.get(mapping.targetKey);
+    if (current?.provenance.source !== "tool") continue;
+    const cleared = clearRuntimeField({
+      definition: input.definition,
+      eventId: input.eventId,
+      fieldKey: mapping.targetKey,
+      fields,
+      now: input.now,
+      reason: "tool_result_stale",
+    });
+    fields = cleared.fields;
+    for (const [key, value] of cleared.updates) updates.set(key, value);
+  }
+  return updates;
 }
 
 async function recordAudit(
@@ -815,15 +1037,107 @@ function eventAllowedForRunStatus(event: InboundEventV1, runStatus: string) {
   ].includes(event.type);
 }
 
+async function completeSynchronousBuiltInToolRequest(input: {
+  event: Extract<InboundEventV1, { type: "tool.requested" }>;
+  expectedRevision: number;
+}) {
+  if (!input.event.taskRunId) return null;
+  const [request] = await db
+    .select()
+    .from(conversationalTaskToolRequests)
+    .where(
+      and(
+        eq(conversationalTaskToolRequests.projectId, input.event.projectId),
+        eq(conversationalTaskToolRequests.taskRunId, input.event.taskRunId),
+        eq(conversationalTaskToolRequests.requestId, input.event.requestId),
+        eq(conversationalTaskToolRequests.status, "pending"),
+      ),
+    )
+    .limit(1);
+  if (!request) return null;
+
+  const [version] = await db
+    .select()
+    .from(conversationalTaskVersions)
+    .where(
+      and(
+        eq(conversationalTaskVersions.projectId, input.event.projectId),
+        eq(conversationalTaskVersions.id, request.taskVersionId),
+      ),
+    )
+    .limit(1);
+  if (!version) return null;
+
+  const snapshot = conversationalTaskSnapshotV1Schema.parse(version.snapshot);
+  const binding = snapshot.task.definition.tools.find(
+    (candidate) => candidate.tool.id === request.toolId,
+  );
+  const definition =
+    snapshot.toolDefinitions.find(
+      (candidate) =>
+        candidate.id === request.toolId &&
+        candidate.version === binding?.tool.version &&
+        candidate.projectId === input.event.projectId,
+    ) ?? null;
+  if (
+    !definition ||
+    definition.execution.adapter !== "built_in" ||
+    definition.execution.mode !== "synchronous"
+  ) {
+    return null;
+  }
+
+  let result: Awaited<ReturnType<typeof executeBuiltInTaskTool>>;
+  try {
+    result = await executeBuiltInTaskTool({
+      definition,
+      projectId: input.event.projectId,
+      toolInput: request.input,
+    });
+  } catch {
+    result = {
+      errorCode: "built_in_tool_failed",
+      result: null,
+      status: "provider_failure",
+    };
+  }
+
+  const now = new Date(input.event.receivedAt);
+  return applyConversationalTaskEvent({
+    authentication: {
+      keyId: null,
+      kind: "api_key",
+      principal: "lia-built-in-tool",
+      verifiedAt: now.toISOString(),
+    },
+    channelIdentity: input.event.channelIdentity,
+    channelType: input.event.channelType,
+    conversationId: input.event.conversationId,
+    errorCode: result.errorCode,
+    eventId: childEventId(input.event.eventId, "result"),
+    expectedRevision: input.expectedRevision,
+    occurredAt: now.toISOString(),
+    projectId: input.event.projectId,
+    providerSequence: null,
+    receivedAt: now.toISOString(),
+    requestId: input.event.requestId,
+    result: result.result,
+    schemaVersion: 1,
+    status: result.status,
+    taskRunId: input.event.taskRunId,
+    type: "tool.result",
+  });
+}
+
 export async function applyConversationalTaskEvent(
-  input: InboundEventV1,
+  input: InboundEventInputV1,
 ): Promise<ConversationalTaskRuntimeResult> {
   const event = inboundEventV1Schema.parse(input);
   const eventHash = hashPayload(event);
   const occurredAt = new Date(event.occurredAt);
   const receivedAt = new Date(event.receivedAt);
 
-  return runRuntimeTransaction(event.taskRunId, async (tx) => {
+  const applied = await runRuntimeTransaction(event.taskRunId, async (tx) => {
     const [conversation] = await tx
       .select({ id: channelConversations.id })
       .from(channelConversations)
@@ -1036,6 +1350,27 @@ export async function applyConversationalTaskEvent(
         ),
       );
     const fields = runtimeFieldMap(fieldRows);
+    const contextRows = await tx
+      .select()
+      .from(conversationalTaskContextValues)
+      .where(
+        and(
+          eq(conversationalTaskContextValues.projectId, event.projectId),
+          eq(conversationalTaskContextValues.taskRunId, run.id),
+        ),
+      );
+    const contextValues = new Map(
+      contextRows.map((row) => [row.key, row.value]),
+    );
+    const toolContext = new Map<string, RuntimeContextValue>(
+      contextRows.map((row) => [
+        row.key,
+        { expiresAt: row.expiresAt, value: row.value },
+      ]),
+    );
+    const fieldValues = new Map(
+      [...fields].map(([key, field]) => [key, field.canonicalValue]),
+    );
 
     const referencedFieldKeys =
       event.type === "field.candidates"
@@ -1087,6 +1422,40 @@ export async function applyConversationalTaskEvent(
         taskRunId: run.id,
       });
     }
+    if (event.type === "task.complete") {
+      const requiredToolIds = snapshot.toolDefinitions
+        .filter(({ requiredForCompletion }) => requiredForCompletion)
+        .map(({ id }) => id);
+      if (requiredToolIds.length > 0) {
+        const completedToolRequests = await tx
+          .select({
+            status: conversationalTaskToolRequests.status,
+            toolId: conversationalTaskToolRequests.toolId,
+          })
+          .from(conversationalTaskToolRequests)
+          .where(
+            and(
+              eq(conversationalTaskToolRequests.projectId, event.projectId),
+              eq(conversationalTaskToolRequests.taskRunId, run.id),
+            ),
+          );
+        const successfulToolIds = new Set(
+          completedToolRequests
+            .filter(({ status }) => status === "success")
+            .map(({ toolId }) => toolId),
+        );
+        if (requiredToolIds.some((toolId) => !successfulToolIds.has(toolId))) {
+          return quarantineEvent(tx, {
+            conversationId: event.conversationId,
+            eventDbId: eventRow.id,
+            eventType: event.type,
+            projectId: event.projectId,
+            reason: "required_tools_incomplete",
+            taskRunId: run.id,
+          });
+        }
+      }
+    }
     if (
       event.type === "task.cancel" &&
       event.outcomeKey &&
@@ -1104,22 +1473,53 @@ export async function applyConversationalTaskEvent(
         taskRunId: run.id,
       });
     }
-    if (
-      event.type === "tool.requested" &&
-      !snapshot.task.definition.tools.some(
-        (binding) =>
-          binding.tool.id === event.toolId &&
-          binding.allowedStages.includes(event.stage),
-      )
-    ) {
-      return quarantineEvent(tx, {
-        conversationId: event.conversationId,
-        eventDbId: eventRow.id,
-        eventType: event.type,
-        projectId: event.projectId,
-        reason: "tool_not_allowed_for_stage",
-        taskRunId: run.id,
+    let requestedToolDefinition: ToolDefinitionV1 | null = null;
+    let requestedToolInput: Record<string, unknown> | null = null;
+    if (event.type === "tool.requested") {
+      const binding = snapshot.task.definition.tools.find(
+        (candidate) => candidate.tool.id === event.toolId,
+      );
+      requestedToolDefinition =
+        snapshot.toolDefinitions.find(
+          (definition) =>
+            definition.id === event.toolId &&
+            definition.version === binding?.tool.version,
+        ) ?? null;
+      if (
+        !binding ||
+        !requestedToolDefinition ||
+        requestedToolDefinition.projectId !== event.projectId ||
+        requestedToolDefinition.access !== binding.access ||
+        !binding.allowedStages.includes(event.stage) ||
+        requestedToolDefinition.execution.mode !== event.requestMode
+      ) {
+        return quarantineEvent(tx, {
+          conversationId: event.conversationId,
+          eventDbId: eventRow.id,
+          eventType: event.type,
+          projectId: event.projectId,
+          reason: "tool_not_allowed_for_stage",
+          taskRunId: run.id,
+        });
+      }
+      const canonicalInput = buildCanonicalToolInput({
+        context: toolContext,
+        definition: requestedToolDefinition,
+        fields,
+        now: receivedAt,
+        proposedInput: event.input,
       });
+      if (!canonicalInput.ok) {
+        return quarantineEvent(tx, {
+          conversationId: event.conversationId,
+          eventDbId: eventRow.id,
+          eventType: event.type,
+          projectId: event.projectId,
+          reason: canonicalInput.error.code,
+          taskRunId: run.id,
+        });
+      }
+      requestedToolInput = canonicalInput.input;
     }
 
     const executionChanges: Partial<
@@ -1141,11 +1541,20 @@ export async function applyConversationalTaskEvent(
         dependencyInvalidated?: boolean;
       }
     >();
+    let auditSummary: Record<string, unknown> = safeEventSummary(event);
 
     switch (event.type) {
       case "field.candidates": {
-        const result = applyFieldCandidates({
+        const canonicalCandidates = await canonicalizeFieldCandidates({
           candidates: event.candidates,
+          contextValues,
+          definition: snapshot.task.definition,
+          fieldValues,
+          projectId: event.projectId,
+          resolveProjectResource: resolveProjectTaskResource,
+        });
+        const result = applyFieldCandidates({
+          candidates: canonicalCandidates,
           definition: snapshot.task.definition,
           eventId: event.eventId,
           fields,
@@ -1276,18 +1685,31 @@ export async function applyConversationalTaskEvent(
         break;
       case "tool.requested":
         {
+          if (!requestedToolDefinition || !requestedToolInput) {
+            return quarantineEvent(tx, {
+              conversationId: event.conversationId,
+              eventDbId: eventRow.id,
+              eventType: event.type,
+              projectId: event.projectId,
+              reason: "pinned_tool_definition_not_found",
+              taskRunId: run.id,
+            });
+          }
+          const timeoutAt = new Date(
+            receivedAt.getTime() + requestedToolDefinition.execution.timeoutMs,
+          );
           const [createdRequest] = await tx
             .insert(conversationalTaskToolRequests)
             .values({
               idempotencyKey: event.idempotencyKey,
-              input: event.input,
+              input: requestedToolInput,
               projectId: event.projectId,
               requestId: event.requestId,
-              requestMode: event.requestMode,
+              requestMode: requestedToolDefinition.execution.mode,
               stage: event.stage,
               taskRunId: run.id,
               taskVersionId: version.id,
-              timeoutAt: event.timeoutAt ? new Date(event.timeoutAt) : null,
+              timeoutAt,
               toolId: event.toolId,
             })
             .onConflictDoNothing()
@@ -1335,10 +1757,7 @@ export async function applyConversationalTaskEvent(
         const [request] = await tx
           .update(conversationalTaskToolRequests)
           .set({
-            completedAt: receivedAt,
-            errorCode: event.errorCode,
-            result: event.result,
-            status: event.status,
+            status: "processing",
             updatedAt: receivedAt,
           })
           .where(
@@ -1360,6 +1779,98 @@ export async function applyConversationalTaskEvent(
             taskRunId: run.id,
           });
         }
+        const binding = snapshot.task.definition.tools.find(
+          (candidate) => candidate.tool.id === request.toolId,
+        );
+        const definition =
+          snapshot.toolDefinitions.find(
+            (candidate) =>
+              candidate.id === request.toolId &&
+              candidate.version === binding?.tool.version &&
+              candidate.projectId === event.projectId,
+          ) ?? null;
+        let finalStatus = event.status;
+        let finalResult: Record<string, unknown> | null = null;
+        let finalErrorCode = event.errorCode;
+
+        if (!definition) {
+          finalStatus = "rejected";
+          finalErrorCode = "pinned_tool_definition_not_found";
+        } else if (event.status === "success") {
+          if (!event.result) {
+            finalStatus = "rejected";
+            finalErrorCode = "tool_output_missing";
+          } else {
+            const validatedResult = await validateToolResultPayload({
+              contextValues,
+              definition,
+              fieldValues,
+              projectId: event.projectId,
+              result: event.result,
+            });
+            if (!validatedResult.ok) {
+              finalStatus = "rejected";
+              finalErrorCode = validatedResult.error.code;
+            } else {
+              const mapped = await applyToolResultMappings(tx, {
+                contextValues,
+                definition: snapshot.task.definition,
+                eventId: event.eventId,
+                fields,
+                mappings: validatedResult.mappings,
+                now: receivedAt,
+                projectId: event.projectId,
+                runExpiresAt: run.expiresAt,
+                taskRunId: run.id,
+                toolRequestId: request.requestId,
+              });
+              if (mapped.error) {
+                finalStatus = "rejected";
+                finalErrorCode = mapped.error;
+              } else {
+                fieldUpdates = mapped.updates;
+                finalResult = validatedResult.result;
+                finalErrorCode = null;
+              }
+            }
+          }
+        } else {
+          finalErrorCode ??= event.status;
+        }
+
+        if (definition && finalStatus !== "success") {
+          fieldUpdates = await invalidateToolResultMappings(tx, {
+            definition: snapshot.task.definition,
+            eventId: event.eventId,
+            fields,
+            mappings: definition.resultMappings,
+            now: receivedAt,
+            projectId: event.projectId,
+            taskRunId: run.id,
+          });
+        }
+
+        await tx
+          .update(conversationalTaskToolRequests)
+          .set({
+            completedAt: receivedAt,
+            errorCode: finalErrorCode,
+            result: finalResult,
+            status: finalStatus,
+            updatedAt: receivedAt,
+          })
+          .where(
+            and(
+              eq(conversationalTaskToolRequests.id, request.id),
+              eq(conversationalTaskToolRequests.projectId, event.projectId),
+              eq(conversationalTaskToolRequests.taskRunId, run.id),
+            ),
+          );
+        auditSummary = {
+          errorCode: finalErrorCode,
+          requestId: event.requestId,
+          status: finalStatus,
+        };
         break;
       }
     }
@@ -1435,7 +1946,7 @@ export async function applyConversationalTaskEvent(
       eventType: event.type,
       inboundEventId: eventRow.id,
       projectId: event.projectId,
-      summary: safeEventSummary(event),
+      summary: auditSummary,
       taskRunId: run.id,
     });
 
@@ -1446,4 +1957,18 @@ export async function applyConversationalTaskEvent(
       taskRunId: run.id,
     };
   });
+
+  if (
+    event.type === "tool.requested" &&
+    applied.disposition === "applied" &&
+    applied.revision !== null
+  ) {
+    return (
+      (await completeSynchronousBuiltInToolRequest({
+        event,
+        expectedRevision: applied.revision,
+      })) ?? applied
+    );
+  }
+  return applied;
 }

@@ -85,11 +85,12 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 4 of 18 implementation. Phases 1-3 completed
-their implementation and manual UAT gates by 2026-07-26.
+Current phase: Priority 1, Phase 4 of 18 manual UAT. Phases 1-3 completed
+their implementation and manual UAT gates by 2026-07-26. Phase 4
+implementation and automated verification are complete.
 
-Current target: complete Phase 4 Deterministic Validation And Business Tools
-implementation before opening its manual UAT gate.
+Current target: complete the Phase 4 Deterministic Validation And Business
+Tools manual UAT gate before starting Phase 5.
 
 ## Product Direction
 
@@ -392,33 +393,37 @@ manual UAT steps were approved on 2026-07-26.
 Goal: ground every task field and business fact in project-owned validation,
 resources, or approved tools.
 
-- [ ] Build one typed validator registry for every supported task-field type.
-- [ ] Normalize phone, email, number, date, time, date-range, address, location, and media values.
-- [ ] Apply project timezone and locale consistently.
-- [ ] Support fixed choices and dynamic project-resource choices.
-- [ ] Resolve catalog categories, services, products, and other resources by stable project ID.
-- [ ] Add a typed, tenant-scoped tool registry with versioned input and output schemas.
-- [ ] Add a company/project-scoped reusable Tool Library with stable tool IDs and immutable tool versions.
-- [ ] Keep reusable tool definitions separate from assistant, task, and stage bindings.
-- [ ] Require a clear model-facing description and server-facing execution policy for every tool.
-- [ ] Separate read tools from consequential write operations.
-- [ ] Default every task and stage to no model-callable tools until tools are explicitly allowed.
-- [ ] Validate every requested tool against the published task allowlist.
-- [ ] Validate tool arguments against current canonical task state.
-- [ ] Reject resources that do not belong to the current project.
-- [ ] Add service detail, price, duration, and availability lookup tools for the reference task.
-- [ ] Support versioned synchronous and asynchronous execution modes, timeouts, retries, and cancellation behavior.
-- [ ] Define `ToolResultEventV1` for validated success, no-result, rejected, timeout, provider-failure, and cancelled outcomes.
-- [ ] Map only approved tool-result paths into canonical context or task state.
-- [ ] Store current business facts from tool results rather than model assertions.
-- [ ] Mark stale or failed lookups for refresh before confirmation.
-- [ ] Present tool errors in plain language without exposing credentials or provider payloads.
-- [ ] Define deterministic no-result, ambiguous-result, timeout, and provider-failure behavior.
-- [ ] Add safe test fixtures for every tool outcome.
-- [ ] Add tenant-isolation tests for resources, tools, results, and task mappings.
+- [x] Build one typed validator registry for every supported task-field type.
+- [x] Normalize phone, email, number, date, time, date-range, address, location, and media values.
+- [x] Apply project timezone and locale consistently.
+- [x] Support fixed choices and dynamic project-resource choices.
+- [x] Resolve catalog categories, services, products, and other resources by stable project ID.
+- [x] Add a typed, tenant-scoped tool registry with versioned input and output schemas.
+- [x] Add a company/project-scoped reusable Tool Library with stable tool IDs and immutable tool versions.
+- [x] Keep reusable tool definitions separate from assistant, task, and stage bindings.
+- [x] Require a clear model-facing description and server-facing execution policy for every tool.
+- [x] Separate read tools from consequential write operations.
+- [x] Default every task and stage to no model-callable tools until tools are explicitly allowed.
+- [x] Validate every requested tool against the published task allowlist.
+- [x] Validate tool arguments against current canonical task state.
+- [x] Reject resources that do not belong to the current project.
+- [x] Add service detail, price, duration, and availability lookup tools for the reference task.
+- [x] Support versioned synchronous and asynchronous execution modes, timeouts, retries, and cancellation behavior.
+- [x] Define `ToolResultEventV1` for validated success, no-result, rejected, timeout, provider-failure, and cancelled outcomes.
+- [x] Map only approved tool-result paths into canonical context or task state.
+- [x] Store current business facts from tool results rather than model assertions.
+- [x] Mark stale or failed lookups for refresh before confirmation.
+- [x] Present tool errors in plain language without exposing credentials or provider payloads.
+- [x] Define deterministic no-result, ambiguous-result, timeout, and provider-failure behavior.
+- [x] Add safe test fixtures for every tool outcome.
+- [x] Add tenant-isolation tests for resources, tools, results, and task mappings.
 
 Phase 4 exit gate: the task can collect natural language while every canonical
 value and current business fact remains deterministic and tenant-safe.
+
+Phase 4 status: Implementation complete. Type checking, contract tests,
+database-backed runtime tests, tenant-isolation scenarios, and lint passed on
+2026-07-26. Manual UAT is pending.
 
 ## Phase 5: Confirmation, Operations, And Outcomes
 

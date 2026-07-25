@@ -11,6 +11,7 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  SearchCheck,
   Shuffle,
   Square,
   Trash2,
@@ -52,6 +53,7 @@ import {
   applyTaskRuntimeTestLifecycleAction,
   clearTaskRuntimeTestFieldAction,
   requestTaskRuntimeTestFieldAction,
+  requestTaskRuntimeTestToolAction,
   resetTaskRuntimeTestAction,
   startTaskRuntimeTestAction,
   switchTaskRuntimeTestAction,
@@ -79,6 +81,7 @@ const eventMessages: Record<string, string> = {
   side_question_resolved: "Control returned to the task and requested field.",
   started: "A new run started on the latest published version.",
   task_switched: "The active conversation switched to the selected task.",
+  tool_completed: "The business lookup finished. Review its result below.",
 };
 
 const ownerLabels: Record<string, string> = {
@@ -92,6 +95,34 @@ function displayValue(value: unknown) {
   if (value === null || value === undefined) return "Not collected";
   if (typeof value === "string") return value;
   return JSON.stringify(value);
+}
+
+const toolStatusLabels: Record<string, string> = {
+  cancelled: "Cancelled",
+  completed: "Completed",
+  failed: "Provider failed",
+  no_result: "No current result",
+  pending: "Waiting",
+  processing: "Running",
+  provider_failure: "Provider failed",
+  rejected: "Rejected",
+  success: "Completed",
+  timed_out: "Timed out",
+  timeout: "Timed out",
+};
+
+const toolErrorLabels: Record<string, string> = {
+  availability_not_recorded: "No current availability is recorded.",
+  built_in_tool_failed: "The lookup could not be completed.",
+  catalog_not_found: "The selected service catalog is no longer available.",
+  duration_not_recorded: "No current duration is recorded.",
+  price_not_recorded: "No current price is recorded.",
+  service_not_found: "The selected service is no longer available.",
+  tool_result_mapping_invalid: "The lookup result did not match this task.",
+};
+
+function toolResultEntries(value: Record<string, unknown> | null) {
+  return value ? Object.entries(value) : [];
 }
 
 function hiddenContext(projectId: number, taskId: number) {
@@ -170,6 +201,28 @@ export default async function TaskRuntimeTestPage({
       (field) => field.state === "missing" || field.state === "cleared",
     ) ??
     runtime?.fields[0];
+  const toolBindings = session.snapshot?.task.definition.tools ?? [];
+  const runnableTools =
+    session.snapshot?.toolDefinitions.filter((definition) => {
+      const binding = toolBindings.find(
+        (candidate) =>
+          candidate.tool.id === definition.id &&
+          candidate.tool.version === definition.version,
+      );
+      return (
+        binding?.access === "read" &&
+        binding.allowedStages.includes("lookup") &&
+        definition.access === "read" &&
+        definition.execution.adapter === "built_in" &&
+        definition.execution.mode === "synchronous"
+      );
+    }) ?? [];
+  const toolNames = new Map(
+    (session.snapshot?.toolDefinitions ?? []).map((definition) => [
+      definition.id,
+      definition.name,
+    ]),
+  );
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10">
@@ -388,7 +441,7 @@ export default async function TaskRuntimeTestPage({
                             )}
                           </div>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            {field.fieldKey} · {field.fieldType}
+                            {field.fieldKey} / {field.fieldType}
                           </p>
                         </div>
                         <div className="min-w-0">
@@ -396,7 +449,7 @@ export default async function TaskRuntimeTestPage({
                             {displayValue(field.canonicalValue)}
                           </p>
                           <p className="mt-1 text-xs capitalize text-muted-foreground">
-                            {field.state} · {field.attemptCount} attempt
+                            {field.state} / {field.attemptCount} attempt
                             {field.attemptCount === 1 ? "" : "s"}
                           </p>
                         </div>
@@ -498,6 +551,132 @@ export default async function TaskRuntimeTestPage({
                     </ActionStateForm>
                   )}
                 </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {runtime && session.snapshot && toolBindings.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <SearchCheck className="h-5 w-5" />
+                Business Lookup Test
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Run a published read-only lookup using the current validated
+                task values. Lia cannot replace its inputs or expose provider
+                data here.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {runnableTools.length > 0 &&
+                isActive &&
+                !isPaused &&
+                !isAnsweringSideQuestion && (
+                  <ActionStateForm
+                    action={requestTaskRuntimeTestToolAction}
+                    className="space-y-4 rounded-md border p-4"
+                  >
+                    {hiddenContext(context.project.id, task.id)}
+                    <ActionFormError />
+                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                      <div className="space-y-2">
+                        <Label htmlFor="runtimeToolId">Business Lookup</Label>
+                        <Select
+                          name="toolId"
+                          defaultValue={runnableTools[0]?.id}
+                        >
+                          <SelectTrigger id="runtimeToolId" className="w-full">
+                            <SelectValue placeholder="Choose a lookup" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {runnableTools.map((definition) => (
+                              <SelectItem
+                                key={definition.id}
+                                value={definition.id}
+                              >
+                                {definition.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button type="submit">
+                        <SearchCheck className="h-4 w-4" />
+                        Run Lookup
+                      </Button>
+                    </div>
+                  </ActionStateForm>
+                )}
+
+              {runnableTools.length === 0 && (
+                <p className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
+                  Publish at least one read-only built-in tool with the Lookup
+                  stage enabled to test it here.
+                </p>
+              )}
+
+              {runtime.tools.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No business lookups have run in this test conversation.
+                </p>
+              ) : (
+                <div className="divide-y rounded-md border">
+                  {runtime.tools.slice(0, 8).map((tool) => {
+                    const entries = toolResultEntries(tool.result);
+                    return (
+                      <div key={tool.id} className="space-y-3 px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="font-medium">
+                              {toolNames.get(tool.toolId) ?? tool.toolId}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {tool.stage} / {tool.requestMode}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              [
+                                "failed",
+                                "provider_failure",
+                                "rejected",
+                              ].includes(tool.status)
+                                ? "destructive"
+                                : tool.status === "success" ||
+                                    tool.status === "completed"
+                                  ? "default"
+                                  : "secondary"
+                            }
+                          >
+                            {toolStatusLabels[tool.status] ?? tool.status}
+                          </Badge>
+                        </div>
+                        {entries.length > 0 && (
+                          <dl className="grid gap-2 sm:grid-cols-2">
+                            {entries.map(([key, value]) => (
+                              <div key={key}>
+                                <dt className="text-xs capitalize text-muted-foreground">
+                                  {key.replace(/([A-Z])/g, " $1")}
+                                </dt>
+                                <dd className="break-words text-sm font-medium">
+                                  {displayValue(value)}
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                        )}
+                        {tool.errorCode && (
+                          <p className="text-sm text-muted-foreground">
+                            {toolErrorLabels[tool.errorCode] ??
+                              "The lookup did not return a usable result."}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </CardContent>
           </Card>

@@ -35,6 +35,7 @@ import {
   conversationalTaskDetailsSchema,
   conversationalTaskIdSchema,
 } from "@/lib/conversational-task-schema";
+import { resolveProjectTaskToolDefinition } from "@/lib/conversational-task-tools";
 import { validateConversationalTaskForPublish } from "@/lib/conversational-task-validation";
 import {
   createProjectConversationalTask,
@@ -45,7 +46,6 @@ import {
   updateProjectConversationalTask,
   updateProjectConversationalTaskDefinition,
 } from "@/lib/conversational-tasks";
-import { getProjectOperation } from "@/lib/operations";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 
 const projectIdSchema = z.coerce.number().int().positive();
@@ -554,29 +554,31 @@ export async function bindConversationalTaskToolAction(
 ): Promise<ActionFormState> {
   const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/tools`;
-  const operationId = z.coerce
-    .number()
-    .int()
-    .positive()
-    .safeParse(formData.get("operationId"));
-  if (!operationId.success || context.task.isArchived) {
-    return { error: "Operation not found." };
+  const toolId = z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .safeParse(formData.get("toolId"));
+  if (!toolId.success || context.task.isArchived) {
+    return { error: "Tool not found." };
   }
-  const operation = await getProjectOperation(
-    context.project.id,
-    operationId.data,
-  );
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  const tool = await resolveProjectTaskToolDefinition({
+    definition,
+    projectId: context.project.id,
+    toolId: toolId.data,
+    version: 1,
+  });
   const parsed = toolBindingV1Schema.safeParse({
-    tool: { id: `operation:${operationId.data}`, version: 1 },
-    access: formData.get("access"),
+    tool: { id: toolId.data, version: 1 },
+    access: tool?.access,
     allowedStages: ["extraction", "lookup", "confirmation", "operation"].filter(
       (stage) => formData.get(`stage_${stage}`) === "on",
     ),
   });
-  const definition = readConversationalTaskDefinition(context.task.definition);
   if (
-    !operation ||
-    operation.operation.status !== "active" ||
+    !tool ||
     !parsed.success ||
     parsed.data.allowedStages.length === 0 ||
     definition.tools.some((binding) => binding.tool.id === parsed.data.tool.id)
@@ -812,13 +814,20 @@ export async function publishConversationalTaskAction(formData: FormData) {
       `${destination}?error=Resolve%20the%20publish%20blockers%20first.`,
     );
   }
-  const version = await publishConversationalTask({
-    assistantBehavior: normalizeProjectAiSettings(context.project.aiSettings),
-    projectId: context.project.id,
-    taskId: context.task.id,
-    userId: context.user.id,
-    projectPolicy,
-  });
+  let version: Awaited<ReturnType<typeof publishConversationalTask>>;
+  try {
+    version = await publishConversationalTask({
+      assistantBehavior: normalizeProjectAiSettings(context.project.aiSettings),
+      projectId: context.project.id,
+      taskId: context.task.id,
+      userId: context.user.id,
+      projectPolicy,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Tool validation failed.";
+    redirect(`${destination}?error=${encodeURIComponent(message)}`);
+  }
   if (!version) {
     redirect(`${destination}?error=Task%20could%20not%20be%20published.`);
   }

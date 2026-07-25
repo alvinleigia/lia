@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { TOOL_STAGES } from "@/lib/conversation-contracts";
+import {
+  TOOL_RESULT_STATUSES,
+  TOOL_STAGES,
+} from "@/lib/conversation-contracts";
 
 export const TASK_FIELD_STATES = [
   "missing",
@@ -41,6 +44,12 @@ const fieldKey = z
   .max(80)
   .regex(/^[a-z][a-zA-Z0-9_]*$/);
 const safeRecord = z.record(z.string(), z.unknown());
+const toolResultStatus = z.preprocess((value) => {
+  if (value === "completed") return "success";
+  if (value === "failed") return "provider_failure";
+  if (value === "timed_out") return "timeout";
+  return value;
+}, z.enum(TOOL_RESULT_STATUSES));
 
 export const inboundEventAuthenticationV1Schema = z.object({
   kind: z.enum(["hmac", "api_key", "session", "user"]),
@@ -175,7 +184,7 @@ const inboundEventPayloadV1Schema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("tool.result"),
     requestId: stableId,
-    status: z.enum(["completed", "failed", "timed_out"]),
+    status: toolResultStatus,
     result: safeRecord.nullable().default(null),
     errorCode: z.string().trim().min(1).max(120).nullable().default(null),
   }),
@@ -198,6 +207,7 @@ export const inboundEventV1Schema = inboundEventEnvelopeV1Schema
   });
 
 export type InboundEventV1 = z.infer<typeof inboundEventV1Schema>;
+export type InboundEventInputV1 = z.input<typeof inboundEventV1Schema>;
 export type FieldCandidateV1 = z.infer<typeof fieldCandidateV1Schema>;
 export type TaskFieldState = (typeof TASK_FIELD_STATES)[number];
 export type ConversationResponseOwner =

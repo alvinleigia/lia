@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
+import { resolveProjectTaskToolDefinitions } from "@/lib/conversational-task-tools";
 import { validateConversationalTaskForPublish } from "@/lib/conversational-task-validation";
 import {
   getProjectConversationalTask,
@@ -53,6 +54,20 @@ export default async function TaskReviewPage({
     definition,
     projectPolicy,
   });
+  let toolIssue: string | null = null;
+  try {
+    await resolveProjectTaskToolDefinitions({
+      definition,
+      projectId: context.project.id,
+    });
+  } catch (error) {
+    toolIssue =
+      error instanceof Error ? error.message : "A bound tool is unavailable.";
+  }
+  const ready = validation.ready && !toolIssue;
+  const issues = toolIssue
+    ? [...validation.issues, toolIssue]
+    : validation.issues;
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10">
@@ -68,7 +83,7 @@ export default async function TaskReviewPage({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-2xl">
-              {validation.ready ? (
+              {ready ? (
                 <CheckCircle2 className="h-6 w-6 text-green-600" />
               ) : (
                 <CircleAlert className="h-6 w-6 text-amber-600" />
@@ -104,7 +119,7 @@ export default async function TaskReviewPage({
                 </div>
               ))}
             </div>
-            {validation.ready ? (
+            {ready ? (
               <p className="rounded-md bg-green-50 px-3 py-3 text-sm text-green-800">
                 Ready to publish. Contracts, dependencies, and terminal outcomes
                 are valid.
@@ -113,7 +128,7 @@ export default async function TaskReviewPage({
               <div className="rounded-md bg-amber-50 px-4 py-3">
                 <p className="font-medium text-amber-900">Publish blockers</p>
                 <ul className="mt-2 list-disc pl-5 text-sm text-amber-900">
-                  {validation.issues.map((issue) => (
+                  {issues.map((issue) => (
                     <li key={issue}>{issue}</li>
                   ))}
                 </ul>
@@ -129,7 +144,7 @@ export default async function TaskReviewPage({
               <FormSubmitButton
                 label="Publish New Version"
                 pendingLabel="Publishing..."
-                disabled={!validation.ready}
+                disabled={!ready}
                 icon={<Send className="h-4 w-4" />}
               />
             </form>

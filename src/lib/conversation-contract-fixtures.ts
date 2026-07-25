@@ -46,6 +46,16 @@ export const REFERENCE_BOOKING_TASK_DEFINITION: ConversationalTaskDefinitionV1 =
     ...DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
     contextVariables: [
       {
+        key: "lia_locale",
+        type: "text",
+        source: "system",
+        defaultValue: "en-IN",
+        sensitivity: "standard",
+        expiresAfterMinutes: null,
+        modelVisible: true,
+        toolVisible: true,
+      },
+      {
         key: "lia_timezone",
         type: "text",
         source: "system",

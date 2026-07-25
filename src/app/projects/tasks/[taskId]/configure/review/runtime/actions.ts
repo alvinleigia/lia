@@ -37,6 +37,20 @@ const lifecycleSchema = z.enum([
   "side_question",
   "side_question_resolved",
 ]);
+const toolRequestSchema = z.object({
+  toolId: z.string().trim().min(1).max(120),
+});
+
+const toolErrorMessages: Record<string, string> = {
+  pinned_tool_definition_not_found:
+    "Publish the task again before testing this lookup.",
+  tool_input_mismatch:
+    "The lookup input did not match the task's validated values.",
+  tool_input_missing:
+    "Collect the required task fields before running this lookup.",
+  tool_not_allowed_for_stage:
+    "This lookup is not allowed at the current task stage.",
+};
 
 function runtimePath(taskId: number) {
   return `/projects/tasks/${taskId}/configure/review/runtime`;
@@ -284,6 +298,69 @@ export async function clearTaskRuntimeTestFieldAction(formData: FormData) {
     type: "field.clear",
   });
   redirectWithResult(test.task.id, result, "field_cleared");
+}
+
+export async function requestTaskRuntimeTestToolAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const parsed = toolRequestSchema.safeParse({
+    toolId: formData.get("toolId"),
+  });
+  if (!parsed.success) {
+    return { error: "Choose a business lookup." };
+  }
+
+  const test = await resolveRuntimeTest(formData);
+  let active: ReturnType<typeof requireActiveRuntime>;
+  try {
+    active = requireActiveRuntime(test);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Run not found." };
+  }
+  const binding = active.snapshot.task.definition.tools.find(
+    (candidate) => candidate.tool.id === parsed.data.toolId,
+  );
+  const definition = active.snapshot.toolDefinitions.find(
+    (candidate) =>
+      candidate.id === parsed.data.toolId &&
+      candidate.version === binding?.tool.version &&
+      candidate.projectId === test.project.id,
+  );
+  if (
+    !binding ||
+    !definition ||
+    binding.access !== "read" ||
+    !binding.allowedStages.includes("lookup") ||
+    definition.access !== "read" ||
+    definition.execution.adapter !== "built_in" ||
+    definition.execution.mode !== "synchronous"
+  ) {
+    return {
+      error:
+        "This test screen can run only published, read-only business lookups.",
+    };
+  }
+
+  const requestId = crypto.randomUUID();
+  const result = await applyConversationalTaskEvent({
+    ...eventEnvelope(test),
+    idempotencyKey: requestId,
+    input: {},
+    requestId,
+    requestMode: definition.execution.mode,
+    stage: "lookup",
+    timeoutAt: null,
+    toolId: definition.id,
+    type: "tool.requested",
+  });
+  const error = runtimeResultMessage(result);
+  if (error) {
+    return { error: toolErrorMessages[error] ?? "The lookup could not run." };
+  }
+
+  revalidatePath(runtimePath(test.task.id));
+  redirect(`${runtimePath(test.task.id)}?event=tool_completed`);
 }
 
 export async function applyTaskRuntimeTestLifecycleAction(formData: FormData) {

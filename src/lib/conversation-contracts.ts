@@ -54,6 +54,15 @@ export const TOOL_STAGES = [
   "operation",
 ] as const;
 
+export const TOOL_RESULT_STATUSES = [
+  "success",
+  "no_result",
+  "rejected",
+  "timeout",
+  "provider_failure",
+  "cancelled",
+] as const;
+
 export const TURN_MODEL_STAGES = [
   "knowledge",
   "extraction",
@@ -314,6 +323,70 @@ export const toolBindingV1Schema = z.object({
   allowedStages: z.array(z.enum(TOOL_STAGES)).min(1),
 });
 
+const toolValueSourceV1Schema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("field"), key: stableKey }),
+  z.object({ kind: z.literal("context"), key: stableKey }),
+  z.object({ kind: z.literal("literal"), value: z.unknown() }),
+]);
+
+export const toolInputFieldV1Schema = z.object({
+  key: stableKey,
+  type: z.enum(FIELD_TYPES),
+  required: z.boolean(),
+  source: toolValueSourceV1Schema,
+});
+
+export const toolOutputFieldV1Schema = z.object({
+  path: z
+    .string()
+    .trim()
+    .min(1)
+    .max(240)
+    .regex(/^[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/),
+  type: z.enum(FIELD_TYPES),
+  required: z.boolean(),
+});
+
+export const toolResultMappingV1Schema = z.object({
+  sourcePath: toolOutputFieldV1Schema.shape.path,
+  target: z.enum(["field", "context"]),
+  targetKey: stableKey,
+  type: z.enum(FIELD_TYPES),
+  freshnessMinutes: z.number().int().positive().nullable(),
+  modelVisible: z.boolean().default(true),
+  toolVisible: z.boolean().default(true),
+});
+
+export const toolDefinitionV1Schema = z.object({
+  schemaVersion,
+  id: z.string().trim().min(1).max(120),
+  version: z.number().int().positive(),
+  projectId: z.number().int().positive(),
+  name: z.string().trim().min(1).max(160),
+  description: z.string().trim().min(1).max(1000),
+  access: z.enum(["read", "write"]),
+  inputSchema: z.object({
+    fields: z.array(toolInputFieldV1Schema).max(100),
+  }),
+  outputSchema: z.object({
+    fields: z.array(toolOutputFieldV1Schema).max(100),
+  }),
+  resultMappings: z.array(toolResultMappingV1Schema).max(100),
+  execution: z.object({
+    adapter: z.enum(["built_in", "operation"]),
+    handler: z.string().trim().min(1).max(160),
+    mode: z.enum(["synchronous", "asynchronous"]),
+    timeoutMs: z.number().int().min(100).max(300_000),
+    retryAttempts: z.number().int().min(0).max(10),
+    retryDelayMs: z.number().int().min(0).max(300_000),
+    cancellation: z.enum(["supported", "best_effort", "unsupported"]),
+  }),
+  requiredForCompletion: z.boolean().default(false),
+});
+
+export type ToolDefinitionV1 = z.infer<typeof toolDefinitionV1Schema>;
+export type ToolResultMappingV1 = z.infer<typeof toolResultMappingV1Schema>;
+
 export const fieldTransferRuleV1Schema = z.object({
   fieldKey: stableKey,
   allowedSources: z.array(
@@ -448,6 +521,7 @@ export const conversationalTaskSnapshotV1Schema = z.object({
   ),
   assistantPolicy: assistantPolicyV1Schema,
   conversationPolicy: conversationProjectPolicyV1Schema,
+  toolDefinitions: z.array(toolDefinitionV1Schema).default([]),
   task: z.object({
     id: z.number().int().positive(),
     schemaVersion,
