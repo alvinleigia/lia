@@ -125,9 +125,9 @@ export default async function TaskOutcomesPage({
               resetKey={definition.outcomes
                 .map((outcome) => outcome.id)
                 .join(":")}
-              className="grid gap-4 rounded-md border p-4 md:grid-cols-5"
+              className="grid gap-4 rounded-md border p-4 md:grid-cols-4"
             >
-              <ActionFormError className="md:col-span-5" />
+              <ActionFormError className="md:col-span-4" />
               <input
                 type="hidden"
                 name="projectId"
@@ -177,15 +177,7 @@ export default async function TaskOutcomesPage({
                   required
                 />
               </div>
-              <div className="flex items-end">
-                <FormSubmitButton
-                  className="w-full"
-                  label="Add"
-                  pendingLabel="Adding..."
-                  icon={<Plus className="h-4 w-4" />}
-                />
-              </div>
-              <div className="space-y-2 md:col-span-5">
+              <div className="space-y-2 md:col-span-4">
                 <Label htmlFor="outcomeCondition">
                   Completion Condition (optional)
                 </Label>
@@ -193,6 +185,14 @@ export default async function TaskOutcomesPage({
                   id="outcomeCondition"
                   name="condition"
                   placeholder="e.g. appointmentRequestId is present"
+                />
+              </div>
+              <div className="flex justify-end md:col-span-4">
+                <FormSubmitButton
+                  className="w-full sm:w-auto"
+                  label="Add"
+                  pendingLabel="Adding..."
+                  icon={<Plus className="h-4 w-4" />}
                 />
               </div>
             </ActionStateForm>
