@@ -119,6 +119,7 @@ CREATE TABLE "conversational_task_tool_requests" (
 	"idempotency_key" text NOT NULL,
 	"tool_id" text NOT NULL,
 	"stage" text NOT NULL,
+	"request_mode" text DEFAULT 'synchronous' NOT NULL,
 	"status" text DEFAULT 'pending' NOT NULL,
 	"input" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"result" jsonb,

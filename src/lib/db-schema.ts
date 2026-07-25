@@ -1055,6 +1055,7 @@ export const conversationalTaskToolRequests = pgTable(
     idempotencyKey: text("idempotency_key").notNull(),
     toolId: text("tool_id").notNull(),
     stage: text("stage").notNull(),
+    requestMode: text("request_mode").notNull().default("synchronous"),
     status: text("status").notNull().default("pending"),
     input: jsonb("input")
       .$type<Record<string, unknown>>()
