@@ -3,6 +3,7 @@ import type {
   ConversationProjectPolicyV1,
   TURN_MODEL_STAGES,
 } from "@/lib/conversation-contracts";
+import { buildKnowledgeChatSystemPrompt } from "@/lib/ai-guardrails";
 import {
   type TurnContextValueV1,
   type TurnFieldStateV1,
@@ -13,6 +14,7 @@ import {
   turnMessageV1Schema,
   turnRetrievalExcerptV1Schema,
 } from "@/lib/conversation-turn-contracts";
+import type { ProjectAiSettings } from "@/lib/project-ai-settings";
 
 export type PublishedTaskOption = {
   id: number;
@@ -22,11 +24,15 @@ export type PublishedTaskOption = {
 
 type CompileTurnInput = {
   activeTask: ConversationalTaskSnapshotV1 | null;
+  assistantBehavior: ProjectAiSettings;
   assistantIntroduced: boolean;
+  channel: "project_chat" | "widget" | "whatsapp";
+  companyName: string;
   context: TurnContextValueV1[];
   fieldState: TurnFieldStateV1[];
   history: TurnMessageV1[];
   projectPolicy: ConversationProjectPolicyV1;
+  projectName: string;
   publishedTasks: PublishedTaskOption[];
   retrieval: TurnRetrievalExcerptV1[];
   stage: (typeof TURN_MODEL_STAGES)[number];
@@ -36,18 +42,18 @@ type CompileTurnInput = {
 export type CompiledTurn = {
   messages: TurnMessageV1[];
   system: string;
-  validation: {
-    activeTaskId: number | null;
-    allowedExcerptIds: Set<string>;
-    allowedFieldKeys: Set<string>;
-    allowedOutcomeKeys: Set<string>;
-    allowedOutputPorts: Set<string>;
-    allowedTaskIds: Set<number>;
-    allowedTools: Map<string, Set<string>>;
-  };
+  validation: StructuredTurnValidationContext;
 };
 
-const MAX_HISTORY_MESSAGES = 16;
+export type StructuredTurnValidationContext = {
+  activeTaskId: number | null;
+  allowedExcerptIds: Set<string>;
+  allowedFieldKeys: Set<string>;
+  allowedOutcomeKeys: Set<string>;
+  allowedOutputPorts: Set<string>;
+  allowedTaskIds: Set<number>;
+  allowedTools: Map<string, Set<string>>;
+};
 
 function renderJson(value: unknown) {
   return JSON.stringify(value, null, 2);
@@ -133,18 +139,28 @@ function taskContract(snapshot: ConversationalTaskSnapshotV1 | null) {
 export function compileStructuredTurn(input: CompileTurnInput): CompiledTurn {
   const history = input.history
     .map((message) => turnMessageV1Schema.parse(message))
-    .slice(-MAX_HISTORY_MESSAGES);
+    .slice(-input.projectPolicy.assistant.modelPolicy.maxHistoryMessages);
   const retrieval = input.retrieval.map((excerpt) =>
     turnRetrievalExcerptV1Schema.parse(excerpt),
   );
   const activeContract = taskContract(input.activeTask);
   const allowedTools = new Map<string, Set<string>>();
+  const knowledgeInstructions = buildKnowledgeChatSystemPrompt({
+    channel: input.channel === "widget" ? "widget_chat" : input.channel,
+    companyName: input.companyName,
+    hasDocuments: retrieval.length > 0,
+    projectAiSettings: input.assistantBehavior,
+    projectName: input.projectName,
+  });
 
   for (const binding of input.activeTask?.task.definition.tools ?? []) {
     allowedTools.set(binding.tool.id, new Set(binding.allowedStages));
   }
 
   const system = `You are a structured conversation decision engine.
+
+Published visitor-facing behavior:
+${knowledgeInstructions}
 
 Instruction hierarchy, highest to lowest:
 1. This protocol and server safety rules.
@@ -214,7 +230,11 @@ ${renderJson(retrieval.map(({ id, content }) => ({ id, content })))}`;
           ({ outputPort }) => outputPort,
         ) ?? [],
       ),
-      allowedTaskIds: new Set(input.publishedTasks.map(({ id }) => id)),
+      allowedTaskIds: new Set(
+        input.projectPolicy.entry.allowTaskRecommendation
+          ? input.publishedTasks.map(({ id }) => id)
+          : [],
+      ),
       allowedTools,
     },
   };

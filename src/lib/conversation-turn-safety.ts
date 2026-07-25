@@ -1,0 +1,109 @@
+import type { ConversationProjectPolicyV1 } from "@/lib/conversation-contracts";
+import type { TurnMessageV1 } from "@/lib/conversation-turn-contracts";
+
+export type TurnAdmissionDecision =
+  | { allowed: true }
+  | {
+      allowed: false;
+      nextAction: "clarify" | "fail" | "handoff";
+      reasonCode: string;
+      reply: string;
+    };
+
+export type TurnBudgetAdmission = {
+  allowed: boolean;
+  reasonCode?: string;
+};
+
+export interface TurnBudgetGate {
+  admit(input: {
+    estimatedCostUnits: number;
+    estimatedInputTokens: number;
+    maxTurnsPerMinute: number;
+    modelId: string;
+    projectId: number;
+  }): Promise<TurnBudgetAdmission>;
+}
+
+export const allowTurnBudget: TurnBudgetGate = {
+  async admit() {
+    return { allowed: true };
+  },
+};
+
+function estimateTokens(text: string) {
+  return Math.ceil(text.length / 4);
+}
+
+const PROMPT_EXTRACTION_PATTERNS = [
+  /\bignore (?:all |the |your )?(?:previous|system|developer) instructions?\b/i,
+  /\breveal (?:the )?(?:system prompt|hidden instructions?|developer message)\b/i,
+  /\b(?:show|send|give) me (?:your |the )?(?:api key|credentials?|secret key)\b/i,
+];
+
+export function evaluateTurnAdmission(input: {
+  history: TurnMessageV1[];
+  policy: ConversationProjectPolicyV1;
+  visitorMessage: string;
+}): TurnAdmissionDecision & {
+  estimatedCostUnits?: number;
+  estimatedInputTokens?: number;
+} {
+  const visitorMessage = input.visitorMessage.trim();
+  const modelPolicy = input.policy.assistant.modelPolicy;
+
+  if (!visitorMessage) {
+    return {
+      allowed: false,
+      nextAction: "clarify",
+      reasonCode: "empty_message",
+      reply: "Please enter a question or request.",
+    };
+  }
+  if (visitorMessage.length > modelPolicy.maxVisitorCharacters) {
+    return {
+      allowed: false,
+      nextAction: "clarify",
+      reasonCode: "message_too_long",
+      reply: "Please shorten your message and send the main question.",
+    };
+  }
+  if (
+    PROMPT_EXTRACTION_PATTERNS.some((pattern) => pattern.test(visitorMessage))
+  ) {
+    return {
+      allowed: false,
+      nextAction: "fail",
+      reasonCode: "private_instruction_request",
+      reply:
+        "I can help with this business, but I cannot expose private instructions or credentials.",
+    };
+  }
+
+  const boundedHistory = input.history.slice(-modelPolicy.maxHistoryMessages);
+  const estimatedInputTokens = estimateTokens(
+    [...boundedHistory.map(({ content }) => content), visitorMessage].join(
+      "\n",
+    ),
+  );
+  const estimatedCostUnits =
+    estimatedInputTokens + modelPolicy.maxOutputTokens * 4;
+  if (estimatedCostUnits > modelPolicy.maxCostUnitsPerTurn) {
+    return {
+      allowed: false,
+      nextAction: "clarify",
+      reasonCode: "turn_budget_exceeded",
+      reply: "Please shorten the request so I can process it safely.",
+    };
+  }
+
+  return { allowed: true, estimatedCostUnits, estimatedInputTokens };
+}
+
+export function hasUnsafeTurnOutput(reply: string) {
+  return (
+    /instruction hierarchy, highest to lowest/i.test(reply) ||
+    /\b(?:OPENAI_API_KEY|DATABASE_URL|AUTH_SECRET)\b/.test(reply) ||
+    /\bsk-[A-Za-z0-9_-]{20,}\b/.test(reply)
+  );
+}

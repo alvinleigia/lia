@@ -9,6 +9,7 @@ export default defineConfig({
     "channel-adapter.spec.ts",
     "channel-certification.spec.ts",
     "conversation-turn-contracts.spec.ts",
+    "conversation-turn-engine.spec.ts",
     "conversational-task-runtime.spec.ts",
     "conversational-task-schema.spec.ts",
   ],

@@ -234,7 +234,18 @@ export async function updateConversationProjectPolicyAction(
       greetingStrategy: formData.get("greetingStrategy"),
       language: formData.get("language"),
       modelPolicy: {
+        ...current.assistant.modelPolicy,
         mode: formData.get("modelPolicyMode"),
+        primaryModelId: formData.get("primaryModelId"),
+        fallbackModelId: formData.get("fallbackModelId") || null,
+        timeoutMs: Number(formData.get("timeoutMs")),
+        maxOutputTokens: Number(formData.get("maxOutputTokens")),
+        maxRetries: Number(formData.get("maxRetries")),
+        maxRepairAttempts: Number(formData.get("maxRepairAttempts")),
+        maxVisitorCharacters: Number(formData.get("maxVisitorCharacters")),
+        maxHistoryMessages: Number(formData.get("maxHistoryMessages")),
+        maxTurnsPerMinute: Number(formData.get("maxTurnsPerMinute")),
+        maxCostUnitsPerTurn: Number(formData.get("maxCostUnitsPerTurn")),
       },
     },
     entry: {

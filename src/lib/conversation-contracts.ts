@@ -98,6 +98,10 @@ export const assistantPolicyV1Schema = z.object({
     maxOutputTokens: z.number().int().min(64).max(4_096).default(900),
     maxRetries: z.number().int().min(0).max(2).default(1),
     maxRepairAttempts: z.number().int().min(0).max(2).default(1),
+    maxVisitorCharacters: z.number().int().min(500).max(32_000).default(8_000),
+    maxHistoryMessages: z.number().int().min(1).max(50).default(16),
+    maxTurnsPerMinute: z.number().int().min(1).max(300).default(30),
+    maxCostUnitsPerTurn: z.number().int().min(500).max(100_000).default(10_000),
     stageOverrides: z
       .array(
         z.object({
@@ -203,6 +207,10 @@ export const DEFAULT_CONVERSATION_PROJECT_POLICY: ConversationProjectPolicyV1 =
         maxOutputTokens: 900,
         maxRetries: 1,
         maxRepairAttempts: 1,
+        maxVisitorCharacters: 8_000,
+        maxHistoryMessages: 16,
+        maxTurnsPerMinute: 30,
+        maxCostUnitsPerTurn: 10_000,
         stageOverrides: [],
       },
     },

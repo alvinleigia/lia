@@ -81,7 +81,10 @@ test("grounded replies must reference supplied excerpts", () => {
 test("compiler exposes only allowed task contracts and model-visible context", () => {
   const compiled = compileStructuredTurn({
     activeTask: snapshot,
+    assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
     assistantIntroduced: true,
+    channel: "project_chat",
+    companyName: "Ewissen Infra",
     context: [
       {
         key: "lia_timezone",
@@ -108,6 +111,7 @@ test("compiler exposes only allowed task contracts and model-visible context", (
     ],
     history: [{ role: "assistant", content: "How can I help?" }],
     projectPolicy: REFERENCE_BOOKING_PROJECT_POLICY,
+    projectName: "Ewissen Infra",
     publishedTasks: [
       {
         id: 95,

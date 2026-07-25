@@ -248,6 +248,152 @@ export default async function AssistantPolicyPage({
                         </option>
                       </select>
                     </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="primaryModelId">Primary Model</Label>
+                        <Input
+                          id="primaryModelId"
+                          name="primaryModelId"
+                          defaultValue={
+                            policy.assistant.modelPolicy.primaryModelId
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fallbackModelId">Fallback Model</Label>
+                        <Input
+                          id="fallbackModelId"
+                          name="fallbackModelId"
+                          defaultValue={
+                            policy.assistant.modelPolicy.fallbackModelId ?? ""
+                          }
+                          placeholder="No fallback"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="timeoutMs">Timeout (ms)</Label>
+                        <Input
+                          id="timeoutMs"
+                          name="timeoutMs"
+                          type="number"
+                          min={1000}
+                          max={60000}
+                          defaultValue={policy.assistant.modelPolicy.timeoutMs}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxOutputTokens">Output Tokens</Label>
+                        <Input
+                          id="maxOutputTokens"
+                          name="maxOutputTokens"
+                          type="number"
+                          min={64}
+                          max={4096}
+                          defaultValue={
+                            policy.assistant.modelPolicy.maxOutputTokens
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxRetries">Provider Retries</Label>
+                        <Input
+                          id="maxRetries"
+                          name="maxRetries"
+                          type="number"
+                          min={0}
+                          max={2}
+                          defaultValue={policy.assistant.modelPolicy.maxRetries}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxRepairAttempts">
+                          Validation Repairs
+                        </Label>
+                        <Input
+                          id="maxRepairAttempts"
+                          name="maxRepairAttempts"
+                          type="number"
+                          min={0}
+                          max={2}
+                          defaultValue={
+                            policy.assistant.modelPolicy.maxRepairAttempts
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="maxVisitorCharacters">
+                          Message Characters
+                        </Label>
+                        <Input
+                          id="maxVisitorCharacters"
+                          name="maxVisitorCharacters"
+                          type="number"
+                          min={500}
+                          max={32000}
+                          defaultValue={
+                            policy.assistant.modelPolicy.maxVisitorCharacters
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxHistoryMessages">
+                          History Messages
+                        </Label>
+                        <Input
+                          id="maxHistoryMessages"
+                          name="maxHistoryMessages"
+                          type="number"
+                          min={1}
+                          max={50}
+                          defaultValue={
+                            policy.assistant.modelPolicy.maxHistoryMessages
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxTurnsPerMinute">
+                          Turns per Minute
+                        </Label>
+                        <Input
+                          id="maxTurnsPerMinute"
+                          name="maxTurnsPerMinute"
+                          type="number"
+                          min={1}
+                          max={300}
+                          defaultValue={
+                            policy.assistant.modelPolicy.maxTurnsPerMinute
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxCostUnitsPerTurn">
+                          Cost Units per Turn
+                        </Label>
+                        <Input
+                          id="maxCostUnitsPerTurn"
+                          name="maxCostUnitsPerTurn"
+                          type="number"
+                          min={500}
+                          max={100000}
+                          defaultValue={
+                            policy.assistant.modelPolicy.maxCostUnitsPerTurn
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
                     <div className="grid gap-4 md:grid-cols-3">
                       <div className="space-y-2">
                         <Label htmlFor="maxTaskSwitches">
