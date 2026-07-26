@@ -80,7 +80,7 @@ export default async function TaskFieldsPage({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to task
         </Link>
-        <TaskConfigurationNav active="fields" taskId={task.id} />
+        <TaskConfigurationNav active="context" taskId={task.id} />
         {query.error && (
           <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             {query.error}

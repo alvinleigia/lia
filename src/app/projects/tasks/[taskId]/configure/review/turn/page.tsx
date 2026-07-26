@@ -51,7 +51,7 @@ export default async function StructuredTurnTestPage({ params }: PageProps) {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to review
         </Link>
-        <TaskConfigurationNav active="review" taskId={task.id} />
+        <TaskConfigurationNav active="test" taskId={task.id} />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-2xl">

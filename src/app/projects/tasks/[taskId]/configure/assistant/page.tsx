@@ -79,16 +79,16 @@ export default async function AssistantPolicyPage({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to task
         </Link>
-        <TaskConfigurationNav active="assistant" taskId={task.id} />
+        <TaskConfigurationNav active="behavior" taskId={task.id} />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-2xl">
               <Bot className="h-6 w-6" />
-              Assistant and Entry Policy
+              Behavior
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Shared project behavior for knowledge answers and conversational
-              tasks. Task-specific fields and tools remain separate.
+              Set how Lia greets visitors, starts conversations, and identifies
+              returning contacts.
             </p>
           </CardHeader>
           <CardContent>
@@ -158,37 +158,30 @@ export default async function AssistantPolicyPage({
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="entryMode">Conversation Entry</Label>
-                  <select
-                    id="entryMode"
-                    name="entryMode"
-                    defaultValue={policy.entry.mode}
-                    className={selectClass}
-                  >
-                    <option value="knowledge_first">Knowledge first</option>
-                    <option value="task_first">Task first</option>
-                    <option value="deterministic">Configured flow first</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="noAnswerBehavior">
-                    When no answer exists
-                  </Label>
-                  <select
-                    id="noAnswerBehavior"
-                    name="noAnswerBehavior"
-                    defaultValue={policy.knowledge.noAnswerBehavior}
-                    className={selectClass}
-                  >
-                    <option value="fallback">Use fallback</option>
-                    <option value="handoff">Handoff</option>
-                    <option value="task_recommendation">
-                      Recommend a task
-                    </option>
-                  </select>
-                </div>
+              <input
+                type="hidden"
+                name="noAnswerBehavior"
+                value={policy.knowledge.noAnswerBehavior}
+              />
+              <input
+                type="hidden"
+                name="allowTaskRecommendation"
+                value={policy.entry.allowTaskRecommendation ? "on" : "off"}
+              />
+              <div className="space-y-2">
+                <Label htmlFor="entryMode">Conversation Entry</Label>
+                <select
+                  id="entryMode"
+                  name="entryMode"
+                  defaultValue={policy.entry.mode}
+                  className={selectClass}
+                >
+                  <option value="knowledge_first">
+                    Answer questions first
+                  </option>
+                  <option value="task_first">Start with a task</option>
+                  <option value="deterministic">Start with a fixed flow</option>
+                </select>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -230,14 +223,6 @@ export default async function AssistantPolicyPage({
                 </div>
               </div>
 
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  name="allowTaskRecommendation"
-                  defaultChecked={policy.entry.allowTaskRecommendation}
-                />
-                Allow knowledge answers to recommend published tasks
-              </label>
               <Accordion
                 type="single"
                 collapsible

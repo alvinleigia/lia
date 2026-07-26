@@ -68,7 +68,7 @@ export default async function TaskOutcomesPage({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to task
         </Link>
-        <TaskConfigurationNav active="outcomes" taskId={task.id} />
+        <TaskConfigurationNav active="workflow" taskId={task.id} />
         {query.error && (
           <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             {query.error}

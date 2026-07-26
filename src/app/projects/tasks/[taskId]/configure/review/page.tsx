@@ -1,21 +1,11 @@
-import {
-  Activity,
-  ArrowLeft,
-  CheckCircle2,
-  CircleAlert,
-  MessagesSquare,
-  Send,
-} from "lucide-react";
+import { Activity, ArrowLeft, MessagesSquare } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { TaskChannelPreview } from "@/components/task-channel-preview";
 import { TaskConfigurationNav } from "@/components/task-configuration-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FormSubmitButton } from "@/components/ui/form-submit-button";
-import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
-import { resolveProjectTaskToolDefinitions } from "@/lib/conversational-task-tools";
-import { validateConversationalTaskForPublish } from "@/lib/conversational-task-validation";
 import {
   getProjectConversationalTask,
   listConversationalTaskVersions,
@@ -25,49 +15,27 @@ import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
-import { publishConversationalTaskAction } from "../../../actions";
 
 type PageProps = {
   params: Promise<{ taskId: string }>;
-  searchParams: Promise<{ error?: string; published?: string }>;
 };
 
-export default async function TaskReviewPage({
-  params,
-  searchParams,
-}: PageProps) {
+export default async function TaskTestPage({ params }: PageProps) {
   const route = conversationalTaskIdSchema.safeParse((await params).taskId);
-  const query = await searchParams;
   const activeProjectId = await getActiveProjectIdCookie();
   const context = await resolveOptionalPageUserAndProject(activeProjectId);
   if (!route.success || !context) {
     redirect("/projects/tasks?error=Task%20not%20found.");
   }
-  const [task, projectPolicy, versions] = await Promise.all([
+
+  const [task, versions] = await Promise.all([
     getProjectConversationalTask(context.project.id, route.data),
-    getConversationProjectPolicy(context.project.id),
     listConversationalTaskVersions(context.project.id, route.data),
   ]);
-  if (!task) redirect("/projects/tasks?error=Task%20not%20found.");
-  const definition = readConversationalTaskDefinition(task.definition);
-  const validation = validateConversationalTaskForPublish({
-    definition,
-    projectPolicy,
-  });
-  let toolIssue: string | null = null;
-  try {
-    await resolveProjectTaskToolDefinitions({
-      definition,
-      projectId: context.project.id,
-    });
-  } catch (error) {
-    toolIssue =
-      error instanceof Error ? error.message : "A bound tool is unavailable.";
+  if (!task) {
+    redirect("/projects/tasks?error=Task%20not%20found.");
   }
-  const ready = validation.ready && !toolIssue;
-  const issues = toolIssue
-    ? [...validation.issues, toolIssue]
-    : validation.issues;
+  const definition = readConversationalTaskDefinition(task.definition);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10">
@@ -79,152 +47,74 @@ export default async function TaskReviewPage({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to task
         </Link>
-        <TaskConfigurationNav active="review" taskId={task.id} />
+        <TaskConfigurationNav active="test" taskId={task.id} />
+
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              {ready ? (
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
-              ) : (
-                <CircleAlert className="h-6 w-6 text-amber-600" />
-              )}
-              Review and Publish
-            </CardTitle>
+            <CardTitle className="text-2xl">Channel Preview</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Publishing creates an immutable runtime snapshot. Later edits
-              remain a draft until published again.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {query.error && (
-              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-                {query.error}
-              </p>
-            )}
-            {query.published && (
-              <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
-                Version {query.published} published.
-              </p>
-            )}
-            <div className="grid gap-4 sm:grid-cols-4">
-              {[
-                ["Fields", definition.fields.length],
-                ["Context", definition.contextVariables.length],
-                ["Tools", definition.tools.length],
-                ["Outcomes", definition.outcomes.length],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-md border p-4">
-                  <p className="text-sm text-muted-foreground">{label}</p>
-                  <p className="text-2xl font-semibold">{value}</p>
-                </div>
-              ))}
-            </div>
-            {ready ? (
-              <p className="rounded-md bg-green-50 px-3 py-3 text-sm text-green-800">
-                Ready to publish. Contracts, dependencies, and terminal outcomes
-                are valid.
-              </p>
-            ) : (
-              <div className="rounded-md bg-amber-50 px-4 py-3">
-                <p className="font-medium text-amber-900">Publish blockers</p>
-                <ul className="mt-2 list-disc pl-5 text-sm text-amber-900">
-                  {issues.map((issue) => (
-                    <li key={issue}>{issue}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <form action={publishConversationalTaskAction}>
-              <input
-                type="hidden"
-                name="projectId"
-                value={context.project.id}
-              />
-              <input type="hidden" name="taskId" value={task.id} />
-              <FormSubmitButton
-                label="Publish New Version"
-                pendingLabel="Publishing..."
-                disabled={!ready}
-                icon={<Send className="h-4 w-4" />}
-              />
-            </form>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <MessagesSquare className="h-5 w-5" />
-              Structured Conversation Test
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Verify grounded answers and recommendation-only model decisions
-              before they reach the durable task runtime.
+              Preview the same channel-independent task on each supported
+              conversation surface.
             </p>
           </CardHeader>
           <CardContent>
-            <Button asChild>
-              <Link href={`/projects/tasks/${task.id}/configure/review/turn`}>
-                <MessagesSquare className="h-4 w-4" />
-                Open Conversation Test
-              </Link>
-            </Button>
+            <TaskChannelPreview definition={definition} />
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Activity className="h-5 w-5" />
-              Runtime Lifecycle Test
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Verify durable fields, corrections, pause and resume, side
-              questions, task switching, and completion against a published
-              version.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {versions.length > 0 ? (
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <MessagesSquare className="h-5 w-5" />
+                Conversation Test
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Test answers, task recommendations, and safe model proposals
+                without changing live runtime data.
+              </p>
+            </CardHeader>
+            <CardContent>
               <Button asChild>
-                <Link
-                  href={`/projects/tasks/${task.id}/configure/review/runtime`}
-                >
-                  <Activity className="h-4 w-4" />
-                  Open Runtime Test
+                <Link href={`/projects/tasks/${task.id}/configure/review/turn`}>
+                  <MessagesSquare className="h-4 w-4" />
+                  Open Conversation Test
                 </Link>
               </Button>
-            ) : (
-              <Button disabled>
-                <Activity className="h-4 w-4" />
-                Publish Before Testing
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">Version History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {versions.length === 0 ? (
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Activity className="h-5 w-5" />
+                Runtime Test
+              </CardTitle>
               <p className="text-sm text-muted-foreground">
-                No published versions yet.
+                Test fields, corrections, lookups, confirmation, and completion
+                against a published version.
               </p>
-            ) : (
-              <div className="divide-y rounded-md border">
-                {versions.map((version) => (
-                  <div key={version.id} className="px-4 py-3">
-                    <p className="font-medium">
-                      Version {version.versionNumber}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {version.publishedAt.toLocaleString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              {versions.length > 0 ? (
+                <Button asChild>
+                  <Link
+                    href={`/projects/tasks/${task.id}/configure/review/runtime`}
+                  >
+                    <Activity className="h-4 w-4" />
+                    Open Runtime Test
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline">
+                  <Link href={`/projects/tasks/${task.id}/configure/versions`}>
+                    Publish Before Testing
+                  </Link>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </main>
   );

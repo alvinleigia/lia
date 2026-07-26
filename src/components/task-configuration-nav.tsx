@@ -1,7 +1,9 @@
 import {
+  BookOpen,
   Bot,
   Braces,
   CheckCircle2,
+  History,
   ListChecks,
   ShieldCheck,
 } from "lucide-react";
@@ -10,11 +12,43 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const items = [
-  { key: "assistant", label: "Assistant", icon: Bot },
-  { key: "fields", label: "Fields", icon: Braces },
-  { key: "tools", label: "Tools", icon: ShieldCheck },
-  { key: "outcomes", label: "Outcomes", icon: ListChecks },
-  { key: "review", label: "Review", icon: CheckCircle2 },
+  {
+    key: "behavior",
+    label: "Behavior",
+    icon: Bot,
+    path: "assistant",
+  },
+  {
+    key: "context",
+    label: "Context",
+    icon: Braces,
+    path: "fields",
+  },
+  { key: "tools", label: "Tools", icon: ShieldCheck, path: "tools" },
+  {
+    key: "knowledge",
+    label: "Knowledge",
+    icon: BookOpen,
+    path: "knowledge",
+  },
+  {
+    key: "workflow",
+    label: "Workflow",
+    icon: ListChecks,
+    path: "outcomes",
+  },
+  {
+    key: "test",
+    label: "Test",
+    icon: CheckCircle2,
+    path: "review",
+  },
+  {
+    key: "versions",
+    label: "Versions",
+    icon: History,
+    path: "versions",
+  },
 ] as const;
 
 export function TaskConfigurationNav({
@@ -36,7 +70,7 @@ export function TaskConfigurationNav({
             asChild
           >
             <Link
-              href={`/projects/tasks/${taskId}/configure/${item.key}`}
+              href={`/projects/tasks/${taskId}/configure/${item.path}`}
               className={cn(active === item.key && "pointer-events-none")}
             >
               <Icon className="h-4 w-4" />

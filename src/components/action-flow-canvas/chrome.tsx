@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   FileDown,
+  ListTodo,
   Loader2,
   Save,
   Wand2,
@@ -53,6 +54,30 @@ export function FlowComponentPalette({
         </p>
       </div>
       <div className="h-[716px] space-y-5 overflow-y-auto p-3">
+        <div className="space-y-2">
+          <p className="px-1 text-xs uppercase tracking-wide text-muted-foreground">
+            Conversational tasks
+          </p>
+          <div className="rounded-md border border-green-200 bg-green-50/40 p-3">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <ListTodo className="h-4 w-4 text-green-700" />
+              Business Task
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Blend natural conversation with validated fields, tools, and
+              outcomes.
+            </p>
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full bg-white"
+            >
+              <Link href="/projects/tasks">Configure Tasks</Link>
+            </Button>
+          </div>
+        </div>
+
         {groups.map((group) => (
           <div key={group} className="space-y-2">
             <p className="px-1 text-xs uppercase tracking-wide text-muted-foreground">

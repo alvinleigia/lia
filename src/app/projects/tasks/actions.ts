@@ -340,6 +340,55 @@ export async function updateConversationProjectPolicyAction(
   redirect(`${destination}?saved=1`);
 }
 
+export async function updateConversationKnowledgePolicyAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const context = await resolveConversationalTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/knowledge`;
+  if (context.task.isArchived) {
+    return { error: "Restore the task before editing it." };
+  }
+
+  const parsed = z
+    .object({
+      allowTaskRecommendation: z.boolean(),
+      noAnswerBehavior: z.enum(["fallback", "handoff", "task_recommendation"]),
+    })
+    .safeParse({
+      allowTaskRecommendation: formData.get("allowTaskRecommendation") === "on",
+      noAnswerBehavior: formData.get("noAnswerBehavior"),
+    });
+  if (!parsed.success) {
+    return { error: "Please check the knowledge settings." };
+  }
+
+  const policy = await getConversationProjectPolicy(context.project.id);
+  await saveConversationProjectPolicy(context.project.id, {
+    ...policy,
+    entry: {
+      ...policy.entry,
+      allowTaskRecommendation: parsed.data.allowTaskRecommendation,
+    },
+    knowledge: {
+      ...policy.knowledge,
+      noAnswerBehavior: parsed.data.noAnswerBehavior,
+    },
+  });
+  await writeAuditLog({
+    ...context,
+    action: "conversation_knowledge_policy.updated",
+    targetType: "conversation_project_policy",
+    targetId: context.project.id,
+    metadata: {
+      allowTaskRecommendation: parsed.data.allowTaskRecommendation,
+      noAnswerBehavior: parsed.data.noAnswerBehavior,
+    },
+  });
+  revalidatePath(destination);
+  redirect(`${destination}?saved=1`);
+}
+
 export async function addConversationalTaskFieldAction(
   _previousState: ActionFormState,
   formData: FormData,
@@ -839,7 +888,7 @@ export async function updateConversationalTaskSafetyAction(
 
 export async function publishConversationalTaskAction(formData: FormData) {
   const context = await resolveConversationalTaskMutation(formData);
-  const destination = `/projects/tasks/${context.task.id}/configure/review`;
+  const destination = `/projects/tasks/${context.task.id}/configure/versions`;
   const definition = readConversationalTaskDefinition(context.task.definition);
   const projectPolicy = await getConversationProjectPolicy(context.project.id);
   const validation = validateConversationalTaskForPublish({

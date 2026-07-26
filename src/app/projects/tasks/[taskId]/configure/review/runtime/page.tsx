@@ -300,7 +300,7 @@ export default async function TaskRuntimeTestPage({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to review
         </Link>
-        <TaskConfigurationNav active="review" taskId={task.id} />
+        <TaskConfigurationNav active="test" taskId={task.id} />
 
         <Card>
           <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
