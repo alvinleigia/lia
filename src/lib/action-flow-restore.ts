@@ -6,6 +6,10 @@ import {
   actionFlowSteps,
   projectActions,
 } from "@/lib/db-schema";
+import {
+  remapHybridEntryPolicySettings,
+  remapHybridStepSettings,
+} from "@/lib/hybrid-flow-settings";
 
 const recordSchema = z.record(z.string(), z.unknown());
 const nullableStringSchema = z.string().nullable();
@@ -87,23 +91,6 @@ export async function restoreActionFlowDraftFromSnapshot(input: {
         ),
       );
 
-    await tx
-      .update(projectActions)
-      .set({
-        description: snapshot.action.description,
-        name: snapshot.action.name,
-        settings: snapshot.action.settings,
-        status: snapshot.action.status,
-        triggerPhrases: snapshot.action.triggerPhrases,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(projectActions.projectId, input.projectId),
-          eq(projectActions.id, input.actionId),
-        ),
-      );
-
     const stepIdMap = new Map<number, number>();
     for (const step of orderedSteps) {
       const [restoredStep] = await tx
@@ -145,6 +132,7 @@ export async function restoreActionFlowDraftFromSnapshot(input: {
         .update(actionFlowSteps)
         .set({
           nextStepId,
+          settings: remapHybridStepSettings(step.settings, stepIdMap),
           updatedAt: new Date(),
         })
         .where(
@@ -155,6 +143,26 @@ export async function restoreActionFlowDraftFromSnapshot(input: {
           ),
         );
     }
+
+    await tx
+      .update(projectActions)
+      .set({
+        description: snapshot.action.description,
+        name: snapshot.action.name,
+        settings: remapHybridEntryPolicySettings(
+          snapshot.action.settings,
+          stepIdMap,
+        ),
+        status: snapshot.action.status,
+        triggerPhrases: snapshot.action.triggerPhrases,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(projectActions.projectId, input.projectId),
+          eq(projectActions.id, input.actionId),
+        ),
+      );
 
     let branchRuleCount = 0;
     let skippedBranchRuleCount = 0;

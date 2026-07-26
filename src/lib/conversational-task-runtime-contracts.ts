@@ -3,6 +3,7 @@ import {
   TOOL_RESULT_STATUSES,
   TOOL_STAGES,
 } from "@/lib/conversation-contracts";
+import { hybridGraphTaskReturnTargetV1Schema } from "@/lib/hybrid-flow-contracts";
 
 export const TASK_FIELD_STATES = [
   "missing",
@@ -239,6 +240,9 @@ export const startConversationalTaskRunV1Schema = z
     projectId: z.number().int().positive(),
     conversationId: z.number().int().positive(),
     taskId: z.number().int().positive(),
+    taskVersionId: z.number().int().positive().nullable().default(null),
+    activeNodeId: stableId.nullable().default(null),
+    returnTarget: hybridGraphTaskReturnTargetV1Schema.nullable().default(null),
     eventId: stableId,
     channelType: z.string().trim().min(1).max(80),
     channelIdentity: safeRecord.default({}),
@@ -256,6 +260,24 @@ export const startConversationalTaskRunV1Schema = z
     initializationContext: safeRecord.default({}),
   })
   .superRefine((input, context) => {
+    if (input.returnTarget && !input.taskVersionId) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "A hybrid graph task requires an exact published task version.",
+        path: ["taskVersionId"],
+      });
+    }
+    if (
+      input.returnTarget &&
+      input.activeNodeId !== input.returnTarget.taskNodeId
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "The active node must match the hybrid task return target.",
+        path: ["activeNodeId"],
+      });
+    }
     if (input.identityKind === "verified_contact" && !input.verifiedContactId) {
       context.addIssue({
         code: "custom",
@@ -276,6 +298,9 @@ export const startConversationalTaskRunV1Schema = z
   });
 
 export type StartConversationalTaskRunV1 = z.infer<
+  typeof startConversationalTaskRunV1Schema
+>;
+export type StartConversationalTaskRunInputV1 = z.input<
   typeof startConversationalTaskRunV1Schema
 >;
 

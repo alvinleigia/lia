@@ -36,6 +36,8 @@ export const ACTION_STEP_TYPES = [
   "set_attribute",
   "add_tag",
   "wait",
+  "knowledge_conversation",
+  "conversational_task",
 ] as const;
 export const ACTION_STEP_INPUT_TYPES = [
   "text",

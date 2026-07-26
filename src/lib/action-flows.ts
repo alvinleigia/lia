@@ -1,14 +1,14 @@
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
-import {
-  type ActionFlowCompilerIssueCode,
-  type ActionFlowCompilerIssueSource,
-  compileActionFlowGraph,
+import type {
+  ActionFlowCompilerIssueCode,
+  ActionFlowCompilerIssueSource,
 } from "@/lib/action-flow-compiler";
 import type {
   ActionBranchOperator,
   ActionSubmissionStatus,
   ProjectActionStatus,
 } from "@/lib/action-flow-constants";
+import { getPublishedConversationalTaskOption } from "@/lib/conversational-tasks";
 import { db } from "@/lib/db-config";
 import {
   actionFlowBranchRules,
@@ -23,6 +23,11 @@ import { resolveTraceId } from "@/lib/execution-trace";
 import { getFlowStepChannelCapabilityIssues } from "@/lib/flow-channel-capabilities";
 import { getInvalidAllowedFileTypeTokens } from "@/lib/flow-file-validation";
 import { isFlowInputStepType } from "@/lib/flow-input-editor";
+import {
+  compileHybridFlowGraph,
+  type HybridFlowCompilerIssue,
+} from "@/lib/hybrid-flow-compiler";
+import type { CompiledHybridFlowGraphV1 } from "@/lib/hybrid-flow-contracts";
 
 export type {
   ActionBranchOperator,
@@ -144,12 +149,17 @@ export type ActionFlowVersionSnapshot = {
     isEnabled: boolean;
     settings: Record<string, unknown>;
   }>;
+  hybridGraph?: CompiledHybridFlowGraphV1;
   publishedAt: string;
 };
 
 export type ActionFlowRouteValidationIssue = {
-  code?: ActionFlowCompilerIssueCode;
-  source: ActionFlowCompilerIssueSource | "channel_capability" | "step_config";
+  code?: ActionFlowCompilerIssueCode | HybridFlowCompilerIssue["code"];
+  source:
+    | ActionFlowCompilerIssueSource
+    | "channel_capability"
+    | "hybrid_graph"
+    | "step_config";
   stepId?: number;
   ruleId?: number;
   severity?: "error" | "warning";
@@ -890,6 +900,7 @@ export async function listActionFlowBranchRules(
 function buildActionFlowVersionSnapshot(input: {
   action: NonNullable<Awaited<ReturnType<typeof getProjectAction>>>;
   branchRules: Awaited<ReturnType<typeof listActionFlowBranchRules>>;
+  hybridGraph: CompiledHybridFlowGraphV1;
   publishedAt: Date;
   steps: Awaited<ReturnType<typeof listActionFlowSteps>>;
 }): ActionFlowVersionSnapshot {
@@ -929,8 +940,96 @@ function buildActionFlowVersionSnapshot(input: {
       isEnabled: rule.isEnabled,
       settings: rule.settings,
     })),
+    hybridGraph: input.hybridGraph,
     publishedAt: input.publishedAt.toISOString(),
   };
+}
+
+async function getHybridTaskReferenceIssues(
+  projectId: number,
+  graph: CompiledHybridFlowGraphV1,
+): Promise<ActionFlowRouteValidationIssue[]> {
+  const taskNodes = graph.nodes.filter(
+    (node) => node.kind === "conversational_task",
+  );
+  const options = await Promise.all(
+    taskNodes.map((node) =>
+      getPublishedConversationalTaskOption({
+        projectId,
+        taskVersionId: node.settings.task.taskVersionId,
+      }),
+    ),
+  );
+  const issues: ActionFlowRouteValidationIssue[] = [];
+
+  for (const [index, node] of taskNodes.entries()) {
+    const option = options[index];
+    const reference = node.settings.task;
+    if (
+      !option ||
+      option.taskId !== reference.taskId ||
+      option.versionNumber !== reference.versionNumber
+    ) {
+      issues.push({
+        code: "hybrid_config_invalid",
+        message: `${node.label} needs an available published task version from this project.`,
+        severity: "error",
+        source: "hybrid_graph",
+        stepId: node.sourceStepId,
+      });
+      continue;
+    }
+
+    const referencedOutcomes = reference.outcomes.map((outcome) => ({
+      key: outcome.key,
+      outputPort: outcome.outputPort,
+      type: outcome.type,
+    }));
+    const publishedOutcomes = option.outcomes.map((outcome) => ({
+      key: outcome.key,
+      outputPort: outcome.outputPort,
+      type: outcome.type,
+    }));
+    if (
+      JSON.stringify(referencedOutcomes) !== JSON.stringify(publishedOutcomes)
+    ) {
+      issues.push({
+        code: "hybrid_config_invalid",
+        message: `${node.label} has task outcomes that do not match its pinned published version.`,
+        severity: "error",
+        source: "hybrid_graph",
+        stepId: node.sourceStepId,
+      });
+    }
+
+    const unknownFieldKey = node.settings.transferFieldKeys.find(
+      (key) => !option.fieldKeys.includes(key),
+    );
+    if (unknownFieldKey) {
+      issues.push({
+        code: "hybrid_config_invalid",
+        message: `${node.label} cannot transfer unknown task field "${unknownFieldKey}".`,
+        severity: "error",
+        source: "hybrid_graph",
+        stepId: node.sourceStepId,
+      });
+    }
+
+    const unknownContextKey = node.settings.transferContextKeys.find(
+      (key) => !option.contextKeys.includes(key),
+    );
+    if (unknownContextKey) {
+      issues.push({
+        code: "hybrid_config_invalid",
+        message: `${node.label} cannot transfer unknown task context "${unknownContextKey}".`,
+        severity: "error",
+        source: "hybrid_graph",
+        stepId: node.sourceStepId,
+      });
+    }
+  }
+
+  return issues;
 }
 
 export async function listActionFlowVersions(
@@ -995,9 +1094,26 @@ export async function createPublishedActionFlowVersion(input: {
       (maxVersion, version) => Math.max(maxVersion, version.versionNumber),
       0,
     ) + 1;
+  const hybrid = compileHybridFlowGraph({
+    actionSettings: action.settings,
+    branchRules,
+    steps,
+  });
+  const hybridTaskIssues = await getHybridTaskReferenceIssues(
+    input.projectId,
+    hybrid.graph,
+  );
+  if (
+    hybrid.baseIssues.some((issue) => issue.severity === "error") ||
+    hybrid.issues.some((issue) => issue.severity === "error") ||
+    hybridTaskIssues.some(isBlockingActionFlowIssue)
+  ) {
+    throw new Error("Action flow must pass validation before publishing.");
+  }
   const snapshot = buildActionFlowVersionSnapshot({
     action,
     branchRules,
+    hybridGraph: hybrid.graph,
     publishedAt,
     steps,
   });
@@ -1298,7 +1414,8 @@ export async function validateActionFlowRoutes(
   projectId: number,
   actionId: number,
 ): Promise<ActionFlowRouteValidationIssue[]> {
-  const [steps, branchRules] = await Promise.all([
+  const [action, steps, branchRules] = await Promise.all([
+    getProjectAction(projectId, actionId),
     listActionFlowSteps(projectId, actionId),
     listActionFlowBranchRules(projectId, actionId),
   ]);
@@ -1393,8 +1510,19 @@ export async function validateActionFlowRoutes(
     }
   }
 
-  const graph = compileActionFlowGraph({ branchRules, steps });
-  issues.push(...graph.issues);
+  const hybrid = compileHybridFlowGraph({
+    actionSettings: action?.settings ?? {},
+    branchRules,
+    steps,
+  });
+  issues.push(...hybrid.baseIssues);
+  issues.push(
+    ...hybrid.issues.map((issue) => ({
+      ...issue,
+      source: "hybrid_graph" as const,
+    })),
+  );
+  issues.push(...(await getHybridTaskReferenceIssues(projectId, hybrid.graph)));
 
   return issues;
 }

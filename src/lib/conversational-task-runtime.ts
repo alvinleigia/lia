@@ -20,6 +20,7 @@ import {
   type InboundEventInputV1,
   type InboundEventV1,
   inboundEventV1Schema,
+  type StartConversationalTaskRunInputV1,
   type StartConversationalTaskRunV1,
   type SwitchConversationalTaskRunV1,
   startConversationalTaskRunV1Schema,
@@ -33,6 +34,7 @@ import {
 import { executeBuiltInTaskTool } from "@/lib/conversational-task-tools";
 import { db } from "@/lib/db-config";
 import {
+  actionFlowVersions,
   channelConversations,
   contacts,
   conversationalTaskAuditEvents,
@@ -47,6 +49,16 @@ import {
   conversationInboundEvents,
   users,
 } from "@/lib/db-schema";
+import {
+  compiledHybridFlowGraphV1Schema,
+  parseHybridGraphTaskReturnTarget,
+  sideQuestionReturnTargetV1Schema,
+  taskSuspensionReturnTargetV1Schema,
+} from "@/lib/hybrid-flow-contracts";
+import {
+  buildHybridGraphTaskReturnTarget,
+  resolveHybridTaskOutcomeRoute,
+} from "@/lib/hybrid-flow-runtime";
 
 export {
   cleanupExpiredConversationRuntime,
@@ -584,7 +596,7 @@ async function verifyIdentityReferences(
 }
 
 export async function startConversationalTaskRun(
-  input: StartConversationalTaskRunV1,
+  input: StartConversationalTaskRunInputV1,
 ): Promise<ConversationalTaskRuntimeResult> {
   const parsed = startConversationalTaskRunV1Schema.parse(input);
   const eventHash = hashPayload(parsed);
@@ -638,13 +650,15 @@ export async function startConversationalTaskRun(
     await verifyIdentityReferences(tx, parsed);
 
     const [task] = await tx
-      .select({ id: conversationalTasks.id })
+      .select({
+        id: conversationalTasks.id,
+        isArchived: conversationalTasks.isArchived,
+      })
       .from(conversationalTasks)
       .where(
         and(
           eq(conversationalTasks.id, parsed.taskId),
           eq(conversationalTasks.projectId, parsed.projectId),
-          eq(conversationalTasks.isArchived, false),
         ),
       )
       .limit(1);
@@ -656,12 +670,15 @@ export async function startConversationalTaskRun(
             and(
               eq(conversationalTaskVersions.projectId, parsed.projectId),
               eq(conversationalTaskVersions.taskId, parsed.taskId),
+              ...(parsed.taskVersionId
+                ? [eq(conversationalTaskVersions.id, parsed.taskVersionId)]
+                : []),
             ),
           )
           .orderBy(desc(conversationalTaskVersions.versionNumber))
           .limit(1)
       : [];
-    if (!task || !version) {
+    if (!task || (!parsed.taskVersionId && task.isArchived) || !version) {
       return quarantineEvent(tx, {
         conversationId: parsed.conversationId,
         eventDbId: eventRow.id,
@@ -672,6 +689,60 @@ export async function startConversationalTaskRun(
       });
     }
     const snapshot = conversationalTaskSnapshotV1Schema.parse(version.snapshot);
+    if (parsed.returnTarget) {
+      const [actionVersion] = await tx
+        .select({ snapshot: actionFlowVersions.snapshot })
+        .from(actionFlowVersions)
+        .where(
+          and(
+            eq(actionFlowVersions.projectId, parsed.projectId),
+            eq(actionFlowVersions.id, parsed.returnTarget.actionVersionId),
+            eq(actionFlowVersions.status, "published"),
+          ),
+        )
+        .limit(1);
+      const actionSnapshot =
+        actionVersion?.snapshot &&
+        typeof actionVersion.snapshot === "object" &&
+        !Array.isArray(actionVersion.snapshot)
+          ? (actionVersion.snapshot as Record<string, unknown>)
+          : null;
+      const graph = compiledHybridFlowGraphV1Schema.safeParse(
+        actionSnapshot?.hybridGraph,
+      );
+      const expectedTarget = graph.success
+        ? buildHybridGraphTaskReturnTarget({
+            actionVersionId: parsed.returnTarget.actionVersionId,
+            graph: graph.data,
+            taskNodeId: parsed.returnTarget.taskNodeId,
+          })
+        : null;
+      const taskNodeCandidate = graph.success
+        ? graph.data.nodes.find(
+            (node) => node.id === parsed.returnTarget?.taskNodeId,
+          )
+        : null;
+      const taskNode =
+        taskNodeCandidate?.kind === "conversational_task"
+          ? taskNodeCandidate
+          : null;
+      if (
+        !expectedTarget ||
+        !taskNode ||
+        taskNode.settings.task.taskId !== parsed.taskId ||
+        taskNode.settings.task.taskVersionId !== version.id ||
+        JSON.stringify(expectedTarget) !== JSON.stringify(parsed.returnTarget)
+      ) {
+        return quarantineEvent(tx, {
+          conversationId: parsed.conversationId,
+          eventDbId: eventRow.id,
+          eventType: "task.started",
+          projectId: parsed.projectId,
+          reason: "hybrid_task_return_target_invalid",
+          taskRunId: null,
+        });
+      }
+    }
 
     await tx
       .insert(conversationExecutionStates)
@@ -771,6 +842,7 @@ export async function startConversationalTaskRun(
         projectId: parsed.projectId,
         taskId: parsed.taskId,
         taskVersionId: version.id,
+        suspendedReturnTarget: parsed.returnTarget,
       })
       .returning();
     if (!run) throw new ConversationalTaskRuntimeConflictError();
@@ -837,7 +909,7 @@ export async function startConversationalTaskRun(
     const [updatedExecution] = await tx
       .update(conversationExecutionStates)
       .set({
-        activeNodeId: null,
+        activeNodeId: parsed.activeNodeId,
         activeTaskRunId: run.id,
         activeTaskVersionId: version.id,
         anonymousVisitorId: parsed.anonymousVisitorId,
@@ -858,7 +930,7 @@ export async function startConversationalTaskRun(
           : null,
         sessionId: parsed.sessionId,
         status: "active",
-        suspendedReturnTarget: null,
+        suspendedReturnTarget: parsed.returnTarget,
         updatedAt: receivedAt,
         verifiedContactId:
           parsed.identityKind === "verified_contact"
@@ -890,6 +962,8 @@ export async function startConversationalTaskRun(
       inboundEventId: eventRow.id,
       projectId: parsed.projectId,
       summary: {
+        actionVersionId: parsed.returnTarget?.actionVersionId ?? null,
+        activeNodeId: parsed.activeNodeId,
         identityKind: parsed.identityKind,
         taskId: parsed.taskId,
         taskVersionId: version.id,
@@ -1638,6 +1712,33 @@ export async function applyConversationalTaskEvent(
       }
     >();
     let auditSummary: Record<string, unknown> = safeEventSummary(event);
+    const graphReturnTarget =
+      parseHybridGraphTaskReturnTarget(execution.suspendedReturnTarget) ??
+      parseHybridGraphTaskReturnTarget(run.suspendedReturnTarget);
+
+    function applyGraphOutcomeRoute(input: {
+      eventType: "cancelled" | "completed" | "failed" | "handoff";
+      outcomeKey: string | null;
+    }) {
+      const route = resolveHybridTaskOutcomeRoute({
+        ...input,
+        outcomes: snapshot.task.definition.outcomes,
+        returnTarget: graphReturnTarget,
+      });
+      if (!route) {
+        return false;
+      }
+
+      runChanges.suspendedReturnTarget = null;
+      executionChanges.activeNodeId = route.nodeId;
+      executionChanges.activeTaskRunId = null;
+      executionChanges.activeTaskVersionId = null;
+      executionChanges.executionMode = route.responseOwner;
+      executionChanges.responseOwner = route.responseOwner;
+      executionChanges.status = route.nodeId ? "active" : "closed";
+      executionChanges.suspendedReturnTarget = null;
+      return true;
+    }
 
     switch (event.type) {
       case "field.candidates": {
@@ -1686,22 +1787,39 @@ export async function applyConversationalTaskEvent(
         runChanges.pausedAt = receivedAt;
         runChanges.resumeAt = event.resumeAt ? new Date(event.resumeAt) : null;
         runChanges.status = event.boundary === "manual" ? "paused" : "waiting";
-        runChanges.suspendedReturnTarget = event.returnTarget;
-        executionChanges.suspendedReturnTarget = event.returnTarget;
+        runChanges.suspendedReturnTarget = graphReturnTarget
+          ? taskSuspensionReturnTargetV1Schema.parse({
+              boundaryReturnTarget: event.returnTarget,
+              graphReturnTarget,
+              kind: "task_suspension",
+              schemaVersion: 1,
+            })
+          : event.returnTarget;
+        executionChanges.suspendedReturnTarget =
+          runChanges.suspendedReturnTarget;
         break;
       case "task.resume":
         runChanges.pausedAt = null;
         runChanges.resumeAt = null;
         runChanges.status = "active";
+        runChanges.suspendedReturnTarget = graphReturnTarget;
         executionChanges.executionMode = "task";
         executionChanges.responseOwner = "task";
-        executionChanges.suspendedReturnTarget = null;
+        executionChanges.suspendedReturnTarget = graphReturnTarget;
         break;
       case "task.cancel": {
         const returnMode = snapshot.task.definition.returnPolicy.cancelled;
         runChanges.cancelledAt = receivedAt;
         runChanges.outcomeKey = event.outcomeKey ?? "cancelled";
         runChanges.status = "cancelled";
+        if (
+          applyGraphOutcomeRoute({
+            eventType: "cancelled",
+            outcomeKey: event.outcomeKey,
+          })
+        ) {
+          break;
+        }
         executionChanges.activeNodeId = null;
         executionChanges.activeTaskRunId = null;
         executionChanges.activeTaskVersionId = null;
@@ -1721,13 +1839,21 @@ export async function applyConversationalTaskEvent(
         runChanges.status = "active";
         executionChanges.executionMode = "task";
         executionChanges.responseOwner = "task";
-        executionChanges.suspendedReturnTarget = null;
+        executionChanges.suspendedReturnTarget = graphReturnTarget;
         break;
       case "task.complete": {
         const returnMode = snapshot.task.definition.returnPolicy.completed;
         runChanges.completedAt = receivedAt;
         runChanges.outcomeKey = event.outcomeKey;
         runChanges.status = "completed";
+        if (
+          applyGraphOutcomeRoute({
+            eventType: "completed",
+            outcomeKey: event.outcomeKey,
+          })
+        ) {
+          break;
+        }
         executionChanges.activeNodeId = null;
         executionChanges.activeTaskRunId = null;
         executionChanges.activeTaskVersionId = null;
@@ -1742,6 +1868,15 @@ export async function applyConversationalTaskEvent(
         runChanges.completedAt = receivedAt;
         runChanges.outcomeKey = event.outcomeKey;
         runChanges.status = returnMode === "handoff" ? "handoff" : "completed";
+        if (
+          applyGraphOutcomeRoute({
+            eventType: "failed",
+            outcomeKey: event.outcomeKey,
+          })
+        ) {
+          runChanges.status = "completed";
+          break;
+        }
         executionChanges.activeNodeId = null;
         executionChanges.executionMode =
           returnMode === "handoff" ? "human" : "knowledge";
@@ -1761,6 +1896,16 @@ export async function applyConversationalTaskEvent(
       case "task.handoff":
         runChanges.outcomeKey = event.outcomeKey;
         runChanges.status = "handoff";
+        if (
+          applyGraphOutcomeRoute({
+            eventType: "handoff",
+            outcomeKey: event.outcomeKey,
+          })
+        ) {
+          runChanges.completedAt = receivedAt;
+          runChanges.status = "completed";
+          break;
+        }
         runChanges.suspendedReturnTarget = {
           outcomeKey: event.outcomeKey,
           reason: event.reason,
@@ -1773,19 +1918,24 @@ export async function applyConversationalTaskEvent(
         };
         break;
       case "task.side_question": {
-        const returnTarget = {
+        const returnTarget = sideQuestionReturnTargetV1Schema.parse({
+          graphReturnTarget,
           lastRequestedFieldKey: run.lastRequestedFieldKey,
-          responseOwner: "task",
+          kind: "task_side_question",
+          schemaVersion: 1,
           taskRunId: run.id,
-        };
+        });
         runChanges.suspendedReturnTarget = returnTarget;
         executionChanges.executionMode = "knowledge";
         executionChanges.responseOwner = "knowledge";
         executionChanges.suspendedReturnTarget = returnTarget;
         break;
       }
-      case "task.side_question_resolved":
-        if (!execution.suspendedReturnTarget) {
+      case "task.side_question_resolved": {
+        const returnTarget = sideQuestionReturnTargetV1Schema.safeParse(
+          execution.suspendedReturnTarget,
+        );
+        if (!returnTarget.success) {
           return quarantineEvent(tx, {
             conversationId: event.conversationId,
             eventDbId: eventRow.id,
@@ -1795,11 +1945,13 @@ export async function applyConversationalTaskEvent(
             taskRunId: run.id,
           });
         }
-        runChanges.suspendedReturnTarget = null;
+        runChanges.suspendedReturnTarget = returnTarget.data.graphReturnTarget;
         executionChanges.executionMode = "task";
         executionChanges.responseOwner = "task";
-        executionChanges.suspendedReturnTarget = null;
+        executionChanges.suspendedReturnTarget =
+          returnTarget.data.graphReturnTarget;
         break;
+      }
       case "owner.change":
         executionChanges.activeNodeId = event.activeNodeId;
         executionChanges.executionMode = event.executionMode;

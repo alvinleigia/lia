@@ -9,8 +9,13 @@ import {
   listActionFlowBranchRules,
   listActionFlowSteps,
   updateActionFlowStep,
+  updateProjectAction,
 } from "@/lib/action-flows";
 import type { SelectProject } from "@/lib/db-schema";
+import {
+  remapHybridEntryPolicySettings,
+  remapHybridStepSettings,
+} from "@/lib/hybrid-flow-settings";
 
 export type ActionFlowExport = {
   schemaVersion: 1;
@@ -222,7 +227,7 @@ export async function importActionFlowExport(input: {
   );
 
   for (const step of orderedSteps) {
-    const settings = buildImportedStepSettings(step);
+    const settings = buildImportedStepSettings(step, stepIdMap);
     const importedStep = await createActionFlowStep({
       actionId: importedAction.id,
       fieldKey: step.fieldKey,
@@ -242,6 +247,23 @@ export async function importActionFlowExport(input: {
     stepIdMap.set(step.id, importedStep.id);
   }
 
+  await updateProjectAction({
+    actionId: importedAction.id,
+    description: input.exportData.action.description,
+    name: actionName,
+    projectId: input.projectId,
+    settings: {
+      ...remapHybridEntryPolicySettings(
+        input.exportData.action.settings,
+        stepIdMap,
+      ),
+      importedAt: new Date().toISOString(),
+      importedFromActionId: input.exportData.action.id ?? null,
+    },
+    status: "draft",
+    triggerPhrases: input.exportData.action.triggerPhrases,
+  });
+
   for (const step of orderedSteps) {
     const importedStepId = stepIdMap.get(step.id);
     if (!importedStepId) {
@@ -252,7 +274,7 @@ export async function importActionFlowExport(input: {
       step.nextStepId === null
         ? null
         : (stepIdMap.get(step.nextStepId) ?? null);
-    const settings = buildImportedStepSettings(step);
+    const settings = buildImportedStepSettings(step, stepIdMap);
     await updateActionFlowStep({
       actionId: importedAction.id,
       fieldKey: step.fieldKey,
@@ -311,11 +333,24 @@ function buildPortableExportStepSettings(step: {
   settings: Record<string, unknown>;
   stepType: string;
 }) {
-  if (step.stepType !== "connect_flow") {
+  if (
+    step.stepType !== "connect_flow" &&
+    step.stepType !== "conversational_task"
+  ) {
     return step.settings;
   }
 
   const settings = { ...step.settings };
+  if (step.stepType === "conversational_task") {
+    if (isRecord(settings.conversationalTask)) {
+      settings.exportedConversationalTask = settings.conversationalTask;
+    }
+    delete settings.conversationalTask;
+    settings.conversationalTaskExportNote =
+      "Published task versions are project-specific. Select a published task version after import.";
+    return settings;
+  }
+
   const connectedActionId = toPositiveNumber(settings.connectedActionId);
   delete settings.connectedActionId;
 
@@ -330,7 +365,10 @@ function buildPortableExportStepSettings(step: {
   return settings;
 }
 
-function buildImportedStepSettings(step: ParsedActionFlowExportStep) {
+function buildImportedStepSettings(
+  step: ParsedActionFlowExportStep,
+  stepIdMap: Map<number, number>,
+) {
   const settings: Record<string, unknown> =
     step.operationId === null
       ? { ...step.settings }
@@ -340,6 +378,21 @@ function buildImportedStepSettings(step: ParsedActionFlowExportStep) {
           importedOperationNote:
             "Operation links are not restored automatically during import.",
         };
+
+  if (step.stepType === "conversational_task") {
+    const exportedTask = isRecord(step.settings.exportedConversationalTask)
+      ? step.settings.exportedConversationalTask
+      : isRecord(step.settings.conversationalTask)
+        ? step.settings.conversationalTask
+        : null;
+    delete settings.conversationalTask;
+    delete settings.exportedConversationalTask;
+    if (exportedTask) {
+      settings.importedConversationalTask = exportedTask;
+    }
+    settings.conversationalTaskImportNote =
+      "Reconnect this node to a published task version in the current project.";
+  }
 
   if (step.stepType === "connect_flow") {
     const connectedActionId =
@@ -357,7 +410,11 @@ function buildImportedStepSettings(step: ParsedActionFlowExportStep) {
       "Connected flow links are not restored automatically during import. Select an active action in this project before publishing.";
   }
 
-  return settings;
+  return remapHybridStepSettings(settings, stepIdMap);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function toPositiveNumber(value: unknown) {

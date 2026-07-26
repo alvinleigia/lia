@@ -1,0 +1,256 @@
+import { expect, test } from "@playwright/test";
+import type {
+  ActionFlowCompilerBranchRule,
+  ActionFlowCompilerStep,
+} from "../../src/lib/action-flow-compiler";
+import { DEFAULT_CONVERSATIONAL_TASK_DEFINITION } from "../../src/lib/conversation-contracts";
+import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
+import {
+  compiledHybridFlowGraphV1Schema,
+  getHybridNodeId,
+  parseHybridGraphTaskReturnTarget,
+  taskSuspensionReturnTargetV1Schema,
+} from "../../src/lib/hybrid-flow-contracts";
+import {
+  buildHybridGraphTaskReturnTarget,
+  resolveHybridTaskOutcomeRoute,
+  selectHybridFlowEntryNode,
+  selectHybridFlowTransition,
+} from "../../src/lib/hybrid-flow-runtime";
+
+const outcomes = DEFAULT_CONVERSATIONAL_TASK_DEFINITION.outcomes;
+
+function createStep(
+  id: number,
+  sortOrder: number,
+  input: Partial<ActionFlowCompilerStep> = {},
+): ActionFlowCompilerStep {
+  return {
+    fieldKey: null,
+    id,
+    inputType: null,
+    isEnabled: true,
+    nextStepId: null,
+    settings: {},
+    sortOrder,
+    stepType: "message",
+    ...input,
+  };
+}
+
+const branchRules: ActionFlowCompilerBranchRule[] = [];
+const steps = [
+  createStep(1, 1, {
+    settings: {
+      knowledgeConversation: {
+        answeredRoute: 3,
+        handoffRoute: "end",
+        noAnswerRoute: 3,
+        recommendationTargetStepIds: [2],
+        remainActiveAfterAnswer: false,
+        schemaVersion: 1,
+        stageMode: "goal_driven",
+      },
+      knowledgeGoal: "Answer service questions and recommend booking.",
+      nodeLabel: "Service questions",
+    },
+    stepType: "knowledge_conversation",
+  }),
+  createStep(2, 2, {
+    settings: {
+      conversationalTask: {
+        outcomeRoutes: {
+          cancelled: "end",
+          completed: 3,
+        },
+        schemaVersion: 1,
+        task: {
+          name: "Book a service",
+          outcomes,
+          schemaVersion: 1,
+          taskId: 40,
+          taskVersionId: 80,
+          versionNumber: 2,
+        },
+        transferContextKeys: ["lia_timezone"],
+        transferFieldKeys: ["serviceId"],
+      },
+      nodeLabel: "Book a service",
+    },
+    stepType: "conversational_task",
+  }),
+  createStep(3, 3, {
+    settings: { nodeLabel: "Save request" },
+    stepType: "submit",
+  }),
+];
+
+test("compiler publishes a reachable knowledge-task-deterministic graph", () => {
+  const result = compileHybridFlowGraph({
+    actionSettings: {
+      hybridEntryPolicy: {
+        campaignRoutes: { summer: 2 },
+        channelRoutes: { whatsapp: 1 },
+        deepLinkRoutes: { book: 2 },
+        normalStepId: 1,
+        schemaVersion: 1,
+      },
+    },
+    branchRules,
+    steps,
+  });
+
+  expect(result.baseIssues).toEqual([]);
+  expect(result.issues).toEqual([]);
+  expect(result.graph.entryPolicy).toEqual({
+    campaignRoutes: { summer: "step:2" },
+    channelRoutes: { whatsapp: "step:1" },
+    deepLinkRoutes: { book: "step:2" },
+    normalNodeId: "step:1",
+  });
+  expect(result.graph.nodes.map(({ kind }) => kind)).toEqual([
+    "knowledge",
+    "conversational_task",
+    "deterministic",
+  ]);
+  expect(result.graph.transitions).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        kind: "semantic",
+        sourceNodeId: "step:1",
+        targetNodeId: "step:2",
+        triggerKey: "task:40",
+      }),
+      expect.objectContaining({
+        kind: "task_outcome",
+        sourceNodeId: "step:2",
+        targetNodeId: "step:3",
+        triggerKey: "completed",
+      }),
+    ]),
+  );
+});
+
+test("compiler blocks a task output without an explicit route", () => {
+  const taskStep = steps[1];
+  const settings = structuredClone(taskStep.settings);
+  if (
+    typeof settings.conversationalTask !== "object" ||
+    !settings.conversationalTask
+  ) {
+    throw new Error("Expected task settings.");
+  }
+  settings.conversationalTask = {
+    ...settings.conversationalTask,
+    outcomeRoutes: { completed: 3 },
+  };
+
+  const result = compileHybridFlowGraph({
+    branchRules,
+    steps: [steps[0], { ...taskStep, settings }, steps[2]],
+  });
+
+  expect(result.issues).toContainEqual(
+    expect.objectContaining({
+      code: "hybrid_route_invalid",
+      message: expect.stringContaining('task output "cancelled"'),
+      stepId: 2,
+    }),
+  );
+});
+
+test("entry and transition selection follow explicit precedence", () => {
+  const graph = compileHybridFlowGraph({
+    actionSettings: {
+      hybridEntryPolicy: {
+        campaignRoutes: { launch: 2 },
+        channelRoutes: { whatsapp: 1 },
+        deepLinkRoutes: { booking: 3 },
+        normalStepId: 1,
+        schemaVersion: 1,
+      },
+    },
+    branchRules,
+    steps,
+  }).graph;
+
+  expect(
+    selectHybridFlowEntryNode({
+      campaignKey: "launch",
+      channelType: "whatsapp",
+      deepLinkKey: "booking",
+      graph,
+    }),
+  ).toBe("step:3");
+
+  const transitionGraph = compiledHybridFlowGraphV1Schema.parse({
+    ...graph,
+    transitions: [
+      {
+        id: "semantic",
+        kind: "semantic",
+        priority: 100,
+        sourceNodeId: "step:1",
+        sourceRuleId: null,
+        targetNodeId: "step:2",
+        triggerKey: "book",
+      },
+      {
+        id: "explicit",
+        kind: "deterministic",
+        priority: 1,
+        sourceNodeId: "step:1",
+        sourceRuleId: 10,
+        targetNodeId: "step:3",
+        triggerKey: "button",
+      },
+    ],
+  });
+  expect(
+    selectHybridFlowTransition({
+      graph: transitionGraph,
+      signals: [
+        { kind: "semantic", triggerKey: "book" },
+        {
+          kind: "deterministic",
+          sourceRuleId: 10,
+          triggerKey: "button",
+        },
+      ],
+      sourceNodeId: "step:1",
+    })?.id,
+  ).toBe("explicit");
+});
+
+test("task outcomes and pauses preserve the immutable graph return target", () => {
+  const graph = compileHybridFlowGraph({
+    branchRules,
+    steps,
+  }).graph;
+  const returnTarget = buildHybridGraphTaskReturnTarget({
+    actionVersionId: 500,
+    graph,
+    taskNodeId: getHybridNodeId(2),
+  });
+
+  expect(returnTarget).not.toBeNull();
+  expect(
+    resolveHybridTaskOutcomeRoute({
+      eventType: "completed",
+      outcomeKey: "completed",
+      outcomes,
+      returnTarget,
+    }),
+  ).toEqual({
+    nodeId: "step:3",
+    responseOwner: "deterministic",
+  });
+
+  const suspension = taskSuspensionReturnTargetV1Schema.parse({
+    boundaryReturnTarget: { fieldKey: "serviceId" },
+    graphReturnTarget: returnTarget,
+    kind: "task_suspension",
+    schemaVersion: 1,
+  });
+  expect(parseHybridGraphTaskReturnTarget(suspension)).toEqual(returnTarget);
+});

@@ -12,6 +12,7 @@ export default defineConfig({
     "conversation-turn-engine.spec.ts",
     "conversational-task-runtime.spec.ts",
     "conversational-task-schema.spec.ts",
+    "hybrid-flow.spec.ts",
   ],
   timeout: 30_000,
 });

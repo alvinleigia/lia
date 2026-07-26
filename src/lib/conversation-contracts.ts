@@ -408,6 +408,8 @@ export const taskOutcomeV1Schema = z.object({
   outputPort: stableKey,
 });
 
+export type TaskOutcomeV1 = z.infer<typeof taskOutcomeV1Schema>;
+
 export const conversationReturnPolicyV1Schema = z.object({
   schemaVersion,
   completed: z.enum(["return_to_knowledge", "end"]),

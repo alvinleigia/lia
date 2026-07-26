@@ -102,6 +102,113 @@ export async function listConversationalTaskVersions(
     .orderBy(desc(conversationalTaskVersions.versionNumber));
 }
 
+export type PublishedConversationalTaskOption = {
+  contextKeys: string[];
+  fieldKeys: string[];
+  name: string;
+  objective: string;
+  outcomes: ConversationalTaskDefinitionV1["outcomes"];
+  taskId: number;
+  taskVersionId: number;
+  versionNumber: number;
+};
+
+function toPublishedConversationalTaskOption(input: {
+  snapshot: unknown;
+  taskId: number;
+  taskVersionId: number;
+  versionNumber: number;
+}): PublishedConversationalTaskOption | null {
+  const parsed = conversationalTaskSnapshotV1Schema.safeParse(input.snapshot);
+  if (!parsed.success || parsed.data.task.id !== input.taskId) {
+    return null;
+  }
+
+  return {
+    contextKeys: parsed.data.task.definition.contextVariables.map(
+      (variable) => variable.key,
+    ),
+    fieldKeys: parsed.data.task.definition.fields.map((field) => field.key),
+    name: parsed.data.task.name,
+    objective: parsed.data.task.objective,
+    outcomes: parsed.data.task.definition.outcomes,
+    taskId: input.taskId,
+    taskVersionId: input.taskVersionId,
+    versionNumber: input.versionNumber,
+  };
+}
+
+export async function listPublishedConversationalTaskOptions(
+  projectId: number,
+) {
+  const versions = await db
+    .select({
+      snapshot: conversationalTaskVersions.snapshot,
+      taskId: conversationalTaskVersions.taskId,
+      taskVersionId: conversationalTaskVersions.id,
+      versionNumber: conversationalTaskVersions.versionNumber,
+    })
+    .from(conversationalTaskVersions)
+    .innerJoin(
+      conversationalTasks,
+      and(
+        eq(conversationalTasks.id, conversationalTaskVersions.taskId),
+        eq(conversationalTasks.projectId, conversationalTaskVersions.projectId),
+      ),
+    )
+    .where(
+      and(
+        eq(conversationalTaskVersions.projectId, projectId),
+        eq(conversationalTasks.isArchived, false),
+      ),
+    )
+    .orderBy(
+      asc(conversationalTasks.name),
+      desc(conversationalTaskVersions.versionNumber),
+    );
+
+  return versions.flatMap((version) => {
+    const option = toPublishedConversationalTaskOption(version);
+    return option ? [option] : [];
+  });
+}
+
+export async function getPublishedConversationalTaskOption(input: {
+  includeArchived?: boolean;
+  projectId: number;
+  taskVersionId: number;
+}) {
+  const [version] = await db
+    .select({
+      isArchived: conversationalTasks.isArchived,
+      snapshot: conversationalTaskVersions.snapshot,
+      taskId: conversationalTaskVersions.taskId,
+      taskVersionId: conversationalTaskVersions.id,
+      versionNumber: conversationalTaskVersions.versionNumber,
+    })
+    .from(conversationalTaskVersions)
+    .innerJoin(
+      conversationalTasks,
+      and(
+        eq(conversationalTasks.id, conversationalTaskVersions.taskId),
+        eq(conversationalTasks.projectId, conversationalTaskVersions.projectId),
+      ),
+    )
+    .where(
+      and(
+        eq(conversationalTaskVersions.projectId, input.projectId),
+        eq(conversationalTaskVersions.id, input.taskVersionId),
+      ),
+    )
+    .limit(1);
+
+  if (!version || (version.isArchived && !input.includeArchived)) {
+    return null;
+  }
+
+  return toPublishedConversationalTaskOption(version);
+}
+
 export async function publishConversationalTask(input: {
   assistantBehavior: ProjectAiSettings;
   projectId: number;
