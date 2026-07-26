@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
+import { listProjectReusableActionFields } from "@/lib/action-flows";
 import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveStrictUserAndProject } from "@/lib/auth-project";
@@ -32,6 +33,16 @@ import {
 } from "@/lib/conversation-project-policies";
 import { resolveConversationalTaskMutation } from "@/lib/conversational-task-access";
 import {
+  buildFriendlyValidation,
+  buildRequiredWhen,
+  createStableFieldKey,
+  createUniqueFieldKey,
+  findTaskFieldReferences,
+  moveTaskField,
+  type TaskField,
+  taskFieldTypeFromActionInputTypes,
+} from "@/lib/conversational-task-builder";
+import {
   conversationalTaskDetailsSchema,
   conversationalTaskIdSchema,
 } from "@/lib/conversational-task-schema";
@@ -54,6 +65,23 @@ import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 
 const projectIdSchema = z.coerce.number().int().positive();
 const taskCompletionActionSchema = z.enum(["return_to_knowledge", "end"]);
+const taskFieldRequirementSchema = z.enum([
+  "always",
+  "optional",
+  "conditional",
+]);
+const guidedConditionOperatorSchema = z.enum([
+  "present",
+  "missing",
+  "equals",
+  "not_equals",
+]);
+const friendlyValidationKindSchema = z.enum([
+  "none",
+  "minimum_length",
+  "maximum_length",
+  "existing",
+]);
 
 function parseFieldOptionSource(formData: FormData) {
   const kind = formData.get("optionSourceKind");
@@ -82,6 +110,104 @@ function parseFieldOptionSource(formData: FormData) {
     };
   }
   return null;
+}
+
+function parseTaskFieldFormData(
+  formData: FormData,
+  input: {
+    existing?: TaskField;
+    key: string;
+  },
+) {
+  const requirement = taskFieldRequirementSchema.safeParse(
+    formData.get("requirementMode"),
+  );
+  const conditionOperator = guidedConditionOperatorSchema.safeParse(
+    formData.get("conditionOperator"),
+  );
+  const validationKind = friendlyValidationKindSchema.safeParse(
+    formData.get("validationKind"),
+  );
+  if (
+    !requirement.success ||
+    !conditionOperator.success ||
+    !validationKind.success
+  ) {
+    return { error: "Please check the field settings." } as const;
+  }
+
+  const conditionField = String(formData.get("conditionField") ?? "").trim();
+  const guidedRequiredWhen =
+    requirement.data === "conditional" && conditionField
+      ? buildRequiredWhen({
+          fieldKey: conditionField,
+          operator: conditionOperator.data,
+          value: String(formData.get("conditionValue") ?? ""),
+        })
+      : null;
+  const requiredWhen =
+    requirement.data === "conditional"
+      ? guidedRequiredWhen || input.existing?.requiredWhen || null
+      : null;
+  if (requirement.data === "conditional" && !requiredWhen) {
+    return {
+      error: "Choose when this field should become required.",
+    } as const;
+  }
+
+  const validation =
+    validationKind.data === "existing"
+      ? (input.existing?.validation ?? null)
+      : buildFriendlyValidation(
+          validationKind.data,
+          String(formData.get("validationValue") ?? ""),
+        );
+  if (
+    validationKind.data !== "none" &&
+    validationKind.data !== "existing" &&
+    !validation
+  ) {
+    return { error: "Enter a valid character limit." } as const;
+  }
+
+  const dependsOn = Array.from(
+    new Set(
+      formData
+        .getAll("dependsOn")
+        .map(String)
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .concat(conditionField || []),
+    ),
+  );
+  const parsed = taskFieldV1Schema.safeParse({
+    id: input.existing?.id ?? crypto.randomUUID(),
+    key: input.key,
+    label: formData.get("label"),
+    type: formData.get("type"),
+    cardinality: formData.get("cardinality") || "single",
+    prompt: formData.get("prompt") || null,
+    optionSource: parseFieldOptionSource(formData),
+    required: requirement.data === "always",
+    requiredWhen,
+    validation,
+    normalization: formData.get("normalization") || null,
+    sensitivity: formData.get("sensitivity") || "standard",
+    confirmation: formData.get("confirmation") || "when_changed",
+    sourcePriority: input.existing?.sourcePriority ?? [
+      "visitor",
+      "profile",
+      "project_resource",
+      "tool",
+    ],
+    dependsOn,
+  });
+
+  return parsed.success
+    ? ({ field: parsed.data } as const)
+    : ({
+        error: "Please check the field details and answer source.",
+      } as const);
 }
 
 function parseTaskDetails(formData: FormData) {
@@ -399,33 +525,188 @@ export async function addConversationalTaskFieldAction(
     return { error: "Restore the task before editing." };
   }
 
-  const parsed = taskFieldV1Schema.safeParse({
-    id: crypto.randomUUID(),
-    key: formData.get("key"),
-    label: formData.get("label"),
-    type: formData.get("type"),
-    cardinality: formData.get("cardinality"),
-    prompt: formData.get("prompt") || null,
-    optionSource: parseFieldOptionSource(formData),
-    required: formData.get("required") === "on",
-    requiredWhen: formData.get("requiredWhen") || null,
-    validation: formData.get("validation") || null,
-    normalization: formData.get("normalization") || null,
-    sensitivity: formData.get("sensitivity"),
-    confirmation: formData.get("confirmation"),
-    sourcePriority: ["visitor", "profile", "project_resource", "tool"],
-    dependsOn: String(formData.get("dependsOn") ?? "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
-  });
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  const label = String(formData.get("label") ?? "").trim();
+  const suppliedKey = String(formData.get("key") ?? "").trim();
+  const key = suppliedKey || createStableFieldKey(label);
+  const parsed = parseTaskFieldFormData(formData, { key });
+  if ("error" in parsed) {
+    return parsed;
+  }
+  if (definition.fields.some((field) => field.key === parsed.field.key)) {
+    return { error: "Use a valid, unique field key." };
+  }
+
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      fields: [...definition.fields, parsed.field],
+    },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?fieldAdded=1`);
+}
+
+export async function updateConversationalTaskFieldAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const context = await resolveConversationalTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  const fieldId = z.string().uuid().safeParse(formData.get("fieldId"));
+  if (!fieldId.success || context.task.isArchived) {
+    return { error: "Field not found." };
+  }
 
   const definition = readConversationalTaskDefinition(context.task.definition);
-  if (!parsed.success) {
-    return { error: "Please check the field details and choice source." };
+  const existing = definition.fields.find(
+    (candidate) => candidate.id === fieldId.data,
+  );
+  if (!existing) {
+    return { error: "Field not found." };
   }
-  if (definition.fields.some((field) => field.key === parsed.data.key)) {
-    return { error: "Use a valid, unique field key." };
+
+  const parsed = parseTaskFieldFormData(formData, {
+    existing,
+    key: existing.key,
+  });
+  if ("error" in parsed) {
+    return parsed;
+  }
+
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      fields: definition.fields.map((field) =>
+        field.id === existing.id ? parsed.field : field,
+      ),
+    },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?fieldUpdated=1`);
+}
+
+export async function duplicateConversationalTaskFieldAction(
+  formData: FormData,
+) {
+  const context = await resolveConversationalTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  const fieldId = z.string().uuid().safeParse(formData.get("fieldId"));
+  if (!fieldId.success || context.task.isArchived) {
+    redirect(`${destination}?error=Field%20not%20found.`);
+  }
+
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  const index = definition.fields.findIndex(
+    (candidate) => candidate.id === fieldId.data,
+  );
+  const existing = definition.fields[index];
+  if (!existing) {
+    redirect(`${destination}?error=Field%20not%20found.`);
+  }
+
+  const copy: TaskField = {
+    ...existing,
+    id: crypto.randomUUID(),
+    key: createUniqueFieldKey(
+      existing.key,
+      definition.fields.map((field) => field.key),
+    ),
+    label: `${existing.label} Copy`.slice(0, 120),
+  };
+  const fields = [...definition.fields];
+  fields.splice(index + 1, 0, copy);
+
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    { ...definition, fields },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?fieldDuplicated=1`);
+}
+
+export async function moveConversationalTaskFieldAction(formData: FormData) {
+  const context = await resolveConversationalTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  const fieldId = z.string().uuid().safeParse(formData.get("fieldId"));
+  const direction = z.enum(["up", "down"]).safeParse(formData.get("direction"));
+  if (!fieldId.success || !direction.success || context.task.isArchived) {
+    redirect(`${destination}?error=Field%20not%20found.`);
+  }
+
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  if (!definition.fields.some((field) => field.id === fieldId.data)) {
+    redirect(`${destination}?error=Field%20not%20found.`);
+  }
+
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    {
+      ...definition,
+      fields: moveTaskField(definition.fields, fieldId.data, direction.data),
+    },
+  );
+  revalidatePath(destination);
+  redirect(`${destination}?fieldMoved=1`);
+}
+
+export async function addReusableConversationalTaskFieldAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const context = await resolveConversationalTaskMutation(formData);
+  const destination = `/projects/tasks/${context.task.id}/configure/fields`;
+  if (context.task.isArchived) {
+    return { error: "Restore the task before editing." };
+  }
+
+  const selectedKey = z
+    .string()
+    .trim()
+    .min(1)
+    .safeParse(formData.get("reusableFieldKey"));
+  if (!selectedKey.success) {
+    return { error: "Choose a reusable field." };
+  }
+
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  if (definition.fields.some((field) => field.key === selectedKey.data)) {
+    return { error: "That field is already part of this task." };
+  }
+
+  const available = await listProjectReusableActionFields(context.project.id);
+  const reusable = available.find(
+    (field) => field.fieldKey === selectedKey.data,
+  );
+  if (!reusable) {
+    return { error: "That reusable field is no longer available." };
+  }
+
+  const parsed = taskFieldV1Schema.safeParse({
+    id: crypto.randomUUID(),
+    key: reusable.fieldKey,
+    label: reusable.labels[0] || reusable.fieldKey,
+    type: taskFieldTypeFromActionInputTypes(reusable.inputTypes),
+    cardinality: "single",
+    prompt: null,
+    optionSource: null,
+    required: false,
+    requiredWhen: null,
+    validation: null,
+    normalization: null,
+    sensitivity: "standard",
+    confirmation: "when_changed",
+    sourcePriority: ["visitor", "profile", "project_resource", "tool"],
+    dependsOn: [],
+  });
+  if (!parsed.success) {
+    return { error: "That reusable field has an incompatible key." };
   }
 
   await updateProjectConversationalTaskDefinition(
@@ -437,7 +718,7 @@ export async function addConversationalTaskFieldAction(
     },
   );
   revalidatePath(destination);
-  redirect(`${destination}?fieldAdded=1`);
+  redirect(`${destination}?fieldReused=1`);
 }
 
 export async function removeConversationalTaskFieldAction(formData: FormData) {
@@ -452,21 +733,14 @@ export async function removeConversationalTaskFieldAction(formData: FormData) {
   const field = definition.fields.find(
     (candidate) => candidate.id === fieldId.data,
   );
-  const dependentField = field
-    ? definition.fields.find(
-        (candidate) =>
-          candidate.dependsOn.includes(field.key) ||
-          (candidate.optionSource?.kind === "project_resource" &&
-            candidate.optionSource.filterByField === field.key),
-      )
-    : null;
   if (!field) {
     redirect(`${destination}?error=Field%20not%20found.`);
   }
-  if (dependentField) {
+  const references = findTaskFieldReferences(definition, field.key);
+  if (references.length > 0) {
     redirect(
       `${destination}?error=${encodeURIComponent(
-        `${field.label} is used by ${dependentField.label}. Remove that dependency first.`,
+        `${field.label} is used by ${references.join(", ")}. Remove those references first.`,
       )}`,
     );
   }

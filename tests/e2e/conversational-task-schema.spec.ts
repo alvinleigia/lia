@@ -16,6 +16,17 @@ import {
   taskIntentRecommendationV1Schema,
 } from "../../src/lib/conversation-contracts";
 import {
+  buildFriendlyValidation,
+  buildRequiredWhen,
+  createStableFieldKey,
+  createUniqueFieldKey,
+  findTaskFieldReferences,
+  moveTaskField,
+  parseFriendlyValidation,
+  parseGuidedRequiredWhen,
+  taskFieldNeedsSetup,
+} from "../../src/lib/conversational-task-builder";
+import {
   conversationalTaskDetailsSchema,
   conversationalTaskIdSchema,
 } from "../../src/lib/conversational-task-schema";
@@ -109,6 +120,76 @@ test("booking template keeps catalog choices channel independent", () => {
       resourceType: "service",
     },
   });
+});
+
+test("friendly task fields create stable unique keys", () => {
+  expect(createStableFieldKey("Guest Email Address")).toBe("guestEmailAddress");
+  expect(
+    createUniqueFieldKey("Guest Email", ["guestEmail", "guestEmail2"]),
+  ).toBe("guestEmail3");
+});
+
+test("guided conditions and validation preserve runtime expressions", () => {
+  const condition = buildRequiredWhen({
+    fieldKey: "serviceCategoryId",
+    operator: "equals",
+    value: "facial",
+  });
+
+  expect(condition).toBe('serviceCategoryId == "facial"');
+  expect(parseGuidedRequiredWhen(condition)).toEqual({
+    fieldKey: "serviceCategoryId",
+    operator: "equals",
+    value: "facial",
+  });
+  expect(buildFriendlyValidation("minimum_length", "3")).toBe("minLength:3");
+  expect(parseFriendlyValidation("maxLength:120")).toEqual({
+    kind: "maximum_length",
+    value: "120",
+  });
+});
+
+test("friendly field operations retain ordering and protect references", () => {
+  const definition = createConversationalTaskDefinitionFromTemplate("booking");
+  const first = definition.fields[0];
+  const second = definition.fields[1];
+
+  expect(first).toBeDefined();
+  expect(second).toBeDefined();
+  if (!first || !second) return;
+
+  expect(moveTaskField(definition.fields, first.id, "down")[0]?.id).toBe(
+    second.id,
+  );
+  expect(findTaskFieldReferences(definition, first.key)).toContain(
+    second.label,
+  );
+});
+
+test("catalog-backed fields report missing project setup", () => {
+  const definition = createConversationalTaskDefinitionFromTemplate("booking");
+  const service = definition.fields[1];
+  expect(service).toBeDefined();
+  if (!service) return;
+
+  expect(
+    taskFieldNeedsSetup(service, {
+      catalogCount: 0,
+      catalogIds: new Set(),
+      mediaCount: 0,
+      productCatalogIds: new Set(),
+      productCount: 0,
+    }),
+  ).toBe(true);
+  expect(
+    taskFieldNeedsSetup(service, {
+      catalogCount: 1,
+      catalogIds: new Set([5]),
+      mediaCount: 0,
+      productCatalogIds: new Set([5]),
+      productCount: 2,
+    }),
+  ).toBe(false);
 });
 
 test("reference booking fixture satisfies the universal contracts", () => {

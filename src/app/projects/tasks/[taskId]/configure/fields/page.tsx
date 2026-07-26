@@ -1,8 +1,10 @@
-import { ArrowLeft, Braces, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Braces, Plus } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TaskConfigurationNav } from "@/components/task-configuration-nav";
 import { TaskContextVariableRow } from "@/components/task-context-variable-row";
+import { TaskFieldCard } from "@/components/task-field-card";
+import { TaskFieldFormFields } from "@/components/task-field-form-fields";
 import {
   Accordion,
   AccordionContent,
@@ -18,28 +20,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { listProjectReusableActionFields } from "@/lib/action-flows";
 import { evaluateContextVariableRemoval } from "@/lib/context-variable-dependencies";
 import {
   CUSTOM_CONTEXT_SOURCES,
-  FIELD_CARDINALITIES,
   FIELD_TYPES,
 } from "@/lib/conversation-contracts";
+import { taskFieldNeedsSetup } from "@/lib/conversational-task-builder";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
 import {
   getProjectConversationalTask,
   readConversationalTaskDefinition,
 } from "@/lib/conversational-tasks";
+import { listProjectMediaAssets } from "@/lib/media-assets";
+import {
+  listProjectCatalogProducts,
+  listProjectCatalogs,
+} from "@/lib/product-catalogs";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
 import {
   addConversationalTaskFieldAction,
+  addReusableConversationalTaskFieldAction,
   addTaskContextVariableAction,
   applyReferenceBookingTaskAction,
+  duplicateConversationalTaskFieldAction,
+  moveConversationalTaskFieldAction,
   removeConversationalTaskFieldAction,
   removeTaskContextVariableAction,
+  updateConversationalTaskFieldAction,
   updateTaskContextVariableAction,
 } from "../../../actions";
 
@@ -61,14 +72,31 @@ export default async function TaskFieldsPage({
   if (!route.success || !context) {
     redirect("/projects/tasks?error=Task%20not%20found.");
   }
-  const task = await getProjectConversationalTask(
-    context.project.id,
-    route.data,
-  );
+  const [task, catalogs, productRows, mediaAssets, reusableFields] =
+    await Promise.all([
+      getProjectConversationalTask(context.project.id, route.data),
+      listProjectCatalogs(context.project.id),
+      listProjectCatalogProducts(context.project.id),
+      listProjectMediaAssets(context.project.id),
+      listProjectReusableActionFields(context.project.id),
+    ]);
   if (!task) {
     redirect("/projects/tasks?error=Task%20not%20found.");
   }
   const definition = readConversationalTaskDefinition(task.definition);
+  const resources = {
+    catalogIds: new Set(catalogs.map((catalog) => catalog.id)),
+    catalogCount: catalogs.length,
+    mediaCount: mediaAssets.length,
+    productCatalogIds: new Set(
+      productRows.map(({ product }) => product.catalogId),
+    ),
+    productCount: productRows.length,
+  };
+  const reusableChoices = reusableFields.filter(
+    (candidate) =>
+      !definition.fields.some((field) => field.key === candidate.fieldKey),
+  );
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10">
@@ -117,33 +145,21 @@ export default async function TaskFieldsPage({
               </div>
             ) : (
               <div className="divide-y rounded-md border">
-                {definition.fields.map((field) => (
-                  <div
+                {definition.fields.map((field, index) => (
+                  <TaskFieldCard
                     key={field.id}
-                    className="flex items-center justify-between gap-4 px-4 py-3"
-                  >
-                    <div>
-                      <p className="font-medium">{field.label}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {field.key} / {field.type}
-                        {field.cardinality === "multiple" ? " / multiple" : ""}
-                        {field.required ? " / required" : ""}
-                      </p>
-                    </div>
-                    <form action={removeConversationalTaskFieldAction}>
-                      <input
-                        type="hidden"
-                        name="projectId"
-                        value={context.project.id}
-                      />
-                      <input type="hidden" name="taskId" value={task.id} />
-                      <input type="hidden" name="fieldId" value={field.id} />
-                      <Button type="submit" size="icon" variant="ghost">
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Remove {field.label}</span>
-                      </Button>
-                    </form>
-                  </div>
+                    catalogs={catalogs}
+                    duplicateAction={duplicateConversationalTaskFieldAction}
+                    field={field}
+                    fields={definition.fields}
+                    index={index}
+                    moveAction={moveConversationalTaskFieldAction}
+                    needsSetup={taskFieldNeedsSetup(field, resources)}
+                    projectId={context.project.id}
+                    removeAction={removeConversationalTaskFieldAction}
+                    taskId={task.id}
+                    updateAction={updateConversationalTaskFieldAction}
+                  />
                 ))}
               </div>
             )}
@@ -161,204 +177,56 @@ export default async function TaskFieldsPage({
                 value={context.project.id}
               />
               <input type="hidden" name="taskId" value={task.id} />
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="label">Visitor Label</Label>
-                  <Input
-                    id="label"
-                    name="label"
-                    placeholder="Guest Email"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="key">Field Key</Label>
-                  <Input
-                    id="key"
-                    name="key"
-                    placeholder="guestEmail"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type</Label>
-                  <select id="type" name="type" className={selectClass}>
-                    {FIELD_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {type.replaceAll("_", " ")}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prompt">Visitor Prompt</Label>
-                <Textarea
-                  id="prompt"
-                  name="prompt"
-                  rows={2}
-                  placeholder="What should Lia ask the visitor?"
-                />
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="cardinality">Answers Allowed</Label>
-                  <select
-                    id="cardinality"
-                    name="cardinality"
-                    className={selectClass}
-                    defaultValue="single"
-                  >
-                    {FIELD_CARDINALITIES.map((cardinality) => (
-                      <option key={cardinality} value={cardinality}>
-                        {cardinality === "single"
-                          ? "One answer"
-                          : "Multiple answers"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sensitivity">Sensitivity</Label>
-                  <select
-                    id="sensitivity"
-                    name="sensitivity"
-                    className={selectClass}
-                    defaultValue="standard"
-                  >
-                    <option value="standard">Standard</option>
-                    <option value="personal">Personal</option>
-                    <option value="sensitive">Sensitive</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmation">Confirmation</Label>
-                  <select
-                    id="confirmation"
-                    name="confirmation"
-                    className={selectClass}
-                    defaultValue="when_changed"
-                  >
-                    <option value="never">Never</option>
-                    <option value="when_changed">When changed</option>
-                    <option value="always">Always</option>
-                  </select>
-                </div>
-              </div>
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input type="checkbox" name="required" defaultChecked />
-                Required
-              </label>
-              <Accordion
-                type="single"
-                collapsible
-                className="rounded-md border px-4"
-              >
-                <AccordionItem value="advanced">
-                  <AccordionTrigger>
-                    Choices, dependencies, and validation
-                  </AccordionTrigger>
-                  <AccordionContent forceMount className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="requiredWhen">Required When</Label>
-                        <Input
-                          id="requiredWhen"
-                          name="requiredWhen"
-                          placeholder="Optional condition"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="dependsOn">Depends On</Label>
-                        <Input
-                          id="dependsOn"
-                          name="dependsOn"
-                          placeholder="Comma-separated field keys"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="validation">Validation Rule</Label>
-                        <Input
-                          id="validation"
-                          name="validation"
-                          placeholder="Optional business rule"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="normalization">Normalization</Label>
-                        <Input
-                          id="normalization"
-                          name="normalization"
-                          placeholder="e.g. E.164"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="optionSourceKind">Choice Source</Label>
-                      <select
-                        id="optionSourceKind"
-                        name="optionSourceKind"
-                        className={selectClass}
-                        defaultValue="none"
-                      >
-                        <option value="none">No fixed choices</option>
-                        <option value="static">Static choices</option>
-                        <option value="project_resource">
-                          Project resource
-                        </option>
-                      </select>
-                      <p className="text-xs text-muted-foreground">
-                        Use static choices for enum fields and project resources
-                        for catalog-backed fields.
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="staticOptions">Static Choices</Label>
-                      <Textarea
-                        id="staticOptions"
-                        name="staticOptions"
-                        rows={4}
-                        placeholder={"massage|Massage\nfacial|Facial"}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Enter one value and label per line, separated by a pipe.
-                      </p>
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="resourceType">Resource Type</Label>
-                        <Input
-                          id="resourceType"
-                          name="resourceType"
-                          placeholder="service"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="collectionKey">Collection Key</Label>
-                        <Input
-                          id="collectionKey"
-                          name="collectionKey"
-                          placeholder="serviceCatalog"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="filterByField">Filter By Field</Label>
-                        <Input
-                          id="filterByField"
-                          name="filterByField"
-                          placeholder="serviceCategoryId"
-                        />
-                      </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+              <TaskFieldFormFields
+                catalogs={catalogs}
+                fields={definition.fields}
+                idPrefix="add-task-field"
+              />
               <FormSubmitButton
                 label="Add Field"
                 pendingLabel="Adding..."
                 icon={<Plus className="h-4 w-4" />}
               />
             </ActionStateForm>
+
+            {reusableChoices.length > 0 && (
+              <ActionStateForm
+                action={addReusableConversationalTaskFieldAction}
+                resetKey={definition.fields.map((field) => field.key).join(":")}
+                className="space-y-4 rounded-md border p-4"
+              >
+                <h3 className="font-semibold">Reuse an Automation Field</h3>
+                <ActionFormError />
+                <input
+                  type="hidden"
+                  name="projectId"
+                  value={context.project.id}
+                />
+                <input type="hidden" name="taskId" value={task.id} />
+                <div className="space-y-2">
+                  <Label htmlFor="reusableFieldKey">Existing Field</Label>
+                  <select
+                    id="reusableFieldKey"
+                    name="reusableFieldKey"
+                    className={selectClass}
+                    required
+                  >
+                    <option value="">Choose a field</option>
+                    {reusableChoices.map((field) => (
+                      <option key={field.fieldKey} value={field.fieldKey}>
+                        {field.labels[0] || field.fieldKey} -{" "}
+                        {field.actions.map((action) => action.name).join(", ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <FormSubmitButton
+                  label="Reuse Field"
+                  pendingLabel="Adding..."
+                  icon={<Plus className="h-4 w-4" />}
+                />
+              </ActionStateForm>
+            )}
           </CardContent>
         </Card>
 

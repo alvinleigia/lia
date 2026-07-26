@@ -57,13 +57,17 @@ function readCatalogDependency(
   field: TaskFieldDefinition,
   fieldValues: ReadonlyMap<string, unknown>,
 ) {
-  const filterKey =
-    field.optionSource?.kind === "project_resource"
-      ? field.optionSource.filterByField
-      : null;
-  if (!filterKey) return null;
-  const value = fieldValues.get(filterKey);
-  return typeof value === "string" ? parseScopedId(value, "catalog") : null;
+  if (field.optionSource?.kind !== "project_resource") return null;
+  const filterKey = field.optionSource.filterByField;
+  if (filterKey) {
+    const value = fieldValues.get(filterKey);
+    const catalogId =
+      typeof value === "string" ? parseScopedId(value, "catalog") : null;
+    if (catalogId) return catalogId;
+  }
+  return field.optionSource.collectionKey
+    ? parseScopedId(field.optionSource.collectionKey, "catalog")
+    : null;
 }
 
 async function resolveCatalog(
