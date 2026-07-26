@@ -125,34 +125,36 @@ function parseTaskFieldFormData(
   const requirement = taskFieldRequirementSchema.safeParse(
     formData.get("requirementMode"),
   );
-  const conditionOperator = guidedConditionOperatorSchema.safeParse(
-    formData.get("conditionOperator"),
-  );
   const validationKind = friendlyValidationKindSchema.safeParse(
     formData.get("validationKind"),
   );
-  if (
-    !requirement.success ||
-    !conditionOperator.success ||
-    !validationKind.success
-  ) {
+  if (!requirement.success || !validationKind.success) {
     return { error: "Please check the field settings." } as const;
   }
 
-  const conditionField = String(formData.get("conditionField") ?? "").trim();
+  const isConditional = requirement.data === "conditional";
+  const conditionOperator = guidedConditionOperatorSchema.safeParse(
+    isConditional ? formData.get("conditionOperator") : "present",
+  );
+  if (!conditionOperator.success) {
+    return { error: "Please check the field settings." } as const;
+  }
+
+  const conditionField = isConditional
+    ? String(formData.get("conditionField") ?? "").trim()
+    : "";
   const guidedRequiredWhen =
-    requirement.data === "conditional" && conditionField
+    isConditional && conditionField
       ? buildRequiredWhen({
           fieldKey: conditionField,
           operator: conditionOperator.data,
           value: String(formData.get("conditionValue") ?? ""),
         })
       : null;
-  const requiredWhen =
-    requirement.data === "conditional"
-      ? guidedRequiredWhen || input.existing?.requiredWhen || null
-      : null;
-  if (requirement.data === "conditional" && !requiredWhen) {
+  const requiredWhen = isConditional
+    ? guidedRequiredWhen || input.existing?.requiredWhen || null
+    : null;
+  if (isConditional && !requiredWhen) {
     return {
       error: "Choose when this field should become required.",
     } as const;

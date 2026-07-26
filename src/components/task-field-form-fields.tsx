@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -10,13 +13,16 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   FRIENDLY_TASK_FIELD_TYPES,
   GUIDED_CONDITION_OPERATORS,
+  type GuidedConditionOperator,
   parseFriendlyValidation,
   parseGuidedRequiredWhen,
   TASK_FIELD_RESOURCE_TYPES,
   type TaskField,
 } from "@/lib/conversational-task-builder";
+import { cn } from "@/lib/utils";
 
 type CatalogOption = { id: number; name: string };
+type RequirementMode = "always" | "optional" | "conditional";
 
 export function TaskFieldFormFields({
   catalogs,
@@ -38,6 +44,20 @@ export function TaskFieldFormFields({
     : field?.requiredWhen
       ? "conditional"
       : "optional";
+  const [selectedRequirementMode, setSelectedRequirementMode] =
+    useState<RequirementMode>(requirementMode);
+  const [selectedConditionField, setSelectedConditionField] = useState(
+    guidedCondition?.fieldKey ?? "",
+  );
+  const [selectedConditionOperator, setSelectedConditionOperator] =
+    useState<GuidedConditionOperator>(guidedCondition?.operator ?? "present");
+  const [selectedConditionValue, setSelectedConditionValue] = useState(
+    guidedCondition?.value ?? "",
+  );
+  const showCondition = selectedRequirementMode === "conditional";
+  const showConditionValue =
+    selectedConditionOperator === "equals" ||
+    selectedConditionOperator === "not_equals";
   const validation = parseFriendlyValidation(field?.validation ?? null);
   const staticOptions =
     field?.optionSource?.kind === "static"
@@ -85,7 +105,10 @@ export function TaskFieldFormFields({
         <select
           id={`${idPrefix}-requirementMode`}
           name="requirementMode"
-          defaultValue={requirementMode}
+          value={selectedRequirementMode}
+          onChange={(event) =>
+            setSelectedRequirementMode(event.target.value as RequirementMode)
+          }
           className="h-9 w-full rounded-md border bg-white px-3 text-sm"
         >
           <option value="always">Always required</option>
@@ -94,48 +117,68 @@ export function TaskFieldFormFields({
         </select>
       </div>
 
-      <div className="grid gap-4 rounded-md border bg-gray-50 p-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-conditionField`}>When field</Label>
-          <select
-            id={`${idPrefix}-conditionField`}
-            name="conditionField"
-            defaultValue={guidedCondition?.fieldKey ?? ""}
-            className="h-9 w-full rounded-md border bg-white px-3 text-sm"
-          >
-            <option value="">Choose a field</option>
-            {availableDependencies.map((candidate) => (
-              <option key={candidate.id} value={candidate.key}>
-                {candidate.label}
-              </option>
-            ))}
-          </select>
+      {showCondition && (
+        <div
+          className={cn(
+            "grid gap-4 rounded-md border bg-gray-50 p-4",
+            showConditionValue ? "md:grid-cols-3" : "md:grid-cols-2",
+          )}
+        >
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-conditionField`}>When field</Label>
+            <select
+              id={`${idPrefix}-conditionField`}
+              name="conditionField"
+              value={selectedConditionField}
+              onChange={(event) =>
+                setSelectedConditionField(event.target.value)
+              }
+              className="h-9 w-full rounded-md border bg-white px-3 text-sm"
+            >
+              <option value="">Choose a field</option>
+              {availableDependencies.map((candidate) => (
+                <option key={candidate.id} value={candidate.key}>
+                  {candidate.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-conditionOperator`}>Condition</Label>
+            <select
+              id={`${idPrefix}-conditionOperator`}
+              name="conditionOperator"
+              value={selectedConditionOperator}
+              onChange={(event) =>
+                setSelectedConditionOperator(
+                  event.target.value as GuidedConditionOperator,
+                )
+              }
+              className="h-9 w-full rounded-md border bg-white px-3 text-sm"
+            >
+              {GUIDED_CONDITION_OPERATORS.map((operator) => (
+                <option key={operator.value} value={operator.value}>
+                  {operator.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {showConditionValue && (
+            <div className="space-y-2">
+              <Label htmlFor={`${idPrefix}-conditionValue`}>Value</Label>
+              <Input
+                id={`${idPrefix}-conditionValue`}
+                name="conditionValue"
+                value={selectedConditionValue}
+                onChange={(event) =>
+                  setSelectedConditionValue(event.target.value)
+                }
+                placeholder="Enter a value"
+              />
+            </div>
+          )}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-conditionOperator`}>Condition</Label>
-          <select
-            id={`${idPrefix}-conditionOperator`}
-            name="conditionOperator"
-            defaultValue={guidedCondition?.operator ?? "present"}
-            className="h-9 w-full rounded-md border bg-white px-3 text-sm"
-          >
-            {GUIDED_CONDITION_OPERATORS.map((operator) => (
-              <option key={operator.value} value={operator.value}>
-                {operator.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-conditionValue`}>Value</Label>
-          <Input
-            id={`${idPrefix}-conditionValue`}
-            name="conditionValue"
-            defaultValue={guidedCondition?.value ?? ""}
-            placeholder="Only for equals"
-          />
-        </div>
-      </div>
+      )}
 
       <Accordion type="multiple" className="rounded-md border px-4">
         <AccordionItem value="wording">

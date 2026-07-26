@@ -108,7 +108,11 @@ Guest Email
 Guest Phone
 ```
 
-3. In `Add Field`, enter:
+3. In `Add Field`, confirm `Required` defaults to `Always required` and the
+   conditional controls are not shown.
+4. Set `Required` to `Required only when...`.
+5. Confirm `When field` and `Condition` now appear.
+6. Enter:
 
 ```text
 Visitor Label: Special Request
@@ -116,18 +120,18 @@ Answer Type: Short text
 Required: Required only when...
 When field: Service
 Condition: has an answer
-Value: leave blank
+Value: not shown for this condition
 ```
 
-4. Open `Visitor wording`.
-5. Enter this exact question:
+7. Open `Visitor wording`.
+8. Enter this exact question:
 
 ```text
 Do you have any special requests for the appointment?
 ```
 
-6. Open `Validation and privacy`.
-7. Set:
+9. Open `Validation and privacy`.
+10. Set:
 
 ```text
 Privacy: Standard
@@ -136,18 +140,18 @@ Validation: Maximum characters
 Characters: 300
 ```
 
-8. Select `Add Field`.
-9. On the new `Special Request` card, select its up-arrow control once.
-10. Select its duplicate control.
-11. Delete only the duplicated card.
-12. Edit the original `Special Request` card.
-13. Replace its exact question with:
+11. Select `Add Field`.
+12. On the new `Special Request` card, select its up-arrow control once.
+13. Select its duplicate control.
+14. Delete only the duplicated card.
+15. Edit the original `Special Request` card.
+16. Replace its exact question with:
 
 ```text
 Please share any special requests for the appointment.
 ```
 
-14. Save the field.
+17. Save the field.
 
 **Pass when**
 
@@ -156,6 +160,8 @@ Please share any special requests for the appointment.
 3. Add, move, duplicate, delete, and edit all work.
 4. The edit dialog shows the saved values in friendly controls.
 5. No raw field contract or JSON is required.
+6. Conditional controls appear only for `Required only when...`, and `Value`
+   appears only for `equals` or `does not equal`.
 
 ## Step 4 of 10 - Add Typed Trusted Context
 
