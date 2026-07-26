@@ -85,12 +85,11 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 4 of 18 manual UAT. Phases 1-3 completed
-their implementation and manual UAT gates by 2026-07-26. Phase 4
-implementation and automated verification are complete.
+Current phase: Priority 1, Phase 5 of 18 implementation. Phases 1-4 completed
+their implementation and manual UAT gates by 2026-07-26.
 
-Current target: complete the Phase 4 Deterministic Validation And Business
-Tools manual UAT gate before starting Phase 5.
+Current target: implement Phase 5 Confirmation, Operations, And Outcomes, then
+run its focused manual UAT gate.
 
 ## Product Direction
 
@@ -421,9 +420,9 @@ resources, or approved tools.
 Phase 4 exit gate: the task can collect natural language while every canonical
 value and current business fact remains deterministic and tenant-safe.
 
-Phase 4 status: Implementation complete. Type checking, contract tests,
-database-backed runtime tests, tenant-isolation scenarios, and lint passed on
-2026-07-26. Manual UAT is pending.
+Phase 4 status: Complete. Type checking, contract tests, database-backed
+runtime tests, tenant-isolation scenarios, lint, and all eight manual UAT steps
+passed on 2026-07-26.
 
 ## Phase 5: Confirmation, Operations, And Outcomes
 

@@ -29,14 +29,13 @@ Overall beta status: Not ready for production-like beta traffic.
 
 Authoritative product implementation status:
 
-- Flow roadmap target: Priority 1, Phase 4 manual UAT.
+- Flow roadmap target: Priority 1, Phase 5 implementation.
 - Priority 1, Phase 1 implementation and manual UAT are complete.
 - Priority 1, Phase 2 implementation and manual UAT are complete.
 - Priority 1, Phase 3 implementation and manual UAT are complete.
-- Priority 1, Phase 4 implementation and automated verification are complete;
-  manual UAT is pending.
+- Priority 1, Phase 4 implementation and manual UAT are complete.
 - Priority 1, Phases 5-8 remain required for the goal-driven conversational
-  core after Phase 4 UAT.
+  core.
 - Priority 2, Phases 9-14 remain required for declared non-voice beta
   capability parity, live channel certification, and release approval.
 - Priority 3, Phases 15-18 are advanced post-beta work unless an earlier beta
