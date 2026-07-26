@@ -618,3 +618,56 @@ test("keeps an uncertain provider outcome open until manual reconciliation", asy
     }),
   );
 });
+
+test("routes a reconciled operation failure through the published handoff policy", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const run = await startReadyRun(fixture.uncertainTaskId);
+  const pending = await prepareTaskOperationConfirmation({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+    toolId: fixture.uncertainToolId,
+  });
+  await confirmTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  await executeConfirmedTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  const uncertain = await processAndReconcileTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    workerId: `phase-5-failure-${suffix}`,
+  });
+  expect(uncertain.attempt.status).toBe("outcome_unknown");
+
+  const reconciled = await reconcileUnknownTaskOperation({
+    confirmationId: pending.id,
+    errorMessage: "The provider confirmed the request was not created.",
+    principal,
+    projectId: fixture.projectId,
+    status: "failed",
+  });
+  expect(reconciled.attempt.status).toBe("failed");
+
+  const failed = await getConversationalTaskRuntime({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  expect(failed?.run).toMatchObject({
+    outcomeKey: "failed",
+    status: "handoff",
+  });
+  expect(failed?.execution?.responseOwner).toBe("human");
+  expect(failed?.confirmations[0]?.status).toBe("failed");
+  expect(failed?.tools[0]).toMatchObject({
+    result: null,
+    status: "provider_failure",
+  });
+});

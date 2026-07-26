@@ -85,11 +85,12 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 5 of 18 implementation. Phases 1-4 completed
-their implementation and manual UAT gates by 2026-07-26.
+Current phase: Priority 1, Phase 5 of 18 manual UAT. Phases 1-4 completed
+their implementation and manual UAT gates by 2026-07-26. Phase 5
+implementation is complete.
 
-Current target: implement Phase 5 Confirmation, Operations, And Outcomes, then
-run its focused manual UAT gate.
+Current target: pass the focused Phase 5 Confirmation, Operations, And Outcomes
+manual UAT gate before beginning Phase 6.
 
 ## Product Direction
 
@@ -429,32 +430,36 @@ passed on 2026-07-26.
 Goal: complete consequential business tasks without allowing the LLM to perform
 or fabricate side effects.
 
-- [ ] Generate the confirmation summary from canonical validated values.
-- [ ] Require confirmation for every configured consequential write operation.
-- [ ] Let the visitor correct any value from the confirmation step.
-- [ ] Revalidate changed and dependent values before showing confirmation again.
-- [ ] Prevent the model from treating conversational agreement as confirmation when policy requires an explicit answer.
-- [ ] Map confirmed fields into approved operation inputs.
-- [ ] Authorize the operation against the published task and current project.
-- [ ] Re-read volatile price, availability, eligibility, and authorization facts immediately before a consequential write.
-- [ ] Derive a stable operation idempotency key from the task run, published version, and operation definition.
-- [ ] Use existing encrypted secrets, timeout, retry, idempotency, job, and trace infrastructure.
-- [ ] Prevent double submission after retries, duplicate messages, refreshes, or resumed runs.
-- [ ] Treat a lost or ambiguous provider response as `outcome_unknown` instead of assuming success or failure.
-- [ ] Add reconciliation and, where supported, compensating behavior for partial or uncertain external outcomes.
-- [ ] Do not tell the visitor an operation succeeded until the authoritative result is persisted.
-- [ ] Store sanitized operation outputs and map approved values back into task state.
-- [ ] Route successful completion through the `completed` output.
-- [ ] Route unavailable, validation, timeout, provider failure, outcome unknown, cancellation, and handoff independently.
-- [ ] Add a deterministic human-handoff boundary.
-- [ ] Keep the task open when a recoverable operation fails.
-- [ ] Close the task only after a terminal outcome is persisted.
-- [ ] Add operation audit events without exposing credentials or unnecessary PII.
-- [ ] Add end-to-end operation tests for every named outcome.
+- [x] Generate the confirmation summary from canonical validated values.
+- [x] Require confirmation for every configured consequential write operation.
+- [x] Let the visitor correct any value from the confirmation step.
+- [x] Revalidate changed and dependent values before showing confirmation again.
+- [x] Prevent the model from treating conversational agreement as confirmation when policy requires an explicit answer.
+- [x] Map confirmed fields into approved operation inputs.
+- [x] Authorize the operation against the published task and current project.
+- [x] Re-read volatile price, availability, eligibility, and authorization facts immediately before a consequential write.
+- [x] Derive a stable operation idempotency key from the task run, published version, and operation definition.
+- [x] Use existing encrypted secrets, timeout, retry, idempotency, job, and trace infrastructure.
+- [x] Prevent double submission after retries, duplicate messages, refreshes, or resumed runs.
+- [x] Treat a lost or ambiguous provider response as `outcome_unknown` instead of assuming success or failure.
+- [x] Add reconciliation and, where supported, compensating behavior for partial or uncertain external outcomes.
+- [x] Do not tell the visitor an operation succeeded until the authoritative result is persisted.
+- [x] Store sanitized operation outputs and map approved values back into task state.
+- [x] Route successful completion through the `completed` output.
+- [x] Route unavailable, validation, timeout, provider failure, outcome unknown, cancellation, and handoff independently.
+- [x] Add a deterministic human-handoff boundary.
+- [x] Keep the task open when a recoverable operation fails.
+- [x] Close the task only after a terminal outcome is persisted.
+- [x] Add operation audit events without exposing credentials or unnecessary PII.
+- [x] Add end-to-end operation tests for every named outcome.
 
 Phase 5 exit gate: a confirmed reference task executes exactly once, routes
 according to the persisted business result, and reconciles an uncertain
 external outcome without reporting false success.
+
+Phase 5 status: Implementation complete. Type checking, lint, four focused
+operation database tests, and all 17 shared conversational-runtime database
+tests passed on 2026-07-26. Focused manual UAT is pending.
 
 ## Phase 6: Conversational Task Builder Experience
 

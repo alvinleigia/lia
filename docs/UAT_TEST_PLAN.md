@@ -2,9 +2,9 @@
 
 ## Current Test
 
-Phase: 4 of 18
+Phase: 5 of 18
 
-Test: Deterministic Validation And Business Tools
+Test: Confirmation, Operations, And Outcomes
 
 Progress: Not tested - 0 of 8 steps passed
 
@@ -14,18 +14,25 @@ Task: `Book a Spa Service`
 
 URL: `http://localhost:3000`
 
-No database migration is required for this phase.
+Database migration: Complete
 
 ## What You Are Testing
 
-This phase checks that Lia converts visitor answers into safe, consistent
-values and gets current business facts only from approved project tools.
+This phase checks that Lia:
 
-The model must not invent a product, price, duration, or availability result.
-A lookup may show `No result` when that fact is not configured. That is a valid
-and safer result than a guessed answer.
+1. Builds a confirmation summary from validated task values.
+2. Requires an explicit confirmation before a write operation.
+3. Invalidates an old confirmation after a value changes.
+4. Queues the same operation only once.
+5. Reports success only after the operation result is stored.
+6. Routes the task using the persisted operation outcome.
 
-## Step 1 of 8 - Allow the Business Lookups
+The automated database suite already covers uncertain provider responses,
+manual reconciliation, failed outcomes, handoff, tenant isolation, and
+sanitized operation results. You do not need to create a broken provider for
+this manual UAT.
+
+## Step 1 of 8 - Verify And Publish The Write Operation
 
 **Do this**
 
@@ -35,107 +42,51 @@ and safer result than a guessed answer.
 4. Open `Book a Spa Service`.
 5. Select `Configure Conversation`.
 6. Select `Tools`.
-7. If `Manual Review` says `Read data / lookup / v1`, select its trash icon.
-8. In `Allow a Tool`, choose `Manual Review`.
-9. Under `Allowed Stages`, check only `operation`.
+7. Look for `Manual Review`.
+8. If it already says `Take action / operation / v1`, do not add it again.
+9. If it is missing, use `Allow a Tool` with:
+
+```text
+Operation: Manual Review via Manual Review
+Permission: Take action
+Allowed Stage: operation
+```
+
 10. Select `Allow Tool`.
-11. In `Allow a Tool`, choose `Service Details`.
-12. Under `Allowed Stages`, check only `lookup`.
-13. Select `Allow Tool`.
-14. Repeat steps 11-13 for:
-
-```text
-Service Price
-Service Duration
-Service Availability
-```
+11. Select `Review`.
+12. Confirm the page says the task is ready to publish.
+13. Select `Publish New Version`.
+14. Select `Open Runtime Test`.
 
 **Pass when**
 
-1. All four tools appear in the allowed-tools list.
-2. Each tool says `Read data / lookup / v1`.
-3. `Manual Review` says `Take action / operation / v1`.
-4. No error is shown.
+1. `Manual Review` is allowed only as a write operation.
+2. Review shows no publish blocker.
+3. A new immutable version appears in `Version History`.
+4. Runtime Test opens without an error.
 
 Status: Not tested
 
-## Step 2 of 8 - Publish the Tool Contract
+## Step 2 of 8 - Start A Clean Runtime
 
 **Do this**
 
-1. Select `Review`.
-2. Read the publish checks.
-3. Select `Publish`.
-4. Select `Open Runtime Test`.
+1. Select `Reset Test Data`.
+2. Select `Start Test Run`.
+3. Confirm `Run Status` is `Active`.
+4. Confirm `Active Task` is `Book a Spa Service`.
 
 **Pass when**
 
-1. Review shows no tool-contract blocker.
-2. Publishing creates a new immutable version.
-3. The published version appears in `Version History`.
-4. The `Runtime Lifecycle Test` page opens without an error.
+1. The run is pinned to the version published in Step 1.
+2. All seven fields show `Not collected`.
+3. No old confirmation or operation attempt is visible.
 
 Status: Not tested
 
-## Step 3 of 8 - Start a Clean Test Run
+## Step 3 of 8 - Save Valid Task Values
 
-**Do this**
-
-1. On Runtime Test, select `Reset Test Data`.
-2. Start a new test run if the page asks you to do so.
-3. Confirm that `Run Status` is `Active`.
-4. Scroll below `Field Lifecycle`.
-
-**Pass when**
-
-1. The active task is `Book a Spa Service`.
-2. The run is pinned to the version published in Step 2.
-3. All task fields start as `Not collected`.
-4. No previous lookup result remains.
-5. A `Business Lookup Test` section is visible.
-
-Status: Not tested
-
-## Step 4 of 8 - Test Canonical Field Values
-
-The first two values must exist in this project's Product Catalog. A bundled
-flow example is not a live project resource.
-
-**Prepare the project resources once**
-
-1. Keep the Runtime Test open.
-2. In a new browser tab, open:
-
-```text
-http://localhost:3000/projects/catalog
-```
-
-3. If a catalog named `Facial` does not exist, create it with:
-
-```text
-Name: Facial
-Description: Facial spa services used for Phase 4 UAT.
-```
-
-4. If `Classic Facial` does not exist in that catalog, add it with:
-
-```text
-Catalog: Facial
-Product Name: Classic Facial
-Price: 95.00
-Currency: INR
-Description: Classic facial treatment used for Phase 4 UAT.
-```
-
-5. Return to the Runtime Test tab. You do not need to publish the task again.
-
-Do not create duplicates when the catalog or product already exists.
-
-**Save the field values**
-
-Use `Save or Correct a Value` to save these values one at a time.
-
-**Copy and paste**
+Use `Save or Correct a Value` to save each value separately.
 
 For `Service Category`:
 
@@ -152,140 +103,168 @@ Classic Facial
 For `Preferred Date`:
 
 ```text
-15/08/2026
+2026-08-15
 ```
 
 For `Preferred Time`:
 
 ```text
-3:30 PM
+15:30
 ```
 
 For `Guest Name`:
 
 ```text
-  UAT Guest
+Phase 5 Guest
 ```
 
 For `Guest Email`:
 
 ```text
-  UAT.Guest@Example.COM
+phase5.guest@example.com
 ```
 
 For `Guest Phone`:
 
 ```text
-0091 98765-43210
++919876543210
 ```
 
 **Pass when**
 
-1. `Service Category` and `Service` are accepted as project resources.
-2. The date becomes `2026-08-15`.
-3. The time becomes `15:30`.
-4. The name becomes `UAT Guest`.
-5. The email becomes `uat.guest@example.com`.
-6. The phone becomes `+919876543210`.
-7. Required fields show `Valid`, not merely `Candidate`.
+1. Every required field says `Valid`.
+2. `Facial` and `Classic Facial` resolve to project resources.
+3. No field remains `Candidate`, `Invalid`, or `Not collected`.
 
 Status: Not tested
 
-## Step 5 of 8 - Run the Service Details Lookup
+## Step 4 of 8 - Prepare The Confirmation Summary
 
 **Do this**
 
-1. Find `Business Lookup Test`.
-2. Choose `Service Details`.
-3. Select `Run Lookup`.
+1. Scroll to `Confirmation and Operation Test`.
+2. Under `Write Operation`, choose `Manual Review`.
+3. Select `Prepare Summary`.
 
 **Pass when**
 
-1. The lookup status becomes `success`.
-2. The result belongs to `Classic Facial`.
-3. Only approved result fields are displayed.
-4. No secret, credential, provider payload, or unrelated project data appears.
+1. `Confirmation Summary` appears.
+2. Its status is `Awaiting confirmation`.
+3. Every displayed value matches the validated values from Step 3.
+4. `Confirm Explicitly` is visible.
+5. `Queue Operation` is not yet visible.
+6. No operation attempt has been created.
 
 Status: Not tested
 
-## Step 6 of 8 - Run Price and Duration Lookups
+## Step 5 of 8 - Correct A Value Before Confirming
 
 **Do this**
 
-1. Choose `Service Price`, then select `Run Lookup`.
-2. Choose `Service Duration`, then select `Run Lookup`.
-
-**Pass when**
-
-1. Each lookup ends as `success` or `no result`.
-2. The configured INR `95.00` price displays as `95.00` with currency `INR`,
-   not as the stored minor-unit value `9500`.
-3. A successful duration result shows only the configured duration.
-4. A `no result` response is plain and does not invent a value.
-5. Both attempts appear in the lookup history.
-
-Status: Not tested
-
-## Step 7 of 8 - Run the Availability Lookup
-
-**Do this**
-
-1. Choose `Service Availability`.
-2. Select `Run Lookup`.
-
-**Pass when**
-
-1. The result is `success` or `no result`.
-2. A successful result uses the selected `Classic Facial` service.
-3. The result does not claim live availability unless the project has an
-   approved availability value.
-4. The result does not expose internal provider data.
-
-Status: Not tested
-
-## Step 8 of 8 - Test Missing-Input Protection
-
-**Do this**
-
-1. In `Field Lifecycle`, clear the `Service` field.
-2. In `Business Lookup Test`, choose `Service Price`.
-3. Select `Run Lookup`.
-
-**Pass when**
-
-1. The lookup does not run.
-2. The error appears inside the lookup form.
-3. The message asks you to collect the required task fields.
-4. Existing values for the other fields remain unchanged.
-5. No failed lookup exposes a provider message, secret, or raw payload.
-
-After this check, save `Classic Facial` as the `Service` again.
-
-Status: Not tested
-
-## If a Step Fails
-
-Send:
+1. Return to `Save or Correct a Value`.
+2. Choose `Guest Email`.
+3. Save:
 
 ```text
-Phase 4
-Step number:
-What I clicked:
-What I entered:
+phase5.corrected@example.com
+```
+
+4. Return to `Confirmation and Operation Test`.
+5. Confirm the old summary says `Needs review`.
+6. Select `Prepare Summary` again.
+
+**Pass when**
+
+1. The old confirmation cannot be queued.
+2. The refreshed summary says `Awaiting confirmation`.
+3. It shows `phase5.corrected@example.com`.
+4. No operation attempt has been created.
+
+Status: Not tested
+
+## Step 6 of 8 - Confirm Explicitly
+
+**Do this**
+
+1. Read the refreshed summary.
+2. Select `Confirm Explicitly`.
+
+**Pass when**
+
+1. The confirmation status becomes `Confirmed`.
+2. `Queue Operation` becomes visible.
+3. The operation was not queued before this explicit action.
+
+Status: Not tested
+
+## Step 7 of 8 - Verify Exactly-Once Queueing
+
+**Do this**
+
+1. Select `Queue Operation`.
+2. Note the displayed `Attempt` number.
+3. Select `Verify Duplicate Protection`.
+4. Select `Verify Duplicate Protection` once more.
+
+**Pass when**
+
+1. The confirmation status is `Queued`.
+2. The same attempt number remains visible after both duplicate checks.
+3. No second attempt is created.
+4. No success message is shown yet.
+
+Do not select `Process and Reconcile` until Step 8.
+
+Status: Not tested
+
+## Step 8 of 8 - Process And Verify The Persisted Outcome
+
+**Do this**
+
+1. Select `Process and Reconcile`.
+2. Review the confirmation, attempt, run status, and audit trail.
+
+**Pass when**
+
+1. Confirmation status becomes `Completed`.
+2. Delivery Status becomes `Completed`.
+3. `Finished` shows a date and time.
+4. Run Status becomes `Completed`.
+5. Response Owner becomes `Knowledge Q&A`.
+6. The audit trail includes:
+
+```text
+confirmation.prepared
+confirmation.confirmed
+operation.queued
+operation.completed
+```
+
+7. No credential, provider secret, raw provider payload, or unrelated project
+   data is displayed.
+
+Status: Not tested
+
+## If A Step Fails
+
+Stop at that step and report:
+
+```text
+Phase 5 UAT
+Failed step:
+Expected:
 What happened:
 Screenshot:
 ```
 
-Stop at the failed step. Do not continue to Phase 5.
+Do not continue to Phase 6 until the failed step is corrected.
 
-## Phase 4 Sign-Off
+## Phase 5 Sign-Off
 
-Phase 4 passes when all eight steps pass and no Critical or High issue remains.
+Phase 5 passes when all eight steps pass and no Critical or High issue remains.
 
-Approved: No
+When finished, report:
 
-Approved by:
-
-Date:
-
-Notes:
+```text
+Phase 5 UAT complete
+```
