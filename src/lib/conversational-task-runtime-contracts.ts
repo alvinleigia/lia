@@ -48,6 +48,7 @@ const toolResultStatus = z.preprocess((value) => {
   if (value === "completed") return "success";
   if (value === "failed") return "provider_failure";
   if (value === "timed_out") return "timeout";
+  if (value === "outcome_unknown") return "outcome_unknown";
   return value;
 }, z.enum(TOOL_RESULT_STATUSES));
 

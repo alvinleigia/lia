@@ -38,6 +38,7 @@ export const OPERATION_ATTEMPT_STATUSES = [
   "pending",
   "completed",
   "failed",
+  "outcome_unknown",
 ] as const;
 
 export type IntegrationProviderType =

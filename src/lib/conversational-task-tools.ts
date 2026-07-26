@@ -27,6 +27,7 @@ export type BuiltInToolExecutionResult = {
     | "rejected"
     | "timeout"
     | "provider_failure"
+    | "outcome_unknown"
     | "cancelled";
 };
 
@@ -369,7 +370,7 @@ function operationDefinition(input: {
     name: row.operation.name,
     outputSchema: { fields: outputFields },
     projectId: input.projectId,
-    requiredForCompletion: false,
+    requiredForCompletion: true,
     resultMappings,
     schemaVersion: 1,
     version: 1,

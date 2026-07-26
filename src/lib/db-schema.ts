@@ -1038,6 +1038,56 @@ export const conversationInboundEvents = pgTable(
   ],
 );
 
+export const conversationalTaskConfirmations = pgTable(
+  "conversational_task_confirmations",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    taskRunId: integer("task_run_id")
+      .notNull()
+      .references(() => conversationalTaskRuns.id),
+    taskVersionId: integer("task_version_id")
+      .notNull()
+      .references(() => conversationalTaskVersions.id),
+    toolId: text("tool_id").notNull(),
+    status: text("status").notNull().default("pending"),
+    summary: jsonb("summary")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    canonicalInput: jsonb("canonical_input")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    canonicalHash: text("canonical_hash").notNull(),
+    confirmationToken: text("confirmation_token").notNull(),
+    confirmedBy: jsonb("confirmed_by").$type<Record<string, unknown>>(),
+    expiresAt: timestamp("expires_at").notNull(),
+    confirmedAt: timestamp("confirmed_at"),
+    invalidatedAt: timestamp("invalidated_at"),
+    consumedAt: timestamp("consumed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversational_task_confirmations_project_idx").on(table.projectId),
+    index("conversational_task_confirmations_run_idx").on(table.taskRunId),
+    index("conversational_task_confirmations_status_idx").on(table.status),
+    index("conversational_task_confirmations_expires_idx").on(table.expiresAt),
+    uniqueIndex("conversational_task_confirmations_token_unique").on(
+      table.projectId,
+      table.confirmationToken,
+    ),
+    uniqueIndex("conversational_task_confirmations_active_unique")
+      .on(table.projectId, table.taskRunId, table.toolId)
+      .where(
+        sql`${table.status} in ('pending', 'confirmed', 'executing', 'outcome_unknown')`,
+      ),
+  ],
+);
+
 export const conversationalTaskToolRequests = pgTable(
   "conversational_task_tool_requests",
   {
@@ -1051,6 +1101,9 @@ export const conversationalTaskToolRequests = pgTable(
     taskVersionId: integer("task_version_id")
       .notNull()
       .references(() => conversationalTaskVersions.id),
+    confirmationId: integer("confirmation_id").references(
+      () => conversationalTaskConfirmations.id,
+    ),
     requestId: text("request_id").notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
     toolId: text("tool_id").notNull(),
@@ -1063,6 +1116,7 @@ export const conversationalTaskToolRequests = pgTable(
       .default({}),
     result: jsonb("result").$type<Record<string, unknown>>(),
     errorCode: text("error_code"),
+    outcomeKey: text("outcome_key"),
     requestedAt: timestamp("requested_at").defaultNow().notNull(),
     timeoutAt: timestamp("timeout_at"),
     completedAt: timestamp("completed_at"),
@@ -1072,6 +1126,9 @@ export const conversationalTaskToolRequests = pgTable(
   (table) => [
     index("conversational_task_tools_project_idx").on(table.projectId),
     index("conversational_task_tools_run_idx").on(table.taskRunId),
+    index("conversational_task_tools_confirmation_idx").on(
+      table.confirmationId,
+    ),
     index("conversational_task_tools_status_idx").on(table.status),
     index("conversational_task_tools_timeout_idx").on(table.timeoutAt),
     uniqueIndex("conversational_task_tools_request_unique").on(
@@ -1229,6 +1286,22 @@ export const operationAttempts = pgTable(
     submissionId: integer("submission_id").references(
       () => actionSubmissions.id,
     ),
+    taskRunId: integer("task_run_id").references(
+      () => conversationalTaskRuns.id,
+      { onDelete: "set null" },
+    ),
+    taskVersionId: integer("task_version_id").references(
+      () => conversationalTaskVersions.id,
+      { onDelete: "set null" },
+    ),
+    taskToolRequestId: integer("task_tool_request_id").references(
+      () => conversationalTaskToolRequests.id,
+      { onDelete: "set null" },
+    ),
+    taskConfirmationId: integer("task_confirmation_id").references(
+      () => conversationalTaskConfirmations.id,
+      { onDelete: "set null" },
+    ),
     idempotencyKey: text("idempotency_key"),
     traceId: text("trace_id"),
     status: text("status").notNull().default("pending"),
@@ -1251,6 +1324,13 @@ export const operationAttempts = pgTable(
     index("operation_attempts_provider_idx").on(table.providerId),
     index("operation_attempts_action_idx").on(table.actionId),
     index("operation_attempts_submission_idx").on(table.submissionId),
+    index("operation_attempts_task_run_idx").on(table.taskRunId),
+    index("operation_attempts_task_tool_request_idx").on(
+      table.taskToolRequestId,
+    ),
+    index("operation_attempts_task_confirmation_idx").on(
+      table.taskConfirmationId,
+    ),
     index("operation_attempts_status_idx").on(table.status),
     index("operation_attempts_trace_idx").on(table.traceId),
     index("operation_attempts_created_at_idx").on(table.createdAt),
@@ -1527,6 +1607,10 @@ export type InsertOperation = typeof operations.$inferInsert;
 export type SelectOperation = typeof operations.$inferSelect;
 export type InsertOperationAttempt = typeof operationAttempts.$inferInsert;
 export type SelectOperationAttempt = typeof operationAttempts.$inferSelect;
+export type InsertConversationalTaskConfirmation =
+  typeof conversationalTaskConfirmations.$inferInsert;
+export type SelectConversationalTaskConfirmation =
+  typeof conversationalTaskConfirmations.$inferSelect;
 export type InsertDurableJob = typeof durableJobs.$inferInsert;
 export type SelectDurableJob = typeof durableJobs.$inferSelect;
 export type InsertOutboxMessage = typeof outboxMessages.$inferInsert;

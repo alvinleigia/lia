@@ -60,6 +60,7 @@ export const TOOL_RESULT_STATUSES = [
   "rejected",
   "timeout",
   "provider_failure",
+  "outcome_unknown",
   "cancelled",
 ] as const;
 
