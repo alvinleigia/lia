@@ -159,10 +159,14 @@ function validateDate(
 
   const localized = normalized.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
   if (localized) {
-    const monthFirst = context.locale.toLowerCase().startsWith("en-us");
     const first = Number(localized[1]);
     const second = Number(localized[2]);
     const year = Number(localized[3]);
+    const monthFirst =
+      second > 12 ||
+      (first <= 12 &&
+        second <= 12 &&
+        context.locale.toLowerCase().startsWith("en-us"));
     const month = monthFirst ? first : second;
     const day = monthFirst ? second : first;
     return validCalendarDate(year, month, day)

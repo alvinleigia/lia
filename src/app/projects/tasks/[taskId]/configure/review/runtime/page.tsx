@@ -452,6 +452,12 @@ export default async function TaskRuntimeTestPage({
                             {field.state} / {field.attemptCount} attempt
                             {field.attemptCount === 1 ? "" : "s"}
                           </p>
+                          {field.state === "invalid" &&
+                            typeof field.validation.message === "string" && (
+                              <p className="mt-1 text-xs text-destructive">
+                                {field.validation.message}
+                              </p>
+                            )}
                         </div>
                         {isActive && !isPaused && !isAnsweringSideQuestion && (
                           <div className="flex gap-2">

@@ -98,6 +98,41 @@ Status: Not tested
 
 ## Step 4 of 8 - Test Canonical Field Values
 
+The first two values must exist in this project's Product Catalog. A bundled
+flow example is not a live project resource.
+
+**Prepare the project resources once**
+
+1. Keep the Runtime Test open.
+2. In a new browser tab, open:
+
+```text
+http://localhost:3000/projects/catalog
+```
+
+3. If a catalog named `Facial` does not exist, create it with:
+
+```text
+Name: Facial
+Description: Facial spa services used for Phase 4 UAT.
+```
+
+4. If `Classic Facial` does not exist in that catalog, add it with:
+
+```text
+Catalog: Facial
+Product Name: Classic Facial
+Price: 95.00
+Currency: INR
+Description: Classic facial treatment used for Phase 4 UAT.
+```
+
+5. Return to the Runtime Test tab. You do not need to publish the task again.
+
+Do not create duplicates when the catalog or product already exists.
+
+**Save the field values**
+
 Use `Save or Correct a Value` to save these values one at a time.
 
 **Copy and paste**

@@ -132,6 +132,58 @@ async function resolveMedia(
   );
 }
 
+async function resolveUnspecifiedResource(input: {
+  field: TaskFieldDefinition;
+  fieldValues: ReadonlyMap<string, unknown>;
+  projectId: number;
+  value: unknown;
+}): Promise<ProjectResourceResolution> {
+  const dependentCatalogId = input.field.dependsOn
+    .map((key) => input.fieldValues.get(key))
+    .find(
+      (value): value is string =>
+        typeof value === "string" && parseScopedId(value, "catalog") !== null,
+    );
+  if (dependentCatalogId) {
+    const catalogId = parseScopedId(dependentCatalogId, "catalog");
+    if (!catalogId) return { status: "not_found" };
+    const products = await listProjectCatalogProductsForCatalog(
+      input.projectId,
+      catalogId,
+    );
+    return resolveOption(
+      products.map((product) => ({
+        id: `product:${product.id}`,
+        label: product.name,
+      })),
+      input.value,
+    );
+  }
+
+  const [catalogs, productRows, assets] = await Promise.all([
+    listProjectCatalogs(input.projectId),
+    listProjectCatalogProducts(input.projectId),
+    listProjectMediaAssets(input.projectId),
+  ]);
+  return resolveOption(
+    [
+      ...catalogs.map((catalog) => ({
+        id: `catalog:${catalog.id}`,
+        label: catalog.name,
+      })),
+      ...productRows.map(({ product }) => ({
+        id: `product:${product.id}`,
+        label: product.name,
+      })),
+      ...assets.map((asset) => ({
+        id: `media:${asset.id}`,
+        label: asset.originalName,
+      })),
+    ],
+    input.value,
+  );
+}
+
 export const resolveProjectTaskResource: ProjectResourceResolver = async (
   input,
 ) => {
@@ -152,6 +204,9 @@ export const resolveProjectTaskResource: ProjectResourceResolver = async (
   }
   if (["media", "mediaasset", "asset"].includes(resourceType)) {
     return resolveMedia(input.projectId, input.value);
+  }
+  if (!resourceType) {
+    return resolveUnspecifiedResource(input);
   }
   return { status: "not_found" };
 };

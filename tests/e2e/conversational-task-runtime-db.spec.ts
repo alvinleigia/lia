@@ -8,6 +8,7 @@ import {
   conversationalTaskSnapshotV1Schema,
   type ToolDefinitionV1,
 } from "../../src/lib/conversation-contracts";
+import { resolveProjectTaskResource } from "../../src/lib/conversational-task-project-resources";
 import {
   applyConversationalTaskEvent,
   cleanupExpiredConversationRuntime,
@@ -368,6 +369,42 @@ test.afterAll(async () => {
   await db.delete(workspaces).where(eq(workspaces.id, fixture.workspaceId));
   await db.delete(companies).where(eq(companies.id, fixture.companyId));
   await db.delete(users).where(eq(users.id, fixture.userId));
+});
+
+test("resolves legacy generic resource fields inside the selected project", async () => {
+  const categoryField = {
+    ...REFERENCE_BOOKING_TASK_DEFINITION.fields[0],
+    optionSource: null,
+  };
+  const serviceField = {
+    ...REFERENCE_BOOKING_TASK_DEFINITION.fields[1],
+    optionSource: null,
+  };
+  const category = await resolveProjectTaskResource({
+    field: categoryField,
+    fieldValues: new Map(),
+    projectId: fixture?.projectId as number,
+    value: "Massage",
+  });
+  const service = await resolveProjectTaskResource({
+    field: serviceField,
+    fieldValues: new Map([
+      ["serviceCategoryId", `catalog:${fixture?.catalogId}`],
+    ]),
+    projectId: fixture?.projectId as number,
+    value: "Deep Tissue",
+  });
+
+  expect(category).toEqual({
+    id: `catalog:${fixture?.catalogId}`,
+    label: "Massage",
+    status: "resolved",
+  });
+  expect(service).toEqual({
+    id: `product:${fixture?.serviceProductId}`,
+    label: "Deep Tissue",
+    status: "resolved",
+  });
 });
 
 test("starts a version-pinned run and replays the same event once", async () => {

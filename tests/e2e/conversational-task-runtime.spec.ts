@@ -291,6 +291,12 @@ test("typed validators normalize common business values deterministically", () =
   ).toEqual({ ok: true, value: "2026-08-15" });
   expect(
     validateTaskFieldValue({
+      field: fieldFor("date"),
+      value: "15/08/2026",
+    }),
+  ).toEqual({ ok: true, value: "2026-08-15" });
+  expect(
+    validateTaskFieldValue({
       contextValues,
       field: fieldFor("time"),
       value: "3:30 PM",
