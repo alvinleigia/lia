@@ -59,7 +59,11 @@ export function validateStructuredTurnProposal(
     }
   }
   for (const candidate of proposal.fieldCandidates) {
-    if (!allowed.allowedFieldKeys.has(candidate.fieldKey)) {
+    const allowedFields =
+      allowed.activeTaskId === null && proposal.taskRecommendation
+        ? allowed.allowedTaskFieldKeys.get(proposal.taskRecommendation.taskId)
+        : allowed.allowedFieldKeys;
+    if (!allowedFields?.has(candidate.fieldKey)) {
       issues.push("unknown_field");
     }
   }
@@ -92,7 +96,8 @@ export function validateStructuredTurnProposal(
 
   if (
     allowed.activeTaskId === null &&
-    (proposal.fieldCandidates.length > 0 ||
+    ((proposal.fieldCandidates.length > 0 &&
+      proposal.taskRecommendation === null) ||
       proposal.toolRequest ||
       proposal.routeRecommendation ||
       proposal.outcomeRecommendation)

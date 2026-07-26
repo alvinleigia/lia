@@ -909,6 +909,9 @@ export async function startConversationalTaskRun(
     const [updatedExecution] = await tx
       .update(conversationExecutionStates)
       .set({
+        activeActionVersionId:
+          parsed.returnTarget?.actionVersionId ??
+          execution.activeActionVersionId,
         activeNodeId: parsed.activeNodeId,
         activeTaskRunId: run.id,
         activeTaskVersionId: version.id,
@@ -1730,6 +1733,10 @@ export async function applyConversationalTaskEvent(
       }
 
       runChanges.suspendedReturnTarget = null;
+      executionChanges.activeActionVersionId = route.nodeId
+        ? (graphReturnTarget?.actionVersionId ??
+          execution.activeActionVersionId)
+        : null;
       executionChanges.activeNodeId = route.nodeId;
       executionChanges.activeTaskRunId = null;
       executionChanges.activeTaskVersionId = null;
@@ -1821,6 +1828,7 @@ export async function applyConversationalTaskEvent(
           break;
         }
         executionChanges.activeNodeId = null;
+        executionChanges.activeActionVersionId = null;
         executionChanges.activeTaskRunId = null;
         executionChanges.activeTaskVersionId = null;
         executionChanges.executionMode = "knowledge";
@@ -1855,6 +1863,7 @@ export async function applyConversationalTaskEvent(
           break;
         }
         executionChanges.activeNodeId = null;
+        executionChanges.activeActionVersionId = null;
         executionChanges.activeTaskRunId = null;
         executionChanges.activeTaskVersionId = null;
         executionChanges.executionMode = "knowledge";
@@ -1878,6 +1887,7 @@ export async function applyConversationalTaskEvent(
           break;
         }
         executionChanges.activeNodeId = null;
+        executionChanges.activeActionVersionId = null;
         executionChanges.executionMode =
           returnMode === "handoff" ? "human" : "knowledge";
         executionChanges.responseOwner =
@@ -1912,6 +1922,7 @@ export async function applyConversationalTaskEvent(
         };
         executionChanges.executionMode = "human";
         executionChanges.responseOwner = "human";
+        executionChanges.activeActionVersionId = null;
         executionChanges.suspendedReturnTarget = {
           outcomeKey: event.outcomeKey,
           reason: event.reason,

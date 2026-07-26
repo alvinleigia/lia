@@ -86,6 +86,7 @@ export async function executeProjectStructuredTurn(
     projectPolicy,
     publishedTasks: publishedTaskVersions.map(
       ({ taskId, name, objective }) => ({
+        candidateFieldKeys: [],
         id: taskId,
         name,
         objective,

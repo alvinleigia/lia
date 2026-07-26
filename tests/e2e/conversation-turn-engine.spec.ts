@@ -106,6 +106,7 @@ function engineInput() {
     projectName: "Ewissen Infra",
     publishedTasks: [
       {
+        candidateFieldKeys: ["serviceCategoryId"],
         id: 95,
         name: "Book a Spa Service",
         objective: "Submit a validated appointment request.",
