@@ -71,3 +71,19 @@ test("channel exclusions stay explicit instead of silently falling back", () => 
     )?.expectation,
   ).toBe("runtime");
 });
+
+test("hybrid knowledge and task nodes are certified for every channel", () => {
+  const matrix = buildChannelCertificationMatrix();
+
+  for (const stepType of [
+    "knowledge_conversation",
+    "conversational_task",
+  ] as const) {
+    const cells = matrix.filter((cell) => cell.stepType === stepType);
+
+    expect(cells).toHaveLength(CERTIFICATION_CHANNELS.length);
+    expect(cells.every((cell) => cell.expectation !== "unavailable")).toBe(
+      true,
+    );
+  }
+});

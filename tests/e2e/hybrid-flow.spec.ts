@@ -254,3 +254,132 @@ test("task outcomes and pauses preserve the immutable graph return target", () =
   });
   expect(parseHybridGraphTaskReturnTarget(suspension)).toEqual(returnTarget);
 });
+
+test("knowledge answers can remain owned by the active knowledge node", () => {
+  const knowledgeStep = createStep(10, 1, {
+    settings: {
+      knowledgeConversation: {
+        answeredRoute: null,
+        handoffRoute: "end",
+        noAnswerRoute: "end",
+        recommendationTargetStepIds: [],
+        remainActiveAfterAnswer: true,
+        schemaVersion: 1,
+        stageMode: "goal_driven",
+      },
+      knowledgeGoal: "Answer ordinary project questions.",
+      nodeLabel: "Project questions",
+    },
+    stepType: "knowledge_conversation",
+  });
+  const result = compileHybridFlowGraph({
+    branchRules,
+    steps: [knowledgeStep],
+  });
+
+  expect(result.issues).toEqual([]);
+  expect(result.graph.nodes[0]).toEqual(
+    expect.objectContaining({
+      id: "step:10",
+      kind: "knowledge",
+      responseOwner: "knowledge",
+    }),
+  );
+  expect(
+    result.graph.transitions.some(
+      (transition) =>
+        transition.sourceNodeId === "step:10" &&
+        transition.triggerKey === "answered",
+    ),
+  ).toBe(false);
+});
+
+test("published task nodes retain exact versions and every named return route", () => {
+  const graph = compileHybridFlowGraph({
+    branchRules,
+    steps,
+  }).graph;
+  const taskNode = graph.nodes.find(
+    (node) => node.kind === "conversational_task",
+  );
+  const returnTarget = buildHybridGraphTaskReturnTarget({
+    actionVersionId: 500,
+    graph,
+    taskNodeId: getHybridNodeId(2),
+  });
+
+  expect(taskNode).toEqual(
+    expect.objectContaining({
+      settings: expect.objectContaining({
+        task: expect.objectContaining({
+          taskId: 40,
+          taskVersionId: 80,
+          versionNumber: 2,
+        }),
+      }),
+    }),
+  );
+  expect(returnTarget?.outcomeRoutes).toEqual({
+    cancelled: {
+      nodeId: null,
+      responseOwner: "knowledge",
+    },
+    completed: {
+      nodeId: "step:3",
+      responseOwner: "deterministic",
+    },
+  });
+});
+
+test("compiler rejects hybrid nodes that no published entry can reach", () => {
+  const isolatedTask = {
+    ...steps[1],
+    settings: {
+      ...steps[1].settings,
+      conversationalTask: {
+        ...(steps[1].settings.conversationalTask as Record<string, unknown>),
+        outcomeRoutes: {
+          cancelled: "end",
+          completed: "end",
+        },
+      },
+    },
+  };
+  const result = compileHybridFlowGraph({
+    actionSettings: {
+      hybridEntryPolicy: {
+        campaignRoutes: {},
+        channelRoutes: {},
+        deepLinkRoutes: {},
+        normalStepId: 1,
+        schemaVersion: 1,
+      },
+    },
+    branchRules,
+    steps: [
+      {
+        ...steps[0],
+        settings: {
+          ...steps[0].settings,
+          knowledgeConversation: {
+            answeredRoute: null,
+            handoffRoute: "end",
+            noAnswerRoute: "end",
+            recommendationTargetStepIds: [],
+            remainActiveAfterAnswer: true,
+            schemaVersion: 1,
+            stageMode: "goal_driven",
+          },
+        },
+      },
+      isolatedTask,
+    ],
+  });
+
+  expect(result.issues).toContainEqual(
+    expect.objectContaining({
+      code: "hybrid_step_unreachable",
+      stepId: 2,
+    }),
+  );
+});
