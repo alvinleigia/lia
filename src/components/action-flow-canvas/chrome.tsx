@@ -2,6 +2,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   FileDown,
+  FlaskConical,
+  LogIn,
   ListTodo,
   Loader2,
   Save,
@@ -170,6 +172,7 @@ export function CanvasToolbar({
   hasUnsavedLayout,
   isPending,
   onSaveLayout,
+  onOpenEntryRules,
   routeIssueCount,
   routeWarningCount,
   stepCount,
@@ -180,6 +183,7 @@ export function CanvasToolbar({
   hasUnsavedLayout: boolean;
   isPending: boolean;
   onSaveLayout: () => void;
+  onOpenEntryRules: () => void;
   routeIssueCount: number;
   routeWarningCount: number;
   stepCount: number;
@@ -240,6 +244,16 @@ export function CanvasToolbar({
               <Save className="h-4 w-4" />
             )}
             Save Layout
+          </Button>
+          <Button type="button" variant="outline" onClick={onOpenEntryRules}>
+            <LogIn className="h-4 w-4" />
+            Entry Rules
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={`/projects/actions/${actionId}/hybrid-test`}>
+              <FlaskConical className="h-4 w-4" />
+              Test Flow
+            </Link>
           </Button>
           <Button asChild variant="outline">
             <Link href={`/projects/actions/${actionId}`}>

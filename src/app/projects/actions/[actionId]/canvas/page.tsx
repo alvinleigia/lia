@@ -10,6 +10,7 @@ import {
   listActiveProjectActions,
   validateActionFlowRoutes,
 } from "@/lib/action-flows";
+import { listPublishedConversationalTaskOptions } from "@/lib/conversational-tasks";
 import { listProjectMediaAssets } from "@/lib/media-assets";
 import { listProjectOperations } from "@/lib/operations";
 import {
@@ -54,6 +55,7 @@ export default async function ActionCanvasPage({
     productCatalogRows,
     productRows,
     actionRows,
+    taskOptions,
   ] = await Promise.all([
     listActionFlowSteps(project.id, action.id),
     listActionFlowBranchRules(project.id, action.id),
@@ -63,6 +65,7 @@ export default async function ActionCanvasPage({
     listProjectCatalogs(project.id),
     listProjectCatalogProducts(project.id),
     listActiveProjectActions(project.id),
+    listPublishedConversationalTaskOptions(project.id),
   ]);
   const operations = operationRows.map((row) => ({
     id: row.operation.id,
@@ -122,6 +125,7 @@ export default async function ActionCanvasPage({
 
         <ActionFlowCanvas
           actionId={action.id}
+          actionSettings={action.settings}
           branchRules={branchRules}
           catalogProducts={catalogProducts}
           mediaAssets={mediaAssets}
@@ -130,6 +134,7 @@ export default async function ActionCanvasPage({
           projectActions={projectActions}
           routeIssues={routeIssues}
           steps={steps}
+          taskOptions={taskOptions}
         />
       </div>
     </div>

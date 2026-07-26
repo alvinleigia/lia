@@ -17,6 +17,10 @@ import {
   getFlowComponentColor,
   getFlowComponentLabel,
 } from "@/lib/flow-components";
+import {
+  readConversationalTaskFlowNodeSettings,
+  readKnowledgeFlowNodeSettings,
+} from "@/lib/hybrid-flow-compiler";
 import type { FlowContentBlock } from "@/lib/flow-content-blocks";
 import {
   type FlowContentComponentKey,
@@ -230,7 +234,15 @@ function buildOrderedFallbackEdges(steps: FlowStep[]) {
 
   for (const [index, step] of enabledSteps.entries()) {
     const nextStep = enabledSteps[index + 1];
-    if (!nextStep || step.nextStepId !== null || step.stepType === "submit") {
+    if (
+      !nextStep ||
+      step.nextStepId !== null ||
+      [
+        "conversational_task",
+        "knowledge_conversation",
+        "submit",
+      ].includes(step.stepType)
+    ) {
       continue;
     }
 
@@ -248,6 +260,92 @@ function buildOrderedFallbackEdges(steps: FlowStep[]) {
       type: "smoothstep",
       ...CANVAS_EDGE_LABEL_PROPS,
     });
+  }
+
+  return edges;
+}
+
+function buildHybridEdges(steps: FlowStep[]) {
+  const edges: Edge[] = [];
+  const availableStepIds = new Set(steps.map((step) => step.id));
+
+  function addEdge(input: {
+    id: string;
+    label: string;
+    sourceStepId: number;
+    target: number | "end" | null;
+    color: string;
+  }) {
+    if (
+      typeof input.target !== "number" ||
+      !availableStepIds.has(input.target)
+    ) {
+      return;
+    }
+    edges.push({
+      id: input.id,
+      label: input.label,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      source: String(input.sourceStepId),
+      style: {
+        stroke: input.color,
+        strokeWidth: 1.8,
+      },
+      target: String(input.target),
+      type: "smoothstep",
+      ...CANVAS_EDGE_LABEL_PROPS,
+    });
+  }
+
+  for (const step of steps) {
+    const knowledge = readKnowledgeFlowNodeSettings(step.settings);
+    if (knowledge) {
+      addEdge({
+        color: "#7c3aed",
+        id: `hybrid-answered-${step.id}`,
+        label: "answered",
+        sourceStepId: step.id,
+        target: knowledge.answeredRoute,
+      });
+      addEdge({
+        color: "#dc2626",
+        id: `hybrid-handoff-${step.id}`,
+        label: "handoff",
+        sourceStepId: step.id,
+        target: knowledge.handoffRoute,
+      });
+      addEdge({
+        color: "#d97706",
+        id: `hybrid-no-answer-${step.id}`,
+        label: "no answer",
+        sourceStepId: step.id,
+        target: knowledge.noAnswerRoute,
+      });
+      for (const targetStepId of knowledge.recommendationTargetStepIds) {
+        addEdge({
+          color: "#2563eb",
+          id: `hybrid-recommend-${step.id}-${targetStepId}`,
+          label: "recommend task",
+          sourceStepId: step.id,
+          target: targetStepId,
+        });
+      }
+      continue;
+    }
+
+    const task = readConversationalTaskFlowNodeSettings(step.settings);
+    if (!task) {
+      continue;
+    }
+    for (const [outputPort, target] of Object.entries(task.outcomeRoutes)) {
+      addEdge({
+        color: "#059669",
+        id: `hybrid-outcome-${step.id}-${outputPort}`,
+        label: outputPort,
+        sourceStepId: step.id,
+        target,
+      });
+    }
   }
 
   return edges;
@@ -304,6 +402,7 @@ export function buildEdges(input: {
   return [
     ...defaultEdges,
     ...branchEdges,
+    ...buildHybridEdges(input.steps),
     ...buildOrderedFallbackEdges(input.steps),
   ];
 }

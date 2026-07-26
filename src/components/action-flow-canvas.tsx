@@ -33,7 +33,9 @@ import {
   createCanvasBranchRuleAction,
   createCanvasStepAction,
   deleteCanvasBranchRuleAction,
+  saveCanvasHybridStepAction,
   saveCanvasStepPositionsAction,
+  saveHybridEntryPolicyAction,
   setCanvasDefaultRouteAction,
   updateCanvasBranchRuleAction,
   updateCanvasStepAction,
@@ -45,6 +47,11 @@ import {
   FlowComponentPalette,
   RouteValidationPanel,
 } from "@/components/action-flow-canvas/chrome";
+import { HybridEntryPolicyForm } from "@/components/action-flow-canvas/hybrid-entry-policy-form";
+import {
+  HybridStepForm,
+  isHybridStepType,
+} from "@/components/action-flow-canvas/hybrid-step-form";
 import {
   buildEdges,
   countBlockingDiagnostics,
@@ -64,6 +71,8 @@ import type {
   CanvasMutationResult,
   CanvasStepBasicsInput,
   CanvasStepInput,
+  HybridEntryPolicyInput,
+  HybridStepInput,
   InspectorSelection,
 } from "@/components/action-flow-canvas/types";
 import { Button } from "@/components/ui/button";
@@ -79,6 +88,7 @@ import { getFlowComponentLabel } from "@/lib/flow-components";
 
 export function ActionFlowCanvas({
   actionId,
+  actionSettings,
   branchRules,
   catalogProducts,
   mediaAssets,
@@ -87,11 +97,13 @@ export function ActionFlowCanvas({
   projectActions,
   routeIssues,
   steps,
+  taskOptions,
 }: ActionFlowCanvasProps) {
   const router = useRouter();
   const [feedback, setFeedback] = useState("");
   const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
   const [isCreateStepDialogOpen, setIsCreateStepDialogOpen] = useState(false);
+  const [isEntryRulesDialogOpen, setIsEntryRulesDialogOpen] = useState(false);
   const [paletteStepType, setPaletteStepType] = useState("collect_input");
   const [quickEditingStepId, setQuickEditingStepId] = useState<number | null>(
     null,
@@ -196,6 +208,13 @@ export function ActionFlowCanvas({
     selection?.type === "edge" && selection.id.startsWith("ordered-")
       ? edges.find((edge) => edge.id === selection.id)
       : null;
+  const selectedNamedRoute =
+    selection?.type === "edge" &&
+    !selectedBranchRule &&
+    !selectedDefaultRoute &&
+    !selectedOrderedRoute
+      ? (edges.find((edge) => edge.id === selection.id) ?? null)
+      : null;
   const activeBranchRuleCount = branchRules.filter(
     (rule) => rule.isEnabled,
   ).length;
@@ -261,6 +280,38 @@ export function ActionFlowCanvas({
     [actionId, runMutation],
   );
 
+  const saveHybridStep = useCallback(
+    (input: HybridStepInput, stepId?: number) => {
+      runMutation(
+        () =>
+          saveCanvasHybridStepAction({
+            actionId,
+            ...input,
+            ...(stepId ? { stepId } : {}),
+          }),
+        () => {
+          setIsCreateStepDialogOpen(false);
+          setSelection(null);
+        },
+      );
+    },
+    [actionId, runMutation],
+  );
+
+  const saveEntryPolicy = useCallback(
+    (input: HybridEntryPolicyInput) => {
+      runMutation(
+        () =>
+          saveHybridEntryPolicyAction({
+            actionId,
+            ...input,
+          }),
+        () => setIsEntryRulesDialogOpen(false),
+      );
+    },
+    [actionId, runMutation],
+  );
+
   const saveLayout = useCallback(() => {
     runMutation(
       () =>
@@ -311,9 +362,17 @@ export function ActionFlowCanvas({
         return;
       }
 
+      const sourceStep = getStepById(steps, sourceStepId);
+      if (sourceStep && isHybridStepType(sourceStep.stepType)) {
+        setFeedback(
+          "Open this hybrid step to configure its named destinations.",
+        );
+        return;
+      }
+
       saveDefaultRoute(sourceStepId, targetStepId);
     },
-    [saveDefaultRoute],
+    [saveDefaultRoute, steps],
   );
 
   const createBranchRule = useCallback(
@@ -363,6 +422,7 @@ export function ActionFlowCanvas({
         defaultRouteCount={defaultRouteCount}
         hasUnsavedLayout={hasUnsavedLayout}
         isPending={isPending}
+        onOpenEntryRules={() => setIsEntryRulesDialogOpen(true)}
         onSaveLayout={saveLayout}
         routeIssueCount={blockingRouteIssueCount}
         routeWarningCount={routeWarningCount}
@@ -450,16 +510,49 @@ export function ActionFlowCanvas({
               Configure the selected block and add it to this flow.
             </DialogDescription>
           </DialogHeader>
-          <StepCreateForm
-            branchRules={branchRules}
-            catalogProducts={catalogProducts}
-            defaultStepType={paletteStepType}
+          {isHybridStepType(paletteStepType) ? (
+            <HybridStepForm
+              isPending={isPending}
+              onSubmit={(input) => saveHybridStep(input)}
+              stepType={paletteStepType}
+              steps={steps}
+              taskOptions={taskOptions}
+            />
+          ) : (
+            <StepCreateForm
+              branchRules={branchRules}
+              catalogProducts={catalogProducts}
+              defaultStepType={paletteStepType}
+              isPending={isPending}
+              mediaAssets={mediaAssets}
+              onSubmit={createStep}
+              operations={operations}
+              productCatalogs={productCatalogs}
+              projectActions={projectActions}
+              steps={steps}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isEntryRulesDialogOpen}
+        onOpenChange={setIsEntryRulesDialogOpen}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Route className="h-5 w-5" />
+              Entry Rules
+            </DialogTitle>
+            <DialogDescription>
+              Choose where normal conversations and approved entry points begin.
+            </DialogDescription>
+          </DialogHeader>
+          <HybridEntryPolicyForm
+            actionSettings={actionSettings}
             isPending={isPending}
-            mediaAssets={mediaAssets}
-            onSubmit={createStep}
-            operations={operations}
-            productCatalogs={productCatalogs}
-            projectActions={projectActions}
+            onSubmit={saveEntryPolicy}
             steps={steps}
           />
         </DialogContent>
@@ -525,70 +618,87 @@ export function ActionFlowCanvas({
                 </span>
               </div>
 
-              <StepBasicsForm
-                branchRules={branchRules}
-                catalogProducts={catalogProducts}
-                isPending={isPending}
-                mediaAssets={mediaAssets}
-                onSubmit={(input) => updateStepBasics(selectedStep.id, input)}
-                operations={operations}
-                productCatalogs={productCatalogs}
-                projectActions={projectActions}
-                step={selectedStep}
-                steps={steps}
-              />
-
-              {!isFlowActionStepType(selectedStep.stepType) && (
-                <details className="group rounded-md border bg-white">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
-                    <span className="flex items-center gap-2">
-                      <Wand2 className="h-4 w-4" />
-                      Advanced settings
-                    </span>
-                    <span className="text-xs font-normal text-muted-foreground group-open:hidden">
-                      Validation, integrations, and channel controls
-                    </span>
-                  </summary>
-                  <div className="border-t p-4">
-                    <StepCreateForm
-                      branchRules={branchRules}
-                      catalogProducts={catalogProducts}
-                      isPending={isPending}
-                      mediaAssets={mediaAssets}
-                      onSubmit={(input) => updateStep(selectedStep.id, input)}
-                      operations={operations}
-                      productCatalogs={productCatalogs}
-                      projectActions={projectActions}
-                      step={selectedStep}
-                      steps={steps}
-                      submitLabel="Save Advanced Settings"
-                    />
-                  </div>
-                </details>
-              )}
-
-              <details className="group rounded-md border bg-white">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
-                  <span className="flex items-center gap-2">
-                    <GitBranch className="h-4 w-4" />
-                    Branching
-                  </span>
-                  <span className="text-xs font-normal text-muted-foreground group-open:hidden">
-                    Add a conditional route from this step
-                  </span>
-                </summary>
-                <div className="border-t p-4">
-                  <BranchRuleForm
-                    key={`create-branch-${selectedStep.id}`}
+              {isHybridStepType(selectedStep.stepType) ? (
+                <HybridStepForm
+                  isPending={isPending}
+                  onSubmit={(input) => saveHybridStep(input, selectedStep.id)}
+                  step={selectedStep}
+                  stepType={selectedStep.stepType}
+                  steps={steps}
+                  taskOptions={taskOptions}
+                />
+              ) : (
+                <>
+                  <StepBasicsForm
                     branchRules={branchRules}
+                    catalogProducts={catalogProducts}
                     isPending={isPending}
-                    mode="create"
-                    onSubmit={createBranchRule}
-                    sourceStep={selectedStep}
+                    mediaAssets={mediaAssets}
+                    onSubmit={(input) =>
+                      updateStepBasics(selectedStep.id, input)
+                    }
+                    operations={operations}
+                    productCatalogs={productCatalogs}
+                    projectActions={projectActions}
+                    step={selectedStep}
                     steps={steps}
                   />
-                </div>
-              </details>
+
+                  {!isFlowActionStepType(selectedStep.stepType) && (
+                    <details className="group rounded-md border bg-white">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
+                        <span className="flex items-center gap-2">
+                          <Wand2 className="h-4 w-4" />
+                          Advanced settings
+                        </span>
+                        <span className="text-xs font-normal text-muted-foreground group-open:hidden">
+                          Validation, integrations, and channel controls
+                        </span>
+                      </summary>
+                      <div className="border-t p-4">
+                        <StepCreateForm
+                          branchRules={branchRules}
+                          catalogProducts={catalogProducts}
+                          isPending={isPending}
+                          mediaAssets={mediaAssets}
+                          onSubmit={(input) =>
+                            updateStep(selectedStep.id, input)
+                          }
+                          operations={operations}
+                          productCatalogs={productCatalogs}
+                          projectActions={projectActions}
+                          step={selectedStep}
+                          steps={steps}
+                          submitLabel="Save Advanced Settings"
+                        />
+                      </div>
+                    </details>
+                  )}
+
+                  <details className="group rounded-md border bg-white">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
+                      <span className="flex items-center gap-2">
+                        <GitBranch className="h-4 w-4" />
+                        Branching
+                      </span>
+                      <span className="text-xs font-normal text-muted-foreground group-open:hidden">
+                        Add a conditional route from this step
+                      </span>
+                    </summary>
+                    <div className="border-t p-4">
+                      <BranchRuleForm
+                        key={`create-branch-${selectedStep.id}`}
+                        branchRules={branchRules}
+                        isPending={isPending}
+                        mode="create"
+                        onSubmit={createBranchRule}
+                        sourceStep={selectedStep}
+                        steps={steps}
+                      />
+                    </div>
+                  </details>
+                </>
+              )}
             </div>
           )}
 
@@ -669,6 +779,23 @@ export function ActionFlowCanvas({
               <p className="mt-1 text-sm text-muted-foreground">
                 This dashed route is implicit runtime behavior. Connect nodes to
                 save an explicit default route.
+              </p>
+            </div>
+          )}
+
+          {selectedNamedRoute && (
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Named Route
+              </p>
+              <p className="mt-1 font-medium">
+                {String(selectedNamedRoute.label ?? "Hybrid route")}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {getStepRouteLabel(steps, Number(selectedNamedRoute.source))}{" "}
+                routes to{" "}
+                {getStepRouteLabel(steps, Number(selectedNamedRoute.target))}.
+                Open the source node to change this destination.
               </p>
             </div>
           )}

@@ -2,7 +2,6 @@ import {
   ACTION_STEP_TYPES,
   type ActionStepType,
 } from "@/lib/action-flow-constants";
-import { FLOW_ACTION_FAMILY_DEFINITIONS } from "@/lib/flow-action-editor";
 
 export const FLOW_COMPONENT_GROUPS = ["message", "action"] as const;
 export const FLOW_COMPONENT_STATUSES = ["enabled", "planned"] as const;
@@ -304,6 +303,26 @@ const CURRENT_STEP_COMPONENTS: readonly FlowComponentDefinition[] = [
     status: "enabled",
     stepType: "connect_flow",
   },
+  {
+    channels: ["project_chat", "widget", "whatsapp", "future"],
+    color: "#7c3aed",
+    description: "Answer questions from approved project knowledge.",
+    group: "action",
+    key: "knowledge_conversation",
+    label: "Knowledge",
+    status: "enabled",
+    stepType: "knowledge_conversation",
+  },
+  {
+    channels: ["project_chat", "widget", "whatsapp", "future"],
+    color: "#059669",
+    description: "Complete a published business task through conversation.",
+    group: "action",
+    key: "conversational_task",
+    label: "Business Task",
+    status: "enabled",
+    stepType: "conversational_task",
+  },
 ] as const;
 
 const PLANNED_COMPONENTS: readonly FlowComponentDefinition[] = [
@@ -324,17 +343,6 @@ const PLANNED_COMPONENTS: readonly FlowComponentDefinition[] = [
     key: "list_message",
     label: "List Message",
     status: "planned",
-  },
-  {
-    channels: ["project_chat", "widget", "whatsapp", "future"],
-    color: "#7c3aed",
-    description:
-      "Generate a grounded response after AI action contracts are available.",
-    group: "action",
-    key: "ai_knowledge",
-    label: "AI and Knowledge",
-    status: "planned",
-    disabledReason: FLOW_ACTION_FAMILY_DEFINITIONS.ai_knowledge.plannedReason,
   },
 ] as const;
 

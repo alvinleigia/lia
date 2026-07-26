@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { FlowAddContentMenuItems } from "@/components/action-flow-canvas/content-menu";
+import { isHybridStepType } from "@/components/action-flow-canvas/hybrid-step-form";
 import {
   createFlowContentBlock,
   duplicateFlowContentBlock,
@@ -373,6 +374,42 @@ function CanvasStepNodeContent({
     !hasDynamicChoices &&
     step.stepType !== "choice" &&
     storedManualChoices.length === 0;
+
+  if (isHybridStepType(step.stepType)) {
+    return (
+      <div className="w-full space-y-3 text-left">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase leading-none text-muted-foreground">
+              Step {step.sortOrder}
+            </p>
+            <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-gray-950">
+              {getStepLabel(step)}
+            </p>
+          </div>
+          {issueCount > 0 && (
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span
+            className="max-w-full truncate rounded-full px-2.5 py-1 font-medium leading-none text-white"
+            style={{ backgroundColor: stepColor }}
+          >
+            {formatLabel(step.stepType)}
+          </span>
+          <span className="rounded-full bg-gray-100 px-2.5 py-1 leading-none text-gray-700">
+            {step.isEnabled ? "Enabled" : "Disabled"}
+          </span>
+        </div>
+        {step.prompt && (
+          <p className="line-clamp-3 break-words rounded-md border bg-white p-2.5 text-xs leading-snug text-gray-700">
+            {step.prompt}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   if (isEditing) {
     return (

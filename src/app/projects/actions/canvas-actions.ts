@@ -20,7 +20,9 @@ import {
   syncOperationStepRoutePresets,
   updateActionFlowBranchRule,
   updateActionFlowStep,
+  updateProjectAction,
 } from "@/lib/action-flows";
+import type { ProjectActionStatus } from "@/lib/action-flow-constants";
 import {
   createActionStepSchema,
   parseActionStepOptions,
@@ -28,6 +30,7 @@ import {
 import { buildActionStepSettings } from "@/lib/action-step-settings";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
+import { getPublishedConversationalTaskOption } from "@/lib/conversational-tasks";
 import {
   type FlowContentBlock,
   getFlowChoiceContentBlock,
@@ -35,6 +38,11 @@ import {
   parseFlowContentBlocks,
 } from "@/lib/flow-content-blocks";
 import { getFlowInputType, isFlowInputStepType } from "@/lib/flow-input-editor";
+import {
+  conversationalTaskFlowNodeSettingsV1Schema,
+  hybridFlowEntryPolicySettingsV1Schema,
+  knowledgeFlowNodeSettingsV1Schema,
+} from "@/lib/hybrid-flow-contracts";
 import { getProjectMediaAsset } from "@/lib/media-assets";
 import { getProjectOperation } from "@/lib/operations";
 import {
@@ -76,6 +84,55 @@ const canvasStepPositionsSchema = z.object({
     .max(200),
 });
 const canvasStepSchema = createActionStepSchema({});
+const hybridRouteTargetSchema = z.union([
+  z.literal("end"),
+  z.number().int().positive(),
+]);
+const hybridStepBaseSchema = z.object({
+  actionId: z.number().int().positive(),
+  isEnabled: z.boolean(),
+  label: z.string().trim().min(1).max(160),
+  stepId: z.number().int().positive().optional(),
+});
+const hybridKnowledgeStepSchema = hybridStepBaseSchema.extend({
+  answeredRoute: hybridRouteTargetSchema.nullable(),
+  goal: z.string().trim().min(1).max(1000),
+  handoffRoute: hybridRouteTargetSchema,
+  noAnswerRoute: hybridRouteTargetSchema,
+  recommendationTargetStepIds: z
+    .array(z.number().int().positive())
+    .max(50),
+  remainActiveAfterAnswer: z.boolean(),
+  stageMode: z.enum(["exact", "goal_driven"]),
+  stepType: z.literal("knowledge_conversation"),
+});
+const hybridTaskStepSchema = hybridStepBaseSchema.extend({
+  outcomeRoutes: z.record(z.string().trim().min(1).max(160), hybridRouteTargetSchema),
+  stepType: z.literal("conversational_task"),
+  taskVersionId: z.number().int().positive(),
+  transferContextKeys: z.array(z.string().trim().min(1).max(160)).max(100),
+  transferFieldKeys: z.array(z.string().trim().min(1).max(160)).max(100),
+});
+const hybridStepSchema = z.discriminatedUnion("stepType", [
+  hybridKnowledgeStepSchema,
+  hybridTaskStepSchema,
+]);
+const hybridEntryRouteSchema = z.object({
+  key: z
+    .string()
+    .trim()
+    .min(1)
+    .max(160)
+    .regex(/^[a-zA-Z][a-zA-Z0-9_.:-]*$/),
+  stepId: z.number().int().positive(),
+});
+const hybridEntryPolicySchema = z.object({
+  actionId: z.number().int().positive(),
+  campaignRoutes: z.array(hybridEntryRouteSchema).max(100),
+  channelRoutes: z.array(hybridEntryRouteSchema).max(100),
+  deepLinkRoutes: z.array(hybridEntryRouteSchema).max(100),
+  normalStepId: z.number().int().positive().nullable(),
+});
 const canvasStepBasicsSchema = z.object({
   actionId: z.coerce.number().int().positive(),
   choiceDisplayMode: z.enum(["buttons", "list", "text"]),
@@ -260,6 +317,36 @@ function asSettingsRecord(value: unknown): Record<string, unknown> {
   }
 
   return value as Record<string, unknown>;
+}
+
+function getDuplicateEntryKey(
+  routes: Array<{ key: string; stepId: number }>,
+) {
+  const keys = new Set<string>();
+  for (const route of routes) {
+    if (keys.has(route.key)) {
+      return route.key;
+    }
+    keys.add(route.key);
+  }
+  return null;
+}
+
+function hasAvailableHybridRouteTarget(
+  target: number | "end" | null,
+  stepIds: Set<number>,
+  sourceStepId?: number,
+) {
+  return (
+    target === null ||
+    target === "end" ||
+    (stepIds.has(target) && target !== sourceStepId)
+  );
+}
+
+function revalidateHybridCanvasPaths(actionId: number) {
+  revalidateCanvasPaths(actionId);
+  revalidatePath(`/projects/actions/${actionId}/hybrid-test`);
 }
 
 async function requireCanvasConnectedAction(input: {
@@ -465,6 +552,338 @@ async function hydrateCanvasContentBlocks(input: {
       };
     }),
   );
+}
+
+export async function saveCanvasHybridStepAction(
+  input: unknown,
+): Promise<CanvasRouteActionResult> {
+  const parsed = hybridStepSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Please check the hybrid step details." };
+  }
+
+  const context = await resolveCanvasAction(parsed.data.actionId);
+  if ("error" in context) {
+    return { ok: false, message: context.error ?? "Action not found." };
+  }
+
+  const { action, project } = context;
+  const steps = await listActionFlowSteps(project.id, action.id);
+  const existingStep = parsed.data.stepId
+    ? (steps.find((step) => step.id === parsed.data.stepId) ?? null)
+    : null;
+
+  if (
+    parsed.data.stepId &&
+    (!existingStep || existingStep.stepType !== parsed.data.stepType)
+  ) {
+    return { ok: false, message: "Hybrid step not found." };
+  }
+
+  const stepIds = new Set(steps.map((step) => step.id));
+  const sourceStepId = existingStep?.id;
+  let settings: Record<string, unknown> = {
+    ...(existingStep?.settings ?? {}),
+    nodeLabel: parsed.data.label,
+  };
+  let prompt = "";
+
+  if (parsed.data.stepType === "knowledge_conversation") {
+    const allTargets = [
+      parsed.data.answeredRoute,
+      parsed.data.noAnswerRoute,
+      parsed.data.handoffRoute,
+    ];
+    if (
+      allTargets.some(
+        (target) =>
+          !hasAvailableHybridRouteTarget(target, stepIds, sourceStepId),
+      )
+    ) {
+      return {
+        ok: false,
+        message: "Every knowledge route must use an available flow step.",
+      };
+    }
+    if (
+      !parsed.data.remainActiveAfterAnswer &&
+      parsed.data.answeredRoute === null
+    ) {
+      return {
+        ok: false,
+        message: "Choose where to go after a successful answer.",
+      };
+    }
+
+    const taskStepIds = new Set(
+      steps
+        .filter((step) => step.stepType === "conversational_task")
+        .map((step) => step.id),
+    );
+    if (
+      parsed.data.recommendationTargetStepIds.some(
+        (stepId) => !taskStepIds.has(stepId),
+      )
+    ) {
+      return {
+        ok: false,
+        message: "Recommendations can only open Business Task steps.",
+      };
+    }
+
+    const knowledgeSettings = knowledgeFlowNodeSettingsV1Schema.parse({
+      answeredRoute: parsed.data.answeredRoute,
+      handoffRoute: parsed.data.handoffRoute,
+      noAnswerRoute: parsed.data.noAnswerRoute,
+      recommendationTargetStepIds:
+        parsed.data.recommendationTargetStepIds,
+      remainActiveAfterAnswer: parsed.data.remainActiveAfterAnswer,
+      schemaVersion: 1,
+      stageMode: parsed.data.stageMode,
+    });
+    settings = {
+      ...settings,
+      knowledgeConversation: knowledgeSettings,
+      knowledgeGoal: parsed.data.goal,
+    };
+    delete settings.conversationalTask;
+    prompt = parsed.data.goal;
+  } else {
+    const task = await getPublishedConversationalTaskOption({
+      projectId: project.id,
+      taskVersionId: parsed.data.taskVersionId,
+    });
+    if (!task) {
+      return {
+        ok: false,
+        message: "Choose an available published business task version.",
+      };
+    }
+
+    const taskStep = parsed.data;
+    const outputPorts = Array.from(
+      new Set(task.outcomes.map((outcome) => outcome.outputPort)),
+    );
+    const outcomeRoutes = Object.fromEntries(
+      outputPorts.flatMap((outputPort) => {
+        const target = taskStep.outcomeRoutes[outputPort];
+        return target === undefined ? [] : [[outputPort, target]];
+      }),
+    );
+    if (
+      outputPorts.some(
+        (outputPort) => outcomeRoutes[outputPort] === undefined,
+      )
+    ) {
+      return {
+        ok: false,
+        message: "Choose a destination for every task outcome.",
+      };
+    }
+    if (
+      Object.values(outcomeRoutes).some(
+        (target) =>
+          !hasAvailableHybridRouteTarget(target, stepIds, sourceStepId),
+      )
+    ) {
+      return {
+        ok: false,
+        message: "Every task outcome must use an available flow step.",
+      };
+    }
+
+    const transferFieldKeys = Array.from(
+      new Set(taskStep.transferFieldKeys),
+    );
+    const transferContextKeys = Array.from(
+      new Set(taskStep.transferContextKeys),
+    );
+    if (
+      transferFieldKeys.some((key) => !task.fieldKeys.includes(key)) ||
+      transferContextKeys.some((key) => !task.contextKeys.includes(key))
+    ) {
+      return {
+        ok: false,
+        message: "One or more selected task values are unavailable.",
+      };
+    }
+
+    const taskSettings = conversationalTaskFlowNodeSettingsV1Schema.parse({
+      outcomeRoutes,
+      schemaVersion: 1,
+      task: {
+        name: task.name,
+        outcomes: task.outcomes,
+        schemaVersion: 1,
+        taskId: task.taskId,
+        taskVersionId: task.taskVersionId,
+        versionNumber: task.versionNumber,
+      },
+      transferContextKeys,
+      transferFieldKeys,
+    });
+    settings = {
+      ...settings,
+      conversationalTask: taskSettings,
+    };
+    delete settings.knowledgeConversation;
+    delete settings.knowledgeGoal;
+    prompt = task.objective;
+  }
+
+  const sortOrder =
+    existingStep?.sortOrder ??
+    steps.reduce((maximum, step) => Math.max(maximum, step.sortOrder), 0) + 1;
+  const step = existingStep
+    ? await updateActionFlowStep({
+        actionId: action.id,
+        fieldKey: null,
+        inputType: null,
+        isEnabled: parsed.data.isEnabled,
+        isRequired: false,
+        label: parsed.data.label,
+        nextStepId: null,
+        operationId: null,
+        options: [],
+        projectId: project.id,
+        prompt,
+        settings,
+        sortOrder,
+        stepId: existingStep.id,
+        stepType: parsed.data.stepType,
+      })
+    : await createActionFlowStep({
+        actionId: action.id,
+        fieldKey: null,
+        inputType: null,
+        isEnabled: parsed.data.isEnabled,
+        isRequired: false,
+        label: parsed.data.label,
+        nextStepId: null,
+        operationId: null,
+        options: [],
+        projectId: project.id,
+        prompt,
+        settings,
+        sortOrder,
+        stepType: parsed.data.stepType,
+      });
+
+  if (!step) {
+    return { ok: false, message: "Could not save the hybrid step." };
+  }
+
+  await writeAuditLog({
+    ...context,
+    action: existingStep
+      ? "chatbot_action.hybrid_step_updated"
+      : "chatbot_action.hybrid_step_created",
+    metadata: {
+      actionId: action.id,
+      stepType: step.stepType,
+    },
+    targetId: step.id,
+    targetType: "action_flow_step",
+  });
+  revalidateHybridCanvasPaths(action.id);
+
+  return {
+    ok: true,
+    message: existingStep ? "Hybrid step updated." : "Hybrid step created.",
+  };
+}
+
+export async function saveHybridEntryPolicyAction(
+  input: unknown,
+): Promise<CanvasRouteActionResult> {
+  const parsed = hybridEntryPolicySchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Please check the entry rules." };
+  }
+
+  const context = await resolveCanvasAction(parsed.data.actionId);
+  if ("error" in context) {
+    return { ok: false, message: context.error ?? "Action not found." };
+  }
+
+  for (const routes of [
+    parsed.data.deepLinkRoutes,
+    parsed.data.campaignRoutes,
+    parsed.data.channelRoutes,
+  ]) {
+    const duplicateKey = getDuplicateEntryKey(routes);
+    if (duplicateKey) {
+      return {
+        ok: false,
+        message: `Entry key "${duplicateKey}" is used more than once.`,
+      };
+    }
+  }
+
+  const { action, project } = context;
+  const steps = await listActionFlowSteps(project.id, action.id);
+  const stepIds = new Set(
+    steps.filter((step) => step.isEnabled).map((step) => step.id),
+  );
+  const selectedStepIds = [
+    parsed.data.normalStepId,
+    ...parsed.data.deepLinkRoutes.map((route) => route.stepId),
+    ...parsed.data.campaignRoutes.map((route) => route.stepId),
+    ...parsed.data.channelRoutes.map((route) => route.stepId),
+  ].filter((stepId): stepId is number => stepId !== null);
+
+  if (selectedStepIds.some((stepId) => !stepIds.has(stepId))) {
+    return {
+      ok: false,
+      message: "Every entry rule must start at an enabled flow step.",
+    };
+  }
+
+  const entryPolicy = hybridFlowEntryPolicySettingsV1Schema.parse({
+    campaignRoutes: Object.fromEntries(
+      parsed.data.campaignRoutes.map((route) => [route.key, route.stepId]),
+    ),
+    channelRoutes: Object.fromEntries(
+      parsed.data.channelRoutes.map((route) => [route.key, route.stepId]),
+    ),
+    deepLinkRoutes: Object.fromEntries(
+      parsed.data.deepLinkRoutes.map((route) => [route.key, route.stepId]),
+    ),
+    normalStepId: parsed.data.normalStepId,
+    schemaVersion: 1,
+  });
+  const updated = await updateProjectAction({
+    actionId: action.id,
+    description: action.description,
+    name: action.name,
+    projectId: project.id,
+    settings: {
+      ...action.settings,
+      hybridEntryPolicy: entryPolicy,
+    },
+    status: action.status as ProjectActionStatus,
+    triggerPhrases: action.triggerPhrases,
+  });
+  if (!updated) {
+    return { ok: false, message: "Could not save the entry rules." };
+  }
+
+  await writeAuditLog({
+    ...context,
+    action: "chatbot_action.hybrid_entry_policy_updated",
+    metadata: {
+      actionId: action.id,
+      campaignRouteCount: parsed.data.campaignRoutes.length,
+      channelRouteCount: parsed.data.channelRoutes.length,
+      deepLinkRouteCount: parsed.data.deepLinkRoutes.length,
+      normalStepId: parsed.data.normalStepId,
+    },
+    targetId: action.id,
+    targetType: "project_action",
+  });
+  revalidateHybridCanvasPaths(action.id);
+
+  return { ok: true, message: "Entry rules saved." };
 }
 
 export async function createCanvasStepAction(

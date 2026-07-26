@@ -5,6 +5,7 @@ import type {
   listActionFlowBranchRules,
   listActionFlowSteps,
 } from "@/lib/action-flows";
+import type { PublishedConversationalTaskOption } from "@/lib/conversational-tasks";
 
 export type FlowStep = Awaited<ReturnType<typeof listActionFlowSteps>>[number];
 export type BranchRule = Awaited<
@@ -48,6 +49,7 @@ export type CatalogProductOption = {
 
 export type ActionFlowCanvasProps = {
   actionId: number;
+  actionSettings: Record<string, unknown>;
   branchRules: BranchRule[];
   catalogProducts: CatalogProductOption[];
   mediaAssets: MediaAssetOption[];
@@ -56,6 +58,48 @@ export type ActionFlowCanvasProps = {
   projectActions: ProjectActionOption[];
   routeIssues: ActionFlowRouteValidationIssue[];
   steps: FlowStep[];
+  taskOptions: PublishedConversationalTaskOption[];
+};
+
+export type HybridRouteTarget = number | "end";
+
+export type HybridKnowledgeStepInput = {
+  answeredRoute: HybridRouteTarget | null;
+  goal: string;
+  handoffRoute: HybridRouteTarget;
+  isEnabled: boolean;
+  label: string;
+  noAnswerRoute: HybridRouteTarget;
+  recommendationTargetStepIds: number[];
+  remainActiveAfterAnswer: boolean;
+  stageMode: "exact" | "goal_driven";
+  stepType: "knowledge_conversation";
+};
+
+export type HybridTaskStepInput = {
+  isEnabled: boolean;
+  label: string;
+  outcomeRoutes: Record<string, HybridRouteTarget>;
+  stepType: "conversational_task";
+  taskVersionId: number;
+  transferContextKeys: string[];
+  transferFieldKeys: string[];
+};
+
+export type HybridStepInput =
+  | HybridKnowledgeStepInput
+  | HybridTaskStepInput;
+
+export type HybridEntryRouteInput = {
+  key: string;
+  stepId: number;
+};
+
+export type HybridEntryPolicyInput = {
+  campaignRoutes: HybridEntryRouteInput[];
+  channelRoutes: HybridEntryRouteInput[];
+  deepLinkRoutes: HybridEntryRouteInput[];
+  normalStepId: number | null;
 };
 
 export type InspectorSelection =
