@@ -34,6 +34,10 @@ import {
   CONVERSATIONAL_TASK_TEMPLATE_KEYS,
   createConversationalTaskDefinitionFromTemplate,
 } from "../../src/lib/conversational-task-templates";
+import {
+  getMissingTaskToolSourceKeys,
+  resolveProjectTaskToolDefinition,
+} from "../../src/lib/conversational-task-tools";
 import { validateConversationalTaskForPublish } from "../../src/lib/conversational-task-validation";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
@@ -190,6 +194,32 @@ test("catalog-backed fields report missing project setup", () => {
       productCount: 2,
     }),
   ).toBe(false);
+});
+
+test("tool readiness uses required task sources from the runtime contract", async () => {
+  const definition = createConversationalTaskDefinitionFromTemplate("booking");
+  const toolDefinition = await resolveProjectTaskToolDefinition({
+    definition,
+    projectId: 42,
+    toolId: "catalog.service_details",
+    version: 1,
+  });
+
+  expect(toolDefinition).not.toBeNull();
+  if (!toolDefinition) return;
+
+  expect(getMissingTaskToolSourceKeys({ definition, toolDefinition })).toEqual(
+    [],
+  );
+  expect(
+    getMissingTaskToolSourceKeys({
+      definition: {
+        ...definition,
+        fields: definition.fields.filter((field) => field.key !== "serviceId"),
+      },
+      toolDefinition,
+    }),
+  ).toEqual(["serviceId"]);
 });
 
 test("reference booking fixture satisfies the universal contracts", () => {

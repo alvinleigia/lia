@@ -50,7 +50,10 @@ import {
   CONVERSATIONAL_TASK_TEMPLATE_KEYS,
   createConversationalTaskDefinitionFromTemplate,
 } from "@/lib/conversational-task-templates";
-import { resolveProjectTaskToolDefinition } from "@/lib/conversational-task-tools";
+import {
+  getMissingTaskToolSourceKeys,
+  resolveProjectTaskToolDefinition,
+} from "@/lib/conversational-task-tools";
 import { validateConversationalTaskForPublish } from "@/lib/conversational-task-validation";
 import {
   createProjectConversationalTask,
@@ -914,24 +917,31 @@ export async function bindConversationalTaskToolAction(
 ): Promise<ActionFormState> {
   const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/tools`;
-  const toolId = z
+  const toolReference = z
     .string()
     .trim()
-    .min(1)
-    .max(120)
-    .safeParse(formData.get("toolId"));
-  if (!toolId.success || context.task.isArchived) {
+    .min(3)
+    .max(140)
+    .safeParse(formData.get("toolRef"));
+  const referenceMatch = toolReference.success
+    ? toolReference.data.match(/^(.+)@(\d+)$/)
+    : null;
+  const version = referenceMatch
+    ? z.coerce.number().int().positive().safeParse(referenceMatch[2])
+    : null;
+  if (!referenceMatch || !version?.success || context.task.isArchived) {
     return { error: "Tool not found." };
   }
+  const toolId = referenceMatch[1];
   const definition = readConversationalTaskDefinition(context.task.definition);
   const tool = await resolveProjectTaskToolDefinition({
     definition,
     projectId: context.project.id,
-    toolId: toolId.data,
-    version: 1,
+    toolId,
+    version: version.data,
   });
   const parsed = toolBindingV1Schema.safeParse({
-    tool: { id: toolId.data, version: 1 },
+    tool: { id: toolId, version: version.data },
     access: tool?.access,
     allowedStages: ["extraction", "lookup", "confirmation", "operation"].filter(
       (stage) => formData.get(`stage_${stage}`) === "on",
@@ -941,9 +951,13 @@ export async function bindConversationalTaskToolAction(
     !tool ||
     !parsed.success ||
     parsed.data.allowedStages.length === 0 ||
+    getMissingTaskToolSourceKeys({
+      definition,
+      toolDefinition: tool,
+    }).length > 0 ||
     definition.tools.some((binding) => binding.tool.id === parsed.data.tool.id)
   ) {
-    return { error: "Choose an active, unbound tool." };
+    return { error: "Choose a ready, unbound tool and at least one stage." };
   }
 
   await updateProjectConversationalTaskDefinition(
@@ -983,25 +997,43 @@ export async function addConversationalTaskOutcomeAction(
 ): Promise<ActionFormState> {
   const context = await resolveConversationalTaskMutation(formData);
   const destination = `/projects/tasks/${context.task.id}/configure/outcomes`;
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  const label = z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .safeParse(formData.get("label"));
+  if (!label.success || context.task.isArchived) {
+    return { error: "Enter an outcome name." };
+  }
+  const requestedKey = String(formData.get("key") ?? "").trim();
+  const key =
+    requestedKey ||
+    createUniqueFieldKey(
+      label.data,
+      definition.outcomes.flatMap((outcome) => [
+        outcome.key,
+        outcome.outputPort,
+      ]),
+    );
   const parsed = taskOutcomeV1Schema.safeParse({
     id: crypto.randomUUID(),
-    key: formData.get("key"),
-    label: formData.get("label"),
+    key,
+    label: label.data,
     type: formData.get("type"),
     condition: formData.get("condition") || null,
-    outputPort: formData.get("outputPort"),
+    outputPort: formData.get("outputPort") || key,
   });
-  const definition = readConversationalTaskDefinition(context.task.definition);
   if (
     !parsed.success ||
-    context.task.isArchived ||
     definition.outcomes.some(
       (outcome) =>
         outcome.key === parsed.data.key ||
         outcome.outputPort === parsed.data.outputPort,
     )
   ) {
-    return { error: "Use a unique outcome and port." };
+    return { error: "Use a valid, unique outcome name and destination." };
   }
   await updateProjectConversationalTaskDefinition(
     context.project.id,

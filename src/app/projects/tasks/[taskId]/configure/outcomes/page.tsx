@@ -12,6 +12,7 @@ import {
   ActionFormError,
   ActionStateForm,
 } from "@/components/ui/action-state-form";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
@@ -39,6 +40,26 @@ type PageProps = {
   searchParams: Promise<{ error?: string; saved?: string }>;
 };
 const selectClass = "h-9 w-full rounded-md border bg-white px-3 text-sm";
+const outcomeTypeLabels = {
+  completed: "Completed successfully",
+  cancelled: "Cancelled by visitor",
+  failed: "Could not complete",
+  no_answer: "No answer available",
+  handoff: "Hand off to team",
+} as const;
+const returnValueLabels = {
+  return_to_knowledge: "Return to normal Q&A",
+  end: "End the conversation",
+  handoff: "Hand off to the team",
+  suspend: "Pause for the team",
+} as const;
+const degradedValueLabels = {
+  deterministic_fallback: "Use a safe fallback",
+  clarify: "Ask a clarifying question",
+  retry: "Try again",
+  handoff: "Hand off to the team",
+  fail: "Stop with failure",
+} as const;
 
 export default async function TaskOutcomesPage({
   params,
@@ -94,13 +115,15 @@ export default async function TaskOutcomesPage({
                   className="flex items-center justify-between gap-4 px-4 py-3"
                 >
                   <div>
-                    <p className="font-medium">{outcome.label}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {outcome.type} -&gt; {outcome.outputPort}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{outcome.label}</p>
+                      <Badge variant="secondary">
+                        {outcomeTypeLabels[outcome.type]}
+                      </Badge>
+                    </div>
                     {outcome.condition && (
-                      <p className="text-sm text-muted-foreground">
-                        When: {outcome.condition}
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Only when {outcome.condition}
                       </p>
                     )}
                   </div>
@@ -125,76 +148,80 @@ export default async function TaskOutcomesPage({
               resetKey={definition.outcomes
                 .map((outcome) => outcome.id)
                 .join(":")}
-              className="grid gap-4 rounded-md border p-4 md:grid-cols-4"
+              className="space-y-4 rounded-md border p-4"
             >
-              <ActionFormError className="md:col-span-4" />
+              <h3 className="font-semibold">Add an Outcome</h3>
+              <ActionFormError />
               <input
                 type="hidden"
                 name="projectId"
                 value={context.project.id}
               />
               <input type="hidden" name="taskId" value={task.id} />
-              <div className="space-y-2">
-                <Label htmlFor="outcomeLabel">Outcome Name</Label>
-                <Input
-                  id="outcomeLabel"
-                  name="label"
-                  placeholder="Booked"
-                  required
-                />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="outcomeLabel">Outcome Name</Label>
+                  <Input
+                    id="outcomeLabel"
+                    name="label"
+                    placeholder="Booked"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="outcomeType">Result</Label>
+                  <select id="outcomeType" name="type" className={selectClass}>
+                    {Object.entries(outcomeTypeLabels).map(([type, label]) => (
+                      <option key={type} value={type}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="outcomeKey">Outcome Key</Label>
-                <Input
-                  id="outcomeKey"
-                  name="key"
-                  placeholder="booked"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="outcomeType">Result Type</Label>
-                <select id="outcomeType" name="type" className={selectClass}>
-                  {[
-                    "completed",
-                    "cancelled",
-                    "failed",
-                    "no_answer",
-                    "handoff",
-                  ].map((type) => (
-                    <option key={type} value={type}>
-                      {type.replaceAll("_", " ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="outcomeOutputPort">Output Port</Label>
-                <Input
-                  id="outcomeOutputPort"
-                  name="outputPort"
-                  placeholder="booked"
-                  required
-                />
-              </div>
-              <div className="space-y-2 md:col-span-4">
-                <Label htmlFor="outcomeCondition">
-                  Completion Condition (optional)
-                </Label>
-                <Input
-                  id="outcomeCondition"
-                  name="condition"
-                  placeholder="e.g. appointmentRequestId is present"
-                />
-              </div>
-              <div className="flex justify-end md:col-span-4">
-                <FormSubmitButton
-                  className="w-full sm:w-auto"
-                  label="Add"
-                  pendingLabel="Adding..."
-                  icon={<Plus className="h-4 w-4" />}
-                />
-              </div>
+              <Accordion type="single" collapsible>
+                <AccordionItem value="advanced-routing">
+                  <AccordionTrigger>Advanced routing</AccordionTrigger>
+                  <AccordionContent forceMount className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="outcomeCondition">
+                        Completion Condition (optional)
+                      </Label>
+                      <Input
+                        id="outcomeCondition"
+                        name="condition"
+                        placeholder="e.g. appointmentRequestId is present"
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="outcomeKey">Internal Key</Label>
+                        <Input
+                          id="outcomeKey"
+                          name="key"
+                          placeholder="Generated from the outcome name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="outcomeOutputPort">
+                          Canvas Destination
+                        </Label>
+                        <Input
+                          id="outcomeOutputPort"
+                          name="outputPort"
+                          placeholder="Uses the internal key"
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+              <FormSubmitButton
+                className="w-full sm:w-auto"
+                label="Add Outcome"
+                pendingLabel="Adding..."
+                icon={<Plus className="h-4 w-4" />}
+              />
             </ActionStateForm>
           </CardContent>
         </Card>
@@ -267,37 +294,50 @@ export default async function TaskOutcomesPage({
                   </select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="instructions">Task Instructions</Label>
-                <Textarea
-                  id="instructions"
-                  name="instructions"
-                  rows={3}
-                  defaultValue={definition.taskPolicy.instructions ?? ""}
-                  placeholder="Task-specific behavior and boundaries."
-                />
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="fallbackMessage">Fallback Message</Label>
-                  <Input
-                    id="fallbackMessage"
-                    name="fallbackMessage"
-                    defaultValue={definition.taskPolicy.fallbackMessage ?? ""}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="handoffMessage">Handoff Message</Label>
-                  <Input
-                    id="handoffMessage"
-                    name="handoffMessage"
-                    defaultValue={definition.taskPolicy.handoffMessage ?? ""}
-                  />
-                </div>
-              </div>
               <Accordion type="multiple" className="rounded-md border px-4">
+                <AccordionItem value="wording">
+                  <AccordionTrigger>Optional wording</AccordionTrigger>
+                  <AccordionContent forceMount className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="instructions">Task Instructions</Label>
+                      <Textarea
+                        id="instructions"
+                        name="instructions"
+                        rows={3}
+                        defaultValue={definition.taskPolicy.instructions ?? ""}
+                        placeholder="Task-specific behavior and boundaries."
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="fallbackMessage">
+                          When Lia Cannot Continue
+                        </Label>
+                        <Input
+                          id="fallbackMessage"
+                          name="fallbackMessage"
+                          defaultValue={
+                            definition.taskPolicy.fallbackMessage ?? ""
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="handoffMessage">
+                          When Lia Hands Off
+                        </Label>
+                        <Input
+                          id="handoffMessage"
+                          name="handoffMessage"
+                          defaultValue={
+                            definition.taskPolicy.handoffMessage ?? ""
+                          }
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
                 <AccordionItem value="return">
-                  <AccordionTrigger>Return behavior</AccordionTrigger>
+                  <AccordionTrigger>After each result</AccordionTrigger>
                   <AccordionContent forceMount>
                     <div className="grid gap-4 md:grid-cols-5">
                       {(
@@ -314,7 +354,7 @@ export default async function TaskOutcomesPage({
                       ).map(([key, values]) => (
                         <div key={key} className="space-y-2">
                           <Label htmlFor={`return-${key}`}>
-                            {key === "noAnswer" ? "No answer" : key}
+                            Go to after {key === "noAnswer" ? "no answer" : key}
                           </Label>
                           <select
                             id={`return-${key}`}
@@ -324,7 +364,7 @@ export default async function TaskOutcomesPage({
                           >
                             {values.map((value) => (
                               <option key={value} value={value}>
-                                {value.replaceAll("_", " ")}
+                                {returnValueLabels[value]}
                               </option>
                             ))}
                           </select>
@@ -335,7 +375,7 @@ export default async function TaskOutcomesPage({
                 </AccordionItem>
                 <AccordionItem value="degraded">
                   <AccordionTrigger>
-                    Unavailable-service behavior
+                    If a service is unavailable
                   </AccordionTrigger>
                   <AccordionContent forceMount>
                     <div className="grid gap-4 md:grid-cols-4">
@@ -353,8 +393,12 @@ export default async function TaskOutcomesPage({
                         <div key={key} className="space-y-2">
                           <Label htmlFor={`degraded-${key}`}>
                             {key === "outboundChannel"
-                              ? "Outbound channel"
-                              : key}
+                              ? "Message delivery"
+                              : key === "model"
+                                ? "AI response"
+                                : key === "retrieval"
+                                  ? "Knowledge search"
+                                  : "Tool"}
                           </Label>
                           <select
                             id={`degraded-${key}`}
@@ -364,7 +408,7 @@ export default async function TaskOutcomesPage({
                           >
                             {values.map((value) => (
                               <option key={value} value={value}>
-                                {value.replaceAll("_", " ")}
+                                {degradedValueLabels[value]}
                               </option>
                             ))}
                           </select>

@@ -433,6 +433,29 @@ export async function resolveProjectTaskToolDefinition(input: {
   });
 }
 
+export function getMissingTaskToolSourceKeys(input: {
+  definition: ConversationalTaskDefinitionV1;
+  toolDefinition: ToolDefinitionV1;
+}) {
+  const missing = new Set<string>();
+  for (const field of input.toolDefinition.inputSchema.fields) {
+    if (!field.required || field.source.kind === "literal") continue;
+    const sourceKey = field.source.key;
+    const exists =
+      field.source.kind === "field"
+        ? input.definition.fields.some(
+            (candidate) => candidate.key === sourceKey,
+          )
+        : input.definition.contextVariables.some(
+            (candidate) => candidate.key === sourceKey,
+          );
+    if (!exists) {
+      missing.add(sourceKey);
+    }
+  }
+  return Array.from(missing);
+}
+
 export async function resolveProjectTaskToolDefinitions(input: {
   definition: ConversationalTaskDefinitionV1;
   projectId: number;
@@ -457,23 +480,10 @@ export async function resolveProjectTaskToolDefinitions(input: {
         `Tool "${definition.name}" has an outdated permission. Remove it from Tools and add it again as ${expectedPermission}.`,
       );
     }
-    let missingSourceKey: string | null = null;
-    for (const field of definition.inputSchema.fields) {
-      if (!field.required || field.source.kind === "literal") continue;
-      const sourceKey = field.source.key;
-      const exists =
-        field.source.kind === "field"
-          ? input.definition.fields.some(
-              (candidate) => candidate.key === sourceKey,
-            )
-          : input.definition.contextVariables.some(
-              (candidate) => candidate.key === sourceKey,
-            );
-      if (!exists) {
-        missingSourceKey = sourceKey;
-        break;
-      }
-    }
+    const [missingSourceKey] = getMissingTaskToolSourceKeys({
+      definition: input.definition,
+      toolDefinition: definition,
+    });
     if (missingSourceKey) {
       throw new Error(
         `Tool "${definition.name}" requires "${missingSourceKey}".`,

@@ -1,4 +1,12 @@
-import { ArrowLeft, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CircleCheck,
+  Plus,
+  Settings,
+  ShieldCheck,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TaskConfigurationNav } from "@/components/task-configuration-nav";
@@ -6,12 +14,17 @@ import {
   ActionFormError,
   ActionStateForm,
 } from "@/components/ui/action-state-form";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Label } from "@/components/ui/label";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
-import { listProjectTaskToolOptions } from "@/lib/conversational-task-tools";
+import {
+  getMissingTaskToolSourceKeys,
+  listProjectTaskToolOptions,
+  resolveProjectTaskToolDefinition,
+} from "@/lib/conversational-task-tools";
 import {
   getProjectConversationalTask,
   readConversationalTaskDefinition,
@@ -29,6 +42,17 @@ type PageProps = {
   params: Promise<{ taskId: string }>;
   searchParams: Promise<{ error?: string }>;
 };
+
+const stageLabels = {
+  extraction: "While understanding answers",
+  lookup: "While checking business data",
+  confirmation: "Before final confirmation",
+  operation: "When completing the task",
+} as const;
+
+function toolReference(id: string, version: number) {
+  return `${id}@${version}`;
+}
 
 export default async function TaskToolsPage({
   params,
@@ -49,10 +73,38 @@ export default async function TaskToolsPage({
     redirect("/projects/tasks?error=Task%20not%20found.");
   }
   const definition = readConversationalTaskDefinition(task.definition);
-  const toolOptionsById = new Map(toolOptions.map((tool) => [tool.id, tool]));
-  const availableTools = toolOptions.filter(
-    (tool) => !definition.tools.some((binding) => binding.tool.id === tool.id),
+  const toolAvailability = await Promise.all(
+    toolOptions.map(async (option) => {
+      const toolDefinition = await resolveProjectTaskToolDefinition({
+        definition,
+        projectId: context.project.id,
+        toolId: option.id,
+        version: option.version,
+      });
+      const missingSourceKeys = toolDefinition
+        ? getMissingTaskToolSourceKeys({
+            definition,
+            toolDefinition,
+          })
+        : [];
+      return {
+        missingSourceKeys,
+        option,
+        ready: Boolean(toolDefinition) && missingSourceKeys.length === 0,
+      };
+    }),
   );
+  const availabilityByReference = new Map(
+    toolAvailability.map((availability) => [
+      toolReference(availability.option.id, availability.option.version),
+      availability,
+    ]),
+  );
+  const availableTools = toolAvailability.filter(
+    ({ option }) =>
+      !definition.tools.some((binding) => binding.tool.id === option.id),
+  );
+  const hasReadyAvailableTool = availableTools.some(({ ready }) => ready);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10">
@@ -66,15 +118,22 @@ export default async function TaskToolsPage({
         </Link>
         <TaskConfigurationNav active="tools" taskId={task.id} />
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <ShieldCheck className="h-6 w-6" />
-              Tools and Permissions
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Tools are denied until explicitly bound. Provider credentials
-              remain in Operations and are never copied into the task.
-            </p>
+          <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2">
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <ShieldCheck className="h-6 w-6" />
+                Tools and Permissions
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Tools remain off until you allow them for this task.
+              </p>
+            </div>
+            <Button asChild variant="outline">
+              <Link href="/projects/operations">
+                <Settings className="h-4 w-4" />
+                Manage Tool Library
+              </Link>
+            </Button>
           </CardHeader>
           <CardContent className="space-y-5">
             {query.error && (
@@ -82,58 +141,142 @@ export default async function TaskToolsPage({
                 {query.error}
               </p>
             )}
-            {definition.tools.length === 0 ? (
-              <p className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
-                No tools are allowed for this task.
-              </p>
-            ) : (
-              <div className="divide-y rounded-md border">
-                {definition.tools.map((binding) => (
-                  <div
-                    key={binding.tool.id}
-                    className="flex items-center justify-between gap-4 px-4 py-3"
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {toolOptionsById.get(binding.tool.id)?.name ??
-                          binding.tool.id}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {binding.access === "read"
-                          ? "Read data"
-                          : "Take action"}{" "}
-                        / {binding.allowedStages.join(", ")} / v
-                        {binding.tool.version}
-                      </p>
-                      {toolOptionsById.get(binding.tool.id)?.description && (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {toolOptionsById.get(binding.tool.id)?.description}
-                        </p>
-                      )}
-                    </div>
-                    <form action={unbindConversationalTaskToolAction}>
-                      <input
-                        type="hidden"
-                        name="projectId"
-                        value={context.project.id}
-                      />
-                      <input type="hidden" name="taskId" value={task.id} />
-                      <input
-                        type="hidden"
-                        name="toolId"
-                        value={binding.tool.id}
-                      />
-                      <Button type="submit" size="icon" variant="ghost">
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">
-                          Remove {binding.tool.id}
-                        </span>
-                      </Button>
-                    </form>
-                  </div>
-                ))}
+            <section className="space-y-3">
+              <div>
+                <h3 className="font-semibold">Tool Library</h3>
+                <p className="text-sm text-muted-foreground">
+                  Ready tools can be allowed below. Setup stays in the shared
+                  project library.
+                </p>
               </div>
-            )}
+              <div className="grid gap-3 md:grid-cols-2">
+                {toolAvailability.map(
+                  ({ missingSourceKeys, option, ready }) => {
+                    const missingLabels = missingSourceKeys.map(
+                      (key) =>
+                        definition.fields.find((field) => field.key === key)
+                          ?.label ??
+                        definition.contextVariables.find(
+                          (variable) => variable.key === key,
+                        )?.key ??
+                        key,
+                    );
+                    return (
+                      <div
+                        key={toolReference(option.id, option.version)}
+                        className="space-y-2 rounded-md border p-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{option.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {option.description}
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={
+                              ready
+                                ? "border-green-200 bg-green-50 text-green-700"
+                                : "border-amber-200 bg-amber-50 text-amber-800"
+                            }
+                          >
+                            {ready ? (
+                              <CircleCheck className="h-3 w-3" />
+                            ) : (
+                              <TriangleAlert className="h-3 w-3" />
+                            )}
+                            {ready ? "Ready" : "Needs setup"}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="secondary">
+                            {option.access === "read"
+                              ? "Read only"
+                              : "Can take action"}
+                          </Badge>
+                          <Badge variant="outline">
+                            Version {option.version}
+                          </Badge>
+                        </div>
+                        {!ready && (
+                          <p className="text-xs text-amber-800">
+                            {missingLabels.length > 0
+                              ? `Add these task fields first: ${missingLabels.join(", ")}.`
+                              : "This tool version is no longer available."}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            </section>
+            <section className="space-y-3">
+              <h3 className="font-semibold">Allowed for This Task</h3>
+              {definition.tools.length === 0 ? (
+                <p className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
+                  No tools are allowed for this task.
+                </p>
+              ) : (
+                <div className="divide-y rounded-md border">
+                  {definition.tools.map((binding) => (
+                    <div
+                      key={toolReference(binding.tool.id, binding.tool.version)}
+                      className="flex items-center justify-between gap-4 px-4 py-3"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">
+                            {availabilityByReference.get(
+                              toolReference(
+                                binding.tool.id,
+                                binding.tool.version,
+                              ),
+                            )?.option.name ?? binding.tool.id}
+                          </p>
+                          <Badge variant="secondary">
+                            {binding.access === "read"
+                              ? "Read only"
+                              : "Can take action"}
+                          </Badge>
+                          <Badge variant="outline">
+                            Version {binding.tool.version}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Available{" "}
+                          {binding.allowedStages
+                            .map((stage) => stageLabels[stage])
+                            .join(", ")
+                            .toLocaleLowerCase()}
+                          .
+                        </p>
+                      </div>
+                      <form action={unbindConversationalTaskToolAction}>
+                        <input
+                          type="hidden"
+                          name="projectId"
+                          value={context.project.id}
+                        />
+                        <input type="hidden" name="taskId" value={task.id} />
+                        <input
+                          type="hidden"
+                          name="toolId"
+                          value={binding.tool.id}
+                        />
+                        <Button type="submit" size="icon" variant="ghost">
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">
+                            Remove {binding.tool.id}
+                          </span>
+                        </Button>
+                      </form>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
             {availableTools.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 All available project tools are already allowed.
@@ -154,54 +297,60 @@ export default async function TaskToolsPage({
                   value={context.project.id}
                 />
                 <input type="hidden" name="taskId" value={task.id} />
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="toolId">Tool</Label>
-                    <select
-                      id="toolId"
-                      name="toolId"
-                      className="h-9 w-full rounded-md border bg-white px-3 text-sm"
-                    >
-                      {availableTools.map((tool) => (
-                        <option key={tool.id} value={tool.id}>
-                          {tool.name} ({tool.access})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Permission</Label>
-                    <p className="flex h-9 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">
-                      Set by the versioned tool definition
-                    </p>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="toolRef">Tool</Label>
+                  <select
+                    id="toolRef"
+                    name="toolRef"
+                    className="h-9 w-full rounded-md border bg-white px-3 text-sm"
+                    defaultValue=""
+                    required
+                  >
+                    <option value="" disabled>
+                      Choose a ready tool
+                    </option>
+                    {availableTools.map(({ option, ready }) => (
+                      <option
+                        key={toolReference(option.id, option.version)}
+                        value={toolReference(option.id, option.version)}
+                        disabled={!ready}
+                      >
+                        {option.name} - {ready ? "Ready" : "Needs setup"}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <fieldset className="space-y-2">
+                <fieldset className="space-y-3">
                   <legend className="text-sm font-medium">
-                    Allowed Stages
+                    When Lia May Use It
                   </legend>
-                  <div className="flex flex-wrap gap-4">
-                    {["extraction", "lookup", "confirmation", "operation"].map(
-                      (stage) => (
-                        <label
-                          key={stage}
-                          className="flex items-center gap-2 text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            name={`stage_${stage}`}
-                            defaultChecked={stage === "operation"}
-                          />
-                          {stage}
-                        </label>
-                      ),
-                    )}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {Object.entries(stageLabels).map(([stage, label]) => (
+                      <label
+                        key={stage}
+                        className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          name={`stage_${stage}`}
+                          defaultChecked={stage === "operation"}
+                        />
+                        {label}
+                      </label>
+                    ))}
                   </div>
                 </fieldset>
+                {!hasReadyAvailableTool && (
+                  <p className="text-sm text-amber-800">
+                    Complete the setup shown in the Tool Library before allowing
+                    another tool.
+                  </p>
+                )}
                 <FormSubmitButton
                   label="Allow Tool"
-                  pendingLabel="Binding..."
+                  pendingLabel="Allowing..."
                   icon={<Plus className="h-4 w-4" />}
+                  disabled={!hasReadyAvailableTool}
                 />
               </ActionStateForm>
             )}

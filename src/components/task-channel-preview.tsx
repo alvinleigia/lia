@@ -56,7 +56,7 @@ export function TaskChannelPreview({
               </p>
               <p className="text-xs text-muted-foreground">
                 {definition.fields.length} field
-                {definition.fields.length === 1 ? "" : "s"} ·{" "}
+                {definition.fields.length === 1 ? "" : "s"} /{" "}
                 {definition.outcomes.length} outcome
                 {definition.outcomes.length === 1 ? "" : "s"}
               </p>
