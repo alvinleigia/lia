@@ -47,6 +47,7 @@ export async function getProjectConversationalTask(
 export async function createProjectConversationalTask(
   projectId: number,
   details: ConversationalTaskDetails,
+  definition: ConversationalTaskDefinitionV1 = DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
 ) {
   const [task] = await db
     .insert(conversationalTasks)
@@ -55,7 +56,7 @@ export async function createProjectConversationalTask(
       name: details.name,
       objective: details.objective,
       description: details.description || null,
-      definition: DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
+      definition,
     })
     .returning();
 
@@ -174,6 +175,7 @@ export async function updateProjectConversationalTask(
   projectId: number,
   taskId: number,
   details: ConversationalTaskDetails,
+  definition?: ConversationalTaskDefinitionV1,
 ) {
   const [task] = await db
     .update(conversationalTasks)
@@ -181,6 +183,7 @@ export async function updateProjectConversationalTask(
       name: details.name,
       objective: details.objective,
       description: details.description || null,
+      ...(definition ? { definition } : {}),
       updatedAt: new Date(),
     })
     .where(

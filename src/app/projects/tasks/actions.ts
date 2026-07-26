@@ -35,6 +35,10 @@ import {
   conversationalTaskDetailsSchema,
   conversationalTaskIdSchema,
 } from "@/lib/conversational-task-schema";
+import {
+  CONVERSATIONAL_TASK_TEMPLATE_KEYS,
+  createConversationalTaskDefinitionFromTemplate,
+} from "@/lib/conversational-task-templates";
 import { resolveProjectTaskToolDefinition } from "@/lib/conversational-task-tools";
 import { validateConversationalTaskForPublish } from "@/lib/conversational-task-validation";
 import {
@@ -49,6 +53,7 @@ import {
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 
 const projectIdSchema = z.coerce.number().int().positive();
+const taskCompletionActionSchema = z.enum(["return_to_knowledge", "end"]);
 
 function parseFieldOptionSource(formData: FormData) {
   const kind = formData.get("optionSourceKind");
@@ -93,16 +98,37 @@ export async function createConversationalTaskAction(
 ): Promise<ActionFormState> {
   const projectId = projectIdSchema.safeParse(formData.get("projectId"));
   const details = parseTaskDetails(formData);
+  const templateKey = z
+    .enum(CONVERSATIONAL_TASK_TEMPLATE_KEYS)
+    .safeParse(formData.get("templateKey"));
+  const completionAction = taskCompletionActionSchema.safeParse(
+    formData.get("completionAction"),
+  );
 
-  if (!projectId.success || !details.success) {
+  if (
+    !projectId.success ||
+    !details.success ||
+    !templateKey.success ||
+    !completionAction.success
+  ) {
     return { error: "Please check the task details." };
   }
 
   const context = await resolveStrictUserAndProject(projectId.data);
   assertPermission(context.membership, "company.project.manage");
+  const templateDefinition = createConversationalTaskDefinitionFromTemplate(
+    templateKey.data,
+  );
   const task = await createProjectConversationalTask(
     context.project.id,
     details.data,
+    {
+      ...templateDefinition,
+      returnPolicy: {
+        ...templateDefinition.returnPolicy,
+        completed: completionAction.data,
+      },
+    },
   );
 
   await writeAuditLog({
@@ -122,8 +148,11 @@ export async function updateConversationalTaskAction(
   formData: FormData,
 ): Promise<ActionFormState> {
   const details = parseTaskDetails(formData);
+  const completionAction = taskCompletionActionSchema.safeParse(
+    formData.get("completionAction"),
+  );
 
-  if (!details.success) {
+  if (!details.success || !completionAction.success) {
     return { error: "Please check the task details." };
   }
 
@@ -132,10 +161,18 @@ export async function updateConversationalTaskAction(
     return { error: "Restore the task before editing it." };
   }
 
+  const definition = readConversationalTaskDefinition(context.task.definition);
   const task = await updateProjectConversationalTask(
     context.project.id,
     context.task.id,
     details.data,
+    {
+      ...definition,
+      returnPolicy: {
+        ...definition.returnPolicy,
+        completed: completionAction.data,
+      },
+    },
   );
 
   if (!task) {

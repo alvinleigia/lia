@@ -19,7 +19,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormActionBar } from "@/components/ui/form-action-bar";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
-import { getProjectConversationalTask } from "@/lib/conversational-tasks";
+import {
+  getProjectConversationalTask,
+  readConversationalTaskDefinition,
+} from "@/lib/conversational-tasks";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
@@ -62,6 +65,7 @@ export default async function TaskDetailsPage({
   if (!task) {
     redirect("/projects/tasks?error=Task%20not%20found.");
   }
+  const definition = readConversationalTaskDefinition(task.definition);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-12">
@@ -134,6 +138,25 @@ export default async function TaskDetailsPage({
               <input type="hidden" name="taskId" value={task.id} />
               <fieldset disabled={task.isArchived}>
                 <ConversationalTaskDetailsFields defaultValues={task} />
+                <div className="mt-4 space-y-2">
+                  <label
+                    htmlFor="completionAction"
+                    className="text-sm font-medium"
+                  >
+                    After completion
+                  </label>
+                  <select
+                    id="completionAction"
+                    name="completionAction"
+                    defaultValue={definition.returnPolicy.completed}
+                    className="h-9 w-full rounded-md border bg-white px-3 text-sm"
+                  >
+                    <option value="return_to_knowledge">
+                      Continue helping the visitor
+                    </option>
+                    <option value="end">End the conversation</option>
+                  </select>
+                </div>
               </fieldset>
               {!task.isArchived && (
                 <FormActionBar

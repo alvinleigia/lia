@@ -19,6 +19,10 @@ import {
   conversationalTaskDetailsSchema,
   conversationalTaskIdSchema,
 } from "../../src/lib/conversational-task-schema";
+import {
+  CONVERSATIONAL_TASK_TEMPLATE_KEYS,
+  createConversationalTaskDefinitionFromTemplate,
+} from "../../src/lib/conversational-task-templates";
 import { validateConversationalTaskForPublish } from "../../src/lib/conversational-task-validation";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
@@ -59,6 +63,52 @@ test("conversational task ids accept only positive integers", () => {
   expect(conversationalTaskIdSchema.parse("42")).toBe(42);
   expect(conversationalTaskIdSchema.safeParse("0").success).toBe(false);
   expect(conversationalTaskIdSchema.safeParse("1.5").success).toBe(false);
+});
+
+test("task templates create valid definitions with fresh field and outcome ids", () => {
+  for (const templateKey of CONVERSATIONAL_TASK_TEMPLATE_KEYS) {
+    const first = createConversationalTaskDefinitionFromTemplate(templateKey);
+    const second = createConversationalTaskDefinitionFromTemplate(templateKey);
+
+    expect(conversationalTaskDefinitionV1Schema.safeParse(first).success).toBe(
+      true,
+    );
+    expect(
+      new Set([
+        ...first.fields.map((field) => field.id),
+        ...first.outcomes.map((outcome) => outcome.id),
+      ]).size,
+    ).toBe(first.fields.length + first.outcomes.length);
+    expect(first.outcomes.some((outcome) => outcome.type === "completed")).toBe(
+      true,
+    );
+    expect(first.outcomes.some((outcome) => outcome.type === "cancelled")).toBe(
+      true,
+    );
+    expect(first.outcomes[0]?.id).not.toBe(second.outcomes[0]?.id);
+  }
+});
+
+test("booking template keeps catalog choices channel independent", () => {
+  const definition = createConversationalTaskDefinitionFromTemplate("booking");
+
+  expect(definition.fields[0]).toMatchObject({
+    key: "serviceCategoryId",
+    optionSource: {
+      collectionKey: null,
+      kind: "project_resource",
+      resourceType: "serviceCategory",
+    },
+  });
+  expect(definition.fields[1]).toMatchObject({
+    dependsOn: ["serviceCategoryId"],
+    key: "serviceId",
+    optionSource: {
+      filterByField: "serviceCategoryId",
+      kind: "project_resource",
+      resourceType: "service",
+    },
+  });
 });
 
 test("reference booking fixture satisfies the universal contracts", () => {
