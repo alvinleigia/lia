@@ -80,6 +80,31 @@ function getMappedValue(fields: Record<string, unknown>, path: string) {
   }, fields);
 }
 
+function setMappedValue(
+  target: Record<string, unknown>,
+  path: string,
+  value: unknown,
+) {
+  const keys = path.split(".").filter(Boolean);
+  if (
+    keys.some((key) => ["__proto__", "constructor", "prototype"].includes(key))
+  ) {
+    return;
+  }
+  let current = target;
+  keys.forEach((key, index) => {
+    if (index === keys.length - 1) {
+      current[key] = value;
+      return;
+    }
+    const child = current[key];
+    if (!child || typeof child !== "object" || Array.isArray(child)) {
+      current[key] = {};
+    }
+    current = current[key] as Record<string, unknown>;
+  });
+}
+
 function buildInputPayload(
   fields: Record<string, unknown>,
   inputMapping: Record<string, unknown>,
@@ -210,6 +235,27 @@ export function getOperationAttemptMappedOutput(input: {
     responsePayload: input.attempt.responsePayload,
     status: input.attempt.status as OperationAttemptStatus,
   });
+}
+
+export function getOperationAttemptToolResult(input: {
+  attempt: SelectOperationAttempt;
+  operation: SelectOperation;
+}) {
+  const context = {
+    attemptId: input.attempt.id,
+    errorMessage: input.attempt.errorMessage ?? null,
+    requestPayload: input.attempt.requestPayload,
+    responsePayload: input.attempt.responsePayload,
+    status: input.attempt.status,
+  };
+  const result: Record<string, unknown> = {};
+  for (const source of Object.values(input.operation.outputMapping)) {
+    if (typeof source !== "string") continue;
+    const sourcePath = source.replace(/^responsePayload\./, "").trim();
+    if (!/^[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/.test(sourcePath)) continue;
+    setMappedValue(result, sourcePath, getOutputMappingValue(context, source));
+  }
+  return result;
 }
 
 export async function createIntegrationProvider(
@@ -522,6 +568,34 @@ export async function getProjectOperationAttemptWithDetails(
   return row ?? null;
 }
 
+export async function reconcileOperationAttemptOutcome(input: {
+  attemptId: number;
+  errorMessage?: string | null;
+  projectId: number;
+  responsePayload?: Record<string, unknown>;
+  status: "completed" | "failed";
+}) {
+  const [attempt] = await db
+    .update(operationAttempts)
+    .set({
+      errorMessage:
+        input.status === "completed" ? null : (input.errorMessage ?? null),
+      finishedAt: new Date(),
+      responsePayload: input.responsePayload ?? {},
+      status: input.status,
+    })
+    .where(
+      and(
+        eq(operationAttempts.projectId, input.projectId),
+        eq(operationAttempts.id, input.attemptId),
+        eq(operationAttempts.status, "outcome_unknown"),
+      ),
+    )
+    .returning();
+
+  return attempt ?? null;
+}
+
 async function executeProvider(input: {
   config: Record<string, unknown>;
   idempotencyKey: string;
@@ -832,6 +906,7 @@ async function postWebhookAttempt(input: {
 
     return {
       ok: response.ok,
+      outcomeKnown: true,
       attemptPayload: {
         body: parsedBody,
         durationMs: Date.now() - startedAt,
@@ -845,6 +920,7 @@ async function postWebhookAttempt(input: {
   } catch (error) {
     return {
       ok: false,
+      outcomeKnown: false,
       attemptPayload: {
         durationMs: Date.now() - startedAt,
         error:
@@ -894,6 +970,7 @@ async function executeWebhookProvider(
   };
   const attempts = [];
   let lastErrorMessage = "Webhook request failed.";
+  let outcomeUnknown = false;
 
   for (let attemptIndex = 0; attemptIndex <= retryCount; attemptIndex += 1) {
     if (attemptIndex > 0 && retryDelayMs > 0) {
@@ -911,6 +988,7 @@ async function executeWebhookProvider(
       ...result.attemptPayload,
     });
     lastErrorMessage = result.errorMessage ?? lastErrorMessage;
+    outcomeUnknown ||= !result.outcomeKnown;
 
     if (result.ok) {
       return {
@@ -926,7 +1004,7 @@ async function executeWebhookProvider(
   }
 
   return {
-    status: "failed" as const,
+    status: outcomeUnknown ? ("outcome_unknown" as const) : ("failed" as const),
     responsePayload: {
       attempts,
       finalAttempt: attempts.length,
@@ -1404,6 +1482,122 @@ export async function queueOperationForSubmission(input: {
   });
 }
 
+export async function queueOperationForConversationalTask(input: {
+  confirmationId: number;
+  idempotencyKey: string;
+  operationId: number;
+  payload: Record<string, unknown>;
+  projectId: number;
+  taskRunId: number;
+  taskToolRequestId: number;
+  taskVersionId: number;
+  traceId?: string | null;
+}) {
+  const operationContext = await getProjectOperation(
+    input.projectId,
+    input.operationId,
+  );
+  if (!operationContext) return null;
+
+  const { operation, provider } = operationContext;
+  if (operation.status !== "active" || provider.status !== "active") {
+    return null;
+  }
+
+  const traceId = resolveTraceId(input.traceId);
+  const requestPayload = {
+    idempotencyKey: input.idempotencyKey,
+    operationType: operation.operationType,
+    payload: input.payload,
+    taskRunId: input.taskRunId,
+    taskVersionId: input.taskVersionId,
+    toolRequestId: input.taskToolRequestId,
+  };
+  const retryConfig = getRetryQueueConfig(provider.config);
+  const maxAttempts = retryConfig.enabled ? retryConfig.maxAttempts + 1 : 1;
+
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx
+      .insert(operationAttempts)
+      .values({
+        idempotencyKey: input.idempotencyKey,
+        operationId: operation.id,
+        projectId: input.projectId,
+        providerId: provider.id,
+        requestPayload,
+        status: "pending",
+        taskConfirmationId: input.confirmationId,
+        taskRunId: input.taskRunId,
+        taskToolRequestId: input.taskToolRequestId,
+        taskVersionId: input.taskVersionId,
+        traceId,
+      })
+      .onConflictDoNothing()
+      .returning();
+    const reservedAttempt =
+      attempt ??
+      (
+        await tx
+          .select()
+          .from(operationAttempts)
+          .where(
+            and(
+              eq(operationAttempts.projectId, input.projectId),
+              eq(operationAttempts.idempotencyKey, input.idempotencyKey),
+            ),
+          )
+          .limit(1)
+      )[0];
+    if (
+      !reservedAttempt ||
+      reservedAttempt.taskRunId !== input.taskRunId ||
+      reservedAttempt.taskVersionId !== input.taskVersionId ||
+      reservedAttempt.taskToolRequestId !== input.taskToolRequestId ||
+      reservedAttempt.taskConfirmationId !== input.confirmationId
+    ) {
+      throw new Error("Could not reserve the task operation attempt.");
+    }
+
+    const [job] = await tx
+      .insert(durableJobs)
+      .values({
+        dedupeKey: input.idempotencyKey,
+        jobType: "operation_delivery",
+        maxAttempts,
+        operationAttemptId: reservedAttempt.id,
+        payload: { operationAttemptId: reservedAttempt.id },
+        projectId: input.projectId,
+        traceId: reservedAttempt.traceId ?? traceId,
+      })
+      .onConflictDoNothing()
+      .returning();
+    const reservedJob =
+      job ??
+      (
+        await tx
+          .select()
+          .from(durableJobs)
+          .where(
+            and(
+              eq(durableJobs.projectId, input.projectId),
+              eq(durableJobs.jobType, "operation_delivery"),
+              eq(durableJobs.dedupeKey, input.idempotencyKey),
+            ),
+          )
+          .limit(1)
+      )[0];
+    if (!reservedJob) {
+      throw new Error("Could not reserve the durable task operation job.");
+    }
+
+    return {
+      attempt: reservedAttempt,
+      created: Boolean(attempt && job),
+      job: reservedJob,
+    };
+  });
+}
+
 async function recordDurableOperationResult(input: {
   attempt: SelectOperationAttempt;
   errorMessage?: string | null;
@@ -1412,7 +1606,7 @@ async function recordDurableOperationResult(input: {
   projectId: number;
   providerType: string;
   responsePayload: Record<string, unknown>;
-  status: "completed" | "failed";
+  status: "completed" | "failed" | "outcome_unknown";
   traceId: string;
 }) {
   const finishedAt = input.final ? new Date() : null;
@@ -1437,11 +1631,15 @@ async function recordDurableOperationResult(input: {
       eventType:
         input.status === "completed"
           ? "operation.completed"
-          : "operation.failed",
+          : input.status === "outcome_unknown"
+            ? "operation.outcome_unknown"
+            : "operation.failed",
       message:
         input.status === "completed"
           ? `Operation "${input.operation.name}" completed.`
-          : `Operation "${input.operation.name}" failed after durable retries.`,
+          : input.status === "outcome_unknown"
+            ? `Operation "${input.operation.name}" needs reconciliation.`
+            : `Operation "${input.operation.name}" failed after durable retries.`,
       payload: {
         attemptId: input.attempt.id,
         operationId: input.operation.id,
@@ -1539,6 +1737,32 @@ export async function processProjectDurableOperationQueue(input: {
           workerId: input.workerId,
         });
         completed += 1;
+        continue;
+      }
+
+      if (result.status === "outcome_unknown") {
+        await recordDurableOperationResult({
+          attempt,
+          errorMessage:
+            result.errorMessage ?? "The provider outcome is unknown.",
+          final: true,
+          operation,
+          projectId: input.projectId,
+          providerType: provider.providerType,
+          responsePayload: result.responsePayload,
+          status: "outcome_unknown",
+          traceId: job.traceId,
+        });
+        await completeDurableJob({
+          jobId: job.id,
+          projectId: input.projectId,
+          result: {
+            operationAttemptId: attempt.id,
+            status: "outcome_unknown",
+          },
+          workerId: input.workerId,
+        });
+        failed += 1;
         continue;
       }
 

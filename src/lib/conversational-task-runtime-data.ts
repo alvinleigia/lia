@@ -4,6 +4,7 @@ import { db } from "@/lib/db-config";
 import {
   channelMessages,
   conversationalTaskAuditEvents,
+  conversationalTaskConfirmations,
   conversationalTaskContextValues,
   conversationalTaskFieldValues,
   conversationalTaskRuns,
@@ -33,61 +34,72 @@ export async function getConversationalTaskRuntime(input: {
     .limit(1);
   if (!run) return null;
 
-  const [execution, fields, context, tools, audit] = await Promise.all([
-    db
-      .select()
-      .from(conversationExecutionStates)
-      .where(
-        and(
-          eq(conversationExecutionStates.projectId, input.projectId),
-          eq(conversationExecutionStates.conversationId, run.conversationId),
-        ),
-      )
-      .limit(1)
-      .then(([row]) => row ?? null),
-    db
-      .select()
-      .from(conversationalTaskFieldValues)
-      .where(
-        and(
-          eq(conversationalTaskFieldValues.projectId, input.projectId),
-          eq(conversationalTaskFieldValues.taskRunId, run.id),
-        ),
-      )
-      .orderBy(asc(conversationalTaskFieldValues.id)),
-    db
-      .select()
-      .from(conversationalTaskContextValues)
-      .where(
-        and(
-          eq(conversationalTaskContextValues.projectId, input.projectId),
-          eq(conversationalTaskContextValues.taskRunId, run.id),
-        ),
-      )
-      .orderBy(asc(conversationalTaskContextValues.id)),
-    db
-      .select()
-      .from(conversationalTaskToolRequests)
-      .where(
-        and(
-          eq(conversationalTaskToolRequests.projectId, input.projectId),
-          eq(conversationalTaskToolRequests.taskRunId, run.id),
-        ),
-      )
-      .orderBy(desc(conversationalTaskToolRequests.requestedAt)),
-    db
-      .select()
-      .from(conversationalTaskAuditEvents)
-      .where(
-        and(
-          eq(conversationalTaskAuditEvents.projectId, input.projectId),
-          eq(conversationalTaskAuditEvents.taskRunId, run.id),
-        ),
-      )
-      .orderBy(asc(conversationalTaskAuditEvents.createdAt)),
-  ]);
+  const [execution, fields, context, tools, confirmations, audit] =
+    await Promise.all([
+      db
+        .select()
+        .from(conversationExecutionStates)
+        .where(
+          and(
+            eq(conversationExecutionStates.projectId, input.projectId),
+            eq(conversationExecutionStates.conversationId, run.conversationId),
+          ),
+        )
+        .limit(1)
+        .then(([row]) => row ?? null),
+      db
+        .select()
+        .from(conversationalTaskFieldValues)
+        .where(
+          and(
+            eq(conversationalTaskFieldValues.projectId, input.projectId),
+            eq(conversationalTaskFieldValues.taskRunId, run.id),
+          ),
+        )
+        .orderBy(asc(conversationalTaskFieldValues.id)),
+      db
+        .select()
+        .from(conversationalTaskContextValues)
+        .where(
+          and(
+            eq(conversationalTaskContextValues.projectId, input.projectId),
+            eq(conversationalTaskContextValues.taskRunId, run.id),
+          ),
+        )
+        .orderBy(asc(conversationalTaskContextValues.id)),
+      db
+        .select()
+        .from(conversationalTaskToolRequests)
+        .where(
+          and(
+            eq(conversationalTaskToolRequests.projectId, input.projectId),
+            eq(conversationalTaskToolRequests.taskRunId, run.id),
+          ),
+        )
+        .orderBy(desc(conversationalTaskToolRequests.requestedAt)),
+      db
+        .select()
+        .from(conversationalTaskConfirmations)
+        .where(
+          and(
+            eq(conversationalTaskConfirmations.projectId, input.projectId),
+            eq(conversationalTaskConfirmations.taskRunId, run.id),
+          ),
+        )
+        .orderBy(desc(conversationalTaskConfirmations.createdAt)),
+      db
+        .select()
+        .from(conversationalTaskAuditEvents)
+        .where(
+          and(
+            eq(conversationalTaskAuditEvents.projectId, input.projectId),
+            eq(conversationalTaskAuditEvents.taskRunId, run.id),
+          ),
+        )
+        .orderBy(asc(conversationalTaskAuditEvents.createdAt)),
+    ]);
 
-  return { audit, context, execution, fields, run, tools };
+  return { audit, confirmations, context, execution, fields, run, tools };
 }
 
 export async function exportConversationRuntimeData(input: {
@@ -105,7 +117,7 @@ export async function exportConversationRuntimeData(input: {
     )
     .orderBy(asc(conversationalTaskRuns.createdAt));
   const runIds = runs.map(({ id }) => id);
-  const [execution, fields, context, tools, audit, messages] =
+  const [execution, fields, context, tools, confirmations, audit, messages] =
     await Promise.all([
       db
         .select()
@@ -154,6 +166,17 @@ export async function exportConversationRuntimeData(input: {
               ),
             )
         : [],
+      runIds.length
+        ? db
+            .select()
+            .from(conversationalTaskConfirmations)
+            .where(
+              and(
+                eq(conversationalTaskConfirmations.projectId, input.projectId),
+                inArray(conversationalTaskConfirmations.taskRunId, runIds),
+              ),
+            )
+        : [],
       db
         .select()
         .from(conversationalTaskAuditEvents)
@@ -177,7 +200,16 @@ export async function exportConversationRuntimeData(input: {
         ),
     ]);
 
-  return { audit, context, execution, fields, messages, runs, tools };
+  return {
+    audit,
+    confirmations,
+    context,
+    execution,
+    fields,
+    messages,
+    runs,
+    tools,
+  };
 }
 
 export async function deleteConversationRuntimeData(input: {
@@ -223,6 +255,14 @@ export async function deleteConversationRuntimeData(input: {
           and(
             eq(conversationalTaskToolRequests.projectId, input.projectId),
             inArray(conversationalTaskToolRequests.taskRunId, runIds),
+          ),
+        );
+      await tx
+        .delete(conversationalTaskConfirmations)
+        .where(
+          and(
+            eq(conversationalTaskConfirmations.projectId, input.projectId),
+            inArray(conversationalTaskConfirmations.taskRunId, runIds),
           ),
         );
       await tx

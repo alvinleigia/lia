@@ -155,6 +155,21 @@ const inboundEventPayloadV1Schema = z.discriminatedUnion("type", [
     outcomeKey: fieldKey,
   }),
   z.object({
+    type: z.literal("task.fail"),
+    outcomeKey: fieldKey,
+    reason: z.enum([
+      "provider_failure",
+      "timeout",
+      "validation",
+      "unavailable",
+    ]),
+  }),
+  z.object({
+    type: z.literal("task.handoff"),
+    outcomeKey: fieldKey.nullable().default(null),
+    reason: z.string().trim().min(1).max(240),
+  }),
+  z.object({
     type: z.literal("task.side_question"),
     category: z.string().trim().min(1).max(120),
   }),
@@ -196,6 +211,10 @@ export const inboundEventV1Schema = inboundEventEnvelopeV1Schema
   .superRefine((event, context) => {
     if (
       (event.type === "tool.result" ||
+        event.type === "task.fail" ||
+        event.type === "task.handoff" ||
+        (event.type === "tool.requested" &&
+          (event.stage === "confirmation" || event.stage === "operation")) ||
         (event.type === "owner.change" && event.responseOwner === "human")) &&
       !event.authentication
     ) {

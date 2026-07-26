@@ -36,6 +36,7 @@ import {
   channelConversations,
   contacts,
   conversationalTaskAuditEvents,
+  conversationalTaskConfirmations,
   conversationalTaskContextValues,
   conversationalTaskFieldValues,
   conversationalTaskRuns,
@@ -170,6 +171,10 @@ function safeEventSummary(event: InboundEventV1) {
     case "task.cancel":
     case "task.complete":
       return { outcomeKey: event.outcomeKey };
+    case "task.fail":
+      return { outcomeKey: event.outcomeKey, reason: event.reason };
+    case "task.handoff":
+      return { outcomeKey: event.outcomeKey, reason: event.reason };
     case "task.restart":
       return { restarted: true };
     case "task.side_question":
@@ -1031,6 +1036,8 @@ function eventAllowedForRunStatus(event: InboundEventV1, runStatus: string) {
   return [
     "session.rotate",
     "task.cancel",
+    "task.fail",
+    "task.handoff",
     "task.restart",
     "task.resume",
     "tool.result",
@@ -1372,6 +1379,37 @@ export async function applyConversationalTaskEvent(
       [...fields].map(([key, field]) => [key, field.canonicalValue]),
     );
 
+    if (
+      event.type === "field.candidates" ||
+      event.type === "field.clear" ||
+      event.type === "task.restart"
+    ) {
+      const [inFlightConfirmation] = await tx
+        .select({ id: conversationalTaskConfirmations.id })
+        .from(conversationalTaskConfirmations)
+        .where(
+          and(
+            eq(conversationalTaskConfirmations.projectId, event.projectId),
+            eq(conversationalTaskConfirmations.taskRunId, run.id),
+            inArray(conversationalTaskConfirmations.status, [
+              "executing",
+              "outcome_unknown",
+            ]),
+          ),
+        )
+        .limit(1);
+      if (inFlightConfirmation) {
+        return quarantineEvent(tx, {
+          conversationId: event.conversationId,
+          eventDbId: eventRow.id,
+          eventType: event.type,
+          projectId: event.projectId,
+          reason: "operation_reconciliation_required",
+          taskRunId: run.id,
+        });
+      }
+    }
+
     const referencedFieldKeys =
       event.type === "field.candidates"
         ? event.candidates.map(({ fieldKey }) => fieldKey)
@@ -1401,6 +1439,31 @@ export async function applyConversationalTaskEvent(
         eventType: event.type,
         projectId: event.projectId,
         reason: "completed_outcome_not_found",
+        taskRunId: run.id,
+      });
+    }
+    if (
+      event.type === "task.complete" &&
+      snapshot.toolDefinitions.some(
+        ({ access, requiredForCompletion }) =>
+          access === "write" && requiredForCompletion,
+      ) &&
+      snapshot.task.definition.fields.some((definition) => {
+        const field = fields.get(definition.key);
+        return (
+          definition.confirmation !== "never" &&
+          field?.canonicalValue !== null &&
+          field?.canonicalValue !== undefined &&
+          field.state !== "confirmed"
+        );
+      })
+    ) {
+      return quarantineEvent(tx, {
+        conversationId: event.conversationId,
+        eventDbId: eventRow.id,
+        eventType: event.type,
+        projectId: event.projectId,
+        reason: "confirmation_required",
         taskRunId: run.id,
       });
     }
@@ -1470,6 +1533,39 @@ export async function applyConversationalTaskEvent(
         eventType: event.type,
         projectId: event.projectId,
         reason: "cancelled_outcome_not_found",
+        taskRunId: run.id,
+      });
+    }
+    if (
+      event.type === "task.fail" &&
+      !snapshot.task.definition.outcomes.some(
+        (outcome) =>
+          outcome.key === event.outcomeKey && outcome.type === "failed",
+      )
+    ) {
+      return quarantineEvent(tx, {
+        conversationId: event.conversationId,
+        eventDbId: eventRow.id,
+        eventType: event.type,
+        projectId: event.projectId,
+        reason: "failed_outcome_not_found",
+        taskRunId: run.id,
+      });
+    }
+    if (
+      event.type === "task.handoff" &&
+      event.outcomeKey &&
+      !snapshot.task.definition.outcomes.some(
+        (outcome) =>
+          outcome.key === event.outcomeKey && outcome.type === "handoff",
+      )
+    ) {
+      return quarantineEvent(tx, {
+        conversationId: event.conversationId,
+        eventDbId: eventRow.id,
+        eventType: event.type,
+        projectId: event.projectId,
+        reason: "handoff_outcome_not_found",
         taskRunId: run.id,
       });
     }
@@ -1641,6 +1737,41 @@ export async function applyConversationalTaskEvent(
         executionChanges.suspendedReturnTarget = null;
         break;
       }
+      case "task.fail": {
+        const returnMode = snapshot.task.definition.returnPolicy.failed;
+        runChanges.completedAt = receivedAt;
+        runChanges.outcomeKey = event.outcomeKey;
+        runChanges.status = returnMode === "handoff" ? "handoff" : "completed";
+        executionChanges.activeNodeId = null;
+        executionChanges.executionMode =
+          returnMode === "handoff" ? "human" : "knowledge";
+        executionChanges.responseOwner =
+          returnMode === "handoff" ? "human" : "knowledge";
+        executionChanges.status = returnMode === "end" ? "closed" : "active";
+        executionChanges.suspendedReturnTarget =
+          returnMode === "handoff"
+            ? { outcomeKey: event.outcomeKey, reason: event.reason }
+            : null;
+        if (returnMode !== "handoff") {
+          executionChanges.activeTaskRunId = null;
+          executionChanges.activeTaskVersionId = null;
+        }
+        break;
+      }
+      case "task.handoff":
+        runChanges.outcomeKey = event.outcomeKey;
+        runChanges.status = "handoff";
+        runChanges.suspendedReturnTarget = {
+          outcomeKey: event.outcomeKey,
+          reason: event.reason,
+        };
+        executionChanges.executionMode = "human";
+        executionChanges.responseOwner = "human";
+        executionChanges.suspendedReturnTarget = {
+          outcomeKey: event.outcomeKey,
+          reason: event.reason,
+        };
+        break;
       case "task.side_question": {
         const returnTarget = {
           lastRequestedFieldKey: run.lastRequestedFieldKey,
@@ -1765,7 +1896,10 @@ export async function applyConversationalTaskEvent(
               eq(conversationalTaskToolRequests.projectId, event.projectId),
               eq(conversationalTaskToolRequests.taskRunId, run.id),
               eq(conversationalTaskToolRequests.requestId, event.requestId),
-              eq(conversationalTaskToolRequests.status, "pending"),
+              inArray(conversationalTaskToolRequests.status, [
+                "pending",
+                "outcome_unknown",
+              ]),
             ),
           )
           .returning();
@@ -1931,6 +2065,48 @@ export async function applyConversationalTaskEvent(
             eq(conversationalTaskFieldValues.fieldKey, key),
           ),
         );
+    }
+
+    const shouldInvalidateConfirmation =
+      event.type === "field.clear" ||
+      event.type === "task.restart" ||
+      (event.type === "field.candidates" &&
+        [...fieldUpdates.values()].some(
+          ({ changed, dependencyInvalidated }) =>
+            changed || dependencyInvalidated,
+        ));
+    if (shouldInvalidateConfirmation) {
+      const invalidated = await tx
+        .update(conversationalTaskConfirmations)
+        .set({
+          invalidatedAt: receivedAt,
+          status: "invalidated",
+          updatedAt: receivedAt,
+        })
+        .where(
+          and(
+            eq(conversationalTaskConfirmations.projectId, event.projectId),
+            eq(conversationalTaskConfirmations.taskRunId, run.id),
+            inArray(conversationalTaskConfirmations.status, [
+              "pending",
+              "confirmed",
+            ]),
+          ),
+        )
+        .returning({ id: conversationalTaskConfirmations.id });
+      if (invalidated.length > 0) {
+        await recordAudit(tx, {
+          conversationId: event.conversationId,
+          eventType: "confirmation.invalidated",
+          inboundEventId: eventRow.id,
+          projectId: event.projectId,
+          summary: {
+            confirmationIds: invalidated.map(({ id }) => id),
+            reason: event.type,
+          },
+          taskRunId: run.id,
+        });
+      }
     }
 
     await tx

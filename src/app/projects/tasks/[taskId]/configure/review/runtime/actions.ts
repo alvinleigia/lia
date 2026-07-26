@@ -7,6 +7,13 @@ import type { ActionFormState } from "@/lib/action-form-state";
 import { getOrCreateChannelConversation } from "@/lib/channels";
 import { resolveConversationalTaskMutation } from "@/lib/conversational-task-access";
 import {
+  confirmTaskOperation,
+  executeConfirmedTaskOperation,
+  prepareTaskOperationConfirmation,
+  processAndReconcileTaskOperation,
+  reconcileUnknownTaskOperation,
+} from "@/lib/conversational-task-operations";
+import {
   applyConversationalTaskEvent,
   deleteConversationRuntimeData,
   startConversationalTaskRun,
@@ -40,6 +47,16 @@ const lifecycleSchema = z.enum([
 const toolRequestSchema = z.object({
   toolId: z.string().trim().min(1).max(120),
 });
+const operationConfirmationSchema = z.object({
+  confirmationId: z.coerce.number().int().positive(),
+});
+const operationToolSchema = z.object({
+  toolId: z.string().trim().min(1).max(120),
+});
+const operationReconciliationSchema = operationConfirmationSchema.extend({
+  responsePayload: z.string().trim().max(20_000).optional().default(""),
+  status: z.enum(["completed", "failed"]),
+});
 
 const toolErrorMessages: Record<string, string> = {
   pinned_tool_definition_not_found:
@@ -58,6 +75,10 @@ function runtimePath(taskId: number) {
 
 function runtimeChannelIdentity(userId: number) {
   return { purpose: "task_runtime_test", userId };
+}
+
+function runtimePrincipal(userId: number) {
+  return { kind: "user" as const, principal: String(userId) };
 }
 
 function addHours(date: Date, hours: number) {
@@ -153,6 +174,20 @@ function redirectWithResult(
   if (error) {
     redirect(`${runtimePath(taskId)}?error=${encodeURIComponent(error)}`);
   }
+  redirect(`${runtimePath(taskId)}?event=${encodeURIComponent(event)}`);
+}
+
+function operationActionError(error: unknown) {
+  return {
+    error:
+      error instanceof Error
+        ? error.message
+        : "The task operation could not be updated.",
+  };
+}
+
+function operationEvent(taskId: number, event: string): never {
+  revalidatePath(runtimePath(taskId));
   redirect(`${runtimePath(taskId)}?event=${encodeURIComponent(event)}`);
 }
 
@@ -361,6 +396,169 @@ export async function requestTaskRuntimeTestToolAction(
 
   revalidatePath(runtimePath(test.task.id));
   redirect(`${runtimePath(test.task.id)}?event=tool_completed`);
+}
+
+export async function prepareTaskRuntimeOperationAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const parsed = operationToolSchema.safeParse({
+    toolId: formData.get("toolId"),
+  });
+  if (!parsed.success) return { error: "Choose a published write operation." };
+
+  const test = await resolveRuntimeTest(formData);
+  let active: ReturnType<typeof requireActiveRuntime>;
+  try {
+    active = requireActiveRuntime(test);
+    await prepareTaskOperationConfirmation({
+      projectId: test.project.id,
+      taskRunId: active.runtime.run.id,
+      toolId: parsed.data.toolId,
+    });
+  } catch (error) {
+    return operationActionError(error);
+  }
+  operationEvent(test.task.id, "operation_prepared");
+}
+
+export async function confirmTaskRuntimeOperationAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const parsed = operationConfirmationSchema.safeParse({
+    confirmationId: formData.get("confirmationId"),
+  });
+  if (!parsed.success) return { error: "Prepare the confirmation first." };
+
+  const test = await resolveRuntimeTest(formData);
+  let active: ReturnType<typeof requireActiveRuntime>;
+  try {
+    active = requireActiveRuntime(test);
+    await confirmTaskOperation({
+      confirmationId: parsed.data.confirmationId,
+      principal: runtimePrincipal(test.user.id),
+      projectId: test.project.id,
+      taskRunId: active.runtime.run.id,
+    });
+  } catch (error) {
+    return operationActionError(error);
+  }
+  operationEvent(test.task.id, "operation_confirmed");
+}
+
+export async function executeTaskRuntimeOperationAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const parsed = operationConfirmationSchema.safeParse({
+    confirmationId: formData.get("confirmationId"),
+  });
+  if (!parsed.success) return { error: "Confirm the operation first." };
+
+  const test = await resolveRuntimeTest(formData);
+  let active: ReturnType<typeof requireActiveRuntime>;
+  let created = false;
+  try {
+    active = requireActiveRuntime(test);
+    const result = await executeConfirmedTaskOperation({
+      confirmationId: parsed.data.confirmationId,
+      principal: runtimePrincipal(test.user.id),
+      projectId: test.project.id,
+      taskRunId: active.runtime.run.id,
+    });
+    created = result.created;
+  } catch (error) {
+    return operationActionError(error);
+  }
+  operationEvent(
+    test.task.id,
+    created ? "operation_queued" : "operation_duplicate_prevented",
+  );
+}
+
+export async function processTaskRuntimeOperationAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const parsed = operationConfirmationSchema.safeParse({
+    confirmationId: formData.get("confirmationId"),
+  });
+  if (!parsed.success) return { error: "Queue the operation first." };
+
+  const test = await resolveRuntimeTest(formData);
+  let status = "pending";
+  try {
+    requireActiveRuntime(test);
+    const result = await processAndReconcileTaskOperation({
+      confirmationId: parsed.data.confirmationId,
+      principal: runtimePrincipal(test.user.id),
+      projectId: test.project.id,
+      workerId: `runtime-test-user-${test.user.id}`,
+    });
+    status = result.attempt.status;
+  } catch (error) {
+    return operationActionError(error);
+  }
+  operationEvent(
+    test.task.id,
+    status === "completed"
+      ? "operation_completed"
+      : status === "outcome_unknown"
+        ? "operation_outcome_unknown"
+        : status === "failed"
+          ? "operation_failed"
+          : "operation_pending",
+  );
+}
+
+export async function reconcileTaskRuntimeOperationAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const parsed = operationReconciliationSchema.safeParse({
+    confirmationId: formData.get("confirmationId"),
+    responsePayload: formData.get("responsePayload"),
+    status: formData.get("status"),
+  });
+  if (!parsed.success) return { error: "Choose a reconciliation result." };
+
+  let responsePayload: Record<string, unknown> = {};
+  if (parsed.data.responsePayload) {
+    try {
+      const value: unknown = JSON.parse(parsed.data.responsePayload);
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return { error: "The provider result must be a JSON object." };
+      }
+      responsePayload = value as Record<string, unknown>;
+    } catch {
+      return { error: "Enter valid JSON for the provider result." };
+    }
+  }
+
+  const test = await resolveRuntimeTest(formData);
+  try {
+    requireActiveRuntime(test);
+    await reconcileUnknownTaskOperation({
+      confirmationId: parsed.data.confirmationId,
+      errorMessage:
+        parsed.data.status === "failed"
+          ? "An authorized operator confirmed provider failure."
+          : null,
+      principal: runtimePrincipal(test.user.id),
+      projectId: test.project.id,
+      responsePayload,
+      status: parsed.data.status,
+    });
+  } catch (error) {
+    return operationActionError(error);
+  }
+  operationEvent(
+    test.task.id,
+    parsed.data.status === "completed"
+      ? "operation_reconciled_completed"
+      : "operation_reconciled_failed",
+  );
 }
 
 export async function applyTaskRuntimeTestLifecycleAction(formData: FormData) {

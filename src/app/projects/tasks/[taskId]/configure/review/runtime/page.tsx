@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getTaskOperationAttempt } from "@/lib/conversational-task-operations";
 import {
   getConversationTaskRuntimeSession,
   getTaskRuntimeTestConversationId,
@@ -59,6 +60,7 @@ import {
   switchTaskRuntimeTestAction,
   updateTaskRuntimeTestFieldAction,
 } from "./actions";
+import { OperationTestPanel } from "./operation-test-panel";
 
 type PageProps = {
   params: Promise<{ taskId: string }>;
@@ -72,6 +74,22 @@ const eventMessages: Record<string, string> = {
   field_corrected: "The value was corrected and dependent fields were checked.",
   field_requested: "The selected field is now the requested field.",
   field_saved: "The test value was validated and saved.",
+  operation_completed:
+    "The confirmed operation completed and the task outcome was recorded.",
+  operation_confirmed: "The current operation summary was confirmed.",
+  operation_duplicate_prevented:
+    "Duplicate protection reused the existing durable operation attempt.",
+  operation_failed:
+    "The operation failed and the configured failure outcome was recorded.",
+  operation_outcome_unknown:
+    "The provider outcome is uncertain. Manual reconciliation is required.",
+  operation_pending: "The operation is still waiting in the durable queue.",
+  operation_prepared: "Review the operation summary before confirming it.",
+  operation_queued: "The confirmed operation was queued once.",
+  operation_reconciled_completed:
+    "The uncertain provider outcome was reconciled as completed.",
+  operation_reconciled_failed:
+    "The uncertain provider outcome was reconciled as failed.",
   pause: "The task is paused without losing its execution position.",
   reset: "The isolated runtime test data was reset.",
   restart: "The task restarted and its collected values were cleared.",
@@ -130,6 +148,7 @@ const toolStatusLabels: Record<string, string> = {
   completed: "Completed",
   failed: "Provider failed",
   no_result: "No current result",
+  outcome_unknown: "Outcome unknown",
   pending: "Waiting",
   processing: "Running",
   provider_failure: "Provider failed",
@@ -210,9 +229,7 @@ export default async function TaskRuntimeTestPage({
   const execution = session.execution;
   const isActive =
     Boolean(runtime && execution?.activeTaskRunId === runtime.run.id) &&
-    runtime?.run.status !== "completed" &&
-    runtime?.run.status !== "cancelled" &&
-    runtime?.run.status !== "abandoned";
+    ["active", "paused", "waiting"].includes(runtime?.run.status ?? "");
   const isPaused =
     runtime?.run.status === "paused" || runtime?.run.status === "waiting";
   const isAnsweringSideQuestion =
@@ -245,6 +262,27 @@ export default async function TaskRuntimeTestPage({
         definition.execution.mode === "synchronous"
       );
     }) ?? [];
+  const writeOperations =
+    session.snapshot?.toolDefinitions.flatMap((definition) => {
+      const binding = toolBindings.find(
+        (candidate) =>
+          candidate.tool.id === definition.id &&
+          candidate.tool.version === definition.version,
+      );
+      return binding?.access === "write" &&
+        binding.allowedStages.includes("operation") &&
+        definition.access === "write" &&
+        definition.execution.adapter === "operation"
+        ? [{ id: definition.id, name: definition.name }]
+        : [];
+    }) ?? [];
+  const latestConfirmation = runtime?.confirmations[0] ?? null;
+  const operationAttemptDetails = latestConfirmation
+    ? await getTaskOperationAttempt({
+        confirmationId: latestConfirmation.id,
+        projectId: context.project.id,
+      })
+    : null;
   const toolNames = new Map(
     (session.snapshot?.toolDefinitions ?? []).map((definition) => [
       definition.id,
@@ -719,6 +757,18 @@ export default async function TaskRuntimeTestPage({
               )}
             </CardContent>
           </Card>
+        )}
+
+        {runtime && session.snapshot && (
+          <OperationTestPanel
+            attempt={operationAttemptDetails?.attempt ?? null}
+            confirmation={latestConfirmation}
+            isActive={isActive}
+            isPaused={isPaused || isAnsweringSideQuestion}
+            projectId={context.project.id}
+            taskId={task.id}
+            writeOperations={writeOperations}
+          />
         )}
 
         {isActive && runtime && session.snapshot && (
