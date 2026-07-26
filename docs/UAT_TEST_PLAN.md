@@ -66,14 +66,14 @@ Status: Not tested
 1. Select `Review`.
 2. Read the publish checks.
 3. Select `Publish`.
-4. Open `Runtime Test`.
+4. Select `Open Runtime Test`.
 
 **Pass when**
 
 1. Review shows no tool-contract blocker.
 2. Publishing creates a new immutable version.
-3. Runtime Test shows that new version under `Pinned Version`.
-4. A `Business Lookup Test` section is visible.
+3. The published version appears in `Version History`.
+4. The `Runtime Lifecycle Test` page opens without an error.
 
 Status: Not tested
 
@@ -84,6 +84,7 @@ Status: Not tested
 1. On Runtime Test, select `Reset Test Data`.
 2. Start a new test run if the page asks you to do so.
 3. Confirm that `Run Status` is `Active`.
+4. Scroll below `Field Lifecycle`.
 
 **Pass when**
 
@@ -91,6 +92,7 @@ Status: Not tested
 2. The run is pinned to the version published in Step 2.
 3. All task fields start as `Not collected`.
 4. No previous lookup result remains.
+5. A `Business Lookup Test` section is visible.
 
 Status: Not tested
 
