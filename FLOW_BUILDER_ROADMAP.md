@@ -85,12 +85,11 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 5 of 18 manual UAT. Phases 1-4 completed
-their implementation and manual UAT gates by 2026-07-26. Phase 5
-implementation is complete.
+Current phase: Priority 1, Phase 6 of 18 implementation. Phases 1-5 completed
+their implementation and manual UAT gates by 2026-07-26.
 
-Current target: pass the focused Phase 5 Confirmation, Operations, And Outcomes
-manual UAT gate before beginning Phase 6.
+Current target: complete the Conversational Task Builder Experience and prepare
+its focused manual UAT gate.
 
 ## Product Direction
 
@@ -457,9 +456,9 @@ Phase 5 exit gate: a confirmed reference task executes exactly once, routes
 according to the persisted business result, and reconciles an uncertain
 external outcome without reporting false success.
 
-Phase 5 status: Implementation complete. Type checking, lint, four focused
-operation database tests, and all 17 shared conversational-runtime database
-tests passed on 2026-07-26. Focused manual UAT is pending.
+Phase 5 status: Complete. Type checking, lint, four focused operation database
+tests, all 17 shared conversational-runtime database tests, and all eight
+focused manual UAT steps passed on 2026-07-26.
 
 ## Phase 6: Conversational Task Builder Experience
 

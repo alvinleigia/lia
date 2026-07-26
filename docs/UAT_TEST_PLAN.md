@@ -6,7 +6,7 @@ Phase: 5 of 18
 
 Test: Confirmation, Operations, And Outcomes
 
-Progress: Not tested - 0 of 8 steps passed
+Progress: Complete - 8 of 8 steps passed on 2026-07-26
 
 Project: `Ewissen Infra (#194)`
 
@@ -65,7 +65,7 @@ Allowed Stage: operation
 3. A new immutable version appears in `Version History`.
 4. Runtime Test opens without an error.
 
-Status: Not tested
+Status: Passed
 
 ## Step 2 of 8 - Start A Clean Runtime
 
@@ -82,7 +82,7 @@ Status: Not tested
 2. All seven fields show `Not collected`.
 3. No old confirmation or operation attempt is visible.
 
-Status: Not tested
+Status: Passed
 
 ## Step 3 of 8 - Save Valid Task Values
 
@@ -136,7 +136,7 @@ For `Guest Phone`:
 2. `Facial` and `Classic Facial` resolve to project resources.
 3. No field remains `Candidate`, `Invalid`, or `Not collected`.
 
-Status: Not tested
+Status: Passed
 
 ## Step 4 of 8 - Prepare The Confirmation Summary
 
@@ -155,7 +155,7 @@ Status: Not tested
 5. `Queue Operation` is not yet visible.
 6. No operation attempt has been created.
 
-Status: Not tested
+Status: Passed
 
 ## Step 5 of 8 - Correct A Value Before Confirming
 
@@ -180,7 +180,7 @@ phase5.corrected@example.com
 3. It shows `phase5.corrected@example.com`.
 4. No operation attempt has been created.
 
-Status: Not tested
+Status: Passed
 
 ## Step 6 of 8 - Confirm Explicitly
 
@@ -195,7 +195,7 @@ Status: Not tested
 2. `Queue Operation` becomes visible.
 3. The operation was not queued before this explicit action.
 
-Status: Not tested
+Status: Passed
 
 ## Step 7 of 8 - Verify Exactly-Once Queueing
 
@@ -215,7 +215,7 @@ Status: Not tested
 
 Do not select `Process and Reconcile` until Step 8.
 
-Status: Not tested
+Status: Passed
 
 ## Step 8 of 8 - Process And Verify The Persisted Outcome
 
@@ -243,7 +243,7 @@ operation.completed
 7. No credential, provider secret, raw provider payload, or unrelated project
    data is displayed.
 
-Status: Not tested
+Status: Passed
 
 ## If A Step Fails
 
