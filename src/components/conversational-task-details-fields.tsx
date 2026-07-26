@@ -14,7 +14,7 @@ export function ConversationalTaskDetailsFields({
   defaultValues,
 }: ConversationalTaskDetailsFieldsProps) {
   return (
-    <>
+    <div className="space-y-5">
       <div className="space-y-2">
         <Label htmlFor="taskName">Task Name</Label>
         <Input
@@ -53,6 +53,6 @@ export function ConversationalTaskDetailsFields({
           maxLength={2000}
         />
       </div>
-    </>
+    </div>
   );
 }

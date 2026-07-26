@@ -136,9 +136,9 @@ export default async function TaskDetailsPage({
                 value={context.project.id}
               />
               <input type="hidden" name="taskId" value={task.id} />
-              <fieldset disabled={task.isArchived}>
+              <fieldset className="space-y-5" disabled={task.isArchived}>
                 <ConversationalTaskDetailsFields defaultValues={task} />
-                <div className="mt-4 space-y-2">
+                <div className="space-y-2">
                   <label
                     htmlFor="completionAction"
                     className="text-sm font-medium"
