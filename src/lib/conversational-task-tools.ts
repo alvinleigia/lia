@@ -444,9 +444,16 @@ export async function resolveProjectTaskToolDefinitions(input: {
       toolId: binding.tool.id,
       version: binding.tool.version,
     });
-    if (!definition || definition.access !== binding.access) {
+    if (!definition) {
       throw new Error(
-        `Tool "${binding.tool.id}" is unavailable or its permission changed.`,
+        `Tool "${binding.tool.id}" is no longer available. Remove it from Tools before publishing.`,
+      );
+    }
+    if (definition.access !== binding.access) {
+      const expectedPermission =
+        definition.access === "read" ? "Read data" : "Take action";
+      throw new Error(
+        `Tool "${definition.name}" has an outdated permission. Remove it from Tools and add it again as ${expectedPermission}.`,
       );
     }
     let missingSourceKey: string | null = null;

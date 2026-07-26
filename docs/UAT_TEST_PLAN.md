@@ -35,10 +35,14 @@ and safer result than a guessed answer.
 4. Open `Book a Spa Service`.
 5. Select `Configure Conversation`.
 6. Select `Tools`.
-7. In `Allow a Tool`, choose `Service Details`.
-8. Under `Allowed Stages`, check only `lookup`.
-9. Select `Allow Tool`.
-10. Repeat steps 7-9 for:
+7. If `Manual Review` says `Read data / lookup / v1`, select its trash icon.
+8. In `Allow a Tool`, choose `Manual Review`.
+9. Under `Allowed Stages`, check only `operation`.
+10. Select `Allow Tool`.
+11. In `Allow a Tool`, choose `Service Details`.
+12. Under `Allowed Stages`, check only `lookup`.
+13. Select `Allow Tool`.
+14. Repeat steps 11-13 for:
 
 ```text
 Service Price
@@ -50,7 +54,8 @@ Service Availability
 
 1. All four tools appear in the allowed-tools list.
 2. Each tool says `Read data / lookup / v1`.
-3. No error is shown.
+3. `Manual Review` says `Take action / operation / v1`.
+4. No error is shown.
 
 Status: Not tested
 
