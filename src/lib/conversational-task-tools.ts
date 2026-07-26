@@ -586,7 +586,7 @@ export async function executeBuiltInTaskTool(input: {
         : {
             errorCode: null,
             result: {
-              amount: product.priceAmount,
+              amount: product.priceAmount / 100,
               currency: product.currency,
             },
             status: "success",

@@ -210,7 +210,7 @@ test.beforeAll(async () => {
           durationMinutes: 75,
         },
         name: "Deep Tissue",
-        priceAmount: 150,
+        priceAmount: 15_000,
         projectId: project.id,
       },
       {

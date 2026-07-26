@@ -218,7 +218,8 @@ Status: Not tested
 **Pass when**
 
 1. Each lookup ends as `success` or `no result`.
-2. A successful price result shows only the configured amount and currency.
+2. The configured INR `95.00` price displays as `95.00` with currency `INR`,
+   not as the stored minor-unit value `9500`.
 3. A successful duration result shows only the configured duration.
 4. A `no result` response is plain and does not invent a value.
 5. Both attempts appear in the lookup history.

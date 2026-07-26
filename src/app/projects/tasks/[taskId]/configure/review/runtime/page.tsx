@@ -97,6 +97,34 @@ function displayValue(value: unknown) {
   return JSON.stringify(value);
 }
 
+function displayToolResultValue(input: {
+  key: string;
+  result: Record<string, unknown> | null;
+  toolId: string;
+  value: unknown;
+}) {
+  if (
+    input.toolId === "catalog.service_price" &&
+    input.key === "amount" &&
+    typeof input.value === "number" &&
+    typeof input.result?.currency === "string"
+  ) {
+    try {
+      const currencyOptions = new Intl.NumberFormat("en", {
+        currency: input.result.currency,
+        style: "currency",
+      }).resolvedOptions();
+      return new Intl.NumberFormat("en", {
+        maximumFractionDigits: currencyOptions.maximumFractionDigits,
+        minimumFractionDigits: currencyOptions.minimumFractionDigits,
+      }).format(input.value);
+    } catch {
+      return displayValue(input.value);
+    }
+  }
+  return displayValue(input.value);
+}
+
 const toolStatusLabels: Record<string, string> = {
   cancelled: "Cancelled",
   completed: "Completed",
@@ -667,7 +695,12 @@ export default async function TaskRuntimeTestPage({
                                   {key.replace(/([A-Z])/g, " $1")}
                                 </dt>
                                 <dd className="break-words text-sm font-medium">
-                                  {displayValue(value)}
+                                  {displayToolResultValue({
+                                    key,
+                                    result: tool.result,
+                                    toolId: tool.toolId,
+                                    value,
+                                  })}
                                 </dd>
                               </div>
                             ))}
