@@ -862,6 +862,9 @@ export const conversationExecutionStates = pgTable(
     activeTaskVersionId: integer("active_task_version_id").references(
       () => conversationalTaskVersions.id,
     ),
+    activeActionVersionId: integer("active_action_version_id").references(
+      () => actionFlowVersions.id,
+    ),
     activeNodeId: text("active_node_id"),
     suspendedReturnTarget: jsonb("suspended_return_target").$type<
       Record<string, unknown>
@@ -895,6 +898,9 @@ export const conversationExecutionStates = pgTable(
     ),
     index("conversation_execution_states_active_run_idx").on(
       table.activeTaskRunId,
+    ),
+    index("conversation_execution_states_active_action_version_idx").on(
+      table.activeActionVersionId,
     ),
     index("conversation_execution_states_owner_idx").on(table.responseOwner),
     index("conversation_execution_states_session_expires_idx").on(

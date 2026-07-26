@@ -16,6 +16,7 @@ import type {
   SelectActionSubmission,
   SelectProjectAction,
 } from "@/lib/db-schema";
+import { compiledHybridFlowGraphV1Schema } from "@/lib/hybrid-flow-contracts";
 
 export function toRuntimeAction(input: {
   action: SelectProjectAction;
@@ -83,6 +84,9 @@ function toRuntimeActionFromSnapshot(
   snapshot: ActionFlowVersionSnapshot,
   version: { id: number; versionNumber: number },
 ): RuntimeAction {
+  const hybridGraph = compiledHybridFlowGraphV1Schema.safeParse(
+    snapshot.hybridGraph,
+  );
   const runtimeAction: RuntimeAction = {
     id: snapshot.action.id,
     versionId: version.id,
@@ -116,6 +120,7 @@ function toRuntimeActionFromSnapshot(
       options: step.options,
       settings: step.settings,
     })),
+    hybridGraph: hybridGraph.success ? hybridGraph.data : undefined,
   };
 
   return {

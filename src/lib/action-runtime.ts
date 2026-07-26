@@ -24,6 +24,7 @@ import {
   normalizeFlowAddressValue,
   normalizeFlowLocationValue,
 } from "@/lib/flow-structured-values";
+import type { CompiledHybridFlowGraphV1 } from "@/lib/hybrid-flow-contracts";
 import type {
   RuntimeReplyMedia,
   RuntimeReplyProduct,
@@ -87,6 +88,7 @@ export type RuntimeAction = {
   steps: RuntimeActionStep[];
   branchRules: RuntimeActionBranchRule[];
   compiledGraph?: CompiledActionFlowGraph;
+  hybridGraph?: CompiledHybridFlowGraphV1;
 };
 
 export type FlowChatMessage = {

@@ -86,6 +86,7 @@ const FLOW_EDIT_STEP_IDS_KEY = "flowEditStepIds";
 const FLOW_WAIT_METADATA_KEY = "flowWait";
 
 type ChannelRuntimeResult = {
+  boundaryNodeId?: string | null;
   replies: RuntimeReply[];
 };
 type ReturnFlowFrame = {
@@ -761,6 +762,9 @@ async function advanceFlowToNextStep(input: {
 
   while (stepIndex < steps.length) {
     const step = steps[stepIndex];
+    const boundaryNode = input.action.hybridGraph?.nodes.find(
+      (node) => node.sourceStepId === step.id && node.kind !== "deterministic",
+    );
 
     if (visitedStepIds.has(step.id)) {
       await cancelActionFlowSubmission({
@@ -779,6 +783,30 @@ async function advanceFlowToNextStep(input: {
     }
 
     visitedStepIds.add(step.id);
+
+    if (boundaryNode) {
+      if (submission.currentStepId !== step.id) {
+        const updatedSubmission = await recordActionFlowProgress({
+          projectId: input.projectId,
+          submissionId: submission.id,
+          currentStepId: step.id,
+          fields: submission.fields,
+          expectedRevision: submission.revision,
+          event: {
+            eventType: "flow.boundary_reached",
+            message: `Reached ${boundaryNode.kind} boundary.`,
+            payload: {
+              actionVersionId: input.action.versionId,
+              nodeId: boundaryNode.id,
+              stepId: step.id,
+            },
+          },
+        });
+        submission = updatedSubmission ?? submission;
+      }
+
+      return { boundaryNodeId: boundaryNode.id, replies };
+    }
 
     if (isActionWaitStep(step)) {
       const decision = getNextActionStepDecision(
@@ -1089,6 +1117,50 @@ export async function resumeChannelFlowExecution(input: {
   });
 }
 
+export async function resumeChannelFlowAtStep(input: {
+  action: RuntimeAction;
+  contactId?: number | null;
+  projectId: number;
+  submission: SelectActionSubmission;
+  targetStepId: number;
+}) {
+  const stepIndex = findStepIndexById(input.action, input.targetStepId);
+
+  if (stepIndex < 0) {
+    return {
+      replies: [
+        createTextReply(
+          "This flow can no longer find its saved resume point. Please start again.",
+        ),
+      ],
+    };
+  }
+
+  const submission =
+    input.submission.currentStepId === input.targetStepId
+      ? input.submission
+      : ((await recordActionFlowProgress({
+          projectId: input.projectId,
+          submissionId: input.submission.id,
+          currentStepId: input.targetStepId,
+          fields: input.submission.fields,
+          expectedRevision: input.submission.revision,
+          event: {
+            eventType: "flow.boundary_resumed",
+            message: "Resumed deterministic flow after a hybrid boundary.",
+            payload: { targetStepId: input.targetStepId },
+          },
+        })) ?? input.submission);
+
+  return advanceFlowToNextStep({
+    action: input.action,
+    contactId: input.contactId,
+    projectId: input.projectId,
+    stepIndex,
+    submission,
+  });
+}
+
 function findStepIndexById(action: RuntimeAction, stepId: number | null) {
   if (stepId === null) {
     return getRunnableActionSteps(action).length;
@@ -1103,11 +1175,16 @@ export async function startChannelFlow(input: {
   conversationId: string;
   projectId: number;
   source: string;
+  startStepId?: number | null;
   traceId?: string | null;
 }) {
   const steps = getRunnableActionSteps(input.action);
+  const stepIndex =
+    input.startStepId === undefined || input.startStepId === null
+      ? 0
+      : steps.findIndex((step) => step.id === input.startStepId);
 
-  if (steps.length === 0) {
+  if (steps.length === 0 || stepIndex < 0) {
     return {
       replies: [
         createTextReply(
@@ -1124,6 +1201,7 @@ export async function startChannelFlow(input: {
     contactId: input.contactId ?? null,
     conversationId: input.conversationId,
     source: input.source,
+    startStepId: input.startStepId,
     traceId: input.traceId,
   });
 
@@ -1140,10 +1218,11 @@ export async function startChannelFlow(input: {
     contactId: input.contactId ?? null,
     projectId: input.projectId,
     submission,
-    stepIndex: 0,
+    stepIndex,
   });
 
   return {
+    boundaryNodeId: result.boundaryNodeId,
     replies: [
       createTextReply(`Sure, I can help with ${input.action.name}.`),
       ...result.replies,

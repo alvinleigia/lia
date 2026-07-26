@@ -25,6 +25,7 @@ type StartActionFlowSubmissionInput = {
   fields?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   source: string;
+  startStepId?: number | null;
   traceId?: string | null;
 };
 
@@ -96,12 +97,22 @@ export async function startActionFlowSubmission(
   if (!action) {
     return null;
   }
+  const startStepId =
+    input.startStepId === undefined
+      ? getFirstRuntimeStepId(action)
+      : (action.steps.find(
+          (step) => step.isEnabled && step.id === input.startStepId,
+        )?.id ?? null);
+
+  if (input.startStepId !== undefined && startStepId === null) {
+    return null;
+  }
 
   const submission = await createActionSubmission({
     projectId: input.projectId,
     actionId: action.id,
     actionVersionId: action.versionId,
-    currentStepId: getFirstRuntimeStepId(action),
+    currentStepId: startStepId,
     conversationId: input.conversationId ?? null,
     source: input.source,
     traceId: input.traceId,
