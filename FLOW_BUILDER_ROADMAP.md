@@ -85,11 +85,12 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 6 of 18 implementation. Phases 1-5 completed
-their implementation and manual UAT gates by 2026-07-26.
+Current phase: Priority 1, Phase 6 of 18 manual UAT. Phases 1-5 completed
+their implementation and manual UAT gates by 2026-07-26. Phase 6
+implementation is complete.
 
-Current target: complete the Conversational Task Builder Experience and prepare
-its focused manual UAT gate.
+Current target: pass the focused Conversational Task Builder Experience UAT,
+then begin Phase 7 graph integration.
 
 ## Product Direction
 
@@ -465,33 +466,37 @@ focused manual UAT steps passed on 2026-07-26.
 Goal: let a non-technical business user configure a bounded conversational task
 without writing prompts, JSON, or one question node per field.
 
-- [ ] Add a first-class Conversational Task block to the builder.
-- [ ] Offer task templates for booking, lead capture, support intake, and custom collection.
-- [ ] Organize assistant and task setup into Behavior, Context, Tools, Knowledge, Workflow, Test, and Versions views.
-- [ ] Use task name, objective, and completion action as the primary setup.
-- [ ] Present required information as friendly field cards.
-- [ ] Add, remove, duplicate, and reorder task fields.
-- [ ] Configure field type, required state, validation, and visitor-facing description without technical terminology.
-- [ ] Configure conditional requirements through a guided rule editor.
-- [ ] Select catalogs, services, tools, operations, and reusable fields by name.
-- [ ] Add a reusable Tool Library view and select pinned tool versions by friendly name.
-- [ ] Show inherited and task/stage-specific tools with explicit default-off permissions.
-- [ ] Add typed context-variable setup with source, fallback, sensitivity, and autocomplete in supported text fields.
-- [ ] Show missing project resources as `Needs setup` instead of inventing defaults.
-- [ ] Configure confirmation, cancellation, retry, fallback, and handoff policies.
-- [ ] Connect named outcomes through both canvas handles and a simple `Go to` selector.
-- [ ] Keep exact wording optional and separate from the business field definition.
-- [ ] Keep raw prompt overrides and model settings out of the primary editor.
-- [ ] Keep provider-specific and voice-only controls out of the non-voice primary editor.
-- [ ] Place allowed advanced controls inside collapsed sections with safe defaults.
-- [ ] Add a task test chat that shows canonical fields, validation, requested tools, and outcome decisions.
-- [ ] Distinguish visitor-visible replies from developer diagnostics.
-- [ ] Add per-channel preview without changing the universal task.
-- [ ] Preserve keyboard, responsive, and screen-reader usability.
+- [x] Add a first-class Business Task entry point to the builder palette; actual graph placement is Phase 7.
+- [x] Offer task templates for booking, lead capture, support intake, and custom collection.
+- [x] Organize assistant and task setup into Behavior, Context, Tools, Knowledge, Workflow, Test, and Versions views.
+- [x] Use task name, objective, and completion action as the primary setup.
+- [x] Present required information as friendly field cards.
+- [x] Add, remove, duplicate, and reorder task fields.
+- [x] Configure field type, required state, validation, and visitor-facing description without technical terminology.
+- [x] Configure conditional requirements through a guided rule editor.
+- [x] Select catalogs, services, tools, operations, and reusable fields by name.
+- [x] Add a reusable Tool Library view and select pinned tool versions by friendly name.
+- [x] Show inherited and task/stage-specific tools with explicit default-off permissions.
+- [x] Add typed context-variable setup with source, fallback, sensitivity, and autocomplete in supported text fields.
+- [x] Show missing project resources as `Needs setup` instead of inventing defaults.
+- [x] Configure confirmation, cancellation, retry, fallback, and handoff policies.
+- [x] Prepare named outcome destinations and friendly post-outcome selectors; canvas handles and compiled graph routes are Phase 7.
+- [x] Keep exact wording optional and separate from the business field definition.
+- [x] Keep raw prompt overrides and model settings out of the primary editor.
+- [x] Keep provider-specific and voice-only controls out of the non-voice primary editor.
+- [x] Place allowed advanced controls inside collapsed sections with safe defaults.
+- [x] Add a task test chat that shows canonical fields, validation, requested tools, and outcome decisions.
+- [x] Distinguish visitor-visible replies from developer diagnostics.
+- [x] Add per-channel preview without changing the universal task.
+- [x] Preserve keyboard, responsive, and screen-reader usability through shared labeled controls and responsive layouts.
 - [ ] Confirm a non-technical tester can configure the reference booking task.
 
 Phase 6 exit gate: a business user can create and test the reference task from
 one focused editor without constructing seven separate collection nodes.
+
+Phase 6 implementation status: Complete. Type checking, lint, 24 focused task
+schema and builder tests, and all 69 channel and conversational contract tests
+passed on 2026-07-26. Focused manual UAT is pending.
 
 ## Phase 7: Hybrid Graph Compiler And Runtime Integration
 
