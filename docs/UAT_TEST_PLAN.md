@@ -388,9 +388,12 @@ I want to book a Classic Facial on 2026-08-15 at 15:30. My name is Phase Six Gue
 ```
 
 8. Select `Test Turn`.
-9. Return to the `Test` view.
+9. Do not reset the conversation. Select `Back to review` to return to the
+   `Test` overview.
 10. Select `Open Runtime Test`.
-11. Confirm the active task is `Phase 6 Builder UAT` and the run is pinned to
+11. If the page says `No active run`, select `Start Test Run`. Previous
+    completed test results may remain visible until the new run starts.
+12. Confirm the active task is `Phase 6 Builder UAT` and the run is pinned to
     the version you published.
 
 **Pass when**

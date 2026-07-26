@@ -230,6 +230,7 @@ export default async function TaskRuntimeTestPage({
   const isActive =
     Boolean(runtime && execution?.activeTaskRunId === runtime.run.id) &&
     ["active", "paused", "waiting"].includes(runtime?.run.status ?? "");
+  const isDifferentTask = Boolean(runtime) && runtime?.run.taskId !== task.id;
   const isPaused =
     runtime?.run.status === "paused" || runtime?.run.status === "waiting";
   const isAnsweringSideQuestion =
@@ -332,12 +333,35 @@ export default async function TaskRuntimeTestPage({
                 {eventMessages[query.event]}
               </p>
             )}
+            {isDifferentTask && session.snapshot && (
+              <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {isActive ? (
+                  <>
+                    The active test belongs to{" "}
+                    <span className="font-medium">
+                      {session.snapshot.task.name}
+                    </span>
+                    . Switch the active task below to test{" "}
+                    <span className="font-medium">{task.name}</span>.
+                  </>
+                ) : (
+                  <>
+                    The results below are from the last completed test for{" "}
+                    <span className="font-medium">
+                      {session.snapshot.task.name}
+                    </span>
+                    . Select Start Test Run to test{" "}
+                    <span className="font-medium">{task.name}</span>.
+                  </>
+                )}
+              </p>
+            )}
 
             {runtime && session.snapshot && session.version ? (
               <div className="grid gap-4 border-y py-5 sm:grid-cols-2 lg:grid-cols-5">
                 <div>
                   <p className="text-xs uppercase text-muted-foreground">
-                    Active Task
+                    {isActive ? "Active Task" : "Last Tested Task"}
                   </p>
                   <p className="mt-1 font-medium">
                     {session.snapshot.task.name}
