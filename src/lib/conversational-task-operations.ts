@@ -6,6 +6,10 @@ import {
   type ToolDefinitionV1,
 } from "@/lib/conversation-contracts";
 import {
+  getBoundAvailabilityDefinition,
+  readCanonicalAvailability,
+} from "@/lib/conversational-task-availability";
+import {
   applyConversationalTaskEvent,
   getConversationalTaskRuntime,
 } from "@/lib/conversational-task-runtime";
@@ -277,6 +281,23 @@ function buildConfirmationState(input: {
   });
   if (!canonicalInput.ok) {
     throw new Error(canonicalInput.error.message);
+  }
+
+  const availabilityDefinition = getBoundAvailabilityDefinition(input.snapshot);
+  if (availabilityDefinition) {
+    const availability = readCanonicalAvailability({
+      context: input.runtime.context,
+      definition: availabilityDefinition,
+      fields: input.runtime.fields,
+      now,
+    });
+    if (availability !== true) {
+      throw new Error(
+        availability === false
+          ? "The selected service is unavailable for that date and time."
+          : "Current availability could not be verified. Do not place the appointment.",
+      );
+    }
   }
 
   const missingRequiredField = input.runtime.fields.find(

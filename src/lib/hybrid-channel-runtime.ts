@@ -16,6 +16,10 @@ import type {
 } from "@/lib/conversation-turn-contracts";
 import { executeConfiguredStructuredTurn } from "@/lib/conversation-turn-service";
 import {
+  getBoundAvailabilityDefinition,
+  readCanonicalAvailability,
+} from "@/lib/conversational-task-availability";
+import {
   applyConversationalTaskEvent,
   ConversationalTaskRuntimeConflictError,
   startConversationalTaskRun,
@@ -40,8 +44,10 @@ import {
   dispatchHybridFlowBoundary,
   type HybridBoundaryExecution,
   type HybridRuntimeResponseOwner,
+  reconcileTaskTurnWithAvailability,
   reconcileTaskTurnWithRuntime,
   resolveHybridBoundaryNode,
+  shouldCheckTaskAvailability,
 } from "@/lib/hybrid-flow-runtime";
 import { startHybridTaskEntry } from "@/lib/hybrid-task-entry";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
@@ -196,6 +202,71 @@ function toRuntimeContext(
         ]
       : [];
   });
+}
+
+async function refreshTaskAvailability(input: {
+  definition: NonNullable<ReturnType<typeof getBoundAvailabilityDefinition>>;
+  runtimeInput: HybridChannelRuntimeInput;
+  session: Awaited<ReturnType<typeof getConversationTaskRuntimeSession>>;
+}) {
+  if (
+    !input.session.execution?.activeTaskRunId ||
+    !input.session.runtime ||
+    !input.session.snapshot
+  ) {
+    return { availability: undefined, session: input.session };
+  }
+  const now = new Date().toISOString();
+  const requestId = `hybrid-availability:${input.runtimeInput.inboundMessageId}:${input.definition.id}`;
+  let result: Awaited<ReturnType<typeof applyConversationalTaskEvent>>;
+  try {
+    result = await applyConversationalTaskEvent({
+      authentication: null,
+      channelIdentity: {
+        externalConversationId: input.runtimeInput.externalConversationId,
+        externalUserId: input.runtimeInput.externalUserId ?? null,
+      },
+      channelType: input.runtimeInput.channelType,
+      conversationId: input.session.runtime.run.conversationId,
+      eventId: `${requestId}:requested`,
+      expectedRevision: input.session.execution.revision,
+      idempotencyKey: requestId,
+      input: {},
+      occurredAt: now,
+      projectId: input.runtimeInput.projectId,
+      providerSequence: null,
+      receivedAt: now,
+      requestId,
+      requestMode: "synchronous",
+      schemaVersion: 1,
+      stage: "lookup",
+      taskRunId: input.session.runtime.run.id,
+      timeoutAt: null,
+      toolId: input.definition.id,
+      type: "tool.requested",
+    });
+  } catch {
+    return { availability: null, session: input.session };
+  }
+  if (result.disposition !== "applied" && result.reason !== "duplicate_event") {
+    return { availability: null, session: input.session };
+  }
+
+  const session = await getConversationTaskRuntimeSession({
+    channelType: input.runtimeInput.channelType,
+    externalConversationId: input.runtimeInput.externalConversationId,
+    projectId: input.runtimeInput.projectId,
+  });
+  return {
+    availability: session.runtime
+      ? readCanonicalAvailability({
+          context: session.runtime.context,
+          definition: input.definition,
+          fields: session.runtime.fields,
+        })
+      : null,
+    session,
+  };
 }
 
 function getResponseOwner(
@@ -460,12 +531,12 @@ async function executeTaskBoundary(input: {
     revision = fieldResult.revision;
   }
 
-  const canonicalSession = await getConversationTaskRuntimeSession({
+  let canonicalSession = await getConversationTaskRuntimeSession({
     channelType: input.runtimeInput.channelType,
     externalConversationId: input.runtimeInput.externalConversationId,
     projectId: input.runtimeInput.projectId,
   });
-  const reconciledProposal =
+  let reconciledProposal =
     canonicalSession.runtime && canonicalSession.snapshot
       ? reconcileTaskTurnWithRuntime({
           fields: canonicalSession.runtime.fields,
@@ -473,6 +544,32 @@ async function executeTaskBoundary(input: {
           snapshot: canonicalSession.snapshot,
         })
       : proposal;
+  const availabilityDefinition = canonicalSession.snapshot
+    ? getBoundAvailabilityDefinition(canonicalSession.snapshot)
+    : null;
+  if (
+    availabilityDefinition &&
+    canonicalSession.runtime &&
+    shouldCheckTaskAvailability({
+      definition: availabilityDefinition,
+      fields: canonicalSession.runtime.fields,
+      proposal: reconciledProposal,
+    })
+  ) {
+    const availability = await refreshTaskAvailability({
+      definition: availabilityDefinition,
+      runtimeInput: input.runtimeInput,
+      session: canonicalSession,
+    });
+    canonicalSession = availability.session;
+    revision = canonicalSession.execution?.revision ?? revision;
+    if (availability.availability !== undefined) {
+      reconciledProposal = reconcileTaskTurnWithAvailability({
+        availability: availability.availability,
+        proposal: reconciledProposal,
+      });
+    }
+  }
 
   const outcome =
     reconciledProposal.nextAction === "complete" &&

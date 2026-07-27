@@ -391,16 +391,24 @@ I want to book a spa service.
 
 6. Confirm Lia enters the published booking task and asks only for a missing
    booking detail.
-   Stop the booking test here. Phase 7 verifies graph entry and ownership, not
-   the complete booking operation.
-7. Send:
+7. Supply the requested service, date, and time.
+8. Confirm Lia checks the task's bound availability source before collecting
+   contact details or asking you to confirm:
+   - If availability is `true`, Lia may show the confirmation question.
+   - If availability is `false`, Lia must ask for another date or time.
+   - If availability is missing, stale, or cannot be verified, Lia must not
+     confirm or place the appointment.
+9. Send:
 
 ```text
 cancel
 ```
 
-8. Confirm the task ends without creating a booking and Lia can answer an
+10. Confirm the task ends without creating a booking and Lia can answer an
    ordinary project question again.
+
+This is a safety-gate smoke test. Phase 8 completes the full provider-backed
+date/time availability and booking journey.
 
 ### Server-truth regression check
 

@@ -14,6 +14,7 @@ import {
 import {
   conversationalTaskSnapshotV1Schema,
   DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
+  type ToolDefinitionV1,
 } from "../../src/lib/conversation-contracts";
 import type { SelectActionSubmission } from "../../src/lib/db-schema";
 import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
@@ -30,12 +31,14 @@ import {
   dispatchHybridFlowBoundary,
   matchesHybridGraphTaskReturnTarget,
   prepareHybridTaskEntry,
+  reconcileTaskTurnWithAvailability,
   reconcileTaskTurnWithRuntime,
   resolveHybridBoundaryNode,
   resolveHybridTaskOutcomeResume,
   resolveHybridTaskOutcomeRoute,
   selectHybridFlowEntryNode,
   selectHybridFlowTransition,
+  shouldCheckTaskAvailability,
 } from "../../src/lib/hybrid-flow-runtime";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
@@ -193,6 +196,53 @@ const taskSnapshot = conversationalTaskSnapshotV1Schema.parse({
     },
   },
 });
+
+const availabilityDefinition = {
+  access: "read",
+  description: "Read service availability for a requested date and time.",
+  execution: {
+    adapter: "built_in",
+    cancellation: "unsupported",
+    handler: "catalog.service_availability",
+    mode: "synchronous",
+    retryAttempts: 0,
+    retryDelayMs: 0,
+    timeoutMs: 5_000,
+  },
+  id: "catalog.service_availability",
+  inputSchema: {
+    fields: ["serviceId", "preferredDate", "preferredTime"].map((key) => ({
+      key,
+      required: key === "serviceId",
+      source: { kind: "field" as const, key },
+      type:
+        key === "preferredDate"
+          ? ("date" as const)
+          : key === "preferredTime"
+            ? ("time" as const)
+            : ("project_resource" as const),
+    })),
+  },
+  name: "Service Availability",
+  outputSchema: {
+    fields: [{ path: "available", required: true, type: "boolean" as const }],
+  },
+  projectId: 1,
+  requiredForCompletion: false,
+  resultMappings: [
+    {
+      freshnessMinutes: 5,
+      modelVisible: true,
+      sourcePath: "available",
+      target: "context",
+      targetKey: "serviceAvailable",
+      toolVisible: true,
+      type: "boolean" as const,
+    },
+  ],
+  schemaVersion: 1,
+  version: 1,
+} satisfies ToolDefinitionV1;
 
 test("compiler publishes a reachable knowledge-task-deterministic graph", () => {
   const result = compileHybridFlowGraph({
@@ -448,6 +498,160 @@ test("task reconciliation preserves cancellation with unresolved fields", () => 
   });
 
   expect(result).toEqual(proposal);
+});
+
+test("task availability gates confirmation and completion", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor supplied all booking details.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "confirm" as const,
+    outcomeRecommendation: null,
+    reply: "Confirm the appointment?",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_answer" as const,
+  };
+
+  expect(
+    reconcileTaskTurnWithAvailability({
+      availability: true,
+      proposal,
+    }),
+  ).toEqual(proposal);
+  expect(
+    reconcileTaskTurnWithAvailability({
+      availability: false,
+      proposal,
+    }),
+  ).toMatchObject({
+    nextAction: "ask",
+    reply:
+      "That service is not available for the requested date and time. Please choose another date or time.",
+    toolRequest: null,
+  });
+  expect(
+    reconcileTaskTurnWithAvailability({
+      availability: null,
+      proposal: { ...proposal, nextAction: "complete" },
+    }),
+  ).toMatchObject({
+    nextAction: "ask",
+    reply:
+      "I could not verify availability for that date and time, so I cannot place the appointment. Please choose another date or time or ask the team for help.",
+    toolRequest: null,
+  });
+});
+
+test("task availability is checked when the last required field is collected", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor supplied the last booking detail.",
+    fieldCandidates: [
+      {
+        confidence: 0.99,
+        fieldKey: "preferredTime",
+        naturalValue: "15:00",
+        source: "visitor" as const,
+      },
+    ],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "ask" as const,
+    outcomeRecommendation: null,
+    reply: "Confirm the appointment?",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_answer" as const,
+  };
+  const fields = taskSnapshot.task.definition.fields.map((field) => ({
+    fieldKey: field.key,
+    isRequired: true,
+    state: "valid",
+    validation: {},
+  }));
+  expect(
+    shouldCheckTaskAvailability({
+      definition: availabilityDefinition,
+      fields,
+      proposal,
+    }),
+  ).toBe(true);
+  expect(
+    reconcileTaskTurnWithAvailability({
+      availability: false,
+      proposal,
+    }),
+  ).toMatchObject({
+    nextAction: "ask",
+    reply:
+      "That service is not available for the requested date and time. Please choose another date or time.",
+  });
+  expect(
+    shouldCheckTaskAvailability({
+      definition: availabilityDefinition,
+      fields: fields.map((field) =>
+        field.fieldKey === "preferredTime"
+          ? { ...field, state: "missing" }
+          : field,
+      ),
+      proposal,
+    }),
+  ).toBe(false);
+});
+
+test("task availability is checked before collecting contact details", () => {
+  const fields = [
+    "serviceId",
+    "preferredDate",
+    "preferredTime",
+    "guestName",
+    "guestEmail",
+  ].map((fieldKey) => ({
+    fieldKey,
+    isRequired: true,
+    state:
+      fieldKey === "guestName" || fieldKey === "guestEmail"
+        ? "missing"
+        : "valid",
+    validation: {},
+  }));
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor supplied a requested date and time.",
+    fieldCandidates: [
+      {
+        confidence: 0.99,
+        fieldKey: "preferredTime",
+        naturalValue: "15:00",
+        source: "visitor" as const,
+      },
+    ],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "ask" as const,
+    outcomeRecommendation: null,
+    reply: "What is your name?",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_answer" as const,
+  };
+
+  expect(
+    shouldCheckTaskAvailability({
+      definition: availabilityDefinition,
+      fields,
+      proposal,
+    }),
+  ).toBe(true);
 });
 
 test("compiler blocks a task output without an explicit route", () => {

@@ -547,7 +547,12 @@ project-chat boundary, response ownership, and universal channel entry rules.
 The task boundary now reloads authoritative field state after every model
 proposal and replaces false progress or confirmation wording with the next
 server-required correction. Cancellation and grounded side questions remain
-available while fields are unresolved.
+available while fields are unresolved. As soon as the service, date, and time
+inputs required by the bound availability lookup are valid, the live task
+boundary refreshes availability before collecting contact details or showing
+confirmation wording. Unavailable, missing, stale, or failed availability
+blocks confirmation, and the operation boundary independently requires
+canonical availability to be `true`.
 Live widget and WhatsApp provider delivery remain the Phase 13 certification
 gate, while the complete reference booking journey remains Phase 8 work.
 

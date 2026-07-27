@@ -1,6 +1,7 @@
 import type {
   ConversationalTaskSnapshotV1,
   TaskOutcomeV1,
+  ToolDefinitionV1,
 } from "@/lib/conversation-contracts";
 import type { TurnResultV1 } from "@/lib/conversation-turn-contracts";
 import type { FieldCandidateV1 } from "@/lib/conversational-task-runtime-contracts";
@@ -130,6 +131,71 @@ export function reconcileTaskTurnWithRuntime(input: {
     turnKind:
       unresolvedField.state === "invalid" ? "field_correction" : "field_answer",
   };
+}
+
+export function reconcileTaskTurnWithAvailability(input: {
+  availability: boolean | null;
+  proposal: TurnResultV1;
+}): TurnResultV1 {
+  if (input.availability === true) {
+    return input.proposal;
+  }
+
+  return {
+    ...input.proposal,
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary:
+      input.availability === false
+        ? "The server blocked confirmation because the selected service is unavailable."
+        : "The server blocked confirmation because availability could not be verified.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" },
+    nextAction: "ask",
+    outcomeRecommendation: null,
+    reply:
+      input.availability === false
+        ? "That service is not available for the requested date and time. Please choose another date or time."
+        : "I could not verify availability for that date and time, so I cannot place the appointment. Please choose another date or time or ask the team for help.",
+    routeRecommendation: null,
+    safety: { decision: "allow", reasonCode: null },
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_correction",
+  };
+}
+
+export function shouldCheckTaskAvailability(input: {
+  definition: ToolDefinitionV1;
+  fields: HybridTaskRuntimeField[];
+  proposal: TurnResultV1;
+}) {
+  const taskFieldKeys = new Set(input.fields.map(({ fieldKey }) => fieldKey));
+  const availabilityFieldKeys = new Set(
+    input.definition.inputSchema.fields.flatMap((field) =>
+      field.source.kind === "field" && taskFieldKeys.has(field.source.key)
+        ? [field.source.key]
+        : [],
+    ),
+  );
+  const availabilityInputsResolved = input.fields
+    .filter(({ fieldKey }) => availabilityFieldKeys.has(fieldKey))
+    .every((field) => field.state === "valid" || field.state === "confirmed");
+  const requiredFieldsResolved = input.fields.every(
+    (field) =>
+      !field.isRequired ||
+      field.state === "valid" ||
+      field.state === "confirmed",
+  );
+  const availabilityInputChanged = input.proposal.fieldCandidates.some(
+    ({ fieldKey }) => availabilityFieldKeys.has(fieldKey),
+  );
+  return (
+    availabilityInputsResolved &&
+    (availabilityInputChanged ||
+      input.proposal.nextAction === "confirm" ||
+      input.proposal.nextAction === "complete" ||
+      (requiredFieldsResolved && input.proposal.fieldCandidates.length > 0))
+  );
 }
 
 type HybridBoundaryNode = Extract<
