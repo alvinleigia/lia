@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
 import { resumeChannelFlowAtStep } from "@/lib/channel-flow-runtime";
@@ -17,6 +17,7 @@ import type {
 import { executeConfiguredStructuredTurn } from "@/lib/conversation-turn-service";
 import {
   applyConversationalTaskEvent,
+  ConversationalTaskRuntimeConflictError,
   startConversationalTaskRun,
 } from "@/lib/conversational-task-runtime";
 import { getConversationTaskRuntimeSession } from "@/lib/conversational-task-runtime-session";
@@ -24,6 +25,7 @@ import { db } from "@/lib/db-config";
 import {
   companies,
   conversationalTaskVersions,
+  conversationExecutionStates,
   projects,
   type SelectActionSubmission,
   workspaces,
@@ -55,6 +57,56 @@ type ProjectTurnContext = {
 export type HybridChannelBoundaryResult = {
   replies: RuntimeReply[];
 };
+
+async function persistReturnedKnowledgeBoundary(input: {
+  actionVersionId: number;
+  conversationId: number;
+  nodeId: string;
+  projectId: number;
+}) {
+  const [execution] = await db
+    .select({
+      id: conversationExecutionStates.id,
+      revision: conversationExecutionStates.revision,
+    })
+    .from(conversationExecutionStates)
+    .where(
+      and(
+        eq(conversationExecutionStates.projectId, input.projectId),
+        eq(conversationExecutionStates.conversationId, input.conversationId),
+      ),
+    )
+    .limit(1);
+  if (!execution) {
+    return;
+  }
+
+  const [updatedExecution] = await db
+    .update(conversationExecutionStates)
+    .set({
+      activeActionVersionId: input.actionVersionId,
+      activeNodeId: input.nodeId,
+      activeTaskRunId: null,
+      activeTaskVersionId: null,
+      executionMode: "knowledge",
+      responseOwner: "knowledge",
+      revision: sql`${conversationExecutionStates.revision} + 1`,
+      status: "active",
+      suspendedReturnTarget: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(conversationExecutionStates.id, execution.id),
+        eq(conversationExecutionStates.projectId, input.projectId),
+        eq(conversationExecutionStates.revision, execution.revision),
+      ),
+    )
+    .returning({ id: conversationExecutionStates.id });
+  if (!updatedExecution) {
+    throw new ConversationalTaskRuntimeConflictError();
+  }
+}
 
 function toTurnValue(value: unknown) {
   if (
@@ -534,13 +586,35 @@ export async function runHybridChannelBoundary(
     externalConversationId: input.externalConversationId,
     projectId: input.projectId,
   });
-  const sourceNode = resolveHybridBoundaryNode({
+  let sourceNode = resolveHybridBoundaryNode({
     actionVersionId: input.action.versionId,
     activeActionVersionId: session.execution?.activeActionVersionId,
     activeNodeId: session.execution?.activeNodeId,
     graph,
     requestedNodeId: input.boundaryNodeId,
   });
+  if (
+    !sourceNode &&
+    session.execution?.activeActionVersionId === input.action.versionId &&
+    !session.execution.activeTaskRunId
+  ) {
+    const activeNode = graph.nodes.find(
+      (node) => node.id === session.execution?.activeNodeId,
+    );
+    const requestedNode = graph.nodes.find(
+      (node): node is Extract<HybridFlowNodeV1, { kind: "knowledge" }> =>
+        node.id === input.boundaryNodeId && node.kind === "knowledge",
+    );
+    if (activeNode?.kind === "deterministic" && requestedNode) {
+      await persistReturnedKnowledgeBoundary({
+        actionVersionId: input.action.versionId,
+        conversationId: input.channelConversationId,
+        nodeId: requestedNode.id,
+        projectId: input.projectId,
+      });
+      sourceNode = requestedNode;
+    }
+  }
   if (!sourceNode) {
     return { replies: [] };
   }
@@ -607,6 +681,20 @@ export async function runHybridChannelBoundary(
       targetStepId: dispatch.targetNode?.sourceStepId ?? null,
     });
     replies.push(...resumed.replies);
+    const returnedBoundary = resumed.boundaryNodeId
+      ? graph.nodes.find(
+          (node) =>
+            node.id === resumed.boundaryNodeId && node.kind === "knowledge",
+        )
+      : null;
+    if (returnedBoundary) {
+      await persistReturnedKnowledgeBoundary({
+        actionVersionId: input.action.versionId,
+        conversationId: input.channelConversationId,
+        nodeId: returnedBoundary.id,
+        projectId: input.projectId,
+      });
+    }
   }
 
   return { replies };
