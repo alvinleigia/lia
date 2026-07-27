@@ -16,6 +16,7 @@ import {
   Pencil,
   Plus,
   Route,
+  Trash2,
   Unlink,
   Wand2,
   Workflow,
@@ -33,6 +34,7 @@ import {
   createCanvasBranchRuleAction,
   createCanvasStepAction,
   deleteCanvasBranchRuleAction,
+  deleteCanvasStepAction,
   saveCanvasHybridStepAction,
   saveCanvasStepPositionsAction,
   saveHybridEntryPolicyAction,
@@ -75,6 +77,17 @@ import type {
   HybridStepInput,
   InspectorSelection,
 } from "@/components/action-flow-canvas/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -262,6 +275,19 @@ export function ActionFlowCanvas({
           stepId,
           ...input,
         }),
+      );
+    },
+    [actionId, runMutation],
+  );
+
+  const deleteStep = useCallback(
+    (stepId: number) => {
+      runMutation(
+        () => deleteCanvasStepAction({ actionId, stepId }),
+        () => {
+          setQuickEditingStepId(null);
+          setSelection(null);
+        },
       );
     },
     [actionId, runMutation],
@@ -701,6 +727,35 @@ export function ActionFlowCanvas({
                   </details>
                 </>
               )}
+
+              <div className="flex justify-end border-t pt-4">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" variant="destructive">
+                      <Trash2 className="h-4 w-4" />
+                      Delete Step
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this step?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This removes {getStepLabel(selectedStep)} and any branch
+                        routes connected to it. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteStep(selectedStep.id)}
+                        className="bg-destructive text-white hover:bg-destructive/90"
+                      >
+                        Delete Step
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
           )}
 

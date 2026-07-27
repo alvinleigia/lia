@@ -12,6 +12,7 @@ import {
   createActionFlowBranchRule,
   createActionFlowStep,
   deleteActionFlowBranchRule,
+  deleteActionFlowStep,
   getActionFlowBranchRule,
   getActionFlowStep,
   getProjectAction,
@@ -265,6 +266,10 @@ const canvasBranchRuleSchema = z
 const deleteCanvasBranchRuleSchema = z.object({
   actionId: z.coerce.number().int().positive(),
   ruleId: z.coerce.number().int().positive(),
+});
+const deleteCanvasStepSchema = z.object({
+  actionId: z.coerce.number().int().positive(),
+  stepId: z.coerce.number().int().positive(),
 });
 
 async function resolveCanvasAction(actionId: number) {
@@ -1907,4 +1912,46 @@ export async function deleteCanvasBranchRuleAction(
   revalidateCanvasPaths(action.id);
 
   return { ok: true, message: "Branch rule deleted." };
+}
+
+export async function deleteCanvasStepAction(
+  input: unknown,
+): Promise<CanvasRouteActionResult> {
+  const parsed = deleteCanvasStepSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return { ok: false, message: "Invalid step." };
+  }
+
+  const context = await resolveCanvasAction(parsed.data.actionId);
+  if ("error" in context) {
+    return { ok: false, message: context.error ?? "Action not found." };
+  }
+
+  const { action, project } = context;
+  const step = await deleteActionFlowStep(
+    project.id,
+    action.id,
+    parsed.data.stepId,
+  );
+
+  if (!step) {
+    return { ok: false, message: "Step not found." };
+  }
+
+  await writeAuditLog({
+    ...context,
+    action: "chatbot_action.canvas_step_deleted",
+    targetType: "action_flow_step",
+    targetId: step.id,
+    metadata: {
+      actionId: action.id,
+      sortOrder: step.sortOrder,
+      stepType: step.stepType,
+    },
+  });
+
+  revalidateCanvasPaths(action.id);
+
+  return { ok: true, message: "Step deleted." };
 }
