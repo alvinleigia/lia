@@ -38,6 +38,7 @@ import {
   dispatchHybridFlowBoundary,
   type HybridBoundaryExecution,
   type HybridRuntimeResponseOwner,
+  reconcileTaskTurnWithRuntime,
   resolveHybridBoundaryNode,
 } from "@/lib/hybrid-flow-runtime";
 import { startHybridTaskEntry } from "@/lib/hybrid-task-entry";
@@ -407,23 +408,40 @@ async function executeTaskBoundary(input: {
     revision = fieldResult.revision;
   }
 
+  const canonicalSession = await getConversationTaskRuntimeSession({
+    channelType: input.runtimeInput.channelType,
+    externalConversationId: input.runtimeInput.externalConversationId,
+    projectId: input.runtimeInput.projectId,
+  });
+  const reconciledProposal =
+    canonicalSession.runtime && canonicalSession.snapshot
+      ? reconcileTaskTurnWithRuntime({
+          fields: canonicalSession.runtime.fields,
+          proposal,
+          snapshot: canonicalSession.snapshot,
+        })
+      : proposal;
+
   const outcome =
-    proposal.nextAction === "complete" && proposal.outcomeRecommendation
+    reconciledProposal.nextAction === "complete" &&
+    reconciledProposal.outcomeRecommendation
       ? session.snapshot.task.definition.outcomes.find(
           (candidate) =>
-            candidate.key === proposal.outcomeRecommendation?.outcomeKey,
+            candidate.key ===
+            reconciledProposal.outcomeRecommendation?.outcomeKey,
         )
-      : proposal.nextAction === "cancel"
+      : reconciledProposal.nextAction === "cancel"
         ? (session.snapshot.task.definition.outcomes.find(
             (candidate) =>
-              candidate.key === proposal.outcomeRecommendation?.outcomeKey,
+              candidate.key ===
+              reconciledProposal.outcomeRecommendation?.outcomeKey,
           ) ??
           session.snapshot.task.definition.outcomes.find(
             (candidate) => candidate.type === "cancelled",
           ))
         : null;
   if (!outcome) {
-    return { output: proposal, signals: [] };
+    return { output: reconciledProposal, signals: [] };
   }
 
   const outcomeResult = await applyConversationalTaskEvent({
@@ -443,11 +461,14 @@ async function executeTaskBoundary(input: {
     receivedAt: new Date().toISOString(),
     schemaVersion: 1,
     taskRunId: session.runtime.run.id,
-    type: proposal.nextAction === "cancel" ? "task.cancel" : "task.complete",
+    type:
+      reconciledProposal.nextAction === "cancel"
+        ? "task.cancel"
+        : "task.complete",
   });
 
   return {
-    output: proposal,
+    output: reconciledProposal,
     signals:
       outcomeResult.disposition === "applied"
         ? [{ kind: "task_outcome", triggerKey: outcome.outputPort }]

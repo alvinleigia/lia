@@ -30,6 +30,7 @@ import {
   dispatchHybridFlowBoundary,
   matchesHybridGraphTaskReturnTarget,
   prepareHybridTaskEntry,
+  reconcileTaskTurnWithRuntime,
   resolveHybridBoundaryNode,
   resolveHybridTaskOutcomeResume,
   resolveHybridTaskOutcomeRoute,
@@ -322,6 +323,131 @@ test("knowledge boundaries emit one dominant transition signal", () => {
       safety: { decision: "handoff", reasonCode: "human_help" },
     }),
   ).toEqual([{ kind: "tool_result", triggerKey: "handoff" }]);
+});
+
+test("task turns cannot claim progress past invalid canonical fields", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor supplied a date.",
+    fieldCandidates: [
+      {
+        confidence: 0.99,
+        fieldKey: "preferredDate",
+        naturalValue: "tomorrow",
+        source: "visitor" as const,
+      },
+    ],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "confirm" as const,
+    outcomeRecommendation: null,
+    reply: "I will use tomorrow. Please confirm the booking.",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: {
+      arguments: [],
+      stage: "lookup" as const,
+      toolId: "catalog.service_availability",
+    },
+    turnKind: "field_answer" as const,
+  };
+
+  const result = reconcileTaskTurnWithRuntime({
+    fields: taskSnapshot.task.definition.fields.map((field) => ({
+      fieldKey: field.key,
+      isRequired: true,
+      state: field.key === "preferredDate" ? "invalid" : "valid",
+      validation:
+        field.key === "preferredDate"
+          ? {
+              code: "invalid_date",
+              message: "Enter a date such as 2026-08-15.",
+            }
+          : {},
+    })),
+    proposal,
+    snapshot: taskSnapshot,
+  });
+
+  expect(result).toMatchObject({
+    fieldCandidates: [],
+    nextAction: "ask",
+    outcomeRecommendation: null,
+    reply: "Enter a date such as 2026-08-15.",
+    routeRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_correction",
+  });
+});
+
+test("task turns ask for the next unresolved field before confirmation", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor confirmed.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "confirm" as const,
+    outcomeRecommendation: null,
+    reply: "Ready to place the booking.",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_answer" as const,
+  };
+
+  const result = reconcileTaskTurnWithRuntime({
+    fields: taskSnapshot.task.definition.fields.map((field) => ({
+      fieldKey: field.key,
+      isRequired: true,
+      state: field.key === "serviceCategoryId" ? "invalid" : "valid",
+      validation:
+        field.key === "serviceCategoryId"
+          ? {
+              code: "project_resource_not_found",
+              message: "Choose an available item from this project.",
+            }
+          : {},
+    })),
+    proposal,
+    snapshot: taskSnapshot,
+  });
+
+  expect(result.reply).toBe("Which service category would you like?");
+  expect(result.nextAction).toBe("ask");
+});
+
+test("task reconciliation preserves cancellation with unresolved fields", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor cancelled the task.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "cancel" as const,
+    outcomeRecommendation: null,
+    reply: "The booking request has been cancelled.",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "cancellation" as const,
+  };
+
+  const result = reconcileTaskTurnWithRuntime({
+    fields: taskSnapshot.task.definition.fields.map((field) => ({
+      fieldKey: field.key,
+      isRequired: true,
+      state: "missing",
+      validation: {},
+    })),
+    proposal,
+    snapshot: taskSnapshot,
+  });
+
+  expect(result).toEqual(proposal);
 });
 
 test("compiler blocks a task output without an explicit route", () => {

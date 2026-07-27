@@ -391,6 +391,8 @@ I want to book a spa service.
 
 6. Confirm Lia enters the published booking task and asks only for a missing
    booking detail.
+   Stop the booking test here. Phase 7 verifies graph entry and ownership, not
+   the complete booking operation.
 7. Send:
 
 ```text
@@ -399,6 +401,28 @@ cancel
 
 8. Confirm the task ends without creating a booking and Lia can answer an
    ordinary project question again.
+
+### Server-truth regression check
+
+This check proves Lia cannot confirm progress using a value rejected by the
+published task contract.
+
+1. Repeat steps 4 and 5 above to enter the booking task again.
+2. When Lia asks for the preferred date, send:
+
+```text
+tomorrow
+```
+
+3. Confirm Lia asks for an exact valid date. It must not say the date was
+   accepted, that the booking is ready, or that availability was checked.
+4. Send:
+
+```text
+cancel
+```
+
+5. Confirm Knowledge Q&A resumes.
 
 ### Cleanup
 
@@ -414,8 +438,9 @@ cancel
 
 1. Project chat uses the published hybrid action without a duplicate reply.
 2. Cancelling returns response ownership to Knowledge Q&A.
-3. The temporary action is removed.
-4. The existing business task, catalogs, documents, and operations remain
+3. Rejected field values cannot advance confirmation or tool execution.
+4. The temporary action is removed.
+5. The existing business task, catalogs, documents, and operations remain
    unchanged.
 
 ## Phase 7 Sign-Off

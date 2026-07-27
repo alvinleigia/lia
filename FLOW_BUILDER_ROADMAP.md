@@ -544,6 +544,10 @@ all declared adapters, immutable task-version boundaries, one-owner dispatch,
 and human-response suppression. The production build also passed at the Step
 4.5 checkpoint. Step 6 manually verifies the published hybrid graph, local
 project-chat boundary, response ownership, and universal channel entry rules.
+The task boundary now reloads authoritative field state after every model
+proposal and replaces false progress or confirmation wording with the next
+server-required correction. Cancellation and grounded side questions remain
+available while fields are unresolved.
 Live widget and WhatsApp provider delivery remain the Phase 13 certification
 gate, while the complete reference booking journey remains Phase 8 work.
 

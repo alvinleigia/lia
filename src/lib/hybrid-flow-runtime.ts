@@ -45,6 +45,93 @@ export function buildKnowledgeBoundarySignals(
   return [{ kind: "semantic", triggerKey: "answered" }];
 }
 
+type HybridTaskRuntimeField = {
+  fieldKey: string;
+  isRequired: boolean;
+  state: string;
+  validation: Record<string, unknown>;
+};
+
+function validationText(
+  validation: Record<string, unknown>,
+  key: "code" | "message",
+) {
+  const value = validation[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+export function reconcileTaskTurnWithRuntime(input: {
+  fields: HybridTaskRuntimeField[];
+  proposal: TurnResultV1;
+  snapshot: ConversationalTaskSnapshotV1;
+}): TurnResultV1 {
+  if (
+    input.proposal.turnKind === "cancellation" ||
+    input.proposal.turnKind === "side_question" ||
+    input.proposal.safety.decision !== "allow" ||
+    (input.proposal.turnKind === "ordinary_question" &&
+      input.proposal.grounding.status === "grounded")
+  ) {
+    return input.proposal;
+  }
+
+  const runtimeFields = new Map(
+    input.fields.map((field) => [field.fieldKey, field]),
+  );
+  const proposedInvalidField = input.proposal.fieldCandidates
+    .map(({ fieldKey }) => runtimeFields.get(fieldKey))
+    .find((field) => field?.state === "invalid");
+  const unresolvedField =
+    proposedInvalidField ??
+    input.snapshot.task.definition.fields
+      .map((field) => runtimeFields.get(field.key))
+      .find(
+        (field) =>
+          field?.isRequired &&
+          field.state !== "valid" &&
+          field.state !== "confirmed",
+      );
+  if (!unresolvedField) {
+    return input.proposal;
+  }
+
+  const definition = input.snapshot.task.definition.fields.find(
+    ({ key }) => key === unresolvedField.fieldKey,
+  );
+  if (!definition) {
+    return input.proposal;
+  }
+
+  const validationCode = validationText(unresolvedField.validation, "code");
+  const validationMessage = validationText(
+    unresolvedField.validation,
+    "message",
+  );
+  const reply =
+    unresolvedField.state === "invalid" &&
+    validationCode !== "project_resource_not_found" &&
+    validationMessage
+      ? validationMessage
+      : (definition.prompt ?? `Please provide ${definition.label}.`);
+
+  return {
+    ...input.proposal,
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: `The server requested unresolved field ${definition.key}.`,
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" },
+    nextAction: "ask",
+    outcomeRecommendation: null,
+    reply,
+    routeRecommendation: null,
+    safety: { decision: "allow", reasonCode: null },
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind:
+      unresolvedField.state === "invalid" ? "field_correction" : "field_answer",
+  };
+}
+
 type HybridBoundaryNode = Extract<
   HybridFlowNodeV1,
   { kind: "conversational_task" | "knowledge" }
