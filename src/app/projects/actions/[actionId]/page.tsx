@@ -30,7 +30,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { getActionFlowAnalytics } from "@/lib/action-flow-analytics";
-import { getStoredActionFlowConditionGroup } from "@/lib/action-flow-compiler";
+import {
+  getStoredActionFlowConditionGroup,
+  needsExplicitPublishTerminalStep,
+} from "@/lib/action-flow-compiler";
 import {
   formatVersionDate,
   getDraftRuntimeChangeSummary,
@@ -256,10 +259,7 @@ function getPublishReadinessIssues(input: {
   }
 
   if (
-    enabledSteps.length > 0 &&
-    !enabledSteps.some((step) =>
-      ["confirmation", "submit"].includes(step.stepType),
-    )
+    needsExplicitPublishTerminalStep(enabledSteps.map((step) => step.stepType))
   ) {
     issues.push("Add an enabled confirmation or submit step.");
   }

@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
-import type {
-  ActionFlowCompilerBranchRule,
-  ActionFlowCompilerStep,
+import {
+  type ActionFlowCompilerBranchRule,
+  type ActionFlowCompilerStep,
+  needsExplicitPublishTerminalStep,
 } from "../../src/lib/action-flow-compiler";
 import {
   REFERENCE_BOOKING_PROJECT_POLICY,
@@ -32,6 +33,20 @@ import {
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 const outcomes = DEFAULT_CONVERSATIONAL_TASK_DEFINITION.outcomes;
+
+test("hybrid graphs use compiled terminal validation for publish readiness", () => {
+  expect(
+    needsExplicitPublishTerminalStep([
+      "knowledge_conversation",
+      "conversational_task",
+      "message",
+    ]),
+  ).toBe(false);
+  expect(needsExplicitPublishTerminalStep(["message"])).toBe(true);
+  expect(needsExplicitPublishTerminalStep(["message", "confirmation"])).toBe(
+    false,
+  );
+});
 
 function createStep(
   id: number,

@@ -132,6 +132,10 @@ const TERMINAL_STEP_TYPES = new Set([
   "handoff",
   "submit",
 ]);
+const HYBRID_RUNTIME_STEP_TYPES = new Set([
+  "conversational_task",
+  "knowledge_conversation",
+]);
 const COMPARISON_FREE_OPERATORS = new Set<ActionBranchOperator>([
   "is_empty",
   "is_not_empty",
@@ -140,6 +144,14 @@ const ORDERED_OPERATORS = new Set<ActionBranchOperator>([
   "greater_than",
   "less_than",
 ]);
+
+export function needsExplicitPublishTerminalStep(stepTypes: readonly string[]) {
+  return (
+    stepTypes.length > 0 &&
+    !stepTypes.some((stepType) => HYBRID_RUNTIME_STEP_TYPES.has(stepType)) &&
+    !stepTypes.some((stepType) => ["confirmation", "submit"].includes(stepType))
+  );
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
