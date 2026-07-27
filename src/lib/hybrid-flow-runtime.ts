@@ -25,11 +25,33 @@ export type HybridTransitionSignal = {
   triggerKey?: string | null;
 };
 
+export function buildKnowledgeBoundarySignals(
+  proposal: TurnResultV1,
+): HybridTransitionSignal[] {
+  if (proposal.taskRecommendation) {
+    return [
+      {
+        kind: "semantic",
+        triggerKey: `task:${proposal.taskRecommendation.taskId}`,
+      },
+    ];
+  }
+  if (proposal.safety.decision === "handoff") {
+    return [{ kind: "tool_result", triggerKey: "handoff" }];
+  }
+  if (proposal.grounding.status === "no_answer") {
+    return [{ kind: "semantic", triggerKey: "no_answer" }];
+  }
+  return [{ kind: "semantic", triggerKey: "answered" }];
+}
+
 type HybridBoundaryNode = Extract<
   HybridFlowNodeV1,
   { kind: "conversational_task" | "knowledge" }
 >;
-type HybridRuntimeResponseOwner = HybridFlowNodeV1["responseOwner"] | "human";
+export type HybridRuntimeResponseOwner =
+  | HybridFlowNodeV1["responseOwner"]
+  | "human";
 
 export type HybridBoundaryExecution<TOutput> = {
   output: TOutput;

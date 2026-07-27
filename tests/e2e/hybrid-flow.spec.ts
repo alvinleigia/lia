@@ -21,6 +21,7 @@ import {
 } from "../../src/lib/hybrid-flow-contracts";
 import {
   buildHybridGraphTaskReturnTarget,
+  buildKnowledgeBoundarySignals,
   dispatchHybridFlowBoundary,
   prepareHybridTaskEntry,
   resolveHybridTaskOutcomeResume,
@@ -176,6 +177,50 @@ test("compiler publishes a reachable knowledge-task-deterministic graph", () => 
       }),
     ]),
   );
+});
+
+test("knowledge boundaries emit one dominant transition signal", () => {
+  const baseProposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "Test decision.",
+    fieldCandidates: [],
+    grounding: { excerptIds: ["chunk:1"], status: "grounded" as const },
+    nextAction: "ask" as const,
+    outcomeRecommendation: null,
+    reply: "Answer.",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "ordinary_question" as const,
+  };
+
+  expect(buildKnowledgeBoundarySignals(baseProposal)).toEqual([
+    { kind: "semantic", triggerKey: "answered" },
+  ]);
+  expect(
+    buildKnowledgeBoundarySignals({
+      ...baseProposal,
+      grounding: { excerptIds: [], status: "no_answer" },
+    }),
+  ).toEqual([{ kind: "semantic", triggerKey: "no_answer" }]);
+  expect(
+    buildKnowledgeBoundarySignals({
+      ...baseProposal,
+      taskRecommendation: {
+        confidence: 0.9,
+        reason: "The visitor wants to book.",
+        taskId: 40,
+      },
+    }),
+  ).toEqual([{ kind: "semantic", triggerKey: "task:40" }]);
+  expect(
+    buildKnowledgeBoundarySignals({
+      ...baseProposal,
+      safety: { decision: "handoff", reasonCode: "human_help" },
+    }),
+  ).toEqual([{ kind: "tool_result", triggerKey: "handoff" }]);
 });
 
 test("compiler blocks a task output without an explicit route", () => {

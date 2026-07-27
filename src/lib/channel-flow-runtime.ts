@@ -1122,7 +1122,7 @@ export async function resumeChannelFlowAtStep(input: {
   contactId?: number | null;
   projectId: number;
   submission: SelectActionSubmission;
-  targetStepId: number;
+  targetStepId: number | null;
 }) {
   const stepIndex = findStepIndexById(input.action, input.targetStepId);
 

@@ -510,7 +510,7 @@ Phase 7 execution checkpoints:
 - [x] Step 4.1 of 6: shared single-owner hybrid-boundary dispatcher.
 - [x] Step 4.2 of 6: knowledge-to-task entry and whitelisted value transfer.
 - [x] Step 4.3 of 6: task outcome return and deterministic-flow resume.
-- [ ] Step 4.4 of 6: project-chat and widget integration.
+- [x] Step 4.4 of 6: project-chat and widget integration.
 - [ ] Step 4.5 of 6: WhatsApp integration and response-ownership enforcement.
 - [ ] Step 5 of 6: combined cross-channel verification and documentation.
 - [ ] Step 6 of 6: focused manual UAT and phase closure.
@@ -524,6 +524,13 @@ Step 4.3 status: completed, cancelled, failed, and handed-off task events now
 resolve one immutable named output route inside the durable task transaction.
 The transaction restores the configured published node and response owner, or
 closes the graph, without executing the resumed node during the same event.
+
+Step 4.4 status: project chat and the website widget now enter the same
+project-scoped hybrid boundary runtime after deterministic execution. The
+runtime uses the pinned action and task versions, preserves one response owner,
+applies task field and outcome events through the authoritative durable task
+runtime, and resumes deterministic nodes through the existing channel-flow
+executor.
 
 - [ ] Extend the universal graph contract with conversational-task nodes.
 - [ ] Add a first-class knowledge-conversation node backed by the existing project retrieval interface.

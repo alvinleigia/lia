@@ -6,6 +6,7 @@ import type {
   TurnFieldStateV1,
 } from "@/lib/conversation-turn-contracts";
 import {
+  type ExecuteStructuredTurnInput,
   StructuredTurnEngine,
   type StructuredTurnExecution,
 } from "@/lib/conversation-turn-engine";
@@ -39,6 +40,17 @@ type ExecuteProjectStructuredTurnInput = StructuredTurnRequestV1 & {
   projectName: string;
 };
 
+export async function executeConfiguredStructuredTurn(
+  input: ExecuteStructuredTurnInput,
+) {
+  const engine = new StructuredTurnEngine({
+    budgetGate: projectTurnBudgetGate,
+    retriever: new ProjectDocumentTurnRetriever(),
+  });
+
+  return engine.execute(input);
+}
+
 export async function executeProjectStructuredTurn(
   input: ExecuteProjectStructuredTurnInput,
 ): Promise<ProjectStructuredTurnResult> {
@@ -68,11 +80,7 @@ export async function executeProjectStructuredTurn(
   const context: TurnContextValueV1[] = activeTask
     ? selectModelVisibleTurnContext(activeTask)
     : [];
-  const engine = new StructuredTurnEngine({
-    budgetGate: projectTurnBudgetGate,
-    retriever: new ProjectDocumentTurnRetriever(),
-  });
-  const execution = await engine.execute({
+  const execution = await executeConfiguredStructuredTurn({
     activeTask,
     assistantBehavior,
     assistantIntroduced: input.assistantIntroduced,

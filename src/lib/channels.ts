@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { getOrCreateContactForConversation } from "@/lib/contacts";
 import { db } from "@/lib/db-config";
 import {
@@ -191,6 +191,34 @@ export async function getChannelConversation(input: {
     .limit(1);
 
   return conversation ?? null;
+}
+
+export async function listRecentChannelMessages(input: {
+  beforeMessageId?: number | null;
+  conversationId: number;
+  limit?: number;
+  projectId: number;
+}) {
+  const rows = await db
+    .select({
+      direction: channelMessages.direction,
+      id: channelMessages.id,
+      text: channelMessages.text,
+    })
+    .from(channelMessages)
+    .where(
+      and(
+        eq(channelMessages.projectId, input.projectId),
+        eq(channelMessages.conversationId, input.conversationId),
+        input.beforeMessageId
+          ? lt(channelMessages.id, input.beforeMessageId)
+          : undefined,
+      ),
+    )
+    .orderBy(desc(channelMessages.id))
+    .limit(Math.min(Math.max(input.limit ?? 20, 1), 50));
+
+  return rows.reverse();
 }
 
 export async function markChannelConversationForReview(input: {
