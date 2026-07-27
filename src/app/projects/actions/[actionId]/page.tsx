@@ -386,6 +386,14 @@ export default async function ActionDetailPage({
                     Canvas
                   </Link>
                 </Button>
+                {currentPublishedVersion ? (
+                  <Button asChild variant="outline">
+                    <Link href={`/projects/actions/${action.id}/hybrid-test`}>
+                      <FlaskConical className="h-4 w-4" />
+                      Test Flow
+                    </Link>
+                  </Button>
+                ) : null}
                 <Button asChild variant="outline">
                   <Link href={`/projects/actions/${action.id}/export`}>
                     <Download className="h-4 w-4" />

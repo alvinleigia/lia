@@ -299,7 +299,7 @@ Start At: Project Questions
 2. Confirm the action reports no publish blockers.
 3. Select `Publish`.
 4. Confirm the first published version appears in `Version History`.
-5. Select `Test Flow`.
+5. In the top action controls, select `Test Flow` beside `Canvas`.
 
 **Pass when**
 
