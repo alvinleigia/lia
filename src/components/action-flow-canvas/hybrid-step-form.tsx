@@ -19,6 +19,7 @@ import {
   readConversationalTaskFlowNodeSettings,
   readKnowledgeFlowNodeSettings,
 } from "@/lib/hybrid-flow-compiler";
+import { getDefaultTaskOutcomeRoutes } from "./model";
 
 export const HYBRID_STEP_TYPES = [
   "knowledge_conversation",
@@ -362,6 +363,9 @@ function TaskStepForm({
       : [boundOption, ...taskOptions];
   const initialTaskVersionId =
     stored?.task.taskVersionId ?? taskOptions[0]?.taskVersionId ?? 0;
+  const initialTask = availableOptions.find(
+    (option) => option.taskVersionId === initialTaskVersionId,
+  );
   const [label, setLabel] = useState(step?.label ?? "Business Task");
   const [taskVersionId, setTaskVersionId] = useState(initialTaskVersionId);
   const [transferFieldKeys, setTransferFieldKeys] = useState<string[]>(
@@ -372,7 +376,10 @@ function TaskStepForm({
   );
   const [outcomeRoutes, setOutcomeRoutes] = useState<
     Record<string, HybridRouteTarget>
-  >(stored?.outcomeRoutes ?? {});
+  >(
+    stored?.outcomeRoutes ??
+      getDefaultTaskOutcomeRoutes(initialTask?.outcomes ?? []),
+  );
   const [isEnabled, setIsEnabled] = useState(step?.isEnabled ?? true);
   const [error, setError] = useState("");
   const selectedTask = availableOptions.find(
@@ -463,12 +470,7 @@ function TaskStepForm({
             setTransferFieldKeys([]);
             setTransferContextKeys([]);
             setOutcomeRoutes(
-              Object.fromEntries(
-                (nextTask?.outcomes ?? []).map((outcome) => [
-                  outcome.outputPort,
-                  "end",
-                ]),
-              ),
+              getDefaultTaskOutcomeRoutes(nextTask?.outcomes ?? []),
             );
           }}
         >

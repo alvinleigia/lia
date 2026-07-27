@@ -7,6 +7,7 @@ import type {
   CanvasStepInput,
   CatalogProductOption,
   FlowStep,
+  HybridRouteTarget,
   MediaAssetOption,
   ProductCatalogOption,
 } from "@/components/action-flow-canvas/types";
@@ -169,6 +170,14 @@ export function getStepById(steps: FlowStep[], stepId: number | null) {
   }
 
   return steps.find((step) => step.id === stepId) ?? null;
+}
+
+export function getDefaultTaskOutcomeRoutes(
+  outcomes: Array<{ outputPort: string }>,
+): Record<string, HybridRouteTarget> {
+  return Object.fromEntries(
+    outcomes.map((outcome) => [outcome.outputPort, "end"]),
+  );
 }
 
 export function getBranchRuleSettingText(rule: BranchRule, key: string) {

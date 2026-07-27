@@ -4,6 +4,7 @@ import {
   countBlockingDiagnostics,
   countWarningDiagnostics,
   getCanvasPosition,
+  getDefaultTaskOutcomeRoutes,
   moveFlowContentBlock,
 } from "../../src/components/action-flow-canvas/model";
 import type {
@@ -53,6 +54,22 @@ test("canvas positions accept only finite coordinates", () => {
     null,
   );
   expect(getCanvasPosition({ canvasPosition: [120, 80] })).toBe(null);
+});
+
+test("business task outcomes default to terminal routes", () => {
+  expect(
+    getDefaultTaskOutcomeRoutes([
+      { outputPort: "completed" },
+      { outputPort: "cancelled" },
+      { outputPort: "needs_team_help" },
+      { outputPort: "booking_failed" },
+    ]),
+  ).toEqual({
+    booking_failed: "end",
+    cancelled: "end",
+    completed: "end",
+    needs_team_help: "end",
+  });
 });
 
 test("canvas edges preserve explicit routes, branches, and ordered fallbacks", () => {
