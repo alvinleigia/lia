@@ -242,11 +242,13 @@ export function ActionFlowCanvas({
 
   const createStep = useCallback(
     (input: CanvasStepInput) => {
-      runMutation(() =>
-        createCanvasStepAction({
-          actionId,
-          ...input,
-        }),
+      runMutation(
+        () =>
+          createCanvasStepAction({
+            actionId,
+            ...input,
+          }),
+        () => setIsCreateStepDialogOpen(false),
       );
     },
     [actionId, runMutation],
