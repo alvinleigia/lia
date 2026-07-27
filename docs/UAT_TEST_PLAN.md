@@ -12,7 +12,16 @@ Project: `Ewissen Infra (#194)`
 
 URL: `http://localhost:3000`
 
-Database migration: Not required for Phase 7
+Database migration: Required before Phase 7 UAT
+
+Run:
+
+```powershell
+npx drizzle-kit migrate
+```
+
+Confirm the command reports that migrations were applied successfully before
+opening Project Chat.
 
 ## What You Are Testing
 
