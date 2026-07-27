@@ -3,7 +3,14 @@ import type {
   ActionFlowCompilerBranchRule,
   ActionFlowCompilerStep,
 } from "../../src/lib/action-flow-compiler";
-import { DEFAULT_CONVERSATIONAL_TASK_DEFINITION } from "../../src/lib/conversation-contracts";
+import {
+  REFERENCE_BOOKING_PROJECT_POLICY,
+  REFERENCE_BOOKING_TASK_DEFINITION,
+} from "../../src/lib/conversation-contract-fixtures";
+import {
+  conversationalTaskSnapshotV1Schema,
+  DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
+} from "../../src/lib/conversation-contracts";
 import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
 import {
   compiledHybridFlowGraphV1Schema,
@@ -14,10 +21,12 @@ import {
 import {
   buildHybridGraphTaskReturnTarget,
   dispatchHybridFlowBoundary,
+  prepareHybridTaskEntry,
   resolveHybridTaskOutcomeRoute,
   selectHybridFlowEntryNode,
   selectHybridFlowTransition,
 } from "../../src/lib/hybrid-flow-runtime";
+import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 const outcomes = DEFAULT_CONVERSATIONAL_TASK_DEFINITION.outcomes;
 
@@ -85,6 +94,41 @@ const steps = [
     stepType: "submit",
   }),
 ];
+
+const taskSnapshot = conversationalTaskSnapshotV1Schema.parse({
+  schemaVersion: 1,
+  assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
+  assistantPolicy: REFERENCE_BOOKING_PROJECT_POLICY.assistant,
+  conversationPolicy: REFERENCE_BOOKING_PROJECT_POLICY,
+  task: {
+    id: 40,
+    schemaVersion: 1,
+    name: "Book a service",
+    objective: "Submit a service request.",
+    description: null,
+    definition: {
+      ...REFERENCE_BOOKING_TASK_DEFINITION,
+      fieldTransferWhitelist: [
+        {
+          allowSensitive: false,
+          allowedSources: ["visitor"],
+          fieldKey: "serviceId",
+          maximumAgeMinutes: null,
+          minimumValidationState: "candidate",
+          requireProvenance: true,
+        },
+        {
+          allowSensitive: true,
+          allowedSources: ["visitor"],
+          fieldKey: "guestEmail",
+          maximumAgeMinutes: null,
+          minimumValidationState: "candidate",
+          requireProvenance: true,
+        },
+      ],
+    },
+  },
+});
 
 test("compiler publishes a reachable knowledge-task-deterministic graph", () => {
   const result = compileHybridFlowGraph({
@@ -310,6 +354,135 @@ test("boundary dispatcher keeps ownership when no route is selected", async () =
       transition: null,
     }),
   );
+});
+
+test("knowledge-to-task entry pins the task and transfers only intersected allowlists", async () => {
+  const graph = compileHybridFlowGraph({
+    branchRules,
+    steps,
+  }).graph;
+  const dispatch = await dispatchHybridFlowBoundary({
+    execute: async () => ({
+      output: {
+        fieldCandidates: [
+          {
+            confidence: 0.95,
+            fieldKey: "serviceId",
+            naturalValue: "product:71",
+            source: "visitor" as const,
+          },
+          {
+            confidence: 0.9,
+            fieldKey: "guestEmail",
+            naturalValue: "guest@example.com",
+            source: "visitor" as const,
+          },
+          {
+            confidence: 0.85,
+            fieldKey: "serviceId",
+            naturalValue: "product:72",
+            source: "visitor" as const,
+          },
+        ],
+        taskRecommendation: {
+          confidence: 0.95,
+          reason: "The visitor wants to book a service.",
+          taskId: 40,
+        },
+      },
+      signals: [{ kind: "semantic" as const, triggerKey: "task:40" }],
+    }),
+    graph,
+    responseOwner: "knowledge",
+    sourceNodeId: "step:1",
+  });
+
+  const entry = prepareHybridTaskEntry({
+    actionVersionId: 500,
+    contextValues: {
+      lia_locale: "en-IN",
+      lia_timezone: "Asia/Kolkata",
+      untrusted: "do-not-transfer",
+    },
+    dispatch,
+    graph,
+    taskSnapshot,
+    taskSnapshotVersionId: 80,
+  });
+
+  expect(entry).toEqual(
+    expect.objectContaining({
+      activeNodeId: "step:2",
+      initializationContext: {
+        lia_timezone: "Asia/Kolkata",
+      },
+      taskId: 40,
+      taskVersionId: 80,
+    }),
+  );
+  expect(entry?.fieldCandidates).toEqual([
+    expect.objectContaining({
+      fieldKey: "serviceId",
+      naturalValue: "product:71",
+      provenance: {
+        source: "visitor",
+        sourceReference: null,
+      },
+      state: "candidate",
+    }),
+  ]);
+  expect(entry?.returnTarget).toEqual(
+    expect.objectContaining({
+      actionVersionId: 500,
+      taskNodeId: "step:2",
+    }),
+  );
+});
+
+test("knowledge-to-task entry rejects a stale version or mismatched recommendation", async () => {
+  const graph = compileHybridFlowGraph({
+    branchRules,
+    steps,
+  }).graph;
+  const createDispatch = (taskId: number) =>
+    dispatchHybridFlowBoundary({
+      execute: async () => ({
+        output: {
+          fieldCandidates: [],
+          taskRecommendation: {
+            confidence: 0.95,
+            reason: "The visitor wants to book a service.",
+            taskId,
+          },
+        },
+        signals: [{ kind: "semantic" as const, triggerKey: "task:40" }],
+      }),
+      graph,
+      responseOwner: "knowledge" as const,
+      sourceNodeId: "step:1",
+    });
+  const dispatch = await createDispatch(40);
+
+  expect(
+    prepareHybridTaskEntry({
+      actionVersionId: 500,
+      contextValues: {},
+      dispatch,
+      graph,
+      taskSnapshot,
+      taskSnapshotVersionId: 81,
+    }),
+  ).toBeNull();
+  expect(
+    prepareHybridTaskEntry({
+      actionVersionId: 500,
+      contextValues: {},
+      dispatch: await createDispatch(41),
+      graph,
+      taskSnapshot,
+      taskSnapshotVersionId: 80,
+    }),
+  ).toBeNull();
 });
 
 test("boundary dispatcher rejects deterministic or stale boundary identifiers", async () => {

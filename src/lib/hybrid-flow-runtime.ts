@@ -1,4 +1,9 @@
-import type { TaskOutcomeV1 } from "@/lib/conversation-contracts";
+import type {
+  ConversationalTaskSnapshotV1,
+  TaskOutcomeV1,
+} from "@/lib/conversation-contracts";
+import type { TurnResultV1 } from "@/lib/conversation-turn-contracts";
+import type { FieldCandidateV1 } from "@/lib/conversational-task-runtime-contracts";
 import type {
   CompiledHybridFlowGraphV1,
   HybridFlowNodeV1,
@@ -38,6 +43,20 @@ export type HybridBoundaryDispatchResult<TOutput> = {
   status: "ended" | "invalid" | "stayed" | "suppressed" | "transitioned";
   targetNode: HybridFlowNodeV1 | null;
   transition: HybridFlowTransitionV1 | null;
+};
+
+export type HybridTaskEntryProposal = Pick<
+  TurnResultV1,
+  "fieldCandidates" | "taskRecommendation"
+>;
+
+export type PreparedHybridTaskEntry = {
+  activeNodeId: string;
+  fieldCandidates: FieldCandidateV1[];
+  initializationContext: Record<string, unknown>;
+  returnTarget: HybridGraphTaskReturnTargetV1;
+  taskId: number;
+  taskVersionId: number;
 };
 
 export function selectHybridFlowEntryNode(input: {
@@ -210,6 +229,120 @@ export async function dispatchHybridFlowBoundary<TOutput>(input: {
     status: "transitioned",
     targetNode,
     transition,
+  };
+}
+
+export function prepareHybridTaskEntry(input: {
+  actionVersionId: number;
+  contextValues: Record<string, unknown>;
+  dispatch: HybridBoundaryDispatchResult<HybridTaskEntryProposal>;
+  graph: CompiledHybridFlowGraphV1;
+  taskSnapshot: ConversationalTaskSnapshotV1;
+  taskSnapshotVersionId: number;
+}): PreparedHybridTaskEntry | null {
+  const { dispatch } = input;
+  if (
+    dispatch.status !== "transitioned" ||
+    dispatch.sourceNode?.kind !== "knowledge" ||
+    dispatch.targetNode?.kind !== "conversational_task" ||
+    dispatch.transition?.kind !== "semantic" ||
+    !dispatch.execution?.output.taskRecommendation
+  ) {
+    return null;
+  }
+
+  const taskNode = dispatch.targetNode;
+  const taskReference = taskNode.settings.task;
+  const recommendation = dispatch.execution.output.taskRecommendation;
+  if (
+    recommendation.taskId !== taskReference.taskId ||
+    dispatch.transition.triggerKey !== `task:${taskReference.taskId}` ||
+    !dispatch.sourceNode.settings.recommendationTargetStepIds.includes(
+      taskNode.sourceStepId,
+    ) ||
+    input.taskSnapshotVersionId !== taskReference.taskVersionId ||
+    input.taskSnapshot.task.id !== taskReference.taskId
+  ) {
+    return null;
+  }
+
+  const returnTarget = buildHybridGraphTaskReturnTarget({
+    actionVersionId: input.actionVersionId,
+    graph: input.graph,
+    taskNodeId: taskNode.id,
+  });
+  if (!returnTarget) {
+    return null;
+  }
+
+  const taskFields = new Map(
+    input.taskSnapshot.task.definition.fields.map((field) => [
+      field.key,
+      field,
+    ]),
+  );
+  const transferRules = new Map(
+    input.taskSnapshot.task.definition.fieldTransferWhitelist.map((rule) => [
+      rule.fieldKey,
+      rule,
+    ]),
+  );
+  const graphFieldKeys = new Set(taskNode.settings.transferFieldKeys);
+  const acceptedFieldKeys = new Set<string>();
+  const fieldCandidates = dispatch.execution.output.fieldCandidates.flatMap(
+    (candidate): FieldCandidateV1[] => {
+      const field = taskFields.get(candidate.fieldKey);
+      const rule = transferRules.get(candidate.fieldKey);
+      if (
+        acceptedFieldKeys.has(candidate.fieldKey) ||
+        !graphFieldKeys.has(candidate.fieldKey) ||
+        !field ||
+        !rule ||
+        rule.minimumValidationState !== "candidate" ||
+        !rule.allowedSources.includes("visitor") ||
+        !field.sourcePriority.includes("visitor") ||
+        (field.sensitivity === "sensitive" && !rule.allowSensitive)
+      ) {
+        return [];
+      }
+      acceptedFieldKeys.add(candidate.fieldKey);
+      return [
+        {
+          fieldKey: candidate.fieldKey,
+          naturalValue: candidate.naturalValue,
+          provenance: {
+            source: "visitor",
+            sourceReference: null,
+          },
+          state: "candidate",
+          validation: {
+            code: null,
+            message: null,
+            valid: false,
+          },
+        },
+      ];
+    },
+  );
+
+  const graphContextKeys = new Set(taskNode.settings.transferContextKeys);
+  const initializationContext = Object.fromEntries(
+    input.taskSnapshot.task.definition.contextVariables.flatMap((variable) =>
+      graphContextKeys.has(variable.key) &&
+      Object.hasOwn(input.contextValues, variable.key) &&
+      input.contextValues[variable.key] !== undefined
+        ? [[variable.key, input.contextValues[variable.key]]]
+        : [],
+    ),
+  );
+
+  return {
+    activeNodeId: taskNode.id,
+    fieldCandidates,
+    initializationContext,
+    returnTarget,
+    taskId: taskReference.taskId,
+    taskVersionId: taskReference.taskVersionId,
   };
 }
 

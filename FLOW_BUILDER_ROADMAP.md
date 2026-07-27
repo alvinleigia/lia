@@ -508,12 +508,17 @@ Phase 7 execution checkpoints:
 - [x] Step 2 of 6: builder controls and simulator.
 - [x] Step 3 of 6: persisted boundaries and published-version pinning.
 - [x] Step 4.1 of 6: shared single-owner hybrid-boundary dispatcher.
-- [ ] Step 4.2 of 6: knowledge-to-task entry and whitelisted value transfer.
+- [x] Step 4.2 of 6: knowledge-to-task entry and whitelisted value transfer.
 - [ ] Step 4.3 of 6: task outcome return and deterministic-flow resume.
 - [ ] Step 4.4 of 6: project-chat and widget integration.
 - [ ] Step 4.5 of 6: WhatsApp integration and response-ownership enforcement.
 - [ ] Step 5 of 6: combined cross-channel verification and documentation.
 - [ ] Step 6 of 6: focused manual UAT and phase closure.
+
+Step 4.2 status: the shared entry service now resolves the exact published task
+version, verifies the graph-approved recommendation, intersects graph and task
+transfer policies, initializes only declared context, and submits approved
+visitor values through the existing deterministic field-validation runtime.
 
 - [ ] Extend the universal graph contract with conversational-task nodes.
 - [ ] Add a first-class knowledge-conversation node backed by the existing project retrieval interface.
