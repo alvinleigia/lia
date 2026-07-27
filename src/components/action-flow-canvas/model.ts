@@ -17,15 +17,15 @@ import {
   getFlowComponentColor,
   getFlowComponentLabel,
 } from "@/lib/flow-components";
-import {
-  readConversationalTaskFlowNodeSettings,
-  readKnowledgeFlowNodeSettings,
-} from "@/lib/hybrid-flow-compiler";
 import type { FlowContentBlock } from "@/lib/flow-content-blocks";
 import {
   type FlowContentComponentKey,
   getFlowContentComponent,
 } from "@/lib/flow-content-components";
+import {
+  readConversationalTaskFlowNodeSettings,
+  readKnowledgeFlowNodeSettings,
+} from "@/lib/hybrid-flow-compiler";
 
 export const CANVAS_INPUT_TYPES = [
   "text",
@@ -237,11 +237,9 @@ function buildOrderedFallbackEdges(steps: FlowStep[]) {
     if (
       !nextStep ||
       step.nextStepId !== null ||
-      [
-        "conversational_task",
-        "knowledge_conversation",
-        "submit",
-      ].includes(step.stepType)
+      ["conversational_task", "knowledge_conversation", "submit"].includes(
+        step.stepType,
+      )
     ) {
       continue;
     }

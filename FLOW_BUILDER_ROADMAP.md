@@ -80,16 +80,15 @@ database, backup, and provider readiness work.
 - [x] A first-class goal-driven Conversational Task exists.
 - [x] Durable conversational field collection, correction, and confirmation exist.
 - [x] The LLM has a constrained, proposal-only turn and tool-request protocol.
-- [ ] Grounded Q&A cannot yet enter a bounded task and return to Q&A within one version-pinned conversation.
+- [x] Grounded Q&A can enter a bounded task and return to Q&A within one version-pinned conversation.
 - [ ] Full rich-content parity with `docs/Flow Builder v2.pdf` is not complete.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 7 of 18, Step 4 of 6. Phases 1-6 completed
+Current phase: Priority 1, Phase 7 of 18, Step 6 of 6. Phases 1-6 completed
 their implementation and manual UAT gates by 2026-07-26.
 
-Current target: finish the bounded live-runtime checkpoints below, run
-cross-channel verification, and prepare focused Phase 7 UAT.
+Current target: run the focused Phase 7 manual UAT and close the phase.
 
 ## Product Direction
 
@@ -512,7 +511,7 @@ Phase 7 execution checkpoints:
 - [x] Step 4.3 of 6: task outcome return and deterministic-flow resume.
 - [x] Step 4.4 of 6: project-chat and widget integration.
 - [x] Step 4.5 of 6: WhatsApp integration and response-ownership enforcement.
-- [ ] Step 5 of 6: combined cross-channel verification and documentation.
+- [x] Step 5 of 6: combined cross-channel verification and documentation.
 - [ ] Step 6 of 6: focused manual UAT and phase closure.
 
 Step 4.2 status: the shared entry service now resolves the exact published task
@@ -537,6 +536,14 @@ post-boundary runtime before replies are adapted and queued through the existing
 WhatsApp outbox. All three live channels resolve the active project-scoped
 submission and pinned action version through one helper, while the boundary
 dispatcher suppresses automated execution whenever a human owns the response.
+
+Step 5 status: `npm run test:channel-certification` passed all 87 contract
+tests on 2026-07-27. The automated gate covers project-chat and widget reply
+parity, WhatsApp native and fallback delivery rules, every hybrid node across
+all declared adapters, immutable task-version boundaries, one-owner dispatch,
+and human-response suppression. The production build also passed at the Step
+4.5 checkpoint. Live WhatsApp delivery, browser visual acceptance, and the
+complete reference journey remain explicit Step 6 manual-UAT work.
 
 - [ ] Extend the universal graph contract with conversational-task nodes.
 - [ ] Add a first-class knowledge-conversation node backed by the existing project retrieval interface.

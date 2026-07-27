@@ -86,9 +86,7 @@ export type HybridTaskStepInput = {
   transferFieldKeys: string[];
 };
 
-export type HybridStepInput =
-  | HybridKnowledgeStepInput
-  | HybridTaskStepInput;
+export type HybridStepInput = HybridKnowledgeStepInput | HybridTaskStepInput;
 
 export type HybridEntryRouteInput = {
   key: string;

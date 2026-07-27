@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
 import { parseStoredActionFlowConditionGroup } from "@/lib/action-flow-compiler";
+import type { ProjectActionStatus } from "@/lib/action-flow-constants";
 import {
   ACTION_BRANCH_OPERATORS,
   ACTION_STEP_INPUT_TYPES,
@@ -22,7 +23,6 @@ import {
   updateActionFlowStep,
   updateProjectAction,
 } from "@/lib/action-flows";
-import type { ProjectActionStatus } from "@/lib/action-flow-constants";
 import {
   createActionStepSchema,
   parseActionStepOptions,
@@ -99,15 +99,16 @@ const hybridKnowledgeStepSchema = hybridStepBaseSchema.extend({
   goal: z.string().trim().min(1).max(1000),
   handoffRoute: hybridRouteTargetSchema,
   noAnswerRoute: hybridRouteTargetSchema,
-  recommendationTargetStepIds: z
-    .array(z.number().int().positive())
-    .max(50),
+  recommendationTargetStepIds: z.array(z.number().int().positive()).max(50),
   remainActiveAfterAnswer: z.boolean(),
   stageMode: z.enum(["exact", "goal_driven"]),
   stepType: z.literal("knowledge_conversation"),
 });
 const hybridTaskStepSchema = hybridStepBaseSchema.extend({
-  outcomeRoutes: z.record(z.string().trim().min(1).max(160), hybridRouteTargetSchema),
+  outcomeRoutes: z.record(
+    z.string().trim().min(1).max(160),
+    hybridRouteTargetSchema,
+  ),
   stepType: z.literal("conversational_task"),
   taskVersionId: z.number().int().positive(),
   transferContextKeys: z.array(z.string().trim().min(1).max(160)).max(100),
@@ -319,9 +320,7 @@ function asSettingsRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function getDuplicateEntryKey(
-  routes: Array<{ key: string; stepId: number }>,
-) {
+function getDuplicateEntryKey(routes: Array<{ key: string; stepId: number }>) {
   const keys = new Set<string>();
   for (const route of routes) {
     if (keys.has(route.key)) {
@@ -635,8 +634,7 @@ export async function saveCanvasHybridStepAction(
       answeredRoute: parsed.data.answeredRoute,
       handoffRoute: parsed.data.handoffRoute,
       noAnswerRoute: parsed.data.noAnswerRoute,
-      recommendationTargetStepIds:
-        parsed.data.recommendationTargetStepIds,
+      recommendationTargetStepIds: parsed.data.recommendationTargetStepIds,
       remainActiveAfterAnswer: parsed.data.remainActiveAfterAnswer,
       schemaVersion: 1,
       stageMode: parsed.data.stageMode,
@@ -671,9 +669,7 @@ export async function saveCanvasHybridStepAction(
       }),
     );
     if (
-      outputPorts.some(
-        (outputPort) => outcomeRoutes[outputPort] === undefined,
-      )
+      outputPorts.some((outputPort) => outcomeRoutes[outputPort] === undefined)
     ) {
       return {
         ok: false,
@@ -692,9 +688,7 @@ export async function saveCanvasHybridStepAction(
       };
     }
 
-    const transferFieldKeys = Array.from(
-      new Set(taskStep.transferFieldKeys),
-    );
+    const transferFieldKeys = Array.from(new Set(taskStep.transferFieldKeys));
     const transferContextKeys = Array.from(
       new Set(taskStep.transferContextKeys),
     );
