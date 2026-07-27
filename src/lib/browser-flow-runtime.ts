@@ -34,7 +34,7 @@ import {
   completeFlowRuntimeCommand,
   failFlowRuntimeCommand,
 } from "@/lib/flow-runtime-commands";
-import { runHybridChannelBoundary } from "@/lib/hybrid-channel-runtime";
+import { runHybridChannelFlowBoundary } from "@/lib/hybrid-channel-runtime";
 import {
   getRuntimeProjectAction,
   getRuntimeProjectActionForSubmission,
@@ -317,34 +317,18 @@ async function executeBrowserFlowText(
 
   let replies = result.replies;
   if (result.boundaryNodeId && text && "message" in inboundRecord) {
-    const submission = await getActiveActionSubmissionForConversation({
-      conversationId: input.conversationId,
+    const hybrid = await runHybridChannelFlowBoundary({
+      boundaryNodeId: result.boundaryNodeId,
+      channelConversationId: inboundRecord.conversation.id,
+      channelType: input.channelType,
+      externalConversationId: input.conversationId,
+      externalUserId: input.externalUserId,
+      inboundMessageId: inboundRecord.message.id,
       projectId: input.projectId,
       source: input.source,
+      text,
     });
-    const runtimeAction =
-      action ??
-      (submission
-        ? await getRuntimeProjectActionForSubmission(
-            input.projectId,
-            submission,
-          )
-        : null);
-    if (submission && runtimeAction) {
-      const hybrid = await runHybridChannelBoundary({
-        action: runtimeAction,
-        boundaryNodeId: result.boundaryNodeId,
-        channelConversationId: inboundRecord.conversation.id,
-        channelType: input.channelType,
-        externalConversationId: input.conversationId,
-        externalUserId: input.externalUserId,
-        inboundMessageId: inboundRecord.message.id,
-        projectId: input.projectId,
-        submission,
-        text,
-      });
-      replies = [...replies, ...hybrid.replies];
-    }
+    replies = [...replies, ...hybrid.replies];
   }
 
   await recordBrowserFlowReplies({

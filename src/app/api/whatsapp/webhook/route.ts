@@ -6,6 +6,7 @@ import {
 } from "@/lib/channel-flow-runtime";
 import { recordChannelInboundMessage } from "@/lib/channels";
 import { resolveTraceId } from "@/lib/execution-trace";
+import { runHybridChannelFlowBoundary } from "@/lib/hybrid-channel-runtime";
 import {
   enqueueWhatsAppRuntimeReplies,
   processProjectOutboxQueue,
@@ -114,6 +115,7 @@ export async function POST(req: Request) {
       source: WHATSAPP_FLOW_SOURCE,
     });
     const traceId = resolveTraceId(activeSubmission?.traceId);
+    const runtimeText = text ?? (location ? JSON.stringify(location) : "");
     const result = media
       ? await processChannelFlowMedia({
           activeSubmission,
@@ -127,22 +129,37 @@ export async function POST(req: Request) {
           conversationId: change.message.from,
           projectId: channel.projectId,
           source: WHATSAPP_FLOW_SOURCE,
-          text: text ?? (location ? JSON.stringify(location) : ""),
+          text: runtimeText,
           traceId,
         });
+    const hybrid =
+      !media && result.boundaryNodeId && runtimeText.trim()
+        ? await runHybridChannelFlowBoundary({
+            boundaryNodeId: result.boundaryNodeId,
+            channelConversationId: inboundRecord.conversation.id,
+            channelType: "whatsapp",
+            externalConversationId: change.message.from,
+            externalUserId: change.message.from,
+            inboundMessageId: inboundRecord.message.id,
+            projectId: channel.projectId,
+            source: WHATSAPP_FLOW_SOURCE,
+            text: runtimeText,
+          })
+        : { replies: [] };
+    const replies = [...result.replies, ...hybrid.replies];
 
-    if (result.replies.length > 0) {
+    if (replies.length > 0) {
       await enqueueWhatsAppRuntimeReplies({
         channelId: channel.id,
         externalConversationId: change.message.from,
         phoneNumberId: change.phoneNumberId,
         projectId: channel.projectId,
-        replies: result.replies,
+        replies,
         to: change.message.from,
         traceId,
       });
       await processProjectOutboxQueue({
-        maxMessages: result.replies.length,
+        maxMessages: replies.length,
         projectId: channel.projectId,
         workerId: `whatsapp-webhook:${change.message.id}`,
       });

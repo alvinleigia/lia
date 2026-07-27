@@ -511,7 +511,7 @@ Phase 7 execution checkpoints:
 - [x] Step 4.2 of 6: knowledge-to-task entry and whitelisted value transfer.
 - [x] Step 4.3 of 6: task outcome return and deterministic-flow resume.
 - [x] Step 4.4 of 6: project-chat and widget integration.
-- [ ] Step 4.5 of 6: WhatsApp integration and response-ownership enforcement.
+- [x] Step 4.5 of 6: WhatsApp integration and response-ownership enforcement.
 - [ ] Step 5 of 6: combined cross-channel verification and documentation.
 - [ ] Step 6 of 6: focused manual UAT and phase closure.
 
@@ -531,6 +531,12 @@ runtime uses the pinned action and task versions, preserves one response owner,
 applies task field and outcome events through the authoritative durable task
 runtime, and resumes deterministic nodes through the existing channel-flow
 executor.
+
+Step 4.5 status: the signed WhatsApp webhook now enters that same shared
+post-boundary runtime before replies are adapted and queued through the existing
+WhatsApp outbox. All three live channels resolve the active project-scoped
+submission and pinned action version through one helper, while the boundary
+dispatcher suppresses automated execution whenever a human owns the response.
 
 - [ ] Extend the universal graph contract with conversational-task nodes.
 - [ ] Add a first-class knowledge-conversation node backed by the existing project retrieval interface.

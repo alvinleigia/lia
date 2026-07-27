@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
 import { resumeChannelFlowAtStep } from "@/lib/channel-flow-runtime";
 import { type ChannelType, listRecentChannelMessages } from "@/lib/channels";
@@ -40,6 +41,7 @@ import {
 } from "@/lib/hybrid-flow-runtime";
 import { startHybridTaskEntry } from "@/lib/hybrid-task-entry";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
+import { getRuntimeProjectActionForSubmission } from "@/lib/runtime-actions";
 import { createTextReply, type RuntimeReply } from "@/lib/runtime-replies";
 
 type HybridBoundaryNode = Extract<
@@ -270,6 +272,13 @@ type HybridChannelRuntimeInput = {
   text: string;
 };
 
+type HybridChannelFlowBoundaryInput = Omit<
+  HybridChannelRuntimeInput,
+  "action" | "submission"
+> & {
+  source: string;
+};
+
 async function ensureDirectTaskEntry(input: {
   node: Extract<HybridFlowNodeV1, { kind: "conversational_task" }>;
   runtimeInput: HybridChannelRuntimeInput;
@@ -494,12 +503,7 @@ export async function runHybridChannelBoundary(
   input: HybridChannelRuntimeInput,
 ): Promise<HybridChannelBoundaryResult> {
   const graph = input.action.hybridGraph;
-  if (
-    !graph ||
-    !input.action.versionId ||
-    !input.text.trim() ||
-    (input.channelType !== "project_chat" && input.channelType !== "widget")
-  ) {
+  if (!graph || !input.action.versionId || !input.text.trim()) {
     return { replies: [] };
   }
 
@@ -592,4 +596,31 @@ export async function runHybridChannelBoundary(
   }
 
   return { replies };
+}
+
+export async function runHybridChannelFlowBoundary(
+  input: HybridChannelFlowBoundaryInput,
+): Promise<HybridChannelBoundaryResult> {
+  const submission = await getActiveActionSubmissionForConversation({
+    conversationId: input.externalConversationId,
+    projectId: input.projectId,
+    source: input.source,
+  });
+  if (!submission) {
+    return { replies: [] };
+  }
+
+  const action = await getRuntimeProjectActionForSubmission(
+    input.projectId,
+    submission,
+  );
+  if (!action) {
+    return { replies: [] };
+  }
+
+  return runHybridChannelBoundary({
+    ...input,
+    action,
+    submission,
+  });
 }
