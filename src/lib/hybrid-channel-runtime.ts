@@ -38,16 +38,12 @@ import {
   dispatchHybridFlowBoundary,
   type HybridBoundaryExecution,
   type HybridRuntimeResponseOwner,
+  resolveHybridBoundaryNode,
 } from "@/lib/hybrid-flow-runtime";
 import { startHybridTaskEntry } from "@/lib/hybrid-task-entry";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 import { getRuntimeProjectActionForSubmission } from "@/lib/runtime-actions";
 import { createTextReply, type RuntimeReply } from "@/lib/runtime-replies";
-
-type HybridBoundaryNode = Extract<
-  HybridFlowNodeV1,
-  { kind: "conversational_task" | "knowledge" }
->;
 
 type ProjectTurnContext = {
   companyName: string;
@@ -507,13 +503,8 @@ export async function runHybridChannelBoundary(
     return { replies: [] };
   }
 
-  const sourceNode = graph.nodes.find(
-    (node): node is HybridBoundaryNode =>
-      node.id === input.boundaryNodeId &&
-      (node.kind === "knowledge" || node.kind === "conversational_task"),
-  );
   const project = await getProjectTurnContext(input.projectId);
-  if (!sourceNode || !project) {
+  if (!project) {
     return { replies: [] };
   }
 
@@ -522,12 +513,14 @@ export async function runHybridChannelBoundary(
     externalConversationId: input.externalConversationId,
     projectId: input.projectId,
   });
-  if (
-    session.execution?.activeActionVersionId !== null &&
-    session.execution?.activeActionVersionId !== undefined &&
-    (session.execution.activeActionVersionId !== input.action.versionId ||
-      session.execution.activeNodeId !== sourceNode.id)
-  ) {
+  const sourceNode = resolveHybridBoundaryNode({
+    actionVersionId: input.action.versionId,
+    activeActionVersionId: session.execution?.activeActionVersionId,
+    activeNodeId: session.execution?.activeNodeId,
+    graph,
+    requestedNodeId: input.boundaryNodeId,
+  });
+  if (!sourceNode) {
     return { replies: [] };
   }
   const history = toHistory(

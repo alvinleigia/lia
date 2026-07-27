@@ -115,6 +115,29 @@ export function selectHybridFlowEntryNode(input: {
   return input.graph.entryPolicy.normalNodeId;
 }
 
+export function resolveHybridBoundaryNode(input: {
+  actionVersionId: number;
+  activeActionVersionId?: number | null;
+  activeNodeId?: string | null;
+  graph: CompiledHybridFlowGraphV1;
+  requestedNodeId: string;
+}): HybridBoundaryNode | null {
+  const findBoundaryNode = (nodeId: string | null | undefined) =>
+    input.graph.nodes.find(
+      (node): node is HybridBoundaryNode =>
+        node.id === nodeId &&
+        (node.kind === "knowledge" || node.kind === "conversational_task"),
+    ) ?? null;
+
+  if (input.activeActionVersionId == null) {
+    return findBoundaryNode(input.requestedNodeId);
+  }
+  if (input.activeActionVersionId !== input.actionVersionId) {
+    return null;
+  }
+  return findBoundaryNode(input.activeNodeId);
+}
+
 function signalMatchesTransition(
   transition: HybridFlowTransitionV1,
   signal: HybridTransitionSignal,

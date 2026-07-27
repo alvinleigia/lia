@@ -30,6 +30,7 @@ import {
   dispatchHybridFlowBoundary,
   matchesHybridGraphTaskReturnTarget,
   prepareHybridTaskEntry,
+  resolveHybridBoundaryNode,
   resolveHybridTaskOutcomeResume,
   resolveHybridTaskOutcomeRoute,
   selectHybridFlowEntryNode,
@@ -43,6 +44,39 @@ test("publishing activates drafts without reactivating archived actions", () => 
   expect(getProjectActionStatusAfterPublish("draft")).toBe("active");
   expect(getProjectActionStatusAfterPublish("active")).toBe("active");
   expect(getProjectActionStatusAfterPublish("archived")).toBe("archived");
+});
+
+test("active hybrid execution owns the next channel boundary", () => {
+  const graph = compileHybridFlowGraph({
+    branchRules,
+    steps,
+  }).graph;
+
+  expect(
+    resolveHybridBoundaryNode({
+      actionVersionId: 500,
+      graph,
+      requestedNodeId: "step:1",
+    })?.id,
+  ).toBe("step:1");
+  expect(
+    resolveHybridBoundaryNode({
+      actionVersionId: 500,
+      activeActionVersionId: 500,
+      activeNodeId: "step:2",
+      graph,
+      requestedNodeId: "step:1",
+    })?.id,
+  ).toBe("step:2");
+  expect(
+    resolveHybridBoundaryNode({
+      actionVersionId: 500,
+      activeActionVersionId: 499,
+      activeNodeId: "step:2",
+      graph,
+      requestedNodeId: "step:1",
+    }),
+  ).toBeNull();
 });
 
 test("hybrid graphs use compiled terminal validation for publish readiness", () => {
