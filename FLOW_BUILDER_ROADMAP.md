@@ -542,8 +542,10 @@ tests on 2026-07-27. The automated gate covers project-chat and widget reply
 parity, WhatsApp native and fallback delivery rules, every hybrid node across
 all declared adapters, immutable task-version boundaries, one-owner dispatch,
 and human-response suppression. The production build also passed at the Step
-4.5 checkpoint. Live WhatsApp delivery, browser visual acceptance, and the
-complete reference journey remain explicit Step 6 manual-UAT work.
+4.5 checkpoint. Step 6 manually verifies the published hybrid graph, local
+project-chat boundary, response ownership, and universal channel entry rules.
+Live widget and WhatsApp provider delivery remain the Phase 13 certification
+gate, while the complete reference booking journey remains Phase 8 work.
 
 - [ ] Extend the universal graph contract with conversational-task nodes.
 - [ ] Add a first-class knowledge-conversation node backed by the existing project retrieval interface.

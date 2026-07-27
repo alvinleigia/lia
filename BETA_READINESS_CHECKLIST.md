@@ -29,15 +29,16 @@ Overall beta status: Not ready for production-like beta traffic.
 
 Authoritative product implementation status:
 
-- Flow roadmap target: Priority 1, Phase 6 manual UAT.
+- Flow roadmap target: Priority 1, Phase 7 manual UAT.
 - Priority 1, Phase 1 implementation and manual UAT are complete.
 - Priority 1, Phase 2 implementation and manual UAT are complete.
 - Priority 1, Phase 3 implementation and manual UAT are complete.
 - Priority 1, Phase 4 implementation and manual UAT are complete.
 - Priority 1, Phase 5 implementation and manual UAT are complete.
-- Priority 1, Phase 6 implementation is complete; focused manual UAT is
+- Priority 1, Phase 6 implementation and manual UAT are complete.
+- Priority 1, Phase 7 implementation is complete; focused manual UAT is
   pending.
-- Priority 1, Phase 6 manual UAT and Phases 7-8 remain required for the
+- Priority 1, Phase 7 manual UAT and Phase 8 remain required for the
   goal-driven conversational core.
 - Priority 2, Phases 9-14 remain required for declared non-voice beta
   capability parity, live channel certification, and release approval.
@@ -282,8 +283,8 @@ These are not blockers for internal beta, but they must be explicitly accepted:
 
 ## Recommended Next Implementation Order
 
-1. Complete Priority 1, Phase 6 focused manual UAT.
-2. Continue Priority 1, Phases 7-8 in `FLOW_BUILDER_ROADMAP.md`, updating
+1. Complete Priority 1, Phase 7 focused manual UAT.
+2. Continue Priority 1, Phase 8 in `FLOW_BUILDER_ROADMAP.md`, updating
    implementation status only there.
 3. Complete Priority 2, Phases 9-14 and the non-voice cross-channel release
    gate.

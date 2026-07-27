@@ -2,9 +2,9 @@
 
 ## Current Test
 
-Phase: 6 of 18
+Phase: 7 of 18
 
-Test: Conversational Task Builder Experience
+Test: Hybrid Graph Compiler And Runtime Integration
 
 Progress: Implementation complete; manual UAT pending
 
@@ -12,435 +12,331 @@ Project: `Ewissen Infra (#194)`
 
 URL: `http://localhost:3000`
 
-Database migration: Not required for Phase 6
+Database migration: Not required for Phase 7
 
 ## What You Are Testing
 
-This phase checks that a business user can create, configure, publish, and test
-a conversational booking task without writing prompts, JSON, provider settings,
-or a separate flow node for every answer.
+This phase checks that one published action can move safely between:
 
-Use the temporary task below. The values are supplied so you can copy and paste
-them without inventing test data.
+1. Knowledge Q&A.
+2. A published conversational business task.
+3. An exact deterministic message.
+4. Knowledge Q&A again.
 
-## Step 1 of 10 - Create A Booking Task
+The test also checks normal and channel entry rules, immutable published
+versions, one response owner at a time, and the local project-chat runtime.
+
+Create only the temporary action described below. Do not edit or delete the
+existing `Book a Spa Service` task.
+
+## Step 1 of 8 - Create A Temporary Action
 
 **Do this**
 
 1. Select `Ewissen Infra (#194)` in the header.
 2. Open `Automation`.
-3. Open `Tasks`.
-4. Select `New Task`.
-5. Select the `Booking` starting point.
-6. Enter the following task name:
+3. Open `Actions`.
+4. Select `New Action`.
+5. Find `Blank Action`.
+6. Enter this action name:
 
 ```text
-Phase 6 Builder UAT
+Phase 7 Hybrid UAT
 ```
 
-7. Enter the following objective:
+7. Enter this description:
 
 ```text
-Help visitors choose a spa service, share their preferred schedule, and submit a booking request.
+Temporary hybrid flow used to test knowledge, task, exact-message, entry, return, and version routing.
 ```
 
-8. Enter the following internal notes:
+8. Enter these trigger phrases:
 
 ```text
-Temporary task used to test the Phase 6 conversational task builder.
+phase seven hybrid test
+book a spa service
 ```
 
-9. Set `After completion` to `Continue helping the visitor`.
-10. Select `Create Task`.
+9. Select `Create Action`.
+10. Open `Canvas`.
 
 **Pass when**
 
-1. The task opens without an error.
-2. Its status is `Draft`.
-3. The task details show the name, objective, and internal notes you entered.
-4. `Save Changes`, `Configure Conversation`, and `Archive Task` appear in one
-   organized action row.
+1. The action opens without an error.
+2. The canvas is empty.
+3. `Knowledge` and `Business Task` are available in `Blocks`.
 
-## Step 2 of 10 - Check The Guided Workspace
+## Step 2 of 8 - Add Four Blocks
 
-**Do this**
+Add the blocks in this exact order.
 
-1. Select `Configure Conversation`.
-2. Confirm these seven views appear:
+### Block 1 - Knowledge
+
+1. Select `Knowledge`.
+2. Enter this step name:
 
 ```text
-Behavior
-Context
-Tools
-Knowledge
-Workflow
-Test
-Versions
+Project Questions
 ```
 
-3. Open `Behavior`.
-4. Confirm the common conversation settings are visible.
-5. Confirm `Advanced model and transition limits` is collapsed by default.
-6. Open and close that section once.
-7. Do not change or save the shared project behavior during this test.
+3. Enter this goal:
+
+```text
+Answer verified project questions briefly. Recommend the booking task when the visitor wants to book a spa service.
+```
+
+4. Set `Conversation Style` to `Natural conversation`.
+5. Turn on `Keep answering questions`.
+6. Set `When No Answer Is Found` to `End Conversation`.
+7. Set `When Human Help Is Needed` to `End Conversation`.
+8. Select `Create Knowledge Step`.
+
+### Block 2 - Business Task
+
+1. Select `Business Task`.
+2. Enter this step name:
+
+```text
+Book Spa Service
+```
+
+3. In `Published Business Task`, select the latest published version of
+   `Book a Spa Service`.
+4. Leave every outcome set to `End Conversation` for now.
+5. Select `Create Business Task Step`.
+
+### Block 3 - Message
+
+1. Select `Message`.
+2. Enter this label:
+
+```text
+Task Finished
+```
+
+3. Enter this visitor message:
+
+```text
+The booking task has finished. I can continue helping with project questions.
+```
+
+4. Keep the block enabled.
+5. Create the step.
+
+### Block 4 - Knowledge
+
+1. Select `Knowledge`.
+2. Enter this step name:
+
+```text
+Return To Questions
+```
+
+3. Enter this goal:
+
+```text
+Continue answering verified project questions after the booking task finishes.
+```
+
+4. Set `Conversation Style` to `Natural conversation`.
+5. Turn on `Keep answering questions`.
+6. Set `When No Answer Is Found` to `End Conversation`.
+7. Set `When Human Help Is Needed` to `End Conversation`.
+8. Select `Create Knowledge Step`.
 
 **Pass when**
 
-1. All seven views are easy to reach.
-2. The advanced section opens and closes correctly.
-3. Raw JSON, provider credentials, and voice-only settings are not present in
-   the primary editor.
+1. The canvas shows four blocks.
+2. Each block has a distinct name.
+3. No block is disabled.
 
-## Step 3 of 10 - Add And Manage A Friendly Field
+## Step 3 of 8 - Configure The Routes
 
-**Do this**
+### Configure Project Questions
 
-1. Open `Context`.
-2. Confirm the booking starter created these seven field cards:
+1. Select `Project Questions`.
+2. Select its edit control.
+3. Confirm `Keep answering questions` is on.
+4. Under `Tasks Lia May Recommend`, select `Book Spa Service`.
+5. Save the Knowledge step.
 
-```text
-Service Category
-Service
-Preferred Date
-Preferred Time
-Guest Name
-Guest Email
-Guest Phone
-```
+### Configure Book Spa Service
 
-3. In `Add Field`, confirm `Required` defaults to `Always required` and the
-   conditional controls are not shown.
-4. Set `Required` to `Required only when...`.
-5. Confirm `When field` and `Condition` now appear.
-6. Enter:
+1. Select `Book Spa Service`.
+2. Select its edit control.
+3. Under `After the Task`, set every available outcome to `Task Finished`.
+4. Save the Business Task step.
 
-```text
-Visitor Label: Special Request
-Answer Type: Short text
-Required: Required only when...
-When field: Service
-Condition: has an answer
-Value: not shown for this condition
-```
+### Configure Task Finished
 
-7. Open `Visitor wording`.
-8. Enter this exact question:
+1. Select `Task Finished`.
+2. Open its edit control.
+3. Set its default or next route to `Return To Questions`.
+4. Save the step.
 
-```text
-Do you have any special requests for the appointment?
-```
-
-9. Open `Validation and privacy`.
-10. Set:
-
-```text
-Privacy: Standard
-Confirmation: Confirm corrections
-Validation: Maximum characters
-Characters: 300
-```
-
-11. Select `Add Field`.
-12. On the new `Special Request` card, select its up-arrow control once.
-13. Select its duplicate control.
-14. Delete only the duplicated card.
-15. Edit the original `Special Request` card.
-16. Replace its exact question with:
-
-```text
-Please share any special requests for the appointment.
-```
-
-17. Save the field.
+5. Select `Save Layout`.
 
 **Pass when**
 
-1. The app generates a stable field key automatically.
-2. The field card is marked `Conditional`.
-3. Add, move, duplicate, delete, and edit all work.
-4. The edit dialog shows the saved values in friendly controls.
-5. No raw field contract or JSON is required.
-6. Conditional controls appear only for `Required only when...`, and `Value`
-   appears only for `equals` or `does not equal`.
+1. Knowledge can recommend `Book Spa Service`.
+2. Every task outcome has a destination.
+3. The exact message continues to `Return To Questions`.
+4. The diagnostics show no blockers.
 
-## Step 4 of 10 - Add Typed Trusted Context
+## Step 4 of 8 - Configure Entry Rules
 
-**Do this**
-
-1. Stay on `Context`.
-2. Find `Trusted Context`.
-3. In `Add Context Variable`, enter:
+1. Select `Entry Rules`.
+2. Set `Normal Conversations` to `Project Questions`.
+3. Under `Channel Rules`, add this rule:
 
 ```text
-Key: campaignCode
-Source: project
-Type: text
+Match Value: project_chat
+Start At: Project Questions
 ```
 
-4. Open `Default, privacy, and expiry`.
-5. Enter:
+4. Add this rule:
 
 ```text
-Default Value: phase-6-uat
-Sensitivity: Standard
-Expires After (minutes): 60
+Match Value: widget
+Start At: Project Questions
 ```
 
-6. Keep `Visible to the assistant` selected.
-7. Keep `Visible to allowed tools` selected.
-8. Select `Add Context`.
-9. Edit `campaignCode`.
-10. Change its default value to:
+5. Add this rule:
 
 ```text
-phase-6-uat-updated
+Match Value: whatsapp
+Start At: Project Questions
 ```
 
-11. Save the change.
+6. Select `Save Entry Rules`.
 
 **Pass when**
 
-1. The new context variable appears in the list.
-2. Its source and type are visible.
-3. Edit preserves the other settings.
-4. The custom key remains in `Trusted Context` without using the reserved
-   `lia_` prefix.
+1. The normal route is saved.
+2. All three channel rules are visible.
+3. No WhatsApp-specific data is stored inside a block or business task.
 
-## Step 5 of 10 - Check Project Data Setup
+## Step 5 of 8 - Publish The Graph
 
-**Do this**
-
-1. Inspect the `Service Category` and `Service` field cards.
-2. If the project has an active catalog and services, confirm neither card says
-   `Needs setup`.
-3. Edit the `Service` field.
-4. Open `Choices and project data`.
-5. Confirm:
-
-```text
-Answer Source: Use project catalog data
-Project Data: Catalog item or service
-Filter Using: Service Category
-```
-
-6. In `Catalog`, select the active spa catalog if it is listed. Otherwise keep
-   `Any active catalog`.
-7. Save the field.
-8. If `Reuse an Automation Field` is displayed, select one field and use
-   `Reuse Field`. If no reusable field is available, record `Not applicable`
-   and continue.
+1. Select `Overview`.
+2. Confirm the action reports no publish blockers.
+3. Select `Publish`.
+4. Confirm the first published version appears in `Version History`.
+5. Select `Test Flow`.
 
 **Pass when**
 
-1. Catalog options use business names instead of internal IDs.
-2. Missing resources are clearly marked `Needs setup`; the app does not invent
-   defaults.
-3. The service remains dependent on the selected service category.
+1. Publication succeeds.
+2. `Published Flow Test` opens.
+3. It shows four nodes and the published version number.
+4. The page states that the test does not create live conversations,
+   submissions, or tool attempts.
 
-## Step 6 of 10 - Allow A Ready Tool
+## Step 6 of 8 - Test The Complete Hybrid Path
 
-**Do this**
-
-1. Open `Tools`.
-2. Inspect the `Tool Library`.
-3. Confirm each tool shows:
-
-```text
-Friendly name and description
-Read only or Can take action
-Version number
-Ready or Needs setup
-```
-
-4. Confirm a `Needs setup` tool cannot be selected.
-5. Under `Allow a Tool`, choose any tool marked `Ready`.
-6. Under `When Lia May Use It`, clear the default stage and select only the
-   stage appropriate for that tool. For a read-only lookup, use:
-
-```text
-While checking business data
-```
-
-7. Select `Allow Tool`.
+1. Set `Start From` to `Normal conversation`.
+2. Select `Start Test`.
+3. Confirm the current node is `Project Questions`.
+4. Confirm the response owner is `Knowledge Q&A`.
+5. Select `Answer and stay here`.
+6. Confirm the current node remains `Project Questions`.
+7. Select `Recommend Book Spa Service`.
+8. Confirm the current node becomes `Book Spa Service`.
+9. Confirm the response owner becomes `Conversational task`.
+10. Select `Ask a side question`.
+11. Confirm the same task remains active.
+12. Select any named task outcome.
+13. Confirm the current node becomes `Task Finished`.
+14. Confirm the response owner becomes `Flow step`.
+15. Select `Continue`.
+16. Confirm the current node becomes `Return To Questions`.
+17. Confirm the response owner becomes `Knowledge Q&A`.
+18. Select `Answer and stay here`.
 
 **Pass when**
 
-1. The allowed tool appears under `Allowed for This Task`.
-2. Its friendly name, access level, pinned version, and allowed stage are
-   visible.
-3. Tools remain off until explicitly allowed.
+1. Only one response owner is shown at every point.
+2. The side question does not leave or restart the task.
+3. The named outcome controls the route.
+4. The exact message runs before Knowledge Q&A resumes.
+5. `Test Trail` records the same sequence.
 
-If no tool is marked `Ready`, stop here and record the tool names and their
-`Needs setup` messages. Do not bind an unavailable tool.
+## Step 7 of 8 - Test Universal Channel Entry
 
-## Step 7 of 10 - Configure Outcomes And Safety
+Repeat these instructions for `project_chat`, `widget`, and `whatsapp`.
 
-**Do this**
-
-1. Open `Workflow`.
-2. Under `Add an Outcome`, enter:
-
-```text
-Outcome Name: Waitlisted
-Result: Could not complete
-```
-
-3. Open `Advanced routing`.
-4. Enter:
-
-```text
-Completion Condition: serviceId is present
-Internal Key: leave blank
-Canvas Destination: leave blank
-```
-
-5. Select `Add Outcome`.
-6. In `Behavior and Safety`, set:
-
-```text
-Task Language: en
-Response Length: Short
-Visitor Identity: Anonymous allowed
-Task Consent: Use project policy
-```
-
-7. Open `Optional wording`.
-8. Enter:
-
-```text
-Task Instructions: Keep the booking conversation concise and confirm the chosen service before completion.
-When Lia Cannot Continue: I could not finish this booking. Please try again.
-When Lia Hands Off: I will ask our team to help with this booking.
-```
-
-9. Open `After each result`.
-10. Set:
-
-```text
-Go to after completed: Return to normal Q&A
-Go to after failed: Hand off to the team
-```
-
-11. Leave `Project data handling` unchanged because it is shared across the
-    project.
-12. Select `Save Policies`.
+1. Set `Start From` to `Channel`.
+2. Select one channel in `Entry Rule`.
+3. Select `Start Again`.
+4. Confirm the current node is `Project Questions`.
+5. Confirm the response owner is `Knowledge Q&A`.
 
 **Pass when**
 
-1. `Waitlisted` appears with `Could not complete`.
-2. Its condition is shown in plain language below the outcome.
-3. The internal key and canvas destination are generated without requiring
-   technical input.
-4. Optional and advanced controls remain collapsible.
-5. The page confirms that policies were saved.
+1. All three channel keys enter the same published graph.
+2. The nodes and routes do not change by channel.
+3. No live WhatsApp number or provider delivery is required in this phase.
 
-## Step 8 of 10 - Check Knowledge And Publish
+Live website-widget and WhatsApp-provider delivery certification belongs to
+Phase 13.
 
-**Do this**
+## Step 8 of 8 - Project Chat Smoke Test And Cleanup
 
-1. Open `Knowledge`.
-2. Confirm the document and indexed-section counts are visible.
-3. Set `When the answer is not available` to:
+### Project chat smoke test
+
+1. Open `Projects`.
+2. Open `Chat`.
+3. Start a new conversation if an old conversation is active.
+4. Send:
 
 ```text
-Use the project fallback
+phase seven hybrid test
 ```
 
-4. Keep `Recommend published tasks` selected.
-5. Select `Save Knowledge Settings`.
-6. Open `Versions`.
-7. Confirm the page says `Ready to publish`.
-8. Confirm the field, context, tool, and outcome counts include the items added
-   in this test.
-9. Select `Publish New Version`.
+5. Then send:
+
+```text
+I want to book a spa service.
+```
+
+6. Confirm Lia enters the published booking task and asks only for a missing
+   booking detail.
+7. Send:
+
+```text
+cancel
+```
+
+8. Confirm the task ends without creating a booking and Lia can answer an
+   ordinary project question again.
+
+### Cleanup
+
+1. Return to `Automation`.
+2. Open `Actions`.
+3. Open `Phase 7 Hybrid UAT`.
+4. Open `Settings`.
+5. Select `Delete Action`.
+6. Confirm the deletion.
+7. Do not delete or archive `Book a Spa Service`.
 
 **Pass when**
 
-1. Knowledge settings save successfully.
-2. Publishing shows no blocker.
-3. A new immutable version appears in version history.
-4. The new version is marked `Current`.
+1. Project chat uses the published hybrid action without a duplicate reply.
+2. Cancelling returns response ownership to Knowledge Q&A.
+3. The temporary action is removed.
+4. The existing business task, catalogs, documents, and operations remain
+   unchanged.
 
-If the page says `Needs attention`, stop and record every blocker exactly as
-shown.
+## Phase 7 Sign-Off
 
-## Step 9 of 10 - Preview And Test The Task
+Phase 7 passes when all eight steps pass.
 
-**Do this**
-
-1. Open `Test`.
-2. Open each channel preview:
+After passing, report:
 
 ```text
-Project Chat
-Widget
-WhatsApp
+Phase 7 UAT complete.
 ```
 
-3. Confirm all three show the same field and outcome counts.
-4. Select `Open Conversation Test`.
-5. Set `Conversation Context` to the published `Phase 6 Builder UAT` version.
-6. Set `Turn Purpose` to `Collect details`.
-7. Enter:
-
-```text
-I want to book a Classic Facial on 2026-08-15 at 15:30. My name is Phase Six Guest and my email is phase6.guest@example.com.
-```
-
-8. Select `Test Turn`.
-9. Do not reset the conversation. Select `Back to review` to return to the
-   `Test` overview.
-10. Select `Open Runtime Test`.
-11. If the page says `No active run`, select `Start Test Run`. Previous
-    completed test results may remain visible until the new run starts.
-12. Confirm the active task is `Phase 6 Builder UAT` and the run is pinned to
-    the version you published.
-
-**Pass when**
-
-1. Channel wording is adapted without changing the task contract.
-2. The conversation test returns a natural visitor reply.
-3. Diagnostics remain separate from the visitor reply.
-4. Model suggestions are proposals only; no live operation is performed.
-5. Runtime Test opens against the published version.
-
-## Step 10 of 10 - Clean Up And Sign Off
-
-**Do this**
-
-1. Return to the `Phase 6 Builder UAT` task.
-2. Select `Archive Task`.
-3. Confirm it moves to `Archived Tasks`.
-4. Do not delete shared catalogs, operations, documents, or project settings.
-
-**Pass when**
-
-1. The temporary task is no longer in the active task list.
-2. It remains available to restore.
-3. No other project task or resource was changed unexpectedly.
-
-## Sign-Off
-
-Use this result after all ten steps:
-
-```text
-Phase 6 UAT: PASS
-Project: Ewissen Infra (#194)
-Published task version:
-Browser:
-Notes:
-```
-
-Use this result if a step fails:
-
-```text
-Phase 6 UAT: FAIL
-Failed step:
-What I clicked:
-Expected:
-Actual:
-Screenshot:
-```
-
-Phase 6 passes only when all ten steps pass and there are no unresolved
-critical or high-severity defects.
+Do not continue to Phase 8 until Phase 7 is recorded as complete in
+`FLOW_BUILDER_ROADMAP.md`.
