@@ -87,9 +87,32 @@ Answer verified project questions briefly. Recommend the booking task when the v
 
 4. Set `Conversation Style` to `Natural conversation`.
 5. Turn on `Keep answering questions`.
-6. Set `When No Answer Is Found` to `End Conversation`.
-7. Set `When Human Help Is Needed` to `End Conversation`.
-8. Select `Create Knowledge Step`.
+6. Set `After Answering` to `Stay in Knowledge`.
+7. Set `When No Answer Is Found` to `End Conversation`.
+8. Set `When Human Help Is Needed` to `End Conversation`.
+9. Under `Tasks Lia May Recommend`, confirm this message appears:
+
+```text
+Add a Business Task block to enable recommendations.
+```
+
+This is expected because the Business Task block has not been added yet.
+
+10. Confirm `Enabled` is on.
+11. Select `Create Knowledge Step`.
+
+Before creating the block, its complete configuration should be:
+
+```text
+Step Name: Project Questions
+Conversation Style: Natural conversation
+Keep answering questions: On
+After Answering: Stay in Knowledge
+When No Answer Is Found: End Conversation
+When Human Help Is Needed: End Conversation
+Tasks Lia May Recommend: Not available yet
+Enabled: On
+```
 
 ### Block 2 - Business Task
 
@@ -103,25 +126,50 @@ Book Spa Service
 3. In `Published Business Task`, select the latest published version of
    `Book a Spa Service`.
 4. Leave every outcome set to `End Conversation` for now.
-5. Select `Create Business Task Step`.
+5. Leave `Values Shared With This Task` collapsed. Do not select any visitor
+   answers or trusted context for this focused test.
+6. Confirm `Enabled` is on.
+7. Select `Create Business Task Step`.
+
+Before creating the block, its complete configuration should be:
+
+```text
+Step Name: Book Spa Service
+Published Business Task: Book a Spa Service - latest version shown
+Every After the Task outcome: End Conversation
+Values Shared With This Task: None
+Enabled: On
+```
 
 ### Block 3 - Message
 
 1. Select `Message`.
-2. Enter this label:
+2. Confirm `Step Behavior` is `Message`.
+3. Enter this label:
 
 ```text
 Task Finished
 ```
 
-3. Enter this visitor message:
+4. In `Message`, enter:
 
 ```text
 The booking task has finished. I can continue helping with project questions.
 ```
 
-4. Keep the block enabled.
-5. Create the step.
+5. Confirm `Enabled` is selected.
+6. Leave `Advanced options` collapsed and unchanged.
+7. Select `Create Step`.
+
+Before creating the block, its complete configuration should be:
+
+```text
+Step Behavior: Message
+Label: Task Finished
+Message: The booking task has finished. I can continue helping with project questions.
+Enabled: On
+Advanced options: Unchanged
+```
 
 ### Block 4 - Knowledge
 
@@ -140,9 +188,25 @@ Continue answering verified project questions after the booking task finishes.
 
 4. Set `Conversation Style` to `Natural conversation`.
 5. Turn on `Keep answering questions`.
-6. Set `When No Answer Is Found` to `End Conversation`.
-7. Set `When Human Help Is Needed` to `End Conversation`.
-8. Select `Create Knowledge Step`.
+6. Set `After Answering` to `Stay in Knowledge`.
+7. Set `When No Answer Is Found` to `End Conversation`.
+8. Set `When Human Help Is Needed` to `End Conversation`.
+9. Under `Tasks Lia May Recommend`, leave `Book Spa Service` unselected.
+10. Confirm `Enabled` is on.
+11. Select `Create Knowledge Step`.
+
+Before creating the block, its complete configuration should be:
+
+```text
+Step Name: Return To Questions
+Conversation Style: Natural conversation
+Keep answering questions: On
+After Answering: Stay in Knowledge
+When No Answer Is Found: End Conversation
+When Human Help Is Needed: End Conversation
+Tasks Lia May Recommend: None selected
+Enabled: On
+```
 
 **Pass when**
 
@@ -157,30 +221,38 @@ Continue answering verified project questions after the booking task finishes.
 1. Select `Project Questions`.
 2. Select its edit control.
 3. Confirm `Keep answering questions` is on.
-4. Under `Tasks Lia May Recommend`, select `Book Spa Service`.
-5. Save the Knowledge step.
+4. Confirm `After Answering` is `Stay in Knowledge`.
+5. Confirm both fallback selections are `End Conversation`.
+6. Under `Tasks Lia May Recommend`, select `Book Spa Service`.
+7. Confirm `Enabled` is on.
+8. Select `Save Knowledge Step`.
 
 ### Configure Book Spa Service
 
 1. Select `Book Spa Service`.
 2. Select its edit control.
 3. Under `After the Task`, set every available outcome to `Task Finished`.
-4. Save the Business Task step.
+4. Leave `Values Shared With This Task` unchanged.
+5. Confirm `Enabled` is on.
+6. Select `Save Business Task Step`.
 
 ### Configure Task Finished
 
-1. Select `Task Finished`.
-2. Open its edit control.
-3. Set its default or next route to `Return To Questions`.
-4. Save the step.
-
-5. Select `Save Layout`.
+1. Close any open editor.
+2. On the canvas, find the small output handle on the right side of
+   `Task Finished`.
+3. Drag from that handle to the small input handle on the left side of
+   `Return To Questions`.
+4. Confirm a solid route connects the two blocks.
+5. Confirm the `Default Routes` count increases.
+6. Select `Save Layout`.
 
 **Pass when**
 
 1. Knowledge can recommend `Book Spa Service`.
 2. Every task outcome has a destination.
-3. The exact message continues to `Return To Questions`.
+3. A solid default route connects `Task Finished` to
+   `Return To Questions`.
 4. The diagnostics show no blockers.
 
 ## Step 4 of 8 - Configure Entry Rules
