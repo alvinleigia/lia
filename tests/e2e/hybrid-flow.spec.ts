@@ -5,6 +5,8 @@ import {
   needsExplicitPublishTerminalStep,
 } from "../../src/lib/action-flow-compiler";
 import { getProjectActionStatusAfterPublish } from "../../src/lib/action-flow-constants";
+import type { RuntimeAction } from "../../src/lib/action-runtime";
+import { buildChannelFlowResumeReplies } from "../../src/lib/channel-flow-runtime";
 import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
@@ -13,6 +15,7 @@ import {
   conversationalTaskSnapshotV1Schema,
   DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
 } from "../../src/lib/conversation-contracts";
+import type { SelectActionSubmission } from "../../src/lib/db-schema";
 import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
 import {
   compiledHybridFlowGraphV1Schema,
@@ -25,6 +28,7 @@ import {
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   dispatchHybridFlowBoundary,
+  matchesHybridGraphTaskReturnTarget,
   prepareHybridTaskEntry,
   resolveHybridTaskOutcomeResume,
   resolveHybridTaskOutcomeRoute,
@@ -199,6 +203,47 @@ test("compiler publishes a reachable knowledge-task-deterministic graph", () => 
       }),
     ]),
   );
+});
+
+test("resuming a hybrid boundary does not expose its internal prompt", () => {
+  const graph = compileHybridFlowGraph({
+    actionSettings: {},
+    branchRules,
+    steps,
+  }).graph;
+  const action = {
+    branchRules: [],
+    description: null,
+    hybridGraph: graph,
+    id: 1,
+    name: "Hybrid booking",
+    steps: [
+      {
+        fieldKey: null,
+        id: 1,
+        inputType: null,
+        isEnabled: true,
+        isRequired: false,
+        label: "Service questions",
+        nextStepId: null,
+        operationId: null,
+        options: [],
+        prompt: "Answer verified project questions.",
+        settings: steps[0].settings,
+        sortOrder: 1,
+        stepType: "knowledge_conversation",
+      },
+    ],
+    triggerPhrases: [],
+    versionId: 1,
+    versionNumber: 1,
+  } satisfies RuntimeAction;
+  const submission = {
+    currentStepId: 1,
+    fields: {},
+  } as SelectActionSubmission;
+
+  expect(buildChannelFlowResumeReplies({ action, submission })).toEqual([]);
 });
 
 test("knowledge boundaries emit one dominant transition signal", () => {
@@ -619,6 +664,21 @@ test("task outcomes and pauses preserve the immutable graph return target", () =
   });
 
   expect(returnTarget).not.toBeNull();
+  if (!returnTarget) {
+    throw new Error("Expected the task return target to compile.");
+  }
+  expect(
+    matchesHybridGraphTaskReturnTarget(
+      returnTarget,
+      hybridGraphTaskReturnTargetV1Schema.parse({
+        actionVersionId: returnTarget.actionVersionId,
+        kind: returnTarget.kind,
+        outcomeRoutes: returnTarget.outcomeRoutes,
+        schemaVersion: returnTarget.schemaVersion,
+        taskNodeId: returnTarget.taskNodeId,
+      }),
+    ),
+  ).toBe(true);
   expect(
     resolveHybridTaskOutcomeRoute({
       eventType: "completed",

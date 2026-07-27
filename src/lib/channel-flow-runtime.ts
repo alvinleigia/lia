@@ -113,6 +113,14 @@ function getSubmissionContactId(submission: SelectActionSubmission) {
   return typeof contactId === "number" ? contactId : null;
 }
 
+function getHybridBoundaryNode(action: RuntimeAction, stepId: number) {
+  return (
+    action.hybridGraph?.nodes.find(
+      (node) => node.sourceStepId === stepId && node.kind !== "deterministic",
+    ) ?? null
+  );
+}
+
 function getFlowEditState(
   action: RuntimeAction,
   submission: SelectActionSubmission,
@@ -322,6 +330,10 @@ export function buildChannelFlowResumeReplies(input: {
     input.submission.currentStepId === null
       ? null
       : steps.find((step) => step.id === input.submission.currentStepId);
+
+  if (currentStep && getHybridBoundaryNode(input.action, currentStep.id)) {
+    return [];
+  }
 
   if (currentStep && isActionConfirmationStep(currentStep)) {
     return [
@@ -762,9 +774,7 @@ async function advanceFlowToNextStep(input: {
 
   while (stepIndex < steps.length) {
     const step = steps[stepIndex];
-    const boundaryNode = input.action.hybridGraph?.nodes.find(
-      (node) => node.sourceStepId === step.id && node.kind !== "deterministic",
-    );
+    const boundaryNode = getHybridBoundaryNode(input.action, step.id);
 
     if (visitedStepIds.has(step.id)) {
       await cancelActionFlowSubmission({

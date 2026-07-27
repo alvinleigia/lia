@@ -421,6 +421,33 @@ export function buildHybridGraphTaskReturnTarget(input: {
   };
 }
 
+export function matchesHybridGraphTaskReturnTarget(
+  expected: HybridGraphTaskReturnTargetV1,
+  actual: HybridGraphTaskReturnTargetV1,
+) {
+  if (
+    expected.schemaVersion !== actual.schemaVersion ||
+    expected.kind !== actual.kind ||
+    expected.actionVersionId !== actual.actionVersionId ||
+    expected.taskNodeId !== actual.taskNodeId
+  ) {
+    return false;
+  }
+
+  const expectedRoutes = Object.entries(expected.outcomeRoutes);
+  if (expectedRoutes.length !== Object.keys(actual.outcomeRoutes).length) {
+    return false;
+  }
+
+  return expectedRoutes.every(([key, route]) => {
+    const actualRoute = actual.outcomeRoutes[key];
+    return (
+      actualRoute?.nodeId === route.nodeId &&
+      actualRoute.responseOwner === route.responseOwner
+    );
+  });
+}
+
 export function resolveTaskOutputPort(input: {
   eventType: "cancelled" | "completed" | "failed" | "handoff";
   outcomeKey: string | null;

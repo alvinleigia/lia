@@ -57,6 +57,7 @@ import {
 } from "@/lib/hybrid-flow-contracts";
 import {
   buildHybridGraphTaskReturnTarget,
+  matchesHybridGraphTaskReturnTarget,
   resolveHybridTaskOutcomeResume,
 } from "@/lib/hybrid-flow-runtime";
 
@@ -731,7 +732,7 @@ export async function startConversationalTaskRun(
         !taskNode ||
         taskNode.settings.task.taskId !== parsed.taskId ||
         taskNode.settings.task.taskVersionId !== version.id ||
-        JSON.stringify(expectedTarget) !== JSON.stringify(parsed.returnTarget)
+        !matchesHybridGraphTaskReturnTarget(expectedTarget, parsed.returnTarget)
       ) {
         return quarantineEvent(tx, {
           conversationId: parsed.conversationId,
