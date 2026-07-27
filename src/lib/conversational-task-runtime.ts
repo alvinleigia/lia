@@ -57,7 +57,7 @@ import {
 } from "@/lib/hybrid-flow-contracts";
 import {
   buildHybridGraphTaskReturnTarget,
-  resolveHybridTaskOutcomeRoute,
+  resolveHybridTaskOutcomeResume,
 } from "@/lib/hybrid-flow-runtime";
 
 export {
@@ -1723,26 +1723,23 @@ export async function applyConversationalTaskEvent(
       eventType: "cancelled" | "completed" | "failed" | "handoff";
       outcomeKey: string | null;
     }) {
-      const route = resolveHybridTaskOutcomeRoute({
+      const resume = resolveHybridTaskOutcomeResume({
         ...input,
         outcomes: snapshot.task.definition.outcomes,
         returnTarget: graphReturnTarget,
       });
-      if (!route) {
+      if (!resume) {
         return false;
       }
 
       runChanges.suspendedReturnTarget = null;
-      executionChanges.activeActionVersionId = route.nodeId
-        ? (graphReturnTarget?.actionVersionId ??
-          execution.activeActionVersionId)
-        : null;
-      executionChanges.activeNodeId = route.nodeId;
+      executionChanges.activeActionVersionId = resume.actionVersionId;
+      executionChanges.activeNodeId = resume.nodeId;
       executionChanges.activeTaskRunId = null;
       executionChanges.activeTaskVersionId = null;
-      executionChanges.executionMode = route.responseOwner;
-      executionChanges.responseOwner = route.responseOwner;
-      executionChanges.status = route.nodeId ? "active" : "closed";
+      executionChanges.executionMode = resume.responseOwner;
+      executionChanges.responseOwner = resume.responseOwner;
+      executionChanges.status = resume.status;
       executionChanges.suspendedReturnTarget = null;
       return true;
     }

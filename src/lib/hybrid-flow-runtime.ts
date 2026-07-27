@@ -59,6 +59,13 @@ export type PreparedHybridTaskEntry = {
   taskVersionId: number;
 };
 
+export type HybridTaskOutcomeResume = {
+  actionVersionId: number | null;
+  nodeId: string | null;
+  responseOwner: HybridRuntimeResponseOwner;
+  status: "active" | "closed";
+};
+
 export function selectHybridFlowEntryNode(input: {
   campaignKey?: string | null;
   channelType?: string | null;
@@ -422,4 +429,25 @@ export function resolveHybridTaskOutcomeRoute(input: {
   return outputPort && input.returnTarget
     ? (input.returnTarget.outcomeRoutes[outputPort] ?? null)
     : null;
+}
+
+export function resolveHybridTaskOutcomeResume(input: {
+  eventType: "cancelled" | "completed" | "failed" | "handoff";
+  outcomeKey: string | null;
+  outcomes: TaskOutcomeV1[];
+  returnTarget: HybridGraphTaskReturnTargetV1 | null;
+}): HybridTaskOutcomeResume | null {
+  const route = resolveHybridTaskOutcomeRoute(input);
+  if (!route) {
+    return null;
+  }
+
+  return {
+    actionVersionId: route.nodeId
+      ? (input.returnTarget?.actionVersionId ?? null)
+      : null,
+    nodeId: route.nodeId,
+    responseOwner: route.responseOwner,
+    status: route.nodeId ? "active" : "closed",
+  };
 }

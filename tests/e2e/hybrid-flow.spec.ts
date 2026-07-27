@@ -15,6 +15,7 @@ import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
 import {
   compiledHybridFlowGraphV1Schema,
   getHybridNodeId,
+  hybridGraphTaskReturnTargetV1Schema,
   parseHybridGraphTaskReturnTarget,
   taskSuspensionReturnTargetV1Schema,
 } from "../../src/lib/hybrid-flow-contracts";
@@ -22,6 +23,7 @@ import {
   buildHybridGraphTaskReturnTarget,
   dispatchHybridFlowBoundary,
   prepareHybridTaskEntry,
+  resolveHybridTaskOutcomeResume,
   resolveHybridTaskOutcomeRoute,
   selectHybridFlowEntryNode,
   selectHybridFlowTransition,
@@ -569,6 +571,104 @@ test("task outcomes and pauses preserve the immutable graph return target", () =
     schemaVersion: 1,
   });
   expect(parseHybridGraphTaskReturnTarget(suspension)).toEqual(returnTarget);
+});
+
+test("task outcome resume restores only the immutable next boundary", () => {
+  const returnTarget = hybridGraphTaskReturnTargetV1Schema.parse({
+    actionVersionId: 500,
+    kind: "hybrid_graph_task",
+    outcomeRoutes: {
+      cancelled: {
+        nodeId: null,
+        responseOwner: "knowledge",
+      },
+      completed: {
+        nodeId: "step:3",
+        responseOwner: "deterministic",
+      },
+      failed: {
+        nodeId: "step:1",
+        responseOwner: "knowledge",
+      },
+      handoff: {
+        nodeId: "step:1",
+        responseOwner: "knowledge",
+      },
+    },
+    schemaVersion: 1,
+    taskNodeId: "step:2",
+  });
+  const taskOutcomes = REFERENCE_BOOKING_TASK_DEFINITION.outcomes;
+
+  expect(
+    resolveHybridTaskOutcomeResume({
+      eventType: "completed",
+      outcomeKey: "completed",
+      outcomes: taskOutcomes,
+      returnTarget,
+    }),
+  ).toEqual({
+    actionVersionId: 500,
+    nodeId: "step:3",
+    responseOwner: "deterministic",
+    status: "active",
+  });
+  expect(
+    resolveHybridTaskOutcomeResume({
+      eventType: "cancelled",
+      outcomeKey: null,
+      outcomes: taskOutcomes,
+      returnTarget,
+    }),
+  ).toEqual({
+    actionVersionId: null,
+    nodeId: null,
+    responseOwner: "knowledge",
+    status: "closed",
+  });
+  expect(
+    resolveHybridTaskOutcomeResume({
+      eventType: "failed",
+      outcomeKey: null,
+      outcomes: taskOutcomes,
+      returnTarget,
+    }),
+  ).toEqual(
+    expect.objectContaining({
+      nodeId: "step:1",
+      responseOwner: "knowledge",
+    }),
+  );
+  expect(
+    resolveHybridTaskOutcomeResume({
+      eventType: "handoff",
+      outcomeKey: "handoff",
+      outcomes: taskOutcomes,
+      returnTarget,
+    }),
+  ).toEqual(
+    expect.objectContaining({
+      nodeId: "step:1",
+      responseOwner: "knowledge",
+    }),
+  );
+});
+
+test("task outcome resume rejects outcomes absent from the pinned return target", () => {
+  expect(
+    resolveHybridTaskOutcomeResume({
+      eventType: "completed",
+      outcomeKey: "completed",
+      outcomes: REFERENCE_BOOKING_TASK_DEFINITION.outcomes,
+      returnTarget: hybridGraphTaskReturnTargetV1Schema.parse({
+        actionVersionId: 500,
+        kind: "hybrid_graph_task",
+        outcomeRoutes: {},
+        schemaVersion: 1,
+        taskNodeId: "step:2",
+      }),
+    }),
+  ).toBeNull();
 });
 
 test("knowledge answers can remain owned by the active knowledge node", () => {
