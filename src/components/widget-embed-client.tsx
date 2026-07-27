@@ -196,6 +196,15 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
       return true;
     }
 
+    const optimisticUserMessage =
+      input.displayUserText && input.text
+        ? makeFlowMessage("user", input.text)
+        : null;
+
+    if (optimisticUserMessage) {
+      setFlowMessages((current) => [...current, optimisticUserMessage]);
+    }
+
     setIsSavingSubmission(true);
 
     try {
@@ -232,14 +241,18 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
 
       const result = (await response.json()) as BrowserFlowRuntimeResult;
       if (!result.handled) {
+        if (optimisticUserMessage) {
+          setFlowMessages((current) =>
+            current.filter(
+              (message) => message.id !== optimisticUserMessage.id,
+            ),
+          );
+        }
         return false;
       }
 
       setFlowMessages((current) => [
         ...current,
-        ...(input.displayUserText && input.text
-          ? [makeFlowMessage("user", input.text)]
-          : []),
         ...browserRuntimeRepliesToFlowMessages("widget", result.replies),
       ]);
       setActiveFlow(result.activeFlow);
@@ -248,9 +261,6 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
     } catch (error) {
       setFlowMessages((current) => [
         ...current,
-        ...(input.displayUserText && input.text
-          ? [makeFlowMessage("user", input.text)]
-          : []),
         makeFlowMessage(
           "assistant",
           error instanceof Error
@@ -372,17 +382,16 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
       return;
     }
 
+    setInput("");
     const handledByFlow = await runCanonicalFlow({
       displayUserText: true,
       text,
     });
     if (handledByFlow) {
-      setInput("");
       return;
     }
 
     sendMessage({ text });
-    setInput("");
   };
 
   const submitActiveStep = async (value: string) => {
@@ -390,8 +399,8 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
       return;
     }
 
-    await runCanonicalFlow({ displayUserText: true, text: value });
     setInput("");
+    await runCanonicalFlow({ displayUserText: true, text: value });
   };
 
   const uploadActiveStepFile = async (file: File) => {
@@ -419,7 +428,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
   };
 
   const cancelActiveFlow = async () => {
-    await runCanonicalFlow({ text: "cancel" });
+    await runCanonicalFlow({ displayUserText: true, text: "cancel" });
     setInput("");
   };
 

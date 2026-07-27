@@ -201,6 +201,15 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       return true;
     }
 
+    const optimisticUserMessage =
+      input.displayUserText && input.text
+        ? makeFlowMessage("user", input.text)
+        : null;
+
+    if (optimisticUserMessage) {
+      setFlowMessages((current) => [...current, optimisticUserMessage]);
+    }
+
     setIsSavingSubmission(true);
 
     try {
@@ -234,14 +243,18 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
 
       const result = (await response.json()) as BrowserFlowRuntimeResult;
       if (!result.handled) {
+        if (optimisticUserMessage) {
+          setFlowMessages((current) =>
+            current.filter(
+              (message) => message.id !== optimisticUserMessage.id,
+            ),
+          );
+        }
         return false;
       }
 
       setFlowMessages((current) => [
         ...current,
-        ...(input.displayUserText && input.text
-          ? [makeFlowMessage("user", input.text)]
-          : []),
         ...browserRuntimeRepliesToFlowMessages("project_chat", result.replies),
       ]);
       setActiveFlow(result.activeFlow);
@@ -250,9 +263,6 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     } catch (error) {
       setFlowMessages((current) => [
         ...current,
-        ...(input.displayUserText && input.text
-          ? [makeFlowMessage("user", input.text)]
-          : []),
         makeFlowMessage(
           "assistant",
           error instanceof Error
@@ -366,19 +376,18 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       return;
     }
 
+    setInput("");
     const handledByFlow = await runCanonicalFlow({
       displayUserText: true,
       text,
     });
     if (handledByFlow) {
-      setInput("");
       return;
     }
 
     sendMessage({
       text,
     });
-    setInput("");
   };
 
   const submitActiveStep = async (value: string) => {
@@ -386,8 +395,8 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       return;
     }
 
-    await runCanonicalFlow({ displayUserText: true, text: value });
     setInput("");
+    await runCanonicalFlow({ displayUserText: true, text: value });
   };
 
   const uploadActiveStepFile = async (file: File) => {
@@ -415,7 +424,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
   };
 
   const cancelActiveFlow = async () => {
-    await runCanonicalFlow({ text: "cancel" });
+    await runCanonicalFlow({ displayUserText: true, text: "cancel" });
     setInput("");
   };
 
@@ -576,7 +585,19 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
             )}
             {(status === "submitted" ||
               status === "streaming" ||
-              isSavingSubmission) && <Loader />}
+              isSavingSubmission) && (
+              <Message from="assistant">
+                <MessageContent>
+                  <output
+                    aria-live="polite"
+                    className="flex items-center gap-2 text-muted-foreground"
+                  >
+                    <Loader />
+                    <span>Processing...</span>
+                  </output>
+                </MessageContent>
+              </Message>
+            )}
           </ConversationContent>
           <ConversationScrollButton />
         </Conversation>
