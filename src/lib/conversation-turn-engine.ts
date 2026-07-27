@@ -185,6 +185,70 @@ function modelFailureProposal(input: ExecuteStructuredTurnInput) {
   });
 }
 
+function directFieldRecoveryProposal(
+  input: ExecuteStructuredTurnInput,
+): TurnResultV1 | null {
+  if (!input.activeTask) return null;
+
+  const value = input.visitorMessage.trim();
+  const fieldStates = new Map(
+    input.fieldState.map((field) => [field.fieldKey, field.state]),
+  );
+  const matches = input.activeTask.task.definition.fields.filter((field) => {
+    const state = fieldStates.get(field.key) ?? "missing";
+    if (!["cleared", "invalid", "missing"].includes(state)) return false;
+
+    if (field.type === "email") {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }
+    if (field.type === "phone") {
+      return /^(?:\+|00)[1-9][\d\s().-]{5,20}$/.test(value);
+    }
+    if (field.type === "date") {
+      return /^\d{4}-\d{2}-\d{2}$/.test(value);
+    }
+    if (field.type === "time") {
+      return /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value);
+    }
+    return false;
+  });
+  if (matches.length !== 1) return null;
+
+  const [field] = matches;
+  return turnResultV1Schema.parse({
+    schemaVersion: 1,
+    turnKind: "field_answer",
+    reply: `Thanks. I received your ${field.label}. Please continue with the remaining required details.`,
+    grounding: {
+      status: "not_needed",
+      excerptIds: [],
+    },
+    fieldCandidates: [
+      {
+        fieldKey: field.key,
+        naturalValue: value,
+        confidence: 1,
+        source: "visitor",
+      },
+    ],
+    taskRecommendation: null,
+    toolRequest: null,
+    routeRecommendation: null,
+    outcomeRecommendation: null,
+    nextAction: "ask",
+    ambiguity: {
+      requiresClarification: false,
+      question: null,
+    },
+    safety: {
+      decision: "allow",
+      reasonCode: "model_unavailable",
+    },
+    decisionSummary:
+      "Recovered one unambiguous visitor field after model failure.",
+  });
+}
+
 function retrievalFailureProposal(input: ExecuteStructuredTurnInput) {
   const mode =
     input.activeTask?.task.definition.degradedMode.retrieval ?? "clarify";
@@ -383,10 +447,12 @@ export class StructuredTurnEngine {
       }
     }
 
+    const fallback =
+      directFieldRecoveryProposal(input) ?? modelFailureProposal(input);
     return {
       attempts,
       proposal: {
-        ...asValidatedDeterministic(modelFailureProposal(input)),
+        ...asValidatedDeterministic(fallback),
         validation: {
           accepted: true,
           modelAttemptCount: attempts,

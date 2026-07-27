@@ -195,6 +195,43 @@ test("provider failures use bounded primary and fallback attempts", async () => 
   expect(new Set(provider.calls.map(({ modelId }) => modelId)).size).toBe(2);
 });
 
+test("model failure preserves an unambiguous typed field answer", async () => {
+  const provider = new QueueProvider([
+    new Error("primary failed"),
+    new Error("primary repair failed"),
+    new Error("fallback failed"),
+    new Error("fallback repair failed"),
+  ]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    fieldState: [
+      {
+        fieldKey: "guestEmail",
+        label: "Guest Email",
+        required: true,
+        sensitivity: "personal",
+        state: "missing",
+        value: null,
+      },
+    ],
+    visitorMessage: "alvinaraujo@gmail.com",
+  });
+
+  expect(result.source).toBe("deterministic");
+  expect(result.proposal.fieldCandidates).toEqual([
+    {
+      fieldKey: "guestEmail",
+      naturalValue: "alvinaraujo@gmail.com",
+      confidence: 1,
+      source: "visitor",
+    },
+  ]);
+  expect(result.proposal.reply).not.toContain("availability");
+  expect(result.proposal.safety.reasonCode).toBe("model_unavailable");
+});
+
 test("low-confidence task recommendations require focused clarification", async () => {
   const provider = new QueueProvider([
     baseTurn({
