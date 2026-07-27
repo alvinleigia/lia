@@ -85,12 +85,11 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 6 of 18 manual UAT. Phases 1-5 completed
-their implementation and manual UAT gates by 2026-07-26. Phase 6
-implementation is complete.
+Current phase: Priority 1, Phase 7 of 18, Step 4 of 6. Phases 1-6 completed
+their implementation and manual UAT gates by 2026-07-26.
 
-Current target: pass the focused Conversational Task Builder Experience UAT,
-then begin Phase 7 graph integration.
+Current target: finish the bounded live-runtime checkpoints below, run
+cross-channel verification, and prepare focused Phase 7 UAT.
 
 ## Product Direction
 
@@ -489,19 +488,32 @@ without writing prompts, JSON, or one question node per field.
 - [x] Distinguish visitor-visible replies from developer diagnostics.
 - [x] Add per-channel preview without changing the universal task.
 - [x] Preserve keyboard, responsive, and screen-reader usability through shared labeled controls and responsive layouts.
-- [ ] Confirm a non-technical tester can configure the reference booking task.
+- [x] Confirm a non-technical tester can configure the reference booking task.
 
 Phase 6 exit gate: a business user can create and test the reference task from
 one focused editor without constructing seven separate collection nodes.
 
-Phase 6 implementation status: Complete. Type checking, lint, 24 focused task
-schema and builder tests, and all 69 channel and conversational contract tests
-passed on 2026-07-26. Focused manual UAT is pending.
+Phase 6 status: Complete. Type checking, lint, 24 focused task schema and
+builder tests, all 69 channel and conversational contract tests, and focused
+manual UAT passed on 2026-07-26.
 
 ## Phase 7: Hybrid Graph Compiler And Runtime Integration
 
 Goal: allow deterministic nodes and conversational tasks to coexist in one
 versioned graph with predictable routing.
+
+Phase 7 execution checkpoints:
+
+- [x] Step 1 of 6: graph contracts and compiler.
+- [x] Step 2 of 6: builder controls and simulator.
+- [x] Step 3 of 6: persisted boundaries and published-version pinning.
+- [x] Step 4.1 of 6: shared single-owner hybrid-boundary dispatcher.
+- [ ] Step 4.2 of 6: knowledge-to-task entry and whitelisted value transfer.
+- [ ] Step 4.3 of 6: task outcome return and deterministic-flow resume.
+- [ ] Step 4.4 of 6: project-chat and widget integration.
+- [ ] Step 4.5 of 6: WhatsApp integration and response-ownership enforcement.
+- [ ] Step 5 of 6: combined cross-channel verification and documentation.
+- [ ] Step 6 of 6: focused manual UAT and phase closure.
 
 - [ ] Extend the universal graph contract with conversational-task nodes.
 - [ ] Add a first-class knowledge-conversation node backed by the existing project retrieval interface.

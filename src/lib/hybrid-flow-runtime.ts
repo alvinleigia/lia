@@ -1,6 +1,7 @@
 import type { TaskOutcomeV1 } from "@/lib/conversation-contracts";
 import type {
   CompiledHybridFlowGraphV1,
+  HybridFlowNodeV1,
   HybridFlowTransitionV1,
   HybridGraphTaskReturnTargetV1,
 } from "@/lib/hybrid-flow-contracts";
@@ -17,6 +18,26 @@ export type HybridTransitionSignal = {
   kind: HybridFlowTransitionV1["kind"];
   sourceRuleId?: number | null;
   triggerKey?: string | null;
+};
+
+type HybridBoundaryNode = Extract<
+  HybridFlowNodeV1,
+  { kind: "conversational_task" | "knowledge" }
+>;
+type HybridRuntimeResponseOwner = HybridFlowNodeV1["responseOwner"] | "human";
+
+export type HybridBoundaryExecution<TOutput> = {
+  output: TOutput;
+  signals: HybridTransitionSignal[];
+};
+
+export type HybridBoundaryDispatchResult<TOutput> = {
+  execution: HybridBoundaryExecution<TOutput> | null;
+  responseOwner: HybridRuntimeResponseOwner | null;
+  sourceNode: HybridBoundaryNode | null;
+  status: "ended" | "invalid" | "stayed" | "suppressed" | "transitioned";
+  targetNode: HybridFlowNodeV1 | null;
+  transition: HybridFlowTransitionV1 | null;
 };
 
 export function selectHybridFlowEntryNode(input: {
@@ -86,6 +107,110 @@ export function selectHybridFlowTransition(input: {
         left.id.localeCompare(right.id),
     )[0] ?? null
   );
+}
+
+export async function dispatchHybridFlowBoundary<TOutput>(input: {
+  execute: (
+    node: HybridBoundaryNode,
+  ) => Promise<HybridBoundaryExecution<TOutput>>;
+  graph: CompiledHybridFlowGraphV1;
+  responseOwner: HybridRuntimeResponseOwner;
+  sourceNodeId: string;
+}): Promise<HybridBoundaryDispatchResult<TOutput>> {
+  const node = input.graph.nodes.find(
+    (candidate) => candidate.id === input.sourceNodeId,
+  );
+  const sourceNode =
+    node?.kind === "knowledge" || node?.kind === "conversational_task"
+      ? node
+      : null;
+
+  if (!sourceNode) {
+    return {
+      execution: null,
+      responseOwner: null,
+      sourceNode: null,
+      status: "invalid",
+      targetNode: null,
+      transition: null,
+    };
+  }
+
+  if (input.responseOwner === "human") {
+    return {
+      execution: null,
+      responseOwner: "human",
+      sourceNode,
+      status: "suppressed",
+      targetNode: sourceNode,
+      transition: null,
+    };
+  }
+
+  if (input.responseOwner !== sourceNode.responseOwner) {
+    return {
+      execution: null,
+      responseOwner: null,
+      sourceNode,
+      status: "invalid",
+      targetNode: null,
+      transition: null,
+    };
+  }
+
+  const execution = await input.execute(sourceNode);
+  const transition = selectHybridFlowTransition({
+    graph: input.graph,
+    signals: execution.signals,
+    sourceNodeId: sourceNode.id,
+  });
+
+  if (!transition) {
+    return {
+      execution,
+      responseOwner: sourceNode.responseOwner,
+      sourceNode,
+      status: "stayed",
+      targetNode: sourceNode,
+      transition: null,
+    };
+  }
+
+  if (!transition.targetNodeId) {
+    return {
+      execution,
+      responseOwner: null,
+      sourceNode,
+      status: "ended",
+      targetNode: null,
+      transition,
+    };
+  }
+
+  const targetNode =
+    input.graph.nodes.find(
+      (candidate) => candidate.id === transition.targetNodeId,
+    ) ?? null;
+
+  if (!targetNode) {
+    return {
+      execution,
+      responseOwner: null,
+      sourceNode,
+      status: "invalid",
+      targetNode: null,
+      transition,
+    };
+  }
+
+  return {
+    execution,
+    responseOwner: targetNode.responseOwner,
+    sourceNode,
+    status: "transitioned",
+    targetNode,
+    transition,
+  };
 }
 
 export function buildHybridGraphTaskReturnTarget(input: {

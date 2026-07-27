@@ -13,6 +13,7 @@ import {
 } from "../../src/lib/hybrid-flow-contracts";
 import {
   buildHybridGraphTaskReturnTarget,
+  dispatchHybridFlowBoundary,
   resolveHybridTaskOutcomeRoute,
   selectHybridFlowEntryNode,
   selectHybridFlowTransition,
@@ -220,6 +221,148 @@ test("entry and transition selection follow explicit precedence", () => {
       sourceNodeId: "step:1",
     })?.id,
   ).toBe("explicit");
+});
+
+test("boundary dispatcher invokes one owner and stops at the selected target", async () => {
+  const graph = compileHybridFlowGraph({
+    branchRules,
+    steps,
+  }).graph;
+  let executions = 0;
+  const result = await dispatchHybridFlowBoundary({
+    execute: async (node) => {
+      executions += 1;
+      expect(node.id).toBe("step:1");
+      return {
+        output: { reply: "Let me help you book that." },
+        signals: [{ kind: "semantic", triggerKey: "task:40" }],
+      };
+    },
+    graph,
+    responseOwner: "knowledge",
+    sourceNodeId: "step:1",
+  });
+
+  expect(executions).toBe(1);
+  expect(result).toEqual(
+    expect.objectContaining({
+      responseOwner: "task",
+      status: "transitioned",
+      targetNode: expect.objectContaining({
+        id: "step:2",
+        kind: "conversational_task",
+      }),
+      transition: expect.objectContaining({
+        kind: "semantic",
+        triggerKey: "task:40",
+      }),
+    }),
+  );
+});
+
+test("boundary dispatcher suppresses automation while a human owns the turn", async () => {
+  const graph = compileHybridFlowGraph({
+    branchRules,
+    steps,
+  }).graph;
+  let executions = 0;
+  const result = await dispatchHybridFlowBoundary({
+    execute: async () => {
+      executions += 1;
+      return { output: null, signals: [] };
+    },
+    graph,
+    responseOwner: "human",
+    sourceNodeId: "step:1",
+  });
+
+  expect(executions).toBe(0);
+  expect(result).toEqual(
+    expect.objectContaining({
+      execution: null,
+      responseOwner: "human",
+      status: "suppressed",
+      transition: null,
+    }),
+  );
+});
+
+test("boundary dispatcher keeps ownership when no route is selected", async () => {
+  const graph = compileHybridFlowGraph({
+    branchRules,
+    steps,
+  }).graph;
+  const result = await dispatchHybridFlowBoundary({
+    execute: async () => ({
+      output: { reply: "Here are the current service details." },
+      signals: [],
+    }),
+    graph,
+    responseOwner: "knowledge",
+    sourceNodeId: "step:1",
+  });
+
+  expect(result).toEqual(
+    expect.objectContaining({
+      responseOwner: "knowledge",
+      status: "stayed",
+      targetNode: expect.objectContaining({ id: "step:1" }),
+      transition: null,
+    }),
+  );
+});
+
+test("boundary dispatcher rejects deterministic or stale boundary identifiers", async () => {
+  const graph = compileHybridFlowGraph({
+    branchRules,
+    steps,
+  }).graph;
+  let executions = 0;
+  const execute = async () => {
+    executions += 1;
+    return { output: null, signals: [] };
+  };
+
+  await expect(
+    dispatchHybridFlowBoundary({
+      execute,
+      graph,
+      responseOwner: "deterministic",
+      sourceNodeId: "step:3",
+    }),
+  ).resolves.toEqual(
+    expect.objectContaining({
+      responseOwner: null,
+      status: "invalid",
+    }),
+  );
+  await expect(
+    dispatchHybridFlowBoundary({
+      execute,
+      graph,
+      responseOwner: "knowledge",
+      sourceNodeId: "step:999",
+    }),
+  ).resolves.toEqual(
+    expect.objectContaining({
+      responseOwner: null,
+      status: "invalid",
+    }),
+  );
+  await expect(
+    dispatchHybridFlowBoundary({
+      execute,
+      graph,
+      responseOwner: "task",
+      sourceNodeId: "step:1",
+    }),
+  ).resolves.toEqual(
+    expect.objectContaining({
+      responseOwner: null,
+      status: "invalid",
+    }),
+  );
+  expect(executions).toBe(0);
 });
 
 test("task outcomes and pauses preserve the immutable graph return target", () => {
