@@ -8,6 +8,7 @@ import type {
   HybridRouteTarget,
   HybridStepInput,
 } from "@/components/action-flow-canvas/types";
+import { FormErrorMessage } from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -195,11 +196,7 @@ function KnowledgeStepForm({
         });
       }}
     >
-      {error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      <FormErrorMessage error={error} />
 
       <div className="space-y-2">
         <Label htmlFor="hybrid-knowledge-label">Step Name</Label>
@@ -440,11 +437,7 @@ function TaskStepForm({
         });
       }}
     >
-      {error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      <FormErrorMessage error={error} />
 
       <div className="space-y-2">
         <Label htmlFor="hybrid-task-label">Step Name</Label>

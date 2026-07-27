@@ -176,6 +176,16 @@ function StatefulActionStateForm({
 export function ActionFormError({ className }: { className?: string }) {
   const { error } = useContext(FormStateContext);
 
+  return <FormErrorMessage className={className} error={error} />;
+}
+
+export function FormErrorMessage({
+  className,
+  error,
+}: {
+  className?: string;
+  error?: string | null;
+}) {
   if (!error) {
     return null;
   }

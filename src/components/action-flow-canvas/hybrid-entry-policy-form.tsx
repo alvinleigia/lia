@@ -7,6 +7,7 @@ import type {
   HybridEntryPolicyInput,
   HybridEntryRouteInput,
 } from "@/components/action-flow-canvas/types";
+import { FormErrorMessage } from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -207,11 +208,7 @@ export function HybridEntryPolicyForm({
         });
       }}
     >
-      {error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      <FormErrorMessage error={error} />
 
       {enabledSteps.length === 0 ? (
         <p className="rounded-md border px-3 py-3 text-sm text-muted-foreground">

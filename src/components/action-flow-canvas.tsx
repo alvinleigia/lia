@@ -77,6 +77,7 @@ import type {
   HybridStepInput,
   InspectorSelection,
 } from "@/components/action-flow-canvas/types";
+import { FormErrorMessage } from "@/components/ui/action-state-form";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -114,6 +115,7 @@ export function ActionFlowCanvas({
 }: ActionFlowCanvasProps) {
   const router = useRouter();
   const [feedback, setFeedback] = useState("");
+  const [dialogError, setDialogError] = useState("");
   const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
   const [isCreateStepDialogOpen, setIsCreateStepDialogOpen] = useState(false);
   const [isEntryRulesDialogOpen, setIsEntryRulesDialogOpen] = useState(false);
@@ -124,19 +126,37 @@ export function ActionFlowCanvas({
   const [selection, setSelection] = useState<InspectorSelection>(null);
   const [isPending, startTransition] = useTransition();
   const runMutation = useCallback(
-    (mutation: () => Promise<CanvasMutationResult>, onSuccess?: () => void) => {
+    (
+      mutation: () => Promise<CanvasMutationResult>,
+      onSuccess?: () => void,
+      onError?: (message: string) => void,
+    ) => {
       setFeedback("");
+      onError?.("");
       startTransition(async () => {
         const result = await mutation();
 
-        setFeedback(result.message);
-        if (result.ok) {
-          onSuccess?.();
-          router.refresh();
+        if (!result.ok) {
+          if (onError) {
+            onError(result.message);
+          } else {
+            setFeedback(result.message);
+          }
+          return;
         }
+
+        setFeedback(result.message);
+        onSuccess?.();
+        router.refresh();
       });
     },
     [router],
+  );
+  const runDialogMutation = useCallback(
+    (mutation: () => Promise<CanvasMutationResult>, onSuccess?: () => void) => {
+      runMutation(mutation, onSuccess, setDialogError);
+    },
+    [runMutation],
   );
   const handleQuickEditChange = useCallback(
     (stepId: number, isEditing: boolean) => {
@@ -255,7 +275,7 @@ export function ActionFlowCanvas({
 
   const createStep = useCallback(
     (input: CanvasStepInput) => {
-      runMutation(
+      runDialogMutation(
         () =>
           createCanvasStepAction({
             actionId,
@@ -264,12 +284,12 @@ export function ActionFlowCanvas({
         () => setIsCreateStepDialogOpen(false),
       );
     },
-    [actionId, runMutation],
+    [actionId, runDialogMutation],
   );
 
   const updateStep = useCallback(
     (stepId: number, input: CanvasStepInput) => {
-      runMutation(() =>
+      runDialogMutation(() =>
         updateCanvasStepAction({
           actionId,
           stepId,
@@ -277,12 +297,12 @@ export function ActionFlowCanvas({
         }),
       );
     },
-    [actionId, runMutation],
+    [actionId, runDialogMutation],
   );
 
   const deleteStep = useCallback(
     (stepId: number) => {
-      runMutation(
+      runDialogMutation(
         () => deleteCanvasStepAction({ actionId, stepId }),
         () => {
           setQuickEditingStepId(null);
@@ -290,12 +310,12 @@ export function ActionFlowCanvas({
         },
       );
     },
-    [actionId, runMutation],
+    [actionId, runDialogMutation],
   );
 
   const updateStepBasics = useCallback(
     (stepId: number, input: CanvasStepBasicsInput) => {
-      runMutation(
+      runDialogMutation(
         () =>
           updateCanvasStepBasicsAction({
             actionId,
@@ -305,12 +325,12 @@ export function ActionFlowCanvas({
         () => setSelection(null),
       );
     },
-    [actionId, runMutation],
+    [actionId, runDialogMutation],
   );
 
   const saveHybridStep = useCallback(
     (input: HybridStepInput, stepId?: number) => {
-      runMutation(
+      runDialogMutation(
         () =>
           saveCanvasHybridStepAction({
             actionId,
@@ -323,12 +343,12 @@ export function ActionFlowCanvas({
         },
       );
     },
-    [actionId, runMutation],
+    [actionId, runDialogMutation],
   );
 
   const saveEntryPolicy = useCallback(
     (input: HybridEntryPolicyInput) => {
-      runMutation(
+      runDialogMutation(
         () =>
           saveHybridEntryPolicyAction({
             actionId,
@@ -337,7 +357,7 @@ export function ActionFlowCanvas({
         () => setIsEntryRulesDialogOpen(false),
       );
     },
-    [actionId, runMutation],
+    [actionId, runDialogMutation],
   );
 
   const saveLayout = useCallback(() => {
@@ -370,14 +390,14 @@ export function ActionFlowCanvas({
 
   const clearDefaultRoute = useCallback(
     (sourceStepId: number) => {
-      runMutation(() =>
+      runDialogMutation(() =>
         clearCanvasDefaultRouteAction({
           actionId,
           sourceStepId,
         }),
       );
     },
-    [actionId, runMutation],
+    [actionId, runDialogMutation],
   );
 
   const handleConnect = useCallback(
@@ -405,19 +425,19 @@ export function ActionFlowCanvas({
 
   const createBranchRule = useCallback(
     (input: CanvasBranchRuleInput) => {
-      runMutation(() =>
+      runDialogMutation(() =>
         createCanvasBranchRuleAction({
           actionId,
           ...input,
         }),
       );
     },
-    [actionId, runMutation],
+    [actionId, runDialogMutation],
   );
 
   const updateBranchRule = useCallback(
     (ruleId: number, input: CanvasBranchRuleInput) => {
-      runMutation(() =>
+      runDialogMutation(() =>
         updateCanvasBranchRuleAction({
           actionId,
           ruleId,
@@ -425,12 +445,12 @@ export function ActionFlowCanvas({
         }),
       );
     },
-    [actionId, runMutation],
+    [actionId, runDialogMutation],
   );
 
   const deleteBranchRule = useCallback(
     (ruleId: number) => {
-      runMutation(
+      runDialogMutation(
         () =>
           deleteCanvasBranchRuleAction({
             actionId,
@@ -439,7 +459,7 @@ export function ActionFlowCanvas({
         () => setSelection(null),
       );
     },
-    [actionId, runMutation],
+    [actionId, runDialogMutation],
   );
 
   return (
@@ -450,7 +470,10 @@ export function ActionFlowCanvas({
         defaultRouteCount={defaultRouteCount}
         hasUnsavedLayout={hasUnsavedLayout}
         isPending={isPending}
-        onOpenEntryRules={() => setIsEntryRulesDialogOpen(true)}
+        onOpenEntryRules={() => {
+          setDialogError("");
+          setIsEntryRulesDialogOpen(true);
+        }}
         onSaveLayout={saveLayout}
         routeIssueCount={blockingRouteIssueCount}
         routeWarningCount={routeWarningCount}
@@ -477,6 +500,7 @@ export function ActionFlowCanvas({
       <div className="grid min-h-[760px] grid-cols-[260px_minmax(760px,1fr)] gap-3 overflow-x-auto">
         <FlowComponentPalette
           onSelectStepType={(stepType) => {
+            setDialogError("");
             setPaletteStepType(stepType);
             setSelection(null);
             setIsCreateStepDialogOpen(true);
@@ -493,10 +517,12 @@ export function ActionFlowCanvas({
             nodes={nodes}
             onConnect={handleConnect}
             onEdgeClick={(_, edge) => {
+              setDialogError("");
               setIsCreateStepDialogOpen(false);
               setSelection({ id: edge.id, type: "edge" });
             }}
             onNodeClick={(_, node) => {
+              setDialogError("");
               setIsCreateStepDialogOpen(false);
               setSelection({ id: node.id, type: "node" });
             }}
@@ -526,7 +552,12 @@ export function ActionFlowCanvas({
 
       <Dialog
         open={isCreateStepDialogOpen}
-        onOpenChange={setIsCreateStepDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateStepDialogOpen(open);
+          if (!open) {
+            setDialogError("");
+          }
+        }}
       >
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
@@ -538,6 +569,7 @@ export function ActionFlowCanvas({
               Configure the selected block and add it to this flow.
             </DialogDescription>
           </DialogHeader>
+          <FormErrorMessage error={dialogError} />
           {isHybridStepType(paletteStepType) ? (
             <HybridStepForm
               isPending={isPending}
@@ -565,7 +597,12 @@ export function ActionFlowCanvas({
 
       <Dialog
         open={isEntryRulesDialogOpen}
-        onOpenChange={setIsEntryRulesDialogOpen}
+        onOpenChange={(open) => {
+          setIsEntryRulesDialogOpen(open);
+          if (!open) {
+            setDialogError("");
+          }
+        }}
       >
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
@@ -577,6 +614,7 @@ export function ActionFlowCanvas({
               Choose where normal conversations and approved entry points begin.
             </DialogDescription>
           </DialogHeader>
+          <FormErrorMessage error={dialogError} />
           <HybridEntryPolicyForm
             actionSettings={actionSettings}
             isPending={isPending}
@@ -590,6 +628,7 @@ export function ActionFlowCanvas({
         open={selection !== null}
         onOpenChange={(open) => {
           if (!open) {
+            setDialogError("");
             setSelection(null);
           }
         }}
@@ -622,6 +661,7 @@ export function ActionFlowCanvas({
                   : "Review or clear this route."}
             </DialogDescription>
           </DialogHeader>
+          <FormErrorMessage error={dialogError} />
 
           {isPending && (
             <p className="flex items-center gap-2 rounded-md bg-gray-50 px-3 py-2 text-sm text-muted-foreground">
