@@ -213,6 +213,11 @@ Enabled: On
 1. The canvas shows four blocks.
 2. Each block has a distinct name.
 3. No block is disabled.
+4. Amber warning icons may appear on Blocks 2-4 because their routes are not
+   configured yet. Hover or focus each icon and confirm it explains that the
+   step cannot currently be reached from the start of the flow.
+5. Do not treat these temporary reachability warnings as a failure. Step 3
+   connects the blocks and clears the relevant diagnostics.
 
 ## Step 3 of 8 - Configure The Routes
 

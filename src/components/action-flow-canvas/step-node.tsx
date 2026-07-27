@@ -45,6 +45,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ActionFlowRouteValidationIssue } from "@/lib/action-flows";
 import {
   type FlowContentBlock,
@@ -129,6 +134,45 @@ function getContentBlockName(block: FlowContentBlock) {
   return getFlowMessageFamilyDefinition(block).title;
 }
 
+function StepDiagnosticIndicator({
+  issues,
+}: {
+  issues: ActionFlowRouteValidationIssue[];
+}) {
+  if (issues.length === 0) {
+    return null;
+  }
+
+  const hasBlockingIssue = issues.some((issue) => issue.severity === "error");
+  const label = `${issues.length} flow ${
+    hasBlockingIssue ? "issue" : "warning"
+  }${issues.length === 1 ? "" : "s"}`;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          aria-label={`${label}: ${issues.map((issue) => issue.message).join(" ")}`}
+          className="nodrag nopan h-6 w-6 cursor-help text-amber-600 hover:text-amber-700"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <AlertTriangle className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-80 space-y-1.5" side="top">
+        <p className="font-medium">{label}</p>
+        {issues.map((issue, index) => (
+          <p key={`${issue.code}-${index}`}>{issue.message}</p>
+        ))}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function CanvasContentBlockEditor({
   block,
   catalogProducts,
@@ -209,7 +253,7 @@ function CanvasContentBlockEditor({
 
 function CanvasStepNodeContent({
   catalogProducts,
-  issueCount,
+  issues,
   mediaAssets,
   onQuickEditChange,
   onQuickSave,
@@ -217,7 +261,7 @@ function CanvasStepNodeContent({
   step,
 }: {
   catalogProducts: CatalogProductOption[];
-  issueCount: number;
+  issues: ActionFlowRouteValidationIssue[];
   mediaAssets: MediaAssetOption[];
   onQuickEditChange: CanvasQuickEditChange;
   onQuickSave: CanvasStepQuickSave;
@@ -387,9 +431,7 @@ function CanvasStepNodeContent({
               {getStepLabel(step)}
             </p>
           </div>
-          {issueCount > 0 && (
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-          )}
+          <StepDiagnosticIndicator issues={issues} />
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span
@@ -560,9 +602,7 @@ function CanvasStepNodeContent({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {issueCount > 0 && (
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-          )}
+          <StepDiagnosticIndicator issues={issues} />
           <Button
             type="button"
             variant="ghost"
@@ -790,19 +830,19 @@ export function buildNodes(input: {
   routeIssues: ActionFlowRouteValidationIssue[];
   steps: FlowStep[];
 }): CanvasNode[] {
-  const issueCountByStepId = new Map<number, number>();
+  const issuesByStepId = new Map<number, ActionFlowRouteValidationIssue[]>();
 
   for (const issue of input.routeIssues) {
     if (issue.stepId) {
-      issueCountByStepId.set(
-        issue.stepId,
-        (issueCountByStepId.get(issue.stepId) ?? 0) + 1,
-      );
+      issuesByStepId.set(issue.stepId, [
+        ...(issuesByStepId.get(issue.stepId) ?? []),
+        issue,
+      ]);
     }
   }
 
   return input.steps.map((step, index) => {
-    const issueCount = issueCountByStepId.get(step.id) ?? 0;
+    const issues = issuesByStepId.get(step.id) ?? [];
     const row = Math.floor(index / 2);
     const column = index % 2;
     const stepColor = getStepColor(step);
@@ -815,7 +855,7 @@ export function buildNodes(input: {
         label: (
           <CanvasStepNodeContent
             catalogProducts={input.catalogProducts}
-            issueCount={issueCount}
+            issues={issues}
             mediaAssets={input.mediaAssets}
             onQuickEditChange={input.onQuickEditChange}
             onQuickSave={input.onQuickSave}
@@ -831,7 +871,7 @@ export function buildNodes(input: {
       sourcePosition: Position.Right,
       style: {
         backgroundColor: "#ffffff",
-        borderColor: issueCount > 0 ? "#d97706" : stepColor,
+        borderColor: issues.length > 0 ? "#d97706" : stepColor,
         borderRadius: 8,
         borderWidth: 1.5,
         boxSizing: "border-box",
