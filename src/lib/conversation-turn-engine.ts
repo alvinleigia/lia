@@ -79,6 +79,37 @@ type StructuredTurnEngineOptions = {
   retriever?: TurnKnowledgeRetriever | null;
 };
 
+const EXPLICIT_TASK_CANCELLATION_PHRASES = new Set([
+  "cancel",
+  "cancel booking",
+  "cancel my booking",
+  "cancel request",
+  "cancel the booking",
+  "cancel the request",
+  "cancel this",
+  "cancel this booking",
+  "cancel this request",
+  "never mind",
+  "nevermind",
+  "please cancel",
+  "stop",
+  "stop this",
+  "stop this booking",
+  "stop this request",
+]);
+
+function isExplicitTaskCancellation(input: ExecuteStructuredTurnInput) {
+  if (!input.activeTask) return false;
+
+  const normalized = input.visitorMessage
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?]+$/g, "")
+    .replace(/\s+/g, " ");
+
+  return EXPLICIT_TASK_CANCELLATION_PHRASES.has(normalized);
+}
+
 function resolveModelIds(
   policy: ConversationProjectPolicyV1,
   stage: (typeof TURN_MODEL_STAGES)[number],
@@ -104,7 +135,7 @@ function resolveModelIds(
 }
 
 function deterministicProposal(input: {
-  nextAction: "ask" | "clarify" | "handoff" | "fail";
+  nextAction: "ask" | "cancel" | "clarify" | "handoff" | "fail";
   reasonCode: string;
   reply: string;
   groundingStatus?: TurnResultV1["grounding"]["status"];
@@ -330,6 +361,23 @@ export class StructuredTurnEngine {
   async execute(
     input: ExecuteStructuredTurnInput,
   ): Promise<StructuredTurnExecution> {
+    if (isExplicitTaskCancellation(input)) {
+      return {
+        attempts: 0,
+        proposal: asValidatedDeterministic(
+          deterministicProposal({
+            nextAction: "cancel",
+            reasonCode: "explicit_task_cancellation",
+            reply: "No problem. I cancelled this request.",
+            groundingStatus: "not_needed",
+            turnKind: "cancellation",
+          }),
+        ),
+        source: "deterministic",
+        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+      };
+    }
+
     const admission = evaluateTurnAdmission({
       history: input.history,
       policy: input.projectPolicy,

@@ -160,6 +160,41 @@ test("prompt extraction requests are blocked before retrieval or model use", asy
   expect(retriever.calls).toBe(0);
 });
 
+test("explicit task cancellation bypasses retrieval and model use", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    visitorMessage: "cancel",
+  });
+
+  expect(result.source).toBe("deterministic");
+  expect(result.proposal).toMatchObject({
+    fieldCandidates: [],
+    nextAction: "cancel",
+    reply: "No problem. I cancelled this request.",
+    turnKind: "cancellation",
+  });
+  expect(provider.calls).toHaveLength(0);
+  expect(retriever.calls).toBe(0);
+});
+
+test("sentences mentioning cancellation still use normal language handling", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    visitorMessage: "Do not cancel my booking.",
+  });
+
+  expect(result.source).toBe("model");
+  expect(result.proposal.nextAction).toBe("ask");
+  expect(provider.calls).toHaveLength(1);
+});
+
 test("rate and cost admission can deny a turn before model use", async () => {
   const provider = new QueueProvider([baseTurn()]);
   const engine = new StructuredTurnEngine({
