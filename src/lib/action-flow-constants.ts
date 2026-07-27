@@ -59,6 +59,12 @@ export const ACTION_BRANCH_OPERATORS = [
 ] as const;
 
 export type ProjectActionStatus = (typeof PROJECT_ACTION_STATUSES)[number];
+
+export function getProjectActionStatusAfterPublish(
+  status: ProjectActionStatus,
+): ProjectActionStatus {
+  return status === "draft" ? "active" : status;
+}
 export type ActionFlowVersionStatus =
   (typeof ACTION_FLOW_VERSION_STATUSES)[number];
 export type ActionSubmissionStatus =

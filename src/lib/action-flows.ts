@@ -3,10 +3,11 @@ import type {
   ActionFlowCompilerIssueCode,
   ActionFlowCompilerIssueSource,
 } from "@/lib/action-flow-compiler";
-import type {
-  ActionBranchOperator,
-  ActionSubmissionStatus,
-  ProjectActionStatus,
+import {
+  type ActionBranchOperator,
+  type ActionSubmissionStatus,
+  getProjectActionStatusAfterPublish,
+  type ProjectActionStatus,
 } from "@/lib/action-flow-constants";
 import { getPublishedConversationalTaskOption } from "@/lib/conversational-tasks";
 import { db } from "@/lib/db-config";
@@ -588,11 +589,13 @@ export async function setProjectActionPublishedVersion(input: {
   projectId: number;
   actionId: number;
   publishedVersionId: number | null;
+  status?: ProjectActionStatus;
 }) {
   const [action] = await db
     .update(projectActions)
     .set({
       publishedVersionId: input.publishedVersionId,
+      ...(input.status ? { status: input.status } : {}),
       updatedAt: new Date(),
     })
     .where(
@@ -1134,6 +1137,9 @@ export async function createPublishedActionFlowVersion(input: {
     projectId: input.projectId,
     actionId: input.actionId,
     publishedVersionId: version.id,
+    status: getProjectActionStatusAfterPublish(
+      action.status as ProjectActionStatus,
+    ),
   });
 
   return version;

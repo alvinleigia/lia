@@ -299,14 +299,18 @@ Start At: Project Questions
 2. Confirm the action reports no publish blockers.
 3. Select `Publish`.
 4. Confirm the first published version appears in `Version History`.
-5. In the top action controls, select `Test Flow` beside `Canvas`.
+5. Confirm the action status is now `Active`. Publishing a Draft action makes
+   it available to live channels while preserving the immutable published
+   version.
+6. In the top action controls, select `Test Flow` beside `Canvas`.
 
 **Pass when**
 
 1. Publication succeeds.
-2. `Published Flow Test` opens.
-3. It shows four nodes and the published version number.
-4. The page states that the test does not create live conversations,
+2. The action is `Active`.
+3. `Published Flow Test` opens.
+4. It shows four nodes and the published version number.
+5. The page states that the test does not create live conversations,
    submissions, or tool attempts.
 
 ## Step 6 of 8 - Test The Complete Hybrid Path

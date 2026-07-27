@@ -4,6 +4,7 @@ import {
   type ActionFlowCompilerStep,
   needsExplicitPublishTerminalStep,
 } from "../../src/lib/action-flow-compiler";
+import { getProjectActionStatusAfterPublish } from "../../src/lib/action-flow-constants";
 import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
@@ -33,6 +34,12 @@ import {
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 const outcomes = DEFAULT_CONVERSATIONAL_TASK_DEFINITION.outcomes;
+
+test("publishing activates drafts without reactivating archived actions", () => {
+  expect(getProjectActionStatusAfterPublish("draft")).toBe("active");
+  expect(getProjectActionStatusAfterPublish("active")).toBe("active");
+  expect(getProjectActionStatusAfterPublish("archived")).toBe("archived");
+});
 
 test("hybrid graphs use compiled terminal validation for publish readiness", () => {
   expect(
