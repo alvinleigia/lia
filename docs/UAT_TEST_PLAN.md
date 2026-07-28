@@ -200,7 +200,7 @@ Continue answering verified project questions after the booking task finishes.
 6. Set `After Answering` to `Stay in Knowledge`.
 7. Set `When No Answer Is Found` to `End Conversation`.
 8. Set `When Human Help Is Needed` to `End Conversation`.
-9. Under `Tasks Lia May Recommend`, leave `Book Spa Service` unselected.
+9. Under `Tasks Lia May Recommend`, select `Book Spa Service`.
 10. Confirm `Enabled` is on.
 11. Select `Create Knowledge Step`.
 
@@ -213,7 +213,7 @@ Keep answering questions: On
 After Answering: Stay in Knowledge
 When No Answer Is Found: End Conversation
 When Human Help Is Needed: End Conversation
-Tasks Lia May Recommend: None selected
+Tasks Lia May Recommend: Book Spa Service
 Enabled: On
 ```
 
@@ -264,10 +264,12 @@ Enabled: On
 **Pass when**
 
 1. Knowledge can recommend `Book Spa Service`.
-2. Every task outcome has a destination.
-3. A solid default route connects `Task Finished` to
+2. `Return To Questions` can recommend `Book Spa Service` again after a
+   completed or cancelled booking attempt.
+3. Every task outcome has a destination.
+4. A solid default route connects `Task Finished` to
    `Return To Questions`.
-4. The diagnostics show no blockers.
+5. The diagnostics show no blockers.
 
 ## Step 4 of 8 - Configure Entry Rules
 
