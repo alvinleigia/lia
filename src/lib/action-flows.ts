@@ -17,6 +17,9 @@ import {
   actionFlowVersions,
   actionSubmissionEvents,
   actionSubmissions,
+  conversationalTaskAuditEvents,
+  conversationalTaskRuns,
+  conversationExecutionStates,
   operationAttempts,
   projectActions,
 } from "@/lib/db-schema";
@@ -1566,94 +1569,198 @@ export async function deleteActionFlowStep(
 }
 
 export async function deleteProjectAction(projectId: number, actionId: number) {
-  const submissions = await db
-    .select({ id: actionSubmissions.id })
-    .from(actionSubmissions)
-    .where(
-      and(
-        eq(actionSubmissions.projectId, projectId),
-        eq(actionSubmissions.actionId, actionId),
-      ),
-    );
-
-  const submissionIds = submissions.map((submission) => submission.id);
-
-  if (submissionIds.length > 0) {
-    await db
-      .delete(operationAttempts)
+  return db.transaction(async (tx) => {
+    const versions = await tx
+      .select({ id: actionFlowVersions.id })
+      .from(actionFlowVersions)
       .where(
         and(
-          eq(operationAttempts.projectId, projectId),
-          inArray(operationAttempts.submissionId, submissionIds),
+          eq(actionFlowVersions.projectId, projectId),
+          eq(actionFlowVersions.actionId, actionId),
         ),
       );
+    const versionIds = versions.map((version) => version.id);
 
-    await db
-      .delete(actionSubmissionEvents)
-      .where(
-        and(
-          eq(actionSubmissionEvents.projectId, projectId),
-          inArray(actionSubmissionEvents.submissionId, submissionIds),
+    if (versionIds.length > 0) {
+      const executionStates = await tx
+        .select({
+          activeTaskRunId: conversationExecutionStates.activeTaskRunId,
+        })
+        .from(conversationExecutionStates)
+        .where(
+          and(
+            eq(conversationExecutionStates.projectId, projectId),
+            inArray(
+              conversationExecutionStates.activeActionVersionId,
+              versionIds,
+            ),
+          ),
+        );
+      const activeTaskRunIds = [
+        ...new Set(
+          executionStates.flatMap(({ activeTaskRunId }) =>
+            activeTaskRunId === null ? [] : [activeTaskRunId],
+          ),
         ),
-      );
+      ];
+      const now = new Date();
 
-    await db
-      .delete(actionSubmissions)
+      if (activeTaskRunIds.length > 0) {
+        const cancelledRuns = await tx
+          .update(conversationalTaskRuns)
+          .set({
+            cancelledAt: now,
+            outcomeKey: "cancelled",
+            revision: sql`${conversationalTaskRuns.revision} + 1`,
+            status: "cancelled",
+            suspendedReturnTarget: null,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(conversationalTaskRuns.projectId, projectId),
+              inArray(conversationalTaskRuns.id, activeTaskRunIds),
+              inArray(conversationalTaskRuns.status, [
+                "active",
+                "paused",
+                "waiting",
+                "handoff",
+              ]),
+            ),
+          )
+          .returning({
+            conversationId: conversationalTaskRuns.conversationId,
+            id: conversationalTaskRuns.id,
+          });
+
+        if (cancelledRuns.length > 0) {
+          await tx.insert(conversationalTaskAuditEvents).values(
+            cancelledRuns.map((run) => ({
+              conversationId: run.conversationId,
+              eventType: "task.cancel",
+              projectId,
+              summary: {
+                actionId,
+                reason: "action_deleted",
+              },
+              taskRunId: run.id,
+            })),
+          );
+        }
+      }
+
+      await tx
+        .update(conversationExecutionStates)
+        .set({
+          activeActionVersionId: null,
+          activeNodeId: null,
+          activeTaskRunId: null,
+          activeTaskVersionId: null,
+          executionMode: "knowledge",
+          responseOwner: "knowledge",
+          revision: sql`${conversationExecutionStates.revision} + 1`,
+          suspendedReturnTarget: null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(conversationExecutionStates.projectId, projectId),
+            inArray(
+              conversationExecutionStates.activeActionVersionId,
+              versionIds,
+            ),
+          ),
+        );
+    }
+
+    const submissions = await tx
+      .select({ id: actionSubmissions.id })
+      .from(actionSubmissions)
       .where(
         and(
           eq(actionSubmissions.projectId, projectId),
           eq(actionSubmissions.actionId, actionId),
         ),
       );
-  }
+    const submissionIds = submissions.map((submission) => submission.id);
 
-  await db
-    .delete(operationAttempts)
-    .where(
-      and(
-        eq(operationAttempts.projectId, projectId),
-        eq(operationAttempts.actionId, actionId),
-      ),
-    );
+    if (submissionIds.length > 0) {
+      await tx
+        .delete(operationAttempts)
+        .where(
+          and(
+            eq(operationAttempts.projectId, projectId),
+            inArray(operationAttempts.submissionId, submissionIds),
+          ),
+        );
 
-  await db
-    .delete(actionFlowBranchRules)
-    .where(
-      and(
-        eq(actionFlowBranchRules.projectId, projectId),
-        eq(actionFlowBranchRules.actionId, actionId),
-      ),
-    );
+      await tx
+        .delete(actionSubmissionEvents)
+        .where(
+          and(
+            eq(actionSubmissionEvents.projectId, projectId),
+            inArray(actionSubmissionEvents.submissionId, submissionIds),
+          ),
+        );
 
-  await db
-    .delete(actionFlowSteps)
-    .where(
-      and(
-        eq(actionFlowSteps.projectId, projectId),
-        eq(actionFlowSteps.actionId, actionId),
-      ),
-    );
+      await tx
+        .delete(actionSubmissions)
+        .where(
+          and(
+            eq(actionSubmissions.projectId, projectId),
+            eq(actionSubmissions.actionId, actionId),
+          ),
+        );
+    }
 
-  await db
-    .delete(actionFlowVersions)
-    .where(
-      and(
-        eq(actionFlowVersions.projectId, projectId),
-        eq(actionFlowVersions.actionId, actionId),
-      ),
-    );
+    await tx
+      .delete(operationAttempts)
+      .where(
+        and(
+          eq(operationAttempts.projectId, projectId),
+          eq(operationAttempts.actionId, actionId),
+        ),
+      );
 
-  const [action] = await db
-    .delete(projectActions)
-    .where(
-      and(
-        eq(projectActions.projectId, projectId),
-        eq(projectActions.id, actionId),
-      ),
-    )
-    .returning();
+    await tx
+      .delete(actionFlowBranchRules)
+      .where(
+        and(
+          eq(actionFlowBranchRules.projectId, projectId),
+          eq(actionFlowBranchRules.actionId, actionId),
+        ),
+      );
 
-  return action ?? null;
+    await tx
+      .delete(actionFlowSteps)
+      .where(
+        and(
+          eq(actionFlowSteps.projectId, projectId),
+          eq(actionFlowSteps.actionId, actionId),
+        ),
+      );
+
+    await tx
+      .delete(actionFlowVersions)
+      .where(
+        and(
+          eq(actionFlowVersions.projectId, projectId),
+          eq(actionFlowVersions.actionId, actionId),
+        ),
+      );
+
+    const [action] = await tx
+      .delete(projectActions)
+      .where(
+        and(
+          eq(projectActions.projectId, projectId),
+          eq(projectActions.id, actionId),
+        ),
+      )
+      .returning();
+
+    return action ?? null;
+  });
 }
 
 export async function createActionSubmission(

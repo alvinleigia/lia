@@ -6,6 +6,7 @@ export default defineConfig({
   reporter: [["list"]],
   testDir: "./tests/e2e",
   testMatch: [
+    "action-delete-runtime-db.spec.ts",
     "conversational-task-runtime-db.spec.ts",
     "conversational-task-operation-runtime-db.spec.ts",
   ],
