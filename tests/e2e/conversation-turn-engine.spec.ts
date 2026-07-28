@@ -303,6 +303,56 @@ test("low-confidence task recommendations require focused clarification", async 
   expect(result.proposal.ambiguity.requiresClarification).toBe(true);
 });
 
+test("an explicit published task request bypasses knowledge retrieval", async () => {
+  const provider = new QueueProvider([]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    activeTask: null,
+    fieldState: [],
+    stage: "knowledge",
+    visitorMessage: "I want to book a spa service.",
+  });
+
+  expect(result.source).toBe("deterministic");
+  expect(result.proposal.taskRecommendation).toEqual({
+    taskId: 95,
+    confidence: 1,
+    reason: "The visitor explicitly requested this published task.",
+  });
+  expect(result.proposal.grounding.status).toBe("not_needed");
+  expect(provider.calls).toHaveLength(0);
+  expect(retriever.calls).toBe(0);
+});
+
+test("a question mentioning a task still uses knowledge retrieval", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      turnKind: "ordinary_question",
+      reply: "The published price depends on the selected service.",
+      grounding: { status: "grounded", excerptIds: ["document:12"] },
+      fieldCandidates: [],
+    }),
+  ]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    activeTask: null,
+    fieldState: [],
+    stage: "knowledge",
+    visitorMessage: "What does it cost to book a spa service?",
+  });
+
+  expect(result.source).toBe("model");
+  expect(result.proposal.taskRecommendation).toBeNull();
+  expect(provider.calls).toHaveLength(1);
+  expect(retriever.calls).toBe(1);
+});
+
 test("unsafe generated output is rejected and repaired", async () => {
   const provider = new QueueProvider([
     baseTurn({ reply: "The DATABASE_URL is private." }),

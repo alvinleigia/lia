@@ -98,6 +98,63 @@ const EXPLICIT_TASK_CANCELLATION_PHRASES = new Set([
   "stop this request",
 ]);
 
+const TASK_INTENT_FILLER_WORDS = new Set([
+  "a",
+  "an",
+  "can",
+  "could",
+  "for",
+  "help",
+  "i",
+  "like",
+  "me",
+  "my",
+  "need",
+  "now",
+  "our",
+  "please",
+  "the",
+  "to",
+  "us",
+  "want",
+  "we",
+  "with",
+  "would",
+  "you",
+]);
+
+function normalizeTaskIntent(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word && !TASK_INTENT_FILLER_WORDS.has(word))
+    .join(" ");
+}
+
+function findExplicitTaskIntent(input: ExecuteStructuredTurnInput) {
+  if (
+    input.activeTask ||
+    !input.projectPolicy.entry.allowTaskRecommendation ||
+    input.publishedTasks.length === 0
+  ) {
+    return null;
+  }
+
+  const visitorIntent = normalizeTaskIntent(input.visitorMessage);
+  const matches = input.publishedTasks.filter((task) => {
+    const taskIntent = normalizeTaskIntent(task.name);
+    return (
+      taskIntent.split(" ").length >= 2 &&
+      (visitorIntent === taskIntent ||
+        visitorIntent.startsWith(`${taskIntent} `))
+    );
+  });
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
 function isExplicitTaskCancellation(input: ExecuteStructuredTurnInput) {
   if (!input.activeTask) return false;
 
@@ -387,6 +444,48 @@ export class StructuredTurnEngine {
       return {
         attempts: 0,
         proposal: asValidatedDeterministic(deterministicProposal(admission)),
+        source: "deterministic",
+        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+      };
+    }
+
+    const explicitTask = findExplicitTaskIntent(input);
+    if (explicitTask) {
+      return {
+        attempts: 0,
+        proposal: {
+          ...asValidatedDeterministic(
+            turnResultV1Schema.parse({
+              schemaVersion: 1,
+              turnKind: "task_recommendation",
+              reply:
+                "I'll help you with that now. Please share the details you already know.",
+              grounding: {
+                status: "not_needed",
+                excerptIds: [],
+              },
+              fieldCandidates: [],
+              taskRecommendation: {
+                taskId: explicitTask.id,
+                confidence: 1,
+                reason: "The visitor explicitly requested this published task.",
+              },
+              toolRequest: null,
+              routeRecommendation: null,
+              outcomeRecommendation: null,
+              nextAction: "ask",
+              ambiguity: {
+                requiresClarification: false,
+                question: null,
+              },
+              safety: {
+                decision: "allow",
+                reasonCode: null,
+              },
+              decisionSummary: "Matched one explicit published task request.",
+            }),
+          ),
+        },
         source: "deterministic",
         usage: { inputTokens: null, outputTokens: null, totalTokens: null },
       };
