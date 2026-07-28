@@ -85,12 +85,13 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 8 of 18, Step 1 of 6. Phases 1-7 completed
-their implementation and manual UAT gates by 2026-07-28.
+Current phase: Priority 1, Phase 8 of 18, Step 2 of 6. Phases 1-7 and the
+Phase 8 temporal-input checkpoint completed their implementation and manual
+UAT gates by 2026-07-28.
 
-Current target: complete focused manual UAT for temporal normalization and
-channel-adaptive typed inputs, then begin reference catalog dependencies,
-deterministic lookups, and field invalidation in Step 2.
+Current target: complete focused manual UAT for the universal catalog
+lifecycle and reference-safety controls, then continue corrections, side
+questions, cancellation, confirmation, and completion in Step 3.
 
 ## Product Direction
 
@@ -605,9 +606,9 @@ journey before broadening task types or channel certification.
 
 Phase 8 execution checkpoints:
 
-- [ ] Step 1 of 6: temporal normalization and channel-adaptive typed inputs
+- [x] Step 1 of 6: temporal normalization and channel-adaptive typed inputs.
+- [ ] Step 2 of 6: reference catalog dependencies and deterministic lookups
   (implementation and automated checks complete; focused manual UAT pending).
-- [ ] Step 2 of 6: reference catalog dependencies and deterministic lookups.
 - [ ] Step 3 of 6: corrections, side questions, cancellation, confirmation,
   and completion.
 - [ ] Step 4 of 6: provider operations, outcomes, idempotency, and interruption
@@ -618,6 +619,15 @@ Phase 8 execution checkpoints:
   closure.
 
 - [ ] Build the reference task using the project service catalog.
+- [x] Keep the Lia project catalog as the channel-independent source of truth.
+- [x] Treat WhatsApp catalog and retailer identifiers as optional channel
+  mappings instead of core catalog identities.
+- [x] Manage catalogs and products through create, edit, archive, restore, and
+  permanent-delete controls.
+- [x] Block permanent deletion while a catalog or product is still referenced
+  by a draft or immutable published flow or task version.
+- [x] Keep every catalog lifecycle read, write, dependency scan, and audit
+  event explicitly project-scoped.
 - [ ] Start the reference journey in grounded Q&A, answer a normal project question, and then recognize a booking request.
 - [ ] Enter `Book Spa Service` only after the server approves the task recommendation.
 - [ ] Carry only fresh, whitelisted candidate values into the task and validate them before use.

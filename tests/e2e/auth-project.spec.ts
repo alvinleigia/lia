@@ -1830,7 +1830,7 @@ test("company owner can create a media asset", async ({ page }) => {
   expect(asset?.publicPath).toContain(`/uploads/media/${projectId}/`);
 });
 
-test("company owner can create a product catalog and product", async ({
+test("company owner can manage a product catalog and product lifecycle", async ({
   page,
 }) => {
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1916,6 +1916,57 @@ test("company owner can create a product catalog and product", async ({
       whatsappRetailerId,
     }),
   );
+
+  const updatedCatalogName = `${catalogName} Updated`;
+  await page.locator(`a[href="/projects/catalog/${catalog?.id}"]`).click();
+  await expect(page).toHaveURL(`/projects/catalog/${catalog?.id}`);
+  await page.getByLabel("Catalog Name").fill(updatedCatalogName);
+  await page.getByLabel("Description").fill("Updated catalog coverage.");
+  await page.getByRole("button", { name: "Save Catalog" }).click();
+
+  await expect(page).toHaveURL(/\/projects\/catalog\/\d+\?updated=1/);
+  await expect(page.getByText("Catalog updated.")).toBeVisible();
+  await expect(page.getByText(updatedCatalogName)).toBeVisible();
+
+  await page.getByRole("link", { name: "Back to catalog" }).click();
+  await page
+    .locator(
+      `a[href="/projects/catalog/${catalog?.id}/products/${product.id}"]`,
+    )
+    .click();
+  await expect(page).toHaveURL(
+    `/projects/catalog/${catalog?.id}/products/${product.id}`,
+  );
+  await page.getByLabel("Product Name").fill(`${productName} Updated`);
+  await page.getByLabel("Price").fill("95.00");
+  await page.getByRole("button", { name: "Save Product" }).click();
+
+  await expect(page).toHaveURL(
+    /\/projects\/catalog\/\d+\/products\/\d+\?updated=1/,
+  );
+  await expect(page.getByText("Product updated.")).toBeVisible();
+  await page.getByRole("button", { name: "Archive" }).click();
+  await expect(
+    page.getByRole("button", { name: "Restore Product" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Restore Product" }).click();
+  await expect(page.getByText("Product restored.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Archive" }).click();
+  await page.getByRole("button", { name: "Delete Permanently" }).click();
+  await expect(page.getByText("Product permanently deleted.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Archive" }).click();
+  await expect(
+    page.getByRole("button", { name: "Restore Catalog" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Restore Catalog" }).click();
+  await expect(page.getByText("Catalog restored.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Archive" }).click();
+  await page.getByRole("button", { name: "Delete Permanently" }).click();
+  await expect(page).toHaveURL(/\/projects\/catalog\?catalogDeleted=1/);
+  await expect(page.getByText("Catalog permanently deleted.")).toBeVisible();
 });
 
 test("project chat action flow follows a branch route", async ({ page }) => {

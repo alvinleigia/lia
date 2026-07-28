@@ -1,15 +1,27 @@
-import { Archive, PackagePlus, ShoppingBag } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  PackagePlus,
+  Pencil,
+  ShoppingBag,
+} from "lucide-react";
+import Link from "next/link";
+import {
+  CatalogFormFields,
+  ProductFormFields,
+} from "@/components/catalog-form-fields";
 import { NoProjectState } from "@/components/no-project-state";
 import {
   ActionFormError,
   ActionStateForm,
 } from "@/components/ui/action-state-form";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
+  listArchivedProjectCatalogProducts,
+  listArchivedProjectCatalogs,
   listProjectCatalogProducts,
   listProjectCatalogs,
 } from "@/lib/product-catalogs";
@@ -22,21 +34,22 @@ import {
   archiveProductAction,
   createCatalogAction,
   createProductAction,
-  updateCatalogWhatsAppSettingsAction,
-  updateProductWhatsAppSettingsAction,
+  restoreCatalogAction,
+  restoreProductAction,
 } from "./actions";
 
 type CatalogPageProps = {
   searchParams: Promise<{
-    catalogArchived?: string;
     catalogCreated?: string;
-    catalogUpdated?: string;
+    catalogDeleted?: string;
     error?: string;
-    productArchived?: string;
     productCreated?: string;
-    productUpdated?: string;
   }>;
 };
+
+type CatalogProductRow = Awaited<
+  ReturnType<typeof listProjectCatalogProducts>
+>[number];
 
 function formatPrice(priceAmount: number | null, currency: string | null) {
   if (priceAmount === null) {
@@ -55,6 +68,85 @@ function getWhatsAppRetailerId(metadata: Record<string, unknown>) {
     : "";
 }
 
+function ProductList({
+  archived,
+  projectId,
+  rows,
+}: {
+  archived?: boolean;
+  projectId: number;
+  rows: CatalogProductRow[];
+}) {
+  if (rows.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {archived ? "No archived products." : "No products added yet."}
+      </p>
+    );
+  }
+
+  return (
+    <div className="divide-y rounded-md border">
+      {rows.map(({ catalog, product }) => (
+        <div
+          key={product.id}
+          className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between"
+        >
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-medium">{product.name}</p>
+              <Badge variant="outline">{catalog.name}</Badge>
+              {product.sku && <Badge variant="secondary">{product.sku}</Badge>}
+              {getWhatsAppRetailerId(product.metadata) && (
+                <Badge variant="outline">
+                  WA: {getWhatsAppRetailerId(product.metadata)}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm font-medium">
+              {formatPrice(product.priceAmount, product.currency)}
+            </p>
+            {product.description && (
+              <p className="text-sm text-muted-foreground">
+                {product.description}
+              </p>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link
+                href={`/projects/catalog/${catalog.id}/products/${product.id}`}
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Link>
+            </Button>
+            <form
+              action={archived ? restoreProductAction : archiveProductAction}
+            >
+              <input type="hidden" name="projectId" value={projectId} />
+              <input type="hidden" name="productId" value={product.id} />
+              <input type="hidden" name="returnTo" value="/projects/catalog" />
+              <FormSubmitButton
+                label={archived ? "Restore" : "Archive"}
+                pendingLabel={archived ? "Restoring..." : "Archiving..."}
+                variant="outline"
+                icon={
+                  archived ? (
+                    <ArchiveRestore className="h-4 w-4" />
+                  ) : (
+                    <Archive className="h-4 w-4" />
+                  )
+                }
+              />
+            </form>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default async function ProjectCatalogPage({
   searchParams,
 }: CatalogPageProps) {
@@ -67,74 +159,78 @@ export default async function ProjectCatalogPage({
   }
 
   const { project } = context;
-  const [catalogs, products] = await Promise.all([
-    listProjectCatalogs(project.id),
-    listProjectCatalogProducts(project.id),
-  ]);
+  const [catalogs, archivedCatalogs, products, archivedProducts] =
+    await Promise.all([
+      listProjectCatalogs(project.id),
+      listArchivedProjectCatalogs(project.id),
+      listProjectCatalogProducts(project.id),
+      listArchivedProjectCatalogProducts(project.id),
+    ]);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <main className="min-h-screen bg-gray-50 px-4 py-10">
+      <div className="mx-auto max-w-6xl space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-2xl">
               <ShoppingBag className="h-6 w-6" />
               Product Catalog: {project.name}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {params.error && (
-              <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">
+              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
                 {params.error}
               </p>
             )}
             {params.catalogCreated === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
+              <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
                 Catalog created.
               </p>
             )}
             {params.productCreated === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
+              <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
                 Product created.
               </p>
             )}
-            {(params.catalogUpdated === "1" ||
-              params.productUpdated === "1") && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                WhatsApp catalog settings saved.
+            {params.catalogDeleted === "1" && (
+              <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
+                Catalog permanently deleted.
               </p>
             )}
-            {(params.catalogArchived === "1" ||
-              params.productArchived === "1") && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Catalog item archived.
-              </p>
-            )}
-
             <p className="text-sm text-muted-foreground">
-              Keep reusable product data here first. Future catalog, single
-              product, and multi-product flow blocks will reference this source
-              for widget, WhatsApp, and other channels.
+              Manage reusable products once for project chat, widgets, WhatsApp,
+              and future channels. WhatsApp IDs are optional channel mappings;
+              Lia remains the source of truth.
             </p>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-md border bg-white p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="grid gap-3 sm:grid-cols-4">
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">
                   Active Catalogs
                 </p>
                 <p className="text-xl font-semibold">{catalogs.length}</p>
               </div>
-              <div className="rounded-md border bg-white p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">
                   Active Products
                 </p>
                 <p className="text-xl font-semibold">{products.length}</p>
               </div>
-              <div className="rounded-md border bg-white p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Source
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">
+                  Archived Catalogs
                 </p>
-                <p className="text-xl font-semibold">Internal</p>
+                <p className="text-xl font-semibold">
+                  {archivedCatalogs.length}
+                </p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">
+                  Archived Products
+                </p>
+                <p className="text-xl font-semibold">
+                  {archivedProducts.length}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -143,7 +239,7 @@ export default async function ProjectCatalogPage({
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-xl">
                 <PackagePlus className="h-5 w-5" />
                 Create Catalog
               </CardTitle>
@@ -155,34 +251,7 @@ export default async function ProjectCatalogPage({
               >
                 <ActionFormError />
                 <input type="hidden" name="projectId" value={project.id} />
-                <div className="space-y-2">
-                  <Label htmlFor="catalog-name">Catalog Name</Label>
-                  <Input
-                    id="catalog-name"
-                    name="name"
-                    placeholder="e.g. Salon Services"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="catalog-description">Description</Label>
-                  <Textarea
-                    id="catalog-description"
-                    name="description"
-                    placeholder="Optional internal note"
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="whatsapp-catalog-id">
-                    WhatsApp Catalog ID
-                  </Label>
-                  <Input
-                    id="whatsapp-catalog-id"
-                    name="whatsappCatalogId"
-                    placeholder="Optional Meta catalog id"
-                  />
-                </div>
+                <CatalogFormFields idPrefix="create-catalog" />
                 <FormSubmitButton
                   label="Create Catalog"
                   pendingLabel="Creating..."
@@ -194,7 +263,7 @@ export default async function ProjectCatalogPage({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-xl">
                 <PackagePlus className="h-5 w-5" />
                 Add Product
               </CardTitle>
@@ -206,100 +275,10 @@ export default async function ProjectCatalogPage({
               >
                 <ActionFormError />
                 <input type="hidden" name="projectId" value={project.id} />
-                <div className="space-y-2">
-                  <Label htmlFor="catalog-id">Catalog</Label>
-                  <select
-                    id="catalog-id"
-                    name="catalogId"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    required
-                    disabled={catalogs.length === 0}
-                  >
-                    {catalogs.length === 0 ? (
-                      <option value="">Create a catalog first</option>
-                    ) : (
-                      catalogs.map((catalog) => (
-                        <option key={catalog.id} value={catalog.id}>
-                          {catalog.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="product-name">Product Name</Label>
-                    <Input
-                      id="product-name"
-                      name="name"
-                      placeholder="e.g. Hair Spa"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="product-sku">SKU</Label>
-                    <Input id="product-sku" name="sku" placeholder="Optional" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="whatsapp-retailer-id">
-                    WhatsApp Retailer ID
-                  </Label>
-                  <Input
-                    id="whatsapp-retailer-id"
-                    name="whatsappRetailerId"
-                    placeholder="Optional product_retailer_id"
-                  />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="product-price">Price</Label>
-                    <Input
-                      id="product-price"
-                      name="price"
-                      inputMode="decimal"
-                      placeholder="e.g. 49.99"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="product-currency">Currency</Label>
-                    <Input
-                      id="product-currency"
-                      name="currency"
-                      maxLength={3}
-                      placeholder="USD"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="product-description">Description</Label>
-                  <Textarea
-                    id="product-description"
-                    name="description"
-                    placeholder="Optional product details"
-                    rows={3}
-                  />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="product-image-url">Image URL</Label>
-                    <Input
-                      id="product-image-url"
-                      name="imageUrl"
-                      type="url"
-                      placeholder="https://..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="product-url">Product URL</Label>
-                    <Input
-                      id="product-url"
-                      name="productUrl"
-                      type="url"
-                      placeholder="https://..."
-                    />
-                  </div>
-                </div>
+                <ProductFormFields
+                  catalogs={catalogs}
+                  idPrefix="create-product"
+                />
                 <FormSubmitButton
                   label="Add Product"
                   pendingLabel="Adding..."
@@ -321,51 +300,30 @@ export default async function ProjectCatalogPage({
                 No catalogs created yet.
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y rounded-md border">
                 {catalogs.map((catalog) => (
                   <div
                     key={catalog.id}
-                    className="rounded-md border bg-white px-4 py-3"
+                    className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="font-medium">{catalog.name}</p>
+                    <div className="space-y-1">
+                      <p className="font-medium">{catalog.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {catalog.description || "No description"}
+                      </p>
+                      {catalog.externalId && (
                         <p className="text-xs text-muted-foreground">
-                          {catalog.description || "No description"} ·{" "}
-                          {catalog.providerType}
+                          WhatsApp catalog: {catalog.externalId}
                         </p>
-                        {catalog.externalId && (
-                          <p className="text-xs text-muted-foreground">
-                            WhatsApp catalog: {catalog.externalId}
-                          </p>
-                        )}
-                        <ActionStateForm
-                          action={updateCatalogWhatsAppSettingsAction}
-                          className="mt-3 flex max-w-md flex-col gap-2 sm:flex-row"
-                        >
-                          <input
-                            type="hidden"
-                            name="projectId"
-                            value={project.id}
-                          />
-                          <input
-                            type="hidden"
-                            name="catalogId"
-                            value={catalog.id}
-                          />
-                          <Input
-                            name="whatsappCatalogId"
-                            defaultValue={catalog.externalId ?? ""}
-                            placeholder="WhatsApp catalog id"
-                          />
-                          <FormSubmitButton
-                            label="Save"
-                            pendingLabel="Saving..."
-                            variant="outline"
-                          />
-                          <ActionFormError className="sm:basis-full" />
-                        </ActionStateForm>
-                      </div>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button variant="outline" asChild>
+                        <Link href={`/projects/catalog/${catalog.id}`}>
+                          <Pencil className="h-4 w-4" />
+                          Edit
+                        </Link>
+                      </Button>
                       <form action={archiveCatalogAction}>
                         <input
                           type="hidden"
@@ -376,6 +334,11 @@ export default async function ProjectCatalogPage({
                           type="hidden"
                           name="catalogId"
                           value={catalog.id}
+                        />
+                        <input
+                          type="hidden"
+                          name="returnTo"
+                          value="/projects/catalog"
                         />
                         <FormSubmitButton
                           label="Archive"
@@ -397,103 +360,83 @@ export default async function ProjectCatalogPage({
             <CardTitle className="text-xl">Products</CardTitle>
           </CardHeader>
           <CardContent>
-            {products.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No products added yet.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {products.map(({ catalog, product }) => (
-                  <div
-                    key={product.id}
-                    className="rounded-md border bg-white px-4 py-3"
-                  >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{product.name}</p>
-                          <span className="rounded-md border px-2 py-1 text-xs">
-                            {catalog.name}
-                          </span>
-                          {product.sku && (
-                            <span className="rounded-md border px-2 py-1 text-xs">
-                              {product.sku}
-                            </span>
-                          )}
-                          {getWhatsAppRetailerId(product.metadata) && (
-                            <span className="rounded-md border px-2 py-1 text-xs">
-                              WA: {getWhatsAppRetailerId(product.metadata)}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm font-medium">
-                          {formatPrice(product.priceAmount, product.currency)}
-                        </p>
-                        {product.description && (
-                          <p className="text-sm text-muted-foreground">
-                            {product.description}
-                          </p>
-                        )}
-                        {(product.imageUrl || product.productUrl) && (
-                          <p className="break-all text-xs text-muted-foreground">
-                            {product.imageUrl || product.productUrl}
-                          </p>
-                        )}
-                        <ActionStateForm
-                          action={updateProductWhatsAppSettingsAction}
-                          className="mt-3 flex max-w-md flex-col gap-2 sm:flex-row"
-                        >
-                          <input
-                            type="hidden"
-                            name="projectId"
-                            value={project.id}
-                          />
-                          <input
-                            type="hidden"
-                            name="productId"
-                            value={product.id}
-                          />
-                          <Input
-                            name="whatsappRetailerId"
-                            defaultValue={getWhatsAppRetailerId(
-                              product.metadata,
-                            )}
-                            placeholder="WhatsApp retailer id"
-                          />
-                          <FormSubmitButton
-                            label="Save"
-                            pendingLabel="Saving..."
-                            variant="outline"
-                          />
-                          <ActionFormError className="sm:basis-full" />
-                        </ActionStateForm>
-                      </div>
-                      <form action={archiveProductAction}>
-                        <input
-                          type="hidden"
-                          name="projectId"
-                          value={project.id}
-                        />
-                        <input
-                          type="hidden"
-                          name="productId"
-                          value={product.id}
-                        />
-                        <FormSubmitButton
-                          label="Archive"
-                          pendingLabel="Archiving..."
-                          variant="outline"
-                          icon={<Archive className="h-4 w-4" />}
-                        />
-                      </form>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <ProductList projectId={project.id} rows={products} />
           </CardContent>
         </Card>
+
+        {(archivedCatalogs.length > 0 || archivedProducts.length > 0) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Archived Catalog Items</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <section className="space-y-3">
+                <h2 className="font-medium">Catalogs</h2>
+                {archivedCatalogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No archived catalogs.
+                  </p>
+                ) : (
+                  <div className="divide-y rounded-md border">
+                    {archivedCatalogs.map((catalog) => (
+                      <div
+                        key={catalog.id}
+                        className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="font-medium">{catalog.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {catalog.description || "No description"}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Button variant="outline" asChild>
+                            <Link href={`/projects/catalog/${catalog.id}`}>
+                              <Pencil className="h-4 w-4" />
+                              View
+                            </Link>
+                          </Button>
+                          <form action={restoreCatalogAction}>
+                            <input
+                              type="hidden"
+                              name="projectId"
+                              value={project.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="catalogId"
+                              value={catalog.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="returnTo"
+                              value="/projects/catalog"
+                            />
+                            <FormSubmitButton
+                              label="Restore"
+                              pendingLabel="Restoring..."
+                              variant="outline"
+                              icon={<ArchiveRestore className="h-4 w-4" />}
+                            />
+                          </form>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+              <section className="space-y-3">
+                <h2 className="font-medium">Products</h2>
+                <ProductList
+                  archived
+                  projectId={project.id}
+                  rows={archivedProducts}
+                />
+              </section>
+            </CardContent>
+          </Card>
+        )}
       </div>
-    </div>
+    </main>
   );
 }
