@@ -195,6 +195,18 @@ test("sentences mentioning cancellation still use normal language handling", asy
   expect(provider.calls).toHaveLength(1);
 });
 
+test("task field extraction skips knowledge retrieval", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+
+  const result = await engine.execute(engineInput());
+
+  expect(result.source).toBe("model");
+  expect(provider.calls).toHaveLength(1);
+  expect(retriever.calls).toBe(0);
+});
+
 test("rate and cost admission can deny a turn before model use", async () => {
   const provider = new QueueProvider([baseTurn()]);
   const engine = new StructuredTurnEngine({

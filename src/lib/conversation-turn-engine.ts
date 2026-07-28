@@ -517,7 +517,7 @@ export class StructuredTurnEngine {
     }
 
     let retrieval: TurnRetrievalExcerptV1[] = [];
-    if (this.retriever && !input.openingTurn) {
+    if (this.retriever && input.stage === "knowledge" && !input.openingTurn) {
       try {
         retrieval = await this.retriever.retrieve({
           projectId: input.projectId,

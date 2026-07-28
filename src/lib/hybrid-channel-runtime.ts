@@ -632,6 +632,14 @@ async function executeKnowledgeBoundary(input: {
   project: ProjectTurnContext;
   runtimeInput: HybridChannelRuntimeInput;
 }): Promise<HybridBoundaryExecution<TurnResultV1>> {
+  const [projectPolicy, publishedTasks] = await Promise.all([
+    getConversationProjectPolicy(input.runtimeInput.projectId),
+    listGraphTaskOptions({
+      graph: input.graph,
+      projectId: input.runtimeInput.projectId,
+      sourceNode: input.node,
+    }),
+  ]);
   const execution = await executeConfiguredStructuredTurn({
     activeTask: null,
     assistantBehavior: normalizeProjectAiSettings(
@@ -647,14 +655,8 @@ async function executeKnowledgeBoundary(input: {
     history: input.history,
     projectId: input.runtimeInput.projectId,
     projectName: input.project.projectName,
-    projectPolicy: await getConversationProjectPolicy(
-      input.runtimeInput.projectId,
-    ),
-    publishedTasks: await listGraphTaskOptions({
-      graph: input.graph,
-      projectId: input.runtimeInput.projectId,
-      sourceNode: input.node,
-    }),
+    projectPolicy,
+    publishedTasks,
     stage: "knowledge",
     visitorMessage: input.runtimeInput.text,
   });
@@ -673,16 +675,18 @@ export async function runHybridChannelBoundary(
     return { replies: [] };
   }
 
-  const project = await getProjectTurnContext(input.projectId);
+  const [project, session] = await Promise.all([
+    getProjectTurnContext(input.projectId),
+    getConversationTaskRuntimeSession({
+      channelType: input.channelType,
+      externalConversationId: input.externalConversationId,
+      projectId: input.projectId,
+    }),
+  ]);
   if (!project) {
     return { replies: [] };
   }
 
-  const session = await getConversationTaskRuntimeSession({
-    channelType: input.channelType,
-    externalConversationId: input.externalConversationId,
-    projectId: input.projectId,
-  });
   let sourceNode = resolveHybridBoundaryNode({
     actionVersionId: input.action.versionId,
     activeActionVersionId: session.execution?.activeActionVersionId,
