@@ -469,6 +469,46 @@ test("task turns ask for the next unresolved field before confirmation", () => {
   expect(result.nextAction).toBe("ask");
 });
 
+test("task entry asks for the first unresolved field", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "Matched one explicit published task request.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "ask" as const,
+    outcomeRecommendation: null,
+    reply: "I'll help you with that now.",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: {
+      confidence: 1,
+      reason: "The visitor explicitly requested this published task.",
+      taskId: taskSnapshot.task.id,
+    },
+    toolRequest: null,
+    turnKind: "task_recommendation" as const,
+  };
+
+  const result = reconcileTaskTurnWithRuntime({
+    fields: taskSnapshot.task.definition.fields.map((field) => ({
+      fieldKey: field.key,
+      isRequired: field.required,
+      state: "missing",
+      validation: {},
+    })),
+    proposal,
+    snapshot: taskSnapshot,
+  });
+
+  expect(result).toMatchObject({
+    nextAction: "ask",
+    reply: "Which service category would you like?",
+    taskRecommendation: null,
+    turnKind: "field_answer",
+  });
+});
+
 test("task reconciliation preserves cancellation with unresolved fields", () => {
   const proposal = {
     ambiguity: { question: null, requiresClarification: false },

@@ -750,6 +750,7 @@ export async function runHybridChannelBoundary(
     return { replies: [] };
   }
 
+  let replyProposal = proposal;
   if (
     sourceNode.kind === "knowledge" &&
     dispatch.targetNode?.kind === "conversational_task"
@@ -762,9 +763,26 @@ export async function runHybridChannelBoundary(
       graph,
       start: startEnvelope(input, input.channelConversationId),
     });
+    const taskSession = await getConversationTaskRuntimeSession({
+      channelType: input.channelType,
+      externalConversationId: input.externalConversationId,
+      projectId: input.projectId,
+    });
+    if (
+      taskSession.execution?.activeTaskRunId &&
+      taskSession.execution.activeNodeId === dispatch.targetNode.id &&
+      taskSession.runtime &&
+      taskSession.snapshot
+    ) {
+      replyProposal = reconcileTaskTurnWithRuntime({
+        fields: taskSession.runtime.fields,
+        proposal,
+        snapshot: taskSession.snapshot,
+      });
+    }
   }
 
-  const replies = [createTextReply(proposal.reply)];
+  const replies = [createTextReply(replyProposal.reply)];
   if (
     dispatch.status === "ended" ||
     (dispatch.status === "transitioned" &&
