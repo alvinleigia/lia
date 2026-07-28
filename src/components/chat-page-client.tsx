@@ -27,6 +27,7 @@ import {
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
 import { Response } from "@/components/ai-elements/response";
+import { RuntimeInputControl } from "@/components/runtime-input-control";
 import {
   type ActiveActionFlow,
   type FlowChatMessage,
@@ -161,6 +162,11 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
         activeStep.stepType === "file_upload" ||
         shouldRenderStepControl(getActionStepInputType(activeStep)))
     : false;
+  const latestFlowMessage = flowMessages[flowMessages.length - 1];
+  const runtimeInputRequest =
+    latestFlowMessage?.role === "assistant"
+      ? latestFlowMessage.inputRequest
+      : null;
 
   const recoverFlow = async (expectedRevision?: number) => {
     if (!conversationId) {
@@ -522,6 +528,18 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
                       disabled={isSavingSubmission}
                     />
                   )}
+                </MessageContent>
+              </Message>
+            )}
+            {runtimeInputRequest && !activeStepHasInlineControl && (
+              <Message from="assistant">
+                <MessageContent>
+                  <RuntimeInputControl
+                    disabled={isSavingSubmission}
+                    key={`${latestFlowMessage?.id ?? "runtime"}-${runtimeInputRequest.fieldKey}`}
+                    onSubmit={submitActiveStep}
+                    request={runtimeInputRequest}
+                  />
                 </MessageContent>
               </Message>
             )}

@@ -7,6 +7,7 @@ type TaskFieldType = TaskFieldDefinition["type"];
 
 type ValidationContext = {
   locale: string;
+  referenceDate: Date;
   timezone: string;
 };
 
@@ -135,6 +136,55 @@ function dateInTimezone(value: Date, context: ValidationContext) {
   }
 }
 
+function addCalendarDays(value: string, days: number) {
+  const match = value.match(ISO_DATE_PATTERN);
+  if (!match) return null;
+  const date = new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
+  );
+  date.setUTCDate(date.getUTCDate() + days);
+  return isoDate(
+    date.getUTCFullYear(),
+    date.getUTCMonth() + 1,
+    date.getUTCDate(),
+  );
+}
+
+function resolveRelativeDate(
+  value: string,
+  context: ValidationContext,
+): ValidationResult | null {
+  const phrase = value
+    .toLowerCase()
+    .replace(/[.,!?]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const offset =
+    phrase === "today"
+      ? 0
+      : phrase === "tomorrow"
+        ? 1
+        : phrase === "day after tomorrow" || phrase === "the day after tomorrow"
+          ? 2
+          : null;
+  if (offset === null) {
+    return /^(?:this|next)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.test(
+      phrase,
+    )
+      ? invalid(
+          "ambiguous_relative_date",
+          "Please choose an exact date so there is no calendar ambiguity.",
+        )
+      : null;
+  }
+
+  const reference = dateInTimezone(context.referenceDate, context);
+  const resolved = reference ? addCalendarDays(reference, offset) : null;
+  return resolved
+    ? { ok: true, value: resolved }
+    : invalid("invalid_timezone", "The project timezone is not valid.");
+}
+
 function validateDate(
   value: unknown,
   context: ValidationContext,
@@ -147,6 +197,9 @@ function validateDate(
   }
 
   const normalized = trimmedText(value);
+  const relative = resolveRelativeDate(normalized, context);
+  if (relative) return relative;
+
   const isoMatch = normalized.match(ISO_DATE_PATTERN);
   if (isoMatch) {
     const year = Number(isoMatch[1]);
@@ -499,11 +552,13 @@ export function createToolOutputField(input: {
 export function validateTaskFieldValue(input: {
   contextValues?: ReadonlyMap<string, unknown>;
   field: TaskFieldDefinition;
+  referenceDate?: Date;
   value: unknown;
 }) {
   const contextValues = input.contextValues ?? new Map<string, unknown>();
   const context: ValidationContext = {
     locale: contextValue(contextValues, "lia_locale", "en-US"),
+    referenceDate: input.referenceDate ?? new Date(),
     timezone: contextValue(contextValues, "lia_timezone", "UTC"),
   };
   const normalized = TASK_FIELD_VALIDATORS[input.field.type](
@@ -521,6 +576,7 @@ export async function canonicalizeTaskFieldValue(input: {
   field: TaskFieldDefinition;
   fieldValues?: ReadonlyMap<string, unknown>;
   projectId: number;
+  referenceDate?: Date;
   resolveProjectResource?: ProjectResourceResolver;
   value: unknown;
 }) {
@@ -528,6 +584,7 @@ export async function canonicalizeTaskFieldValue(input: {
   return validateOne({
     context: {
       locale: contextValue(contextValues, "lia_locale", "en-US"),
+      referenceDate: input.referenceDate ?? new Date(),
       timezone: contextValue(contextValues, "lia_timezone", "UTC"),
     },
     field: input.field,
@@ -544,6 +601,7 @@ export async function canonicalizeFieldCandidates(input: {
   definition: ConversationalTaskDefinitionV1;
   fieldValues: ReadonlyMap<string, unknown>;
   projectId: number;
+  referenceDate?: Date;
   resolveProjectResource?: ProjectResourceResolver;
 }) {
   const fields = new Map(
@@ -551,6 +609,7 @@ export async function canonicalizeFieldCandidates(input: {
   );
   const validationContext: ValidationContext = {
     locale: contextValue(input.contextValues, "lia_locale", "en-US"),
+    referenceDate: input.referenceDate ?? new Date(),
     timezone: contextValue(input.contextValues, "lia_timezone", "UTC"),
   };
 

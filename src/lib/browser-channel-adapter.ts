@@ -9,6 +9,7 @@ import {
   getRuntimeReplyCapability,
 } from "@/lib/channel-adapter-contract";
 import type { ChannelType } from "@/lib/channels";
+import { parseRuntimeInputRequest } from "@/lib/runtime-input-request";
 import type {
   RuntimeReply,
   RuntimeReplyMedia,
@@ -77,11 +78,15 @@ export function createBrowserChannelAdapter(channelType: BrowserChannelType) {
       const media = getPayloadMedia(reply);
       const products = getPayloadProducts(reply);
       const warnings = getBrowserReplyWarnings(channelType, reply);
+      const inputRequest = parseRuntimeInputRequest(
+        reply.payload?.inputRequest,
+      );
 
       return {
         capability,
         delivery: {
           id: context.messageId,
+          ...(inputRequest ? { inputRequest } : {}),
           media,
           productMode:
             reply.payload?.mode === "catalog" ||

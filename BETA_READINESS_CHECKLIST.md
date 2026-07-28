@@ -29,17 +29,17 @@ Overall beta status: Not ready for production-like beta traffic.
 
 Authoritative product implementation status:
 
-- Flow roadmap target: Priority 1, Phase 7 manual UAT.
+- Flow roadmap target: Priority 1, Phase 8 implementation.
 - Priority 1, Phase 1 implementation and manual UAT are complete.
 - Priority 1, Phase 2 implementation and manual UAT are complete.
 - Priority 1, Phase 3 implementation and manual UAT are complete.
 - Priority 1, Phase 4 implementation and manual UAT are complete.
 - Priority 1, Phase 5 implementation and manual UAT are complete.
 - Priority 1, Phase 6 implementation and manual UAT are complete.
-- Priority 1, Phase 7 implementation is complete; focused manual UAT is
-  pending.
-- Priority 1, Phase 7 manual UAT and Phase 8 remain required for the
-  goal-driven conversational core.
+- Priority 1, Phase 7 implementation and focused manual UAT are complete.
+- Priority 1, Phase 8 checkpoint 1 of 6 is implemented and its focused manual
+  UAT is pending; checkpoints 2-6 remain required for the goal-driven
+  conversational core.
 - Priority 2, Phases 9-14 remain required for declared non-voice beta
   capability parity, live channel certification, and release approval.
 - Priority 3, Phases 15-18 are advanced post-beta work unless an earlier beta
@@ -283,18 +283,17 @@ These are not blockers for internal beta, but they must be explicitly accepted:
 
 ## Recommended Next Implementation Order
 
-1. Complete Priority 1, Phase 7 focused manual UAT.
-2. Continue Priority 1, Phase 8 in `FLOW_BUILDER_ROADMAP.md`, updating
+1. Continue Priority 1, Phase 8 in `FLOW_BUILDER_ROADMAP.md`, updating
    implementation status only there.
-3. Complete Priority 2, Phases 9-14 and the non-voice cross-channel release
+2. Complete Priority 2, Phases 9-14 and the non-voice cross-channel release
    gate.
-4. Keep local environment, tenant-safety, migration, and operations checks
+3. Keep local environment, tenant-safety, migration, and operations checks
    passing while product implementation proceeds.
-5. Create or refresh staging app and database environments before live channel
+4. Create or refresh staging app and database environments before live channel
    certification.
-6. Run staging migrations, the complete UAT plan, and the required beta command
+5. Run staging migrations, the complete UAT plan, and the required beta command
    suite against the exact release candidate.
-7. Complete provider backup, restore, public URL, email, and WhatsApp checks.
-8. Defer DNS/subdomain setup until domain routing needs a staging test.
-9. Keep RLS activation and provider billing checkout deferred until their
+6. Complete provider backup, restore, public URL, email, and WhatsApp checks.
+7. Defer DNS/subdomain setup until domain routing needs a staging test.
+8. Keep RLS activation and provider billing checkout deferred until their
    documented prerequisites are approved.

@@ -147,6 +147,7 @@ export async function validateToolResultPayload(input: {
   definition: ToolDefinitionV1;
   fieldValues: ReadonlyMap<string, unknown>;
   projectId: number;
+  referenceDate?: Date;
   result: Record<string, unknown>;
 }): Promise<ValidatedToolResult> {
   const sanitized: Record<string, unknown> = {};
@@ -171,6 +172,7 @@ export async function validateToolResultPayload(input: {
       }),
       fieldValues: input.fieldValues,
       projectId: input.projectId,
+      referenceDate: input.referenceDate,
       resolveProjectResource: resolveProjectTaskResource,
       value,
     });

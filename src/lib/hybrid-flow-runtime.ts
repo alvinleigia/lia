@@ -11,6 +11,10 @@ import type {
   HybridFlowTransitionV1,
   HybridGraphTaskReturnTargetV1,
 } from "@/lib/hybrid-flow-contracts";
+import {
+  createTaskRuntimeInputRequest,
+  type RuntimeInputRequest,
+} from "@/lib/runtime-input-request";
 
 const TRANSITION_PRECEDENCE = {
   deterministic: 4,
@@ -61,28 +65,33 @@ function validationText(
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-export function reconcileTaskTurnWithRuntime(input: {
+type TaskRuntimeReconciliationInput = {
   fields: HybridTaskRuntimeField[];
   proposal: TurnResultV1;
   snapshot: ConversationalTaskSnapshotV1;
-}): TurnResultV1 {
-  if (
-    input.proposal.turnKind === "cancellation" ||
-    input.proposal.turnKind === "side_question" ||
-    input.proposal.safety.decision !== "allow" ||
-    (input.proposal.turnKind === "ordinary_question" &&
-      input.proposal.grounding.status === "grounded")
-  ) {
-    return input.proposal;
-  }
+};
 
+function canRequestTaskField(proposal: TurnResultV1) {
+  return !(
+    proposal.turnKind === "cancellation" ||
+    proposal.turnKind === "side_question" ||
+    proposal.safety.decision !== "allow" ||
+    (proposal.turnKind === "ordinary_question" &&
+      proposal.grounding.status === "grounded")
+  );
+}
+
+function findUnresolvedTaskField(input: TaskRuntimeReconciliationInput) {
+  if (!canRequestTaskField(input.proposal)) {
+    return null;
+  }
   const runtimeFields = new Map(
     input.fields.map((field) => [field.fieldKey, field]),
   );
   const proposedInvalidField = input.proposal.fieldCandidates
     .map(({ fieldKey }) => runtimeFields.get(fieldKey))
     .find((field) => field?.state === "invalid");
-  const unresolvedField =
+  const runtimeField =
     proposedInvalidField ??
     input.snapshot.task.definition.fields
       .map((field) => runtimeFields.get(field.key))
@@ -92,16 +101,36 @@ export function reconcileTaskTurnWithRuntime(input: {
           field.state !== "valid" &&
           field.state !== "confirmed",
       );
-  if (!unresolvedField) {
-    return input.proposal;
+  if (!runtimeField) {
+    return null;
   }
 
   const definition = input.snapshot.task.definition.fields.find(
-    ({ key }) => key === unresolvedField.fieldKey,
+    ({ key }) => key === runtimeField.fieldKey,
   );
-  if (!definition) {
+  return definition ? { definition, runtimeField } : null;
+}
+
+export function getTaskRuntimeInputRequest(
+  input: TaskRuntimeReconciliationInput,
+): RuntimeInputRequest | null {
+  if (input.proposal.nextAction !== "ask") {
+    return null;
+  }
+  const unresolved = findUnresolvedTaskField(input);
+  return unresolved
+    ? createTaskRuntimeInputRequest(unresolved.definition)
+    : null;
+}
+
+export function reconcileTaskTurnWithRuntime(
+  input: TaskRuntimeReconciliationInput,
+): TurnResultV1 {
+  const unresolved = findUnresolvedTaskField(input);
+  if (!unresolved) {
     return input.proposal;
   }
+  const { definition, runtimeField: unresolvedField } = unresolved;
 
   const validationCode = validationText(unresolvedField.validation, "code");
   const validationMessage = validationText(
@@ -207,6 +236,7 @@ export type HybridRuntimeResponseOwner =
   | "human";
 
 export type HybridBoundaryExecution<TOutput> = {
+  inputRequest?: RuntimeInputRequest | null;
   output: TOutput;
   signals: HybridTransitionSignal[];
 };

@@ -286,6 +286,26 @@ test("typed validators normalize common business values deterministically", () =
     validateTaskFieldValue({
       contextValues,
       field: fieldFor("date"),
+      referenceDate: new Date("2026-07-27T20:30:00.000Z"),
+      value: "tomorrow",
+    }),
+  ).toEqual({ ok: true, value: "2026-07-29" });
+  expect(
+    validateTaskFieldValue({
+      contextValues,
+      field: fieldFor("date"),
+      referenceDate: new Date("2026-07-27T20:30:00.000Z"),
+      value: "next Friday",
+    }),
+  ).toEqual({
+    code: "ambiguous_relative_date",
+    message: "Please choose an exact date so there is no calendar ambiguity.",
+    ok: false,
+  });
+  expect(
+    validateTaskFieldValue({
+      contextValues,
+      field: fieldFor("date"),
       value: "15/08/2026",
     }),
   ).toEqual({ ok: true, value: "2026-08-15" });

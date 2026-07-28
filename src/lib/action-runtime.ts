@@ -25,6 +25,7 @@ import {
   normalizeFlowLocationValue,
 } from "@/lib/flow-structured-values";
 import type { CompiledHybridFlowGraphV1 } from "@/lib/hybrid-flow-contracts";
+import type { RuntimeInputRequest } from "@/lib/runtime-input-request";
 import type {
   RuntimeReplyMedia,
   RuntimeReplyProduct,
@@ -93,6 +94,7 @@ export type RuntimeAction = {
 
 export type FlowChatMessage = {
   id: string;
+  inputRequest?: RuntimeInputRequest | null;
   media?: RuntimeReplyMedia[];
   productLayout?: ProductDisplayLayout;
   productGroups?: FlowChatProductGroup[];

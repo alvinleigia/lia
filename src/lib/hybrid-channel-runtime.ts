@@ -42,6 +42,7 @@ import {
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   dispatchHybridFlowBoundary,
+  getTaskRuntimeInputRequest,
   type HybridBoundaryExecution,
   type HybridRuntimeResponseOwner,
   reconcileTaskTurnWithAvailability,
@@ -590,7 +591,18 @@ async function executeTaskBoundary(input: {
           ))
         : null;
   if (!outcome) {
-    return { output: reconciledProposal, signals: [] };
+    return {
+      inputRequest:
+        canonicalSession.runtime && canonicalSession.snapshot
+          ? getTaskRuntimeInputRequest({
+              fields: canonicalSession.runtime.fields,
+              proposal: reconciledProposal,
+              snapshot: canonicalSession.snapshot,
+            })
+          : null,
+      output: reconciledProposal,
+      signals: [],
+    };
   }
 
   const outcomeResult = await applyConversationalTaskEvent({
@@ -754,6 +766,7 @@ export async function runHybridChannelBoundary(
     return { replies: [] };
   }
 
+  let inputRequest = dispatch.execution?.inputRequest ?? null;
   let replyProposal = proposal;
   if (
     sourceNode.kind === "knowledge" &&
@@ -783,10 +796,20 @@ export async function runHybridChannelBoundary(
         proposal,
         snapshot: taskSession.snapshot,
       });
+      inputRequest = getTaskRuntimeInputRequest({
+        fields: taskSession.runtime.fields,
+        proposal: replyProposal,
+        snapshot: taskSession.snapshot,
+      });
     }
   }
 
-  const replies = [createTextReply(replyProposal.reply)];
+  const replies = [
+    createTextReply(
+      replyProposal.reply,
+      inputRequest ? { inputRequest } : undefined,
+    ),
+  ];
   if (
     dispatch.status === "ended" ||
     (dispatch.status === "transitioned" &&

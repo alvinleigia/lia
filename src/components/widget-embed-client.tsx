@@ -10,6 +10,7 @@ import {
   ActionFlowStepInput,
   ActionFlowStepOptions,
 } from "@/components/action-flow-step-input";
+import { RuntimeInputControl } from "@/components/runtime-input-control";
 import {
   type ActiveActionFlow,
   type FlowChatMessage,
@@ -106,6 +107,11 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
         activeStep.stepType === "file_upload" ||
         shouldRenderStepControl(getActionStepInputType(activeStep)))
     : false;
+  const latestFlowMessage = flowMessages[flowMessages.length - 1];
+  const runtimeInputRequest =
+    latestFlowMessage?.role === "assistant"
+      ? latestFlowMessage.inputRequest
+      : null;
 
   const recoverFlow = async (expectedRevision?: number) => {
     if (!conversationId) {
@@ -545,6 +551,17 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
                 disabled={Boolean(error) || isBusy}
               />
             )}
+          </div>
+        )}
+        {runtimeInputRequest && !activeStepHasInlineControl && (
+          <div className="mr-8">
+            <RuntimeInputControl
+              compact
+              disabled={Boolean(error) || isBusy}
+              key={`${latestFlowMessage?.id ?? "runtime"}-${runtimeInputRequest.fieldKey}`}
+              onSubmit={submitActiveStep}
+              request={runtimeInputRequest}
+            />
           </div>
         )}
         {isConfirmingFlow && (

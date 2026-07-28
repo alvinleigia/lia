@@ -29,6 +29,7 @@ import {
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   dispatchHybridFlowBoundary,
+  getTaskRuntimeInputRequest,
   matchesHybridGraphTaskReturnTarget,
   prepareHybridTaskEntry,
   reconcileTaskTurnWithAvailability,
@@ -506,6 +507,43 @@ test("task entry asks for the first unresolved field", () => {
     reply: "Which service category would you like?",
     taskRecommendation: null,
     turnKind: "field_answer",
+  });
+});
+
+test("task runtime exposes a typed request for its unresolved date field", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor supplied a service.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "ask" as const,
+    outcomeRecommendation: null,
+    reply: "What date would you prefer?",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_answer" as const,
+  };
+
+  expect(
+    getTaskRuntimeInputRequest({
+      fields: taskSnapshot.task.definition.fields.map((field) => ({
+        fieldKey: field.key,
+        isRequired: field.required,
+        state: field.key === "preferredDate" ? "missing" : "valid",
+        validation: {},
+      })),
+      proposal,
+      snapshot: taskSnapshot,
+    }),
+  ).toEqual({
+    fieldKey: "preferredDate",
+    inputKind: "date",
+    label: "Preferred Date",
+    options: [],
+    required: true,
   });
 });
 

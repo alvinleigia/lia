@@ -148,6 +148,56 @@ test("browser adapters preserve separate project reply payloads", () => {
   expect(tenantB.delivery.text).toBe("Tenant B");
 });
 
+test("browser adapters preserve validated runtime input requests", () => {
+  const adapter = createBrowserChannelAdapter("project_chat");
+  const adapted = adapter.adaptReply({
+    context: { messageId: "preferred-date-request" },
+    reply: createTextReply("Choose a preferred date.", {
+      inputRequest: {
+        fieldKey: "preferredDate",
+        inputKind: "date",
+        label: "Preferred Date",
+        options: [],
+        required: true,
+      },
+    }),
+  });
+
+  expect(adapted.delivery.inputRequest).toEqual({
+    fieldKey: "preferredDate",
+    inputKind: "date",
+    label: "Preferred Date",
+    options: [],
+    required: true,
+  });
+});
+
+test("WhatsApp keeps typed input requests as a text fallback", async () => {
+  const adapter = createWhatsAppChannelAdapter();
+  const adapted = await adapter.adaptReply({
+    context: { serviceWindowOpen: true, to: "15550001111" },
+    reply: createTextReply("Choose a preferred date.", {
+      inputRequest: {
+        fieldKey: "preferredDate",
+        inputKind: "date",
+        label: "Preferred Date",
+        options: [],
+        required: true,
+      },
+    }),
+  });
+
+  expect(adapted.mode).toBe("native");
+  expect(adapted.delivery.deliveryMode).toBe("text");
+  expect(adapted.delivery.body).toMatchObject({
+    text: {
+      body: "Choose a preferred date.",
+    },
+    type: "text",
+  });
+  expect(JSON.stringify(adapted.delivery.body)).not.toContain("inputRequest");
+});
+
 test("reference adapter preserves the universal future-channel envelope", () => {
   const adapter = createReferenceChannelAdapter();
   const reply = createChoiceReply({

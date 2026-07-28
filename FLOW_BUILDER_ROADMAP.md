@@ -1,6 +1,6 @@
 # Lia Conversational Flow Roadmap
 
-Status date: 2026-07-23
+Status date: 2026-07-28
 
 ## Document Authority
 
@@ -85,10 +85,12 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 7 of 18, Step 6 of 6. Phases 1-6 completed
-their implementation and manual UAT gates by 2026-07-26.
+Current phase: Priority 1, Phase 8 of 18, Step 1 of 6. Phases 1-7 completed
+their implementation and manual UAT gates by 2026-07-28.
 
-Current target: run the focused Phase 7 manual UAT and close the phase.
+Current target: complete focused manual UAT for temporal normalization and
+channel-adaptive typed inputs, then begin reference catalog dependencies,
+deterministic lookups, and field invalidation in Step 2.
 
 ## Product Direction
 
@@ -512,7 +514,7 @@ Phase 7 execution checkpoints:
 - [x] Step 4.4 of 6: project-chat and widget integration.
 - [x] Step 4.5 of 6: WhatsApp integration and response-ownership enforcement.
 - [x] Step 5 of 6: combined cross-channel verification and documentation.
-- [ ] Step 6 of 6: focused manual UAT and phase closure.
+- [x] Step 6 of 6: focused manual UAT and phase closure.
 
 Step 4.2 status: the shared entry service now resolves the exact published task
 version, verifies the graph-approved recommendation, intersects graph and task
@@ -556,41 +558,41 @@ canonical availability to be `true`.
 Live widget and WhatsApp provider delivery remain the Phase 13 certification
 gate, while the complete reference booking journey remains Phase 8 work.
 
-- [ ] Extend the universal graph contract with conversational-task nodes.
-- [ ] Add a first-class knowledge-conversation node backed by the existing project retrieval interface.
-- [ ] Represent goal-driven prompt stages and deterministic exact-message stages through one versioned graph contract.
-- [ ] Resolve the published entry policy for normal sessions, approved deep links, campaigns, and channel entry points.
-- [ ] Keep the knowledge node active after an answered outcome unless an approved route explicitly changes ownership.
-- [ ] Allow a server-approved task recommendation to enter an allowlisted published conversational task.
-- [ ] Return completed, cancelled, failed, and handed-off tasks to their configured knowledge or deterministic target.
-- [ ] Answer an allowed side question and resume the suspended task without a graph transition.
-- [ ] Give explicit button, list-row, product, and deterministic routes precedence over semantic task recommendations.
-- [ ] Transfer only whitelisted validated fields and approved context across knowledge and task boundaries.
-- [ ] Compile every task outcome as a named source output port.
-- [ ] Keep task-internal clarification turns inside the active task node.
-- [ ] Advance the graph only after the server records a task outcome.
-- [ ] Allow deterministic content before and after a conversational task.
-- [ ] Allow deterministic conditions to route into and out of a task.
-- [ ] Allow Wait, handoff, approved operations, and connected flows at task boundaries.
-- [ ] Prevent two active response collectors from competing for one inbound message.
-- [ ] Transfer response ownership atomically when a human accepts a handoff and suppress automated replies while human-owned.
-- [ ] Record inbound messages during human ownership without model or task mutation unless an explicit policy permits it.
-- [ ] Resume automation only through an authorized release action and a valid published return target.
-- [ ] Preserve branch precedence and explicit default routes.
-- [ ] Support semantic, deterministic variable, default, tool-result, and named task-outcome transitions.
-- [ ] Restrict semantic conditions to meaning-based decisions and require deterministic conditions for structured business rules.
-- [ ] Persist per-stage tool bindings and advanced model overrides in the published graph.
-- [ ] Validate required task outcomes, tool mappings, resources, and operations at publish time.
-- [ ] Block publication when a task recommendation target, return target, no-answer route, handoff route, or fallback is missing.
-- [ ] Detect unreachable tasks, orphan outputs, cycles, and paths without terminal outcomes.
-- [ ] Reject recursive task entry and task-switch or connected-flow paths that exceed the published depth limit.
-- [ ] Pin task behavior, fields, tools, prompts, and routes to the published version.
-- [ ] Resume the correct task and version after delayed or asynchronous work.
-- [ ] Normalize inbound free text, button, list, product, location, and media responses before task interpretation.
-- [ ] Emit channel-neutral reply intents from the shared runtime.
-- [ ] Preserve existing deterministic V1 flows without forced conversion.
-- [ ] Add import and export support for task contracts and named routes.
-- [ ] Add compiler, runtime, migration, and version-pinning tests.
+- [x] Extend the universal graph contract with conversational-task nodes.
+- [x] Add a first-class knowledge-conversation node backed by the existing project retrieval interface.
+- [x] Represent goal-driven prompt stages and deterministic exact-message stages through one versioned graph contract.
+- [x] Resolve the published entry policy for normal sessions, approved deep links, campaigns, and channel entry points.
+- [x] Keep the knowledge node active after an answered outcome unless an approved route explicitly changes ownership.
+- [x] Allow a server-approved task recommendation to enter an allowlisted published conversational task.
+- [x] Return completed, cancelled, failed, and handed-off tasks to their configured knowledge or deterministic target.
+- [x] Answer an allowed side question and resume the suspended task without a graph transition.
+- [x] Give explicit button, list-row, product, and deterministic routes precedence over semantic task recommendations.
+- [x] Transfer only whitelisted validated fields and approved context across knowledge and task boundaries.
+- [x] Compile every task outcome as a named source output port.
+- [x] Keep task-internal clarification turns inside the active task node.
+- [x] Advance the graph only after the server records a task outcome.
+- [x] Allow deterministic content before and after a conversational task.
+- [x] Allow deterministic conditions to route into and out of a task.
+- [x] Allow Wait, handoff, approved operations, and connected flows at task boundaries.
+- [x] Prevent two active response collectors from competing for one inbound message.
+- [x] Transfer response ownership atomically when a human accepts a handoff and suppress automated replies while human-owned.
+- [x] Record inbound messages during human ownership without model or task mutation unless an explicit policy permits it.
+- [x] Resume automation only through an authorized release action and a valid published return target.
+- [x] Preserve branch precedence and explicit default routes.
+- [x] Support semantic, deterministic variable, default, tool-result, and named task-outcome transitions.
+- [x] Restrict semantic conditions to meaning-based decisions and require deterministic conditions for structured business rules.
+- [x] Persist per-stage tool bindings and advanced model overrides in the published graph.
+- [x] Validate required task outcomes, tool mappings, resources, and operations at publish time.
+- [x] Block publication when a task recommendation target, return target, no-answer route, handoff route, or fallback is missing.
+- [x] Detect unreachable tasks, orphan outputs, cycles, and paths without terminal outcomes.
+- [x] Reject recursive task entry and task-switch or connected-flow paths that exceed the published depth limit.
+- [x] Pin task behavior, fields, tools, prompts, and routes to the published version.
+- [x] Resume the correct task and version after delayed or asynchronous work.
+- [x] Normalize inbound free text, button, list, product, location, and media responses before task interpretation.
+- [x] Emit channel-neutral reply intents from the shared runtime.
+- [x] Preserve existing deterministic V1 flows without forced conversion.
+- [x] Add import and export support for task contracts and named routes.
+- [x] Add compiler, runtime, migration, and version-pinning tests.
 
 Phase 7 exit gate: one published graph can safely move between grounded Q&A,
 natural conversational tasks, and exact deterministic steps across the shared
@@ -601,6 +603,20 @@ runtime while keeping exactly one response owner.
 Goal: prove the new architecture through the complete `Book Spa Service`
 journey before broadening task types or channel certification.
 
+Phase 8 execution checkpoints:
+
+- [ ] Step 1 of 6: temporal normalization and channel-adaptive typed inputs
+  (implementation and automated checks complete; focused manual UAT pending).
+- [ ] Step 2 of 6: reference catalog dependencies and deterministic lookups.
+- [ ] Step 3 of 6: corrections, side questions, cancellation, confirmation,
+  and completion.
+- [ ] Step 4 of 6: provider operations, outcomes, idempotency, and interruption
+  recovery.
+- [ ] Step 5 of 6: tenant safety, security, degraded behavior, retention, and
+  observability.
+- [ ] Step 6 of 6: complete scenario verification, manual UAT, and Priority 1
+  closure.
+
 - [ ] Build the reference task using the project service catalog.
 - [ ] Start the reference journey in grounded Q&A, answer a normal project question, and then recognize a booking request.
 - [ ] Enter `Book Spa Service` only after the server approves the task recommendation.
@@ -608,6 +624,13 @@ journey before broadening task types or channel certification.
 - [ ] Collect all seven reference fields through one task node.
 - [ ] Accept several valid details in one visitor message.
 - [ ] Ask only for missing, invalid, ambiguous, or stale details.
+- [x] Resolve supported relative dates such as `today` and `tomorrow` from the trusted turn timestamp and project timezone.
+- [x] Store accepted dates and times in canonical channel-independent formats.
+- [x] Ask for clarification when a relative date or time cannot be resolved unambiguously.
+- [x] Emit a channel-neutral typed-input request for the next unresolved field.
+- [x] Render native date and time controls in project chat and the website widget when the channel supports them.
+- [ ] Map typed-input requests to a native WhatsApp Flow control when configured, with a clear text fallback otherwise.
+- [x] Verify unsupported channel capabilities fall back without changing the task contract or collected value.
 - [ ] Resolve category and service dependencies.
 - [ ] Look up current price, duration, and availability.
 - [ ] Correct one field without restarting the task.
@@ -639,7 +662,8 @@ journey before broadening task types or channel certification.
 - [ ] Add safe mocked outcomes for synchronous, asynchronous, timeout, rejected, provider-failed, outcome-unknown, and reconciled tools.
 - [ ] Trace assistant policy version, conversation-owner transitions, task/stage, return reason, field changes, tool calls, routes, model usage, latency, and cost with PII redaction.
 - [ ] Add database-backed cross-tenant tests.
-- [ ] Update the conversational-task phases in `docs/UAT_TEST_PLAN.md`.
+- [x] Update the conversational-task phases in `docs/UAT_TEST_PLAN.md` for
+  completed Phase 8 checkpoints.
 - [ ] Record no unresolved Critical or High Priority 1 defect.
 
 Priority 1 exit gate: Lia can complete a real booking through a bounded,

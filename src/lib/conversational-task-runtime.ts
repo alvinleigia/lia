@@ -339,6 +339,7 @@ async function applyToolResultMappings(
             ]),
           ),
           projectId: input.projectId,
+          referenceDate: input.now,
           resolveProjectResource: resolveProjectTaskResource,
         })
       : [];
@@ -1753,6 +1754,7 @@ export async function applyConversationalTaskEvent(
           definition: snapshot.task.definition,
           fieldValues,
           projectId: event.projectId,
+          referenceDate: occurredAt,
           resolveProjectResource: resolveProjectTaskResource,
         });
         const result = applyFieldCandidates({
@@ -2101,6 +2103,7 @@ export async function applyConversationalTaskEvent(
               definition,
               fieldValues,
               projectId: event.projectId,
+              referenceDate: occurredAt,
               result: event.result,
             });
             if (!validatedResult.ok) {
