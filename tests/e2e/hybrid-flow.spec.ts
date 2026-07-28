@@ -685,6 +685,19 @@ test("task availability is checked before collecting contact details", () => {
     turnKind: "field_answer" as const,
   };
 
+  const reconciledProposal = reconcileTaskTurnWithRuntime({
+    fields,
+    proposal,
+    snapshot: taskSnapshot,
+  });
+  expect(reconciledProposal.fieldCandidates).toEqual([]);
+  expect(
+    shouldCheckTaskAvailability({
+      definition: availabilityDefinition,
+      fields,
+      proposal: reconciledProposal,
+    }),
+  ).toBe(false);
   expect(
     shouldCheckTaskAvailability({
       definition: availabilityDefinition,

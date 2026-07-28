@@ -553,7 +553,7 @@ async function executeTaskBoundary(input: {
     shouldCheckTaskAvailability({
       definition: availabilityDefinition,
       fields: canonicalSession.runtime.fields,
-      proposal: reconciledProposal,
+      proposal,
     })
   ) {
     const availability = await refreshTaskAvailability({
