@@ -198,17 +198,30 @@ Expected result:
 If `Prepare Summary` says availability could not be verified, reopen the
 product and confirm `Current Availability` is `Available`.
 
-## Step 6 of 8 - Complete The Task
+## Step 6 of 8 - Execute The Required Operation And Complete
 
-1. Find `Task Lifecycle`.
-2. Click `Complete`.
+Continue from the confirmed summary created in Step 5. Do not reset the test
+data.
+
+1. Find `Confirmation and Operation Test`.
+2. Confirm its status is `Confirmed`.
+3. Click `Queue Operation`.
+4. Click `Process and Reconcile`.
+5. Confirm the operation attempt shows `Completed`.
+6. Find `Task Lifecycle`.
+7. Click `Complete`.
 
 Expected result:
 
+- Exactly one operation attempt is completed.
 - The run status becomes `Completed`.
 - The configured completed outcome is recorded.
 - The response owner returns to `Knowledge Q&A`.
 - The pinned version and completed field values remain visible for audit.
+
+If completion reports that a required operation is incomplete, return to
+`Confirmation and Operation Test` and complete steps 2 through 5 above before
+clicking `Complete` again.
 
 ## Step 7 of 8 - Cancel A New Run
 

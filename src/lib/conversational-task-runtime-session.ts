@@ -109,6 +109,11 @@ export type ConversationTaskRuntimeSession = Awaited<
   ReturnType<typeof getConversationTaskRuntimeSession>
 >;
 
+const runtimeReasonMessages: Record<string, string> = {
+  required_tools_incomplete:
+    "Complete the required operation before finishing this task.",
+};
+
 export function runtimeResultMessage(result: ConversationalTaskRuntimeResult) {
   if (result.disposition === "applied" && !result.reason) {
     return null;
@@ -116,5 +121,7 @@ export function runtimeResultMessage(result: ConversationalTaskRuntimeResult) {
   if (result.reason === "duplicate_event") {
     return null;
   }
-  return result.reason ?? "The runtime event could not be applied.";
+  return result.reason
+    ? (runtimeReasonMessages[result.reason] ?? result.reason)
+    : "The runtime event could not be applied.";
 }
