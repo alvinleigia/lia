@@ -27,6 +27,7 @@ import type {
   SelectConversationalTaskConfirmation,
   SelectOperationAttempt,
 } from "@/lib/db-schema";
+import { cn } from "@/lib/utils";
 import {
   confirmTaskRuntimeOperationAction,
   executeTaskRuntimeOperationAction,
@@ -52,6 +53,10 @@ type OperationTestPanelProps = {
   confirmation: SelectConversationalTaskConfirmation | null;
   isActive: boolean;
   isPaused: boolean;
+  operationFeedback?: {
+    message: string;
+    tone: "error" | "success" | "warning";
+  };
   projectId: number;
   taskId: number;
   writeOperations: WriteOperation[];
@@ -154,6 +159,7 @@ export function OperationTestPanel({
   confirmation,
   isActive,
   isPaused,
+  operationFeedback,
   projectId,
   taskId,
   writeOperations,
@@ -180,6 +186,22 @@ export function OperationTestPanel({
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
+        {operationFeedback && (
+          <p
+            role={operationFeedback.tone === "error" ? "alert" : "status"}
+            className={cn(
+              "rounded-md px-3 py-2 text-sm",
+              operationFeedback.tone === "error" && "bg-red-50 text-red-700",
+              operationFeedback.tone === "success" &&
+                "bg-green-50 text-green-800",
+              operationFeedback.tone === "warning" &&
+                "bg-amber-50 text-amber-900",
+            )}
+          >
+            {operationFeedback.message}
+          </p>
+        )}
+
         {canPrepare && (
           <ActionStateForm
             action={prepareTaskRuntimeOperationAction}

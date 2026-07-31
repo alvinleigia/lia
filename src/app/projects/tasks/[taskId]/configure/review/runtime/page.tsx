@@ -284,6 +284,23 @@ export default async function TaskRuntimeTestPage({
         projectId: context.project.id,
       })
     : null;
+  const operationEvent = query.event?.startsWith("operation_")
+    ? query.event
+    : undefined;
+  const operationFeedback = operationEvent
+    ? {
+        message: eventMessages[operationEvent],
+        tone: (["operation_failed", "operation_reconciled_failed"].includes(
+          operationEvent,
+        )
+          ? "error"
+          : ["operation_outcome_unknown", "operation_pending"].includes(
+                operationEvent,
+              )
+            ? "warning"
+            : "success") as "error" | "success" | "warning",
+      }
+    : undefined;
   const toolNames = new Map(
     (session.snapshot?.toolDefinitions ?? []).map((definition) => [
       definition.id,
@@ -328,7 +345,7 @@ export default async function TaskRuntimeTestPage({
                 {query.error}
               </p>
             )}
-            {query.event && eventMessages[query.event] && (
+            {query.event && !operationEvent && eventMessages[query.event] && (
               <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
                 {eventMessages[query.event]}
               </p>
@@ -789,6 +806,7 @@ export default async function TaskRuntimeTestPage({
             confirmation={latestConfirmation}
             isActive={isActive}
             isPaused={isPaused || isAnsweringSideQuestion}
+            operationFeedback={operationFeedback}
             projectId={context.project.id}
             taskId={task.id}
             writeOperations={writeOperations}
