@@ -42,6 +42,7 @@ const catalogDetailsSchema = catalogSchema.extend({
 });
 
 const productSchema = z.object({
+  availability: z.enum(["available", "not_recorded", "unavailable"]),
   catalogId: catalogIdSchema,
   currency: z.string().trim().max(3).optional(),
   description: z.string().trim().max(1000).optional(),
@@ -79,6 +80,23 @@ function redirectWithError(message: string): never {
 function normalizeOptionalText(value: string | undefined) {
   const trimmed = value?.trim() ?? "";
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseProductAvailability(
+  value: z.infer<typeof productSchema>["availability"],
+) {
+  if (value === "available") return true;
+  if (value === "unavailable") return false;
+  return null;
+}
+
+function getAvailabilityMetadata(availability: boolean | null) {
+  return availability === null
+    ? {}
+    : {
+        available: availability,
+        availabilityStatus: availability ? "available" : "unavailable",
+      };
 }
 
 function parsePriceToMinorUnits(value: string | undefined) {
@@ -343,6 +361,7 @@ export async function createProductAction(
   assertPermission(context.membership, "company.project.manage");
 
   const parsed = productSchema.safeParse({
+    availability: formData.get("availability"),
     catalogId: formData.get("catalogId"),
     currency: formData.get("currency"),
     description: formData.get("description"),
@@ -388,6 +407,9 @@ export async function createProductAction(
     currency: priceAmount === null ? null : (currency ?? "USD"),
     status: "active",
     metadata: {
+      ...getAvailabilityMetadata(
+        parseProductAvailability(parsed.data.availability),
+      ),
       whatsappRetailerId: normalizeOptionalText(parsed.data.whatsappRetailerId),
     },
   });
@@ -413,6 +435,7 @@ export async function updateProductAction(
   formData: FormData,
 ): Promise<ActionFormState> {
   const parsed = productDetailsSchema.safeParse({
+    availability: formData.get("availability"),
     catalogId: formData.get("catalogId"),
     currency: formData.get("currency"),
     description: formData.get("description"),
@@ -449,6 +472,7 @@ export async function updateProductAction(
 
   const currency = normalizeOptionalText(parsed.data.currency)?.toUpperCase();
   const product = await updateProjectCatalogProductDetails({
+    availability: parseProductAvailability(parsed.data.availability),
     catalogId: catalog.id,
     currency: priceAmount === null ? null : (currency ?? "USD"),
     description: normalizeOptionalText(parsed.data.description),

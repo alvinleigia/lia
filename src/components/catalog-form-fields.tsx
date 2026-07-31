@@ -19,6 +19,7 @@ type CatalogFormFieldsProps = {
 type ProductFormFieldsProps = {
   catalogs: CatalogOption[];
   defaultValues?: {
+    availability?: "available" | "not_recorded" | "unavailable";
     catalogId?: number;
     currency?: string | null;
     description?: string | null;
@@ -146,6 +147,22 @@ export function ProductFormFields({
             placeholder="USD"
           />
         </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-availability`}>Current Availability</Label>
+        <select
+          id={`${idPrefix}-availability`}
+          name="availability"
+          defaultValue={defaultValues?.availability ?? "not_recorded"}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          <option value="not_recorded">Not recorded</option>
+          <option value="available">Available</option>
+          <option value="unavailable">Unavailable</option>
+        </select>
+        <p className="text-xs text-muted-foreground">
+          Booking tasks require verified availability before confirmation.
+        </p>
       </div>
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-description`}>Description</Label>

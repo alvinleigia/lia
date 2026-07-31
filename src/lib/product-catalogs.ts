@@ -325,6 +325,7 @@ export async function restoreProjectCatalogProduct(
 }
 
 export async function updateProjectCatalogProductDetails(input: {
+  availability: boolean | null;
   catalogId: number;
   currency: string | null;
   description: string | null;
@@ -352,6 +353,17 @@ export async function updateProjectCatalogProductDetails(input: {
     return null;
   }
 
+  const metadata = { ...currentProduct.metadata };
+  if (input.availability === null) {
+    delete metadata.available;
+    delete metadata.availabilityStatus;
+  } else {
+    metadata.available = input.availability;
+    metadata.availabilityStatus = input.availability
+      ? "available"
+      : "unavailable";
+  }
+
   const [product] = await db
     .update(catalogProducts)
     .set({
@@ -360,7 +372,7 @@ export async function updateProjectCatalogProductDetails(input: {
       description: input.description,
       imageUrl: input.imageUrl,
       metadata: {
-        ...currentProduct.metadata,
+        ...metadata,
         whatsappRetailerId: input.whatsappRetailerId,
       },
       name: input.name,

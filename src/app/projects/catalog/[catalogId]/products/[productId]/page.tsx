@@ -51,6 +51,12 @@ function getWhatsAppRetailerId(metadata: Record<string, unknown>) {
     : "";
 }
 
+function getAvailability(metadata: Record<string, unknown>) {
+  if (metadata.available === true) return "available" as const;
+  if (metadata.available === false) return "unavailable" as const;
+  return "not_recorded" as const;
+}
+
 function formatEditablePrice(priceAmount: number | null) {
   return priceAmount === null ? "" : (priceAmount / 100).toFixed(2);
 }
@@ -166,6 +172,7 @@ export default async function ProductDetailsPage({
                     catalogs={catalogs}
                     idPrefix={`product-${product.id}`}
                     defaultValues={{
+                      availability: getAvailability(product.metadata),
                       catalogId: product.catalogId,
                       currency: product.currency,
                       description: product.description,

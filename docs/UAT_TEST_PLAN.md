@@ -20,9 +20,9 @@ Use the existing published task:
 Book a Spa Service
 ```
 
-This checkpoint uses the task test screens so availability from a real booking
-provider is not required. Do not click `Queue Operation`; provider execution is
-covered in checkpoint 4.
+This checkpoint uses a catalog availability value instead of a real booking
+provider. Do not click `Queue Operation`; provider execution is covered in
+checkpoint 4.
 
 ## Step 1 of 8 - Start A Clean Runtime Test
 
@@ -166,18 +166,25 @@ Do not reset the test data during this step.
 
 ## Step 5 of 8 - Confirm Without Executing
 
-1. Find `Confirmation and Operation Test`.
-2. Choose the available write operation.
-3. Click `Prepare Summary`.
-4. Review the immutable `Confirmation Summary`.
-5. Confirm the corrected email is shown:
+1. Open `Automation` in a second browser tab.
+2. Open `Product Catalog`.
+3. Open the catalog containing `Classic Facial`.
+4. Click `Edit` beside `Classic Facial`.
+5. Set `Current Availability` to `Available`.
+6. Click `Save Product`.
+7. Return to the still-open Runtime Test tab. Do not reset the test data.
+8. Find `Confirmation and Operation Test`.
+9. Choose the available write operation.
+10. Click `Prepare Summary`.
+11. Review the immutable `Confirmation Summary`.
+12. Confirm the corrected email is shown:
 
 ```text
 phase8.corrected@example.com
 ```
 
-6. Click `Confirm Explicitly`.
-7. Do not click `Queue Operation`.
+13. Click `Confirm Explicitly`.
+14. Do not click `Queue Operation`.
 
 Expected result:
 
@@ -185,6 +192,9 @@ Expected result:
 - The confirmation status becomes `Confirmed`.
 - The corrected value is used instead of the original email.
 - No provider operation is queued or executed.
+
+If `Prepare Summary` says availability could not be verified, reopen the
+product and confirm `Current Availability` is `Available`.
 
 ## Step 6 of 8 - Complete The Task
 
