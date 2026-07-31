@@ -116,40 +116,53 @@ Expected result:
 
 ## Step 4 of 8 - Test A Grounded Side Question And Resume
 
-First verify the answer:
+This step has two short parts. Part A checks that Lia can answer a project
+question. Part B checks that the booking task can pause and resume without
+losing its saved values.
 
-1. Return to the task `Test` page in a second browser tab.
-2. Click `Open Conversation Test`.
-3. Select the latest `Book a Spa Service` version as the conversation context.
-4. Select `Answer a question` as the turn purpose.
-5. Enter:
+### Part A - Ask A Project Question
+
+Starting from the `Book a Spa Service` page shown in the screenshot:
+
+1. Click `Configure Conversation`.
+2. Click the `Test` tab.
+3. Click `Open Conversation Test`.
+4. In `Conversation Context`, select the latest published
+   `Book a Spa Service` version.
+5. In `Turn Purpose`, select `Answer a question`.
+6. In `Visitor Message`, enter:
 
 ```text
 Where is the Panaji office?
 ```
 
-6. Click `Test Turn`.
+7. Click `Test Turn`.
 
 Expected result:
 
-- Lia gives a grounded project answer.
-- No task field, tool, route, or outcome is changed by the answer.
+- Lia answers with the Panaji office information from the project knowledge.
+- The result does not propose changing a field, calling a tool, changing a
+  route, or completing the task.
 
-Then verify the durable resume:
+### Part B - Pause And Resume The Booking Task
 
-1. Return to the Runtime Test tab.
-2. Click `Request` beside `Preferred Date`.
-3. Confirm `Preferred Date` shows the `Requested` badge.
-4. Click `Ask Side Question`.
-5. Confirm the response owner changes to `Knowledge Q&A`.
-6. Click `Return to Task`.
+1. Click `Back to review`.
+2. Click `Open Runtime Test`.
+3. Find `Preferred Date` in `Field Lifecycle`.
+4. Click `Request` beside `Preferred Date`.
+5. Confirm that `Preferred Date` shows `Requested`.
+6. At the top of the Runtime Test, click `Ask Side Question`.
+7. Confirm that `Response Owner` changes to `Knowledge Q&A`.
+8. Click `Return to Task`.
 
 Expected result:
 
-- The run pauses for the side question and returns to the same task.
+- `Response Owner` changes back to `Conversational Task`.
 - `Preferred Date` remains the requested field.
 - All seven saved values remain unchanged.
 - The pinned task version remains unchanged.
+
+Do not reset the test data during this step.
 
 ## Step 5 of 8 - Confirm Without Executing
 
