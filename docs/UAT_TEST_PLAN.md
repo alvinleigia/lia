@@ -2,248 +2,227 @@
 
 Phase: 8 of 18
 
-Checkpoint: 2 of 6
+Checkpoint: 3 of 6
 
-Test: Universal Catalog Management
+Test: Task correction, side questions, cancellation, confirmation, and
+completion
 
 Progress: Implementation and automated checks complete; focused manual UAT
 pending
 
 Project: `Ewissen Infra (#194)`
 
-Start URL: `http://localhost:3000/projects/catalog`
-
 Database migration: Not required for this checkpoint
 
-This checkpoint verifies that Lia has one project-owned catalog for all
-channels. WhatsApp identifiers are optional mappings and do not make the
-catalog WhatsApp-specific.
+Use the existing published task:
 
-## Step 1 of 8 - Open The Catalog
+```text
+Book a Spa Service
+```
 
-1. Open `http://localhost:3000/projects/catalog`.
-2. Confirm the selected project is `Ewissen Infra (#194)`.
-3. Confirm the page shows active and archived catalog and product counts.
+This checkpoint uses the task test screens so availability from a real booking
+provider is not required. Do not click `Queue Operation`; provider execution is
+covered in checkpoint 4.
+
+## Step 1 of 8 - Start A Clean Runtime Test
+
+1. Open `Automation`.
+2. Open `Conversational Tasks`.
+3. Open `Book a Spa Service`.
+4. Click `Configure Conversation`.
+5. Open the `Test` tab.
+6. Click `Open Runtime Test`.
+7. Click `Reset Test Data` if an older test is displayed.
+8. Click `Start Test Run`.
 
 Expected result:
 
-- The page loads without an error.
-- Catalogs and products for another project are not shown.
-- The page explains that Lia is the source of truth for every channel.
+- The active task is `Book a Spa Service`.
+- The run status is `Active`.
+- A published version is pinned.
+- Seven fields are shown in `Field Lifecycle`.
 
-## Step 2 of 8 - Create A Catalog
+## Step 2 of 8 - Save The Required Values
 
-In `Create Catalog`, enter:
+In `Save or Correct a Value`, save these values one at a time.
 
-Catalog Name:
-
-```text
-Phase 8 Service Catalog
-```
-
-Description:
+Service Category:
 
 ```text
-Universal service catalog used for Phase 8 channel testing.
+catalog:76
 ```
 
-WhatsApp Catalog ID:
+Service:
 
 ```text
-uat-meta-catalog-001
+product:71
 ```
 
-Click `Create Catalog`.
-
-Expected result:
-
-- `Catalog created.` appears near the catalog form.
-- The entered values are displayed in the active catalog list.
-- The WhatsApp ID is shown only as an optional channel mapping.
-
-## Step 3 of 8 - Add A Product
-
-In `Add Product`, enter:
-
-Catalog:
+Preferred Date:
 
 ```text
-Phase 8 Service Catalog
+2026-08-15
 ```
 
-Product Name:
+Preferred Time:
 
 ```text
-Classic Facial UAT
+15:30
 ```
 
-SKU:
+Guest Name:
 
 ```text
-UAT-FACIAL-001
+Phase 8 Guest
 ```
 
-Price:
+Guest Email:
 
 ```text
-95.00
+phase8.guest@example.com
 ```
 
-Currency:
+Guest Phone:
 
 ```text
-INR
-```
-
-Description:
-
-```text
-Classic facial treatment used for Phase 8 catalog UAT.
-```
-
-Image URL:
-
-```text
-https://example.com/classic-facial.jpg
-```
-
-Product URL:
-
-```text
-https://example.com/services/classic-facial
-```
-
-WhatsApp Retailer ID:
-
-```text
-uat-classic-facial
-```
-
-Click `Add Product`.
-
-Expected result:
-
-- `Product created.` appears near the product form.
-- The active product list shows `Classic Facial UAT`.
-- The displayed price is `₹95.00`, not `9500`.
-- The WhatsApp retailer ID is an optional mapping.
-
-## Step 4 of 8 - Edit The Catalog And Product
-
-1. Click `Edit` beside `Phase 8 Service Catalog`.
-2. Change Catalog Name to:
-
-```text
-Phase 8 Service Catalog Updated
-```
-
-3. Change Description to:
-
-```text
-Updated universal catalog used for Phase 8 channel testing.
-```
-
-4. Click `Save Catalog`.
-5. Click `Back to catalog`.
-6. Click `Edit` beside `Classic Facial UAT`.
-7. Change Product Name to:
-
-```text
-Classic Facial UAT Updated
-```
-
-8. Change Price to:
-
-```text
-105.50
-```
-
-9. Click `Save Product`.
-
-Expected result:
-
-- Success messages appear inside the relevant form.
-- The edited values remain visible after saving.
-- The price is displayed as `₹105.50`.
-- A failed validation keeps the entered values and shows its error in the form.
-
-## Step 5 of 8 - Archive And Restore The Product
-
-1. On the product page, click `Archive`.
-2. Confirm the product status changes to archived.
-3. Click `Restore Product`.
-
-Expected result:
-
-- The product can no longer be used as an active choice while archived.
-- Restoring returns it to active status.
-- The catalog and other products remain unchanged.
-
-## Step 6 of 8 - Archive And Restore The Catalog
-
-1. Return to the catalog page.
-2. Open `Phase 8 Service Catalog Updated`.
-3. Click `Archive`.
-4. Confirm `Restore Catalog` is shown.
-5. Click `Restore Catalog`.
-
-Expected result:
-
-- The catalog moves between archived and active states.
-- Its product is preserved.
-- An archived parent catalog cannot supply active product choices.
-
-## Step 7 of 8 - Verify Project Isolation
-
-1. Use the selected-project control in the header.
-2. Switch to a different project.
-3. Open `/projects/catalog`.
-4. Confirm the Phase 8 catalog and product are absent.
-5. Switch back to `Ewissen Infra (#194)`.
-
-Expected result:
-
-- The Phase 8 catalog is visible only in project `#194`.
-- No catalog or product data crosses the project boundary.
-
-## Step 8 of 8 - Clean Up
-
-1. Open `Classic Facial UAT Updated`.
-2. Click `Archive`.
-3. Click `Delete Permanently`.
-4. Open `Phase 8 Service Catalog Updated`.
-5. Click `Archive`.
-6. Click `Delete Permanently`.
-
-Expected result:
-
-- The unreferenced archived product is permanently deleted.
-- The now-empty unreferenced archived catalog is permanently deleted.
-- The app returns to the catalog page with a success message.
-
-Automated reference-safety coverage:
-
-```powershell
-npx playwright test tests/e2e/catalog-resource-dependencies.spec.ts
++919876543210
 ```
 
 Expected result:
 
-- All dependency-scanner tests pass.
-- Catalog and product references are detected inside draft and published
-  contracts.
-- Referenced resources cannot be permanently deleted.
+- Every value is shown against the correct field.
+- Every field is marked `Valid` or `Confirmed`.
+- The run remains active and keeps the same pinned version.
+- If `catalog:76` or `product:71` is no longer present, use the current active
+  Facial catalog ID and Classic Facial product ID shown by the catalog.
+
+## Step 3 of 8 - Correct A Value
+
+1. Select `Guest Email` in `Save or Correct a Value`.
+2. Enter:
+
+```text
+phase8.corrected@example.com
+```
+
+3. Click `Save Value`.
+
+Expected result:
+
+- Guest Email changes to `phase8.corrected@example.com`.
+- The other six values are preserved.
+- The task does not restart.
+- The attempt count for Guest Email increases.
+
+## Step 4 of 8 - Test A Grounded Side Question And Resume
+
+First verify the answer:
+
+1. Return to the task `Test` page in a second browser tab.
+2. Click `Open Conversation Test`.
+3. Select the latest `Book a Spa Service` version as the conversation context.
+4. Select `Answer a question` as the turn purpose.
+5. Enter:
+
+```text
+Where is the Panaji office?
+```
+
+6. Click `Test Turn`.
+
+Expected result:
+
+- Lia gives a grounded project answer.
+- No task field, tool, route, or outcome is changed by the answer.
+
+Then verify the durable resume:
+
+1. Return to the Runtime Test tab.
+2. Click `Request` beside `Preferred Date`.
+3. Confirm `Preferred Date` shows the `Requested` badge.
+4. Click `Ask Side Question`.
+5. Confirm the response owner changes to `Knowledge Q&A`.
+6. Click `Return to Task`.
+
+Expected result:
+
+- The run pauses for the side question and returns to the same task.
+- `Preferred Date` remains the requested field.
+- All seven saved values remain unchanged.
+- The pinned task version remains unchanged.
+
+## Step 5 of 8 - Confirm Without Executing
+
+1. Find `Confirmation and Operation Test`.
+2. Choose the available write operation.
+3. Click `Prepare Summary`.
+4. Review the immutable `Confirmation Summary`.
+5. Confirm the corrected email is shown:
+
+```text
+phase8.corrected@example.com
+```
+
+6. Click `Confirm Explicitly`.
+7. Do not click `Queue Operation`.
+
+Expected result:
+
+- The summary contains the current canonical task values.
+- The confirmation status becomes `Confirmed`.
+- The corrected value is used instead of the original email.
+- No provider operation is queued or executed.
+
+## Step 6 of 8 - Complete The Task
+
+1. Find `Task Lifecycle`.
+2. Click `Complete`.
+
+Expected result:
+
+- The run status becomes `Completed`.
+- The configured completed outcome is recorded.
+- The response owner returns to `Knowledge Q&A`.
+- The pinned version and completed field values remain visible for audit.
+
+## Step 7 of 8 - Cancel A New Run
+
+1. Click `Start Test Run`.
+2. Click `Request` beside `Service Category`.
+3. Click `Cancel` under `Task Lifecycle`.
+
+Expected result:
+
+- The new run status becomes `Cancelled`.
+- The response owner returns to `Knowledge Q&A`.
+- The conversation remains available for ordinary project questions.
+- No write operation is created.
+
+## Step 8 of 8 - Verify The Audit Trail
+
+Review `Safe Audit Trail`.
+
+Expected result:
+
+- The trail includes the correction.
+- The trail includes side-question suspension and resume.
+- The trail includes explicit confirmation.
+- The trail includes task completion.
+- The trail includes the later cancellation.
+- Routine events do not expose collected field values, secrets, or unnecessary
+  personal information.
+
+After reviewing the audit trail, click `Reset Test Data`.
 
 ## Checkpoint Result
 
-Checkpoint 2 passes when all eight steps and the automated reference-safety
-check pass.
+Checkpoint 3 passes when all eight steps pass.
 
 After passing, report:
 
 ```text
-Phase 8 checkpoint 2 UAT complete.
+Phase 8 checkpoint 3 UAT complete.
 ```
 
-The next roadmap target is Phase 8 checkpoint 3: corrections, side questions,
-cancellation, confirmation, and completion.
+The next roadmap target is Phase 8 checkpoint 4: provider operations, outcomes,
+idempotency, and interruption recovery.

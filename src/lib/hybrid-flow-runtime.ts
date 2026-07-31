@@ -111,6 +111,40 @@ function findUnresolvedTaskField(input: TaskRuntimeReconciliationInput) {
   return definition ? { definition, runtimeField } : null;
 }
 
+function findRequestedOrUnresolvedTaskField(input: {
+  fields: HybridTaskRuntimeField[];
+  requestedFieldKey: string | null;
+  snapshot: ConversationalTaskSnapshotV1;
+}) {
+  const runtimeFields = new Map(
+    input.fields.map((field) => [field.fieldKey, field]),
+  );
+  const requestedField = input.requestedFieldKey
+    ? runtimeFields.get(input.requestedFieldKey)
+    : null;
+  const runtimeField =
+    requestedField &&
+    requestedField.state !== "valid" &&
+    requestedField.state !== "confirmed"
+      ? requestedField
+      : input.snapshot.task.definition.fields
+          .map((field) => runtimeFields.get(field.key))
+          .find(
+            (field) =>
+              field?.isRequired &&
+              field.state !== "valid" &&
+              field.state !== "confirmed",
+          );
+  if (!runtimeField) {
+    return null;
+  }
+
+  const definition = input.snapshot.task.definition.fields.find(
+    ({ key }) => key === runtimeField.fieldKey,
+  );
+  return definition ? { definition, runtimeField } : null;
+}
+
 export function getTaskRuntimeInputRequest(
   input: TaskRuntimeReconciliationInput,
 ): RuntimeInputRequest | null {
@@ -121,6 +155,48 @@ export function getTaskRuntimeInputRequest(
   return unresolved
     ? createTaskRuntimeInputRequest(unresolved.definition)
     : null;
+}
+
+export function getResumedTaskRuntimeInputRequest(input: {
+  fields: HybridTaskRuntimeField[];
+  requestedFieldKey: string | null;
+  snapshot: ConversationalTaskSnapshotV1;
+}): RuntimeInputRequest | null {
+  const unresolved = findRequestedOrUnresolvedTaskField(input);
+  return unresolved
+    ? createTaskRuntimeInputRequest(unresolved.definition)
+    : null;
+}
+
+export function reconcileTaskSideQuestionWithRuntime(input: {
+  fields: HybridTaskRuntimeField[];
+  proposal: TurnResultV1;
+  requestedFieldKey: string | null;
+  snapshot: ConversationalTaskSnapshotV1;
+}): TurnResultV1 {
+  const unresolved = findRequestedOrUnresolvedTaskField(input);
+  const resumePrompt = unresolved
+    ? (unresolved.definition.prompt ??
+      `Please provide ${unresolved.definition.label}.`)
+    : null;
+
+  return {
+    ...input.proposal,
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: unresolved
+      ? `The server answered a side question and resumed field ${unresolved.definition.key}.`
+      : "The server answered a side question and returned control to the task.",
+    fieldCandidates: [],
+    nextAction: "ask",
+    outcomeRecommendation: null,
+    reply: resumePrompt
+      ? `${input.proposal.reply}\n\n${resumePrompt}`
+      : input.proposal.reply,
+    routeRecommendation: null,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "side_question",
+  };
 }
 
 export function reconcileTaskTurnWithRuntime(

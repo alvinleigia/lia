@@ -85,13 +85,13 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 8 of 18, Step 2 of 6. Phases 1-7 and the
-Phase 8 temporal-input checkpoint completed their implementation and manual
-UAT gates by 2026-07-28.
+Current phase: Priority 1, Phase 8 of 18, Step 3 of 6. Phases 1-7 and the
+first two Phase 8 checkpoints completed their implementation and manual UAT
+gates by 2026-07-31.
 
-Current target: complete focused manual UAT for the universal catalog
-lifecycle and reference-safety controls, then continue corrections, side
-questions, cancellation, confirmation, and completion in Step 3.
+Current target: complete focused manual UAT for task correction, grounded side
+questions, cancellation, confirmation, and completion, then continue provider
+operations and interruption recovery in Step 4.
 
 ## Product Direction
 
@@ -607,10 +607,10 @@ journey before broadening task types or channel certification.
 Phase 8 execution checkpoints:
 
 - [x] Step 1 of 6: temporal normalization and channel-adaptive typed inputs.
-- [ ] Step 2 of 6: reference catalog dependencies and deterministic lookups
-  (implementation and automated checks complete; focused manual UAT pending).
+- [x] Step 2 of 6: reference catalog dependencies and deterministic lookups.
 - [ ] Step 3 of 6: corrections, side questions, cancellation, confirmation,
-  and completion.
+  and completion (implementation and automated checks complete; focused manual
+  UAT pending).
 - [ ] Step 4 of 6: provider operations, outcomes, idempotency, and interruption
   recovery.
 - [ ] Step 5 of 6: tenant safety, security, degraded behavior, retention, and
@@ -618,7 +618,7 @@ Phase 8 execution checkpoints:
 - [ ] Step 6 of 6: complete scenario verification, manual UAT, and Priority 1
   closure.
 
-- [ ] Build the reference task using the project service catalog.
+- [x] Build the reference task using the project service catalog.
 - [x] Keep the Lia project catalog as the channel-independent source of truth.
 - [x] Treat WhatsApp catalog and retailer identifiers as optional channel
   mappings instead of core catalog identities.
@@ -641,8 +641,8 @@ Phase 8 execution checkpoints:
 - [x] Render native date and time controls in project chat and the website widget when the channel supports them.
 - [ ] Map typed-input requests to a native WhatsApp Flow control when configured, with a clear text fallback otherwise.
 - [x] Verify unsupported channel capabilities fall back without changing the task contract or collected value.
-- [ ] Resolve category and service dependencies.
-- [ ] Look up current price, duration, and availability.
+- [x] Resolve category and service dependencies.
+- [x] Look up current price, duration, and availability.
 - [ ] Correct one field without restarting the task.
 - [ ] Answer a project side question during booking and resume the same requested field.
 - [ ] Cancel the task and return to ordinary Q&A without ending the conversation.

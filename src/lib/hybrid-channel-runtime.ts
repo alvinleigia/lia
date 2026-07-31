@@ -42,9 +42,11 @@ import {
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   dispatchHybridFlowBoundary,
+  getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
   type HybridBoundaryExecution,
   type HybridRuntimeResponseOwner,
+  reconcileTaskSideQuestionWithRuntime,
   reconcileTaskTurnWithAvailability,
   reconcileTaskTurnWithRuntime,
   resolveHybridBoundaryNode,
@@ -53,6 +55,7 @@ import {
 import { startHybridTaskEntry } from "@/lib/hybrid-task-entry";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 import { getRuntimeProjectActionForSubmission } from "@/lib/runtime-actions";
+import type { RuntimeInputRequest } from "@/lib/runtime-input-request";
 import { createTextReply, type RuntimeReply } from "@/lib/runtime-replies";
 
 type ProjectTurnContext = {
@@ -400,6 +403,43 @@ type HybridChannelFlowBoundaryInput = Omit<
   source: string;
 };
 
+async function recordTaskFieldRequest(input: {
+  conversationId: number;
+  inputRequest: RuntimeInputRequest | null;
+  revision: number;
+  runtimeInput: HybridChannelRuntimeInput;
+  taskRunId: number;
+}) {
+  if (!input.inputRequest) {
+    return input.revision;
+  }
+
+  const now = new Date().toISOString();
+  const result = await applyConversationalTaskEvent({
+    authentication: null,
+    channelIdentity: {
+      externalConversationId: input.runtimeInput.externalConversationId,
+      externalUserId: input.runtimeInput.externalUserId ?? null,
+    },
+    channelType: input.runtimeInput.channelType,
+    conversationId: input.conversationId,
+    eventId: `channel-message:${input.runtimeInput.inboundMessageId}:field-request`,
+    expectedRevision: input.revision,
+    fieldKey: input.inputRequest.fieldKey,
+    occurredAt: now,
+    projectId: input.runtimeInput.projectId,
+    providerSequence: null,
+    receivedAt: now,
+    schemaVersion: 1,
+    taskRunId: input.taskRunId,
+    type: "field.requested",
+  });
+
+  return result.disposition === "applied" && result.revision !== null
+    ? result.revision
+    : input.revision;
+}
+
 async function ensureDirectTaskEntry(input: {
   node: Extract<HybridFlowNodeV1, { kind: "conversational_task" }>;
   runtimeInput: HybridChannelRuntimeInput;
@@ -488,6 +528,123 @@ async function executeTaskBoundary(input: {
   });
   const proposal = execution.proposal;
   let revision = session.execution.revision;
+
+  if (proposal.turnKind === "side_question") {
+    const now = new Date().toISOString();
+    const suspended = await applyConversationalTaskEvent({
+      authentication: null,
+      category: "visitor_question",
+      channelIdentity: {
+        externalConversationId: input.runtimeInput.externalConversationId,
+        externalUserId: input.runtimeInput.externalUserId ?? null,
+      },
+      channelType: input.runtimeInput.channelType,
+      conversationId: session.runtime.run.conversationId,
+      eventId: `channel-message:${input.runtimeInput.inboundMessageId}:side-question`,
+      expectedRevision: revision,
+      occurredAt: now,
+      projectId: input.runtimeInput.projectId,
+      providerSequence: null,
+      receivedAt: now,
+      schemaVersion: 1,
+      taskRunId: session.runtime.run.id,
+      type: "task.side_question",
+    });
+    if (suspended.disposition !== "applied" || suspended.revision === null) {
+      return { output: proposal, signals: [] };
+    }
+
+    let knowledgeProposal: TurnResultV1;
+    let resumedRevision: number | null = null;
+    try {
+      const knowledgeExecution = await executeConfiguredStructuredTurn({
+        activeTask: session.snapshot,
+        assistantBehavior: normalizeProjectAiSettings(
+          session.snapshot.assistantBehavior,
+        ),
+        assistantIntroduced: input.history.some(
+          (message) => message.role === "assistant",
+        ),
+        channel: input.runtimeInput.channelType,
+        companyName: input.project.companyName,
+        context: toRuntimeContext(session.runtime),
+        fieldState: toRuntimeFieldState({
+          runtime: session.runtime,
+          snapshot: session.snapshot,
+        }),
+        history: input.history,
+        projectId: input.runtimeInput.projectId,
+        projectName: input.project.projectName,
+        projectPolicy: session.snapshot.conversationPolicy,
+        publishedTasks: [],
+        stage: "knowledge",
+        visitorMessage: input.runtimeInput.text,
+      });
+      knowledgeProposal = knowledgeExecution.proposal;
+    } finally {
+      const resolvedAt = new Date().toISOString();
+      const resumed = await applyConversationalTaskEvent({
+        authentication: null,
+        channelIdentity: {
+          externalConversationId: input.runtimeInput.externalConversationId,
+          externalUserId: input.runtimeInput.externalUserId ?? null,
+        },
+        channelType: input.runtimeInput.channelType,
+        conversationId: session.runtime.run.conversationId,
+        eventId: `channel-message:${input.runtimeInput.inboundMessageId}:side-question-resolved`,
+        expectedRevision: suspended.revision,
+        occurredAt: resolvedAt,
+        projectId: input.runtimeInput.projectId,
+        providerSequence: null,
+        receivedAt: resolvedAt,
+        schemaVersion: 1,
+        taskRunId: session.runtime.run.id,
+        type: "task.side_question_resolved",
+      });
+      resumedRevision =
+        resumed.disposition === "applied" ? resumed.revision : null;
+    }
+    if (resumedRevision === null) {
+      return { output: knowledgeProposal, signals: [] };
+    }
+
+    const resumedSession = await getConversationTaskRuntimeSession({
+      channelType: input.runtimeInput.channelType,
+      externalConversationId: input.runtimeInput.externalConversationId,
+      projectId: input.runtimeInput.projectId,
+    });
+    if (
+      !resumedSession.execution ||
+      !resumedSession.runtime ||
+      !resumedSession.snapshot
+    ) {
+      return { output: knowledgeProposal, signals: [] };
+    }
+    const resumedProposal = reconcileTaskSideQuestionWithRuntime({
+      fields: resumedSession.runtime.fields,
+      proposal: knowledgeProposal,
+      requestedFieldKey: resumedSession.runtime.run.lastRequestedFieldKey,
+      snapshot: resumedSession.snapshot,
+    });
+    const inputRequest = getResumedTaskRuntimeInputRequest({
+      fields: resumedSession.runtime.fields,
+      requestedFieldKey: resumedSession.runtime.run.lastRequestedFieldKey,
+      snapshot: resumedSession.snapshot,
+    });
+    await recordTaskFieldRequest({
+      conversationId: resumedSession.runtime.run.conversationId,
+      inputRequest,
+      revision: resumedSession.execution.revision,
+      runtimeInput: input.runtimeInput,
+      taskRunId: resumedSession.runtime.run.id,
+    });
+
+    return {
+      inputRequest,
+      output: resumedProposal,
+      signals: [],
+    };
+  }
 
   if (proposal.fieldCandidates.length > 0) {
     const fieldResult = await applyConversationalTaskEvent({
@@ -591,15 +748,29 @@ async function executeTaskBoundary(input: {
           ))
         : null;
   if (!outcome) {
+    const inputRequest =
+      canonicalSession.runtime && canonicalSession.snapshot
+        ? getTaskRuntimeInputRequest({
+            fields: canonicalSession.runtime.fields,
+            proposal: reconciledProposal,
+            snapshot: canonicalSession.snapshot,
+          })
+        : null;
+    if (
+      canonicalSession.execution &&
+      canonicalSession.runtime &&
+      canonicalSession.snapshot
+    ) {
+      await recordTaskFieldRequest({
+        conversationId: canonicalSession.runtime.run.conversationId,
+        inputRequest,
+        revision: canonicalSession.execution.revision,
+        runtimeInput: input.runtimeInput,
+        taskRunId: canonicalSession.runtime.run.id,
+      });
+    }
     return {
-      inputRequest:
-        canonicalSession.runtime && canonicalSession.snapshot
-          ? getTaskRuntimeInputRequest({
-              fields: canonicalSession.runtime.fields,
-              proposal: reconciledProposal,
-              snapshot: canonicalSession.snapshot,
-            })
-          : null,
+      inputRequest,
       output: reconciledProposal,
       signals: [],
     };
@@ -800,6 +971,13 @@ export async function runHybridChannelBoundary(
         fields: taskSession.runtime.fields,
         proposal: replyProposal,
         snapshot: taskSession.snapshot,
+      });
+      await recordTaskFieldRequest({
+        conversationId: taskSession.runtime.run.conversationId,
+        inputRequest,
+        revision: taskSession.execution.revision,
+        runtimeInput: input,
+        taskRunId: taskSession.runtime.run.id,
       });
     }
   }

@@ -207,6 +207,34 @@ test("task field extraction skips knowledge retrieval", async () => {
   expect(retriever.calls).toBe(0);
 });
 
+test("a side question during a task uses grounded knowledge retrieval", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      fieldCandidates: [],
+      grounding: { status: "grounded", excerptIds: ["document:12"] },
+      reply: "The spa is open from 9 am to 6 pm.",
+      turnKind: "side_question",
+    }),
+  ]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    stage: "knowledge",
+    visitorMessage: "What time does the spa close?",
+  });
+
+  expect(result.source).toBe("model");
+  expect(result.proposal).toMatchObject({
+    grounding: { status: "grounded", excerptIds: ["document:12"] },
+    reply: "The spa is open from 9 am to 6 pm.",
+    turnKind: "side_question",
+  });
+  expect(provider.calls).toHaveLength(1);
+  expect(retriever.calls).toBe(1);
+});
+
 test("rate and cost admission can deny a turn before model use", async () => {
   const provider = new QueueProvider([baseTurn()]);
   const engine = new StructuredTurnEngine({

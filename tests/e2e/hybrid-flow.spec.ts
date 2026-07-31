@@ -29,9 +29,11 @@ import {
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   dispatchHybridFlowBoundary,
+  getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
   matchesHybridGraphTaskReturnTarget,
   prepareHybridTaskEntry,
+  reconcileTaskSideQuestionWithRuntime,
   reconcileTaskTurnWithAvailability,
   reconcileTaskTurnWithRuntime,
   resolveHybridBoundaryNode,
@@ -542,6 +544,91 @@ test("task runtime exposes a typed request for its unresolved date field", () =>
     fieldKey: "preferredDate",
     inputKind: "date",
     label: "Preferred Date",
+    options: [],
+    required: true,
+  });
+});
+
+test("side questions resume the exact requested task field without mutations", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "Answered a question about business hours.",
+    fieldCandidates: [
+      {
+        confidence: 0.99,
+        fieldKey: "guestName",
+        naturalValue: "Do not save this",
+        source: "visitor" as const,
+      },
+    ],
+    grounding: {
+      excerptIds: ["document:12"],
+      status: "grounded" as const,
+    },
+    nextAction: "complete" as const,
+    outcomeRecommendation: {
+      confidence: 0.8,
+      outcomeKey: "completed",
+    },
+    reply: "The spa is open from 9 am to 6 pm.",
+    routeRecommendation: {
+      confidence: 0.8,
+      outputPort: "completed",
+    },
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: {
+      confidence: 0.8,
+      reason: "Unsafe side-turn recommendation.",
+      taskId: taskSnapshot.task.id,
+    },
+    toolRequest: {
+      arguments: [],
+      stage: "operation" as const,
+      toolId: "manual_review",
+    },
+    turnKind: "side_question" as const,
+  };
+  const fields = taskSnapshot.task.definition.fields.map((field) => ({
+    fieldKey: field.key,
+    isRequired: field.required,
+    state: field.key === "preferredTime" ? "missing" : "valid",
+    validation: {},
+  }));
+
+  const result = reconcileTaskSideQuestionWithRuntime({
+    fields,
+    proposal,
+    requestedFieldKey: "preferredTime",
+    snapshot: taskSnapshot,
+  });
+
+  expect(result).toMatchObject({
+    fieldCandidates: [],
+    grounding: {
+      excerptIds: ["document:12"],
+      status: "grounded",
+    },
+    nextAction: "ask",
+    outcomeRecommendation: null,
+    routeRecommendation: null,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "side_question",
+  });
+  expect(result.reply).toBe(
+    "The spa is open from 9 am to 6 pm.\n\nWhat time would you prefer?",
+  );
+  expect(
+    getResumedTaskRuntimeInputRequest({
+      fields,
+      requestedFieldKey: "preferredTime",
+      snapshot: taskSnapshot,
+    }),
+  ).toEqual({
+    fieldKey: "preferredTime",
+    inputKind: "time",
+    label: "Preferred Time",
     options: [],
     required: true,
   });
