@@ -166,25 +166,27 @@ Do not reset the test data during this step.
 
 ## Step 5 of 8 - Confirm Without Executing
 
-1. Open `Automation` in a second browser tab.
-2. Open `Product Catalog`.
-3. Open the catalog containing `Classic Facial`.
-4. Click `Edit` beside `Classic Facial`.
-5. Set `Current Availability` to `Available`.
-6. Click `Save Product`.
-7. Return to the still-open Runtime Test tab. Do not reset the test data.
-8. Find `Confirmation and Operation Test`.
-9. Choose the available write operation.
-10. Click `Prepare Summary`.
-11. Review the immutable `Confirmation Summary`.
-12. Confirm the corrected email is shown:
+1. Keep the current Runtime Test tab open.
+2. Open a second browser tab for Lia.
+3. In the second tab, click the top navigation menu `Projects`.
+4. Click `Product Catalog`. This opens `/projects/catalog`.
+5. In the `Products` section, find `Classic Facial`.
+6. Click `Edit` beside `Classic Facial`.
+7. Set `Current Availability` to `Available`.
+8. Click `Save Product`.
+9. Return to the original Runtime Test tab. Do not reset the test data.
+10. Find `Confirmation and Operation Test`.
+11. Choose the available write operation.
+12. Click `Prepare Summary`.
+13. Review the immutable `Confirmation Summary`.
+14. Confirm the corrected email is shown:
 
 ```text
 phase8.corrected@example.com
 ```
 
-13. Click `Confirm Explicitly`.
-14. Do not click `Queue Operation`.
+15. Click `Confirm Explicitly`.
+16. Do not click `Queue Operation`.
 
 Expected result:
 
