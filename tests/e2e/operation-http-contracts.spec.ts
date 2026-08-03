@@ -48,6 +48,30 @@ test.describe("HTTP operation contracts", () => {
     } as never);
     expect(validLegacy).toEqual([]);
 
+    const validSecretHeader = getOperationConfigurationIssues({
+      operation: {
+        inputMapping: {},
+        operationType: "api_request",
+        outputMapping: {},
+        settings: {},
+        status: "active",
+      },
+      provider: {
+        config: {
+          headers: {
+            Authorization: {
+              $liaProviderSecret: "headers.Authorization",
+            },
+          },
+          url: "https://example.test/bookings",
+        },
+        status: "active",
+      },
+    } as never);
+    expect(validSecretHeader).not.toContain(
+      "Headers must contain named text values.",
+    );
+
     const invalid = getOperationConfigurationIssues({
       operation: {
         inputMapping: { booking: "__proto__.value" },

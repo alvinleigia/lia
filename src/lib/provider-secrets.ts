@@ -21,7 +21,7 @@ export type PreparedProviderSecret = {
   secretName: string;
 };
 
-function isProviderSecretReference(
+export function isProviderSecretReference(
   value: unknown,
 ): value is ProviderSecretReference {
   return (

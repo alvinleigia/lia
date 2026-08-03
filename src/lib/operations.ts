@@ -22,6 +22,7 @@ import { resolveTraceId } from "@/lib/execution-trace";
 import { HTTP_METHODS, type HttpMethod } from "@/lib/operation-contracts";
 import {
   hydrateProviderConfig,
+  isProviderSecretReference,
   listMissingProviderSecretNames,
   prepareProviderConfig,
 } from "@/lib/provider-secrets";
@@ -531,6 +532,19 @@ function isStringRecord(value: unknown) {
   );
 }
 
+function isHeaderRecord(value: unknown) {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.entries(value as Record<string, unknown>).every(
+      ([key, entry]) =>
+        key.trim() &&
+        (typeof entry === "string" || isProviderSecretReference(entry)),
+    )
+  );
+}
+
 function hasUnsafeMappingPath(value: string) {
   return value
     .split(".")
@@ -571,7 +585,7 @@ export function getOperationConfigurationIssues(
   }
   if (
     provider.config.headers !== undefined &&
-    !isStringRecord(provider.config.headers)
+    !isHeaderRecord(provider.config.headers)
   ) {
     issues.push("Headers must contain named text values.");
   }
