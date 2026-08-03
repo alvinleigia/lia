@@ -6,6 +6,7 @@ import {
   CANVAS_INPUT_TYPES,
   formatStepOptions,
   getInputFieldKeys,
+  getOperationOutcomeRouteTargetIds,
   getOperationRoutePresetTargetId,
   getStepChoiceDisplayMode,
   getStepConnectedActionId,
@@ -190,7 +191,12 @@ export function StepCreateForm({
           operations={operations.map((operation) => ({
             id: operation.id,
             label: operation.name,
+            outcomeKeys: operation.outcomeKeys,
           }))}
+          outcomeStepIds={getOperationOutcomeRouteTargetIds(
+            branchRules,
+            step?.id ?? 0,
+          )}
           projectActions={projectActions.map((action) => ({
             id: action.id,
             label: action.name,

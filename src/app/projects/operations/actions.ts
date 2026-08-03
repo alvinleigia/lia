@@ -7,6 +7,7 @@ import { assertPermission } from "@/lib/access-control";
 import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
+import { HTTP_METHODS } from "@/lib/operation-contracts";
 import {
   createIntegrationProvider,
   createOperation,
@@ -41,14 +42,25 @@ const apiRequestOperationSchema = z.object({
   autoRetryDelayMinutes: z.coerce.number().int().min(0).max(10080).default(5),
   autoRetryEnabled: z.coerce.boolean().optional(),
   autoRetryMaxAttempts: z.coerce.number().int().min(0).max(10).default(0),
+  customStatusCodes: z.string().trim().max(240).optional(),
+  headers: z.string().optional(),
   inputMapping: z.string().optional(),
+  method: z.enum(HTTP_METHODS).default("POST"),
   name: z.string().trim().min(1).max(120),
   outputMapping: z.string().optional(),
   providerType: z.enum(["webhook", "n8n_webhook"]),
+  queryParameters: z.string().optional(),
   retryCount: z.coerce.number().int().min(0).max(5).default(0),
   secret: z.string().trim().max(240).optional(),
   timeoutMs: z.coerce.number().int().min(1000).max(30000).default(15000),
-  url: z.string().trim().url().max(1000),
+  url: z
+    .string()
+    .trim()
+    .url()
+    .max(1000)
+    .refine((value) => ["http:", "https:"].includes(new URL(value).protocol), {
+      message: "Endpoint URL must use HTTP or HTTPS.",
+    }),
 });
 
 const metaConversionOperationSchema = z.object({
@@ -112,6 +124,20 @@ function parseJsonObject(value: string | undefined, label: string) {
 
 function getActionError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function parseHttpStatusCodes(value: string | undefined) {
+  if (!value?.trim()) return [];
+  const codes = value
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map((item) => Number.parseInt(item, 10));
+  if (
+    codes.some((code) => !Number.isInteger(code) || code < 100 || code > 599)
+  ) {
+    throw new Error("Custom status codes must be between 100 and 599.");
+  }
+  return [...new Set(codes)];
 }
 
 export async function createIntegrationProviderAction(
@@ -238,10 +264,14 @@ export async function createApiRequestOperationAction(
     autoRetryDelayMinutes: formData.get("autoRetryDelayMinutes") || 5,
     autoRetryEnabled: formData.get("autoRetryEnabled") === "on",
     autoRetryMaxAttempts: formData.get("autoRetryMaxAttempts") || 0,
+    customStatusCodes: formData.get("customStatusCodes"),
+    headers: formData.get("headers"),
     inputMapping: formData.get("inputMapping"),
+    method: formData.get("method") || "POST",
     name: formData.get("name"),
     outputMapping: formData.get("outputMapping"),
     providerType: formData.get("providerType") || "webhook",
+    queryParameters: formData.get("queryParameters"),
     retryCount: formData.get("retryCount") || 0,
     secret: formData.get("secret"),
     timeoutMs: formData.get("timeoutMs") || 15000,
@@ -257,12 +287,21 @@ export async function createApiRequestOperationAction(
 
   let inputMapping: Record<string, unknown>;
   let outputMapping: Record<string, unknown>;
+  let headers: Record<string, unknown>;
+  let queryParameters: Record<string, unknown>;
+  let customStatusCodes: number[];
   try {
     inputMapping = parseJsonObject(parsed.data.inputMapping, "Input mapping");
     outputMapping = parseJsonObject(
       parsed.data.outputMapping,
       "Output mapping",
     );
+    headers = parseJsonObject(parsed.data.headers, "Headers");
+    queryParameters = parseJsonObject(
+      parsed.data.queryParameters,
+      "Query parameters",
+    );
+    customStatusCodes = parseHttpStatusCodes(parsed.data.customStatusCodes);
   } catch (error) {
     return { error: getActionError(error, "Invalid API request mapping.") };
   }
@@ -275,6 +314,9 @@ export async function createApiRequestOperationAction(
       autoRetryDelayMinutes: parsed.data.autoRetryDelayMinutes,
       autoRetryEnabled: parsed.data.autoRetryEnabled === true,
       autoRetryMaxAttempts: parsed.data.autoRetryMaxAttempts,
+      headers,
+      method: parsed.data.method,
+      queryParameters,
       retryCount: parsed.data.retryCount,
       timeoutMs: parsed.data.timeoutMs,
       url: parsed.data.url,
@@ -290,6 +332,7 @@ export async function createApiRequestOperationAction(
     inputMapping,
     outputMapping,
     settings: {
+      customStatusCodes,
       operationKind: "api_request",
     },
   });

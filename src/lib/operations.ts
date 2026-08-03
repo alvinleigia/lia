@@ -19,6 +19,7 @@ import {
   failDurableJob,
 } from "@/lib/durable-jobs";
 import { resolveTraceId } from "@/lib/execution-trace";
+import { HTTP_METHODS, type HttpMethod } from "@/lib/operation-contracts";
 import {
   hydrateProviderConfig,
   prepareProviderConfig,
@@ -188,7 +189,44 @@ export type OperationRunResult = {
   attempt: SelectOperationAttempt;
   contactAttributes: Record<string, unknown>;
   fields: Record<string, unknown>;
+  outcome: string;
 };
+
+function getCustomStatusCodes(settings: Record<string, unknown>) {
+  return Array.isArray(settings.customStatusCodes)
+    ? settings.customStatusCodes.filter(
+        (value): value is number =>
+          typeof value === "number" &&
+          Number.isInteger(value) &&
+          value >= 100 &&
+          value <= 599,
+      )
+    : [];
+}
+
+export function getOperationResultOutcome(input: {
+  attempt: SelectOperationAttempt;
+  operation: SelectOperation;
+}) {
+  const response = getRecordValue(input.attempt.responsePayload, "response");
+  const status = response?.status;
+  if (
+    typeof status === "number" &&
+    getCustomStatusCodes(input.operation.settings).includes(status)
+  ) {
+    return `status_${status}`;
+  }
+  if (typeof status === "number") {
+    if (status >= 200 && status < 300) return "success";
+    if (status >= 400 && status < 500) return "client_error";
+    if (status >= 500) return "server_error";
+  }
+
+  const errorKind = input.attempt.responsePayload.errorKind;
+  if (errorKind === "timeout") return "timeout";
+  if (errorKind === "network_failure") return "network_failure";
+  return input.attempt.status === "completed" ? "success" : "server_error";
+}
 
 type RetryQueueReplayStats = {
   completed: boolean;
@@ -235,6 +273,35 @@ export function getOperationAttemptMappedOutput(input: {
     responsePayload: input.attempt.responsePayload,
     status: input.attempt.status as OperationAttemptStatus,
   });
+}
+
+function sanitizeOperationValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeOperationValue);
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+      key,
+      /secret|password|token|api.?key|authorization|credential/i.test(key)
+        ? "[REDACTED]"
+        : sanitizeOperationValue(entry),
+    ]),
+  );
+}
+
+export function getSanitizedOperationAttemptPreview(input: {
+  attempt: SelectOperationAttempt;
+  operation: SelectOperation;
+}) {
+  const response = getRecordValue(input.attempt.responsePayload, "response");
+
+  return {
+    body: sanitizeOperationValue(response?.body ?? null),
+    outcome: getOperationResultOutcome(input),
+    status: typeof response?.status === "number" ? response.status : null,
+    statusText:
+      typeof response?.statusText === "string" ? response.statusText : null,
+  };
 }
 
 export function getOperationAttemptToolResult(input: {
@@ -739,6 +806,30 @@ function readHeadersConfig(config: Record<string, unknown>) {
   );
 }
 
+function readQueryParametersConfig(config: Record<string, unknown>) {
+  const parameters = config.queryParameters;
+  if (
+    !parameters ||
+    typeof parameters !== "object" ||
+    Array.isArray(parameters)
+  ) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(parameters).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
+
+function readHttpMethod(config: Record<string, unknown>): HttpMethod {
+  const method = readStringConfig(config, "method")?.toUpperCase();
+  return HTTP_METHODS.includes(method as HttpMethod)
+    ? (method as HttpMethod)
+    : "POST";
+}
+
 function buildSignature(secret: string, body: string) {
   return createHmac("sha256", secret).update(body).digest("hex");
 }
@@ -879,8 +970,9 @@ function clampInteger(value: number, min: number, max: number) {
 }
 
 async function postWebhookAttempt(input: {
-  body: string;
+  body?: string;
   headers: Record<string, string>;
+  method: HttpMethod;
   timeoutMs: number;
   url: string;
 }) {
@@ -892,7 +984,7 @@ async function postWebhookAttempt(input: {
     const response = await fetch(input.url, {
       body: input.body,
       headers: input.headers,
-      method: "POST",
+      method: input.method,
       signal: controller.signal,
     });
     const responseText = await response.text();
@@ -918,11 +1010,16 @@ async function postWebhookAttempt(input: {
         : `Webhook returned ${response.status}.`,
     };
   } catch (error) {
+    const errorKind =
+      error instanceof Error && error.name === "AbortError"
+        ? "timeout"
+        : "network_failure";
     return {
       ok: false,
       outcomeKnown: false,
       attemptPayload: {
         durationMs: Date.now() - startedAt,
+        errorKind,
         error:
           error instanceof Error ? error.message : "Webhook request failed.",
       },
@@ -932,6 +1029,43 @@ async function postWebhookAttempt(input: {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export function buildWebhookRequest(input: {
+  config: Record<string, unknown>;
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+}) {
+  const url = readStringConfig(input.config, "url");
+  if (!url) {
+    throw new Error("Webhook provider requires config.url.");
+  }
+
+  const method = readHttpMethod(input.config);
+  const urlWithQuery = new URL(url);
+  for (const [key, value] of Object.entries(
+    readQueryParametersConfig(input.config),
+  )) {
+    if (key.trim()) urlWithQuery.searchParams.set(key.trim(), value);
+  }
+  const body = method === "GET" ? undefined : JSON.stringify(input.payload);
+  const secret = readStringConfig(input.config, "secret");
+  const headers = {
+    ...(body ? { "content-type": "application/json" } : {}),
+    "idempotency-key": input.idempotencyKey,
+    "x-lia-event": "operation.execute",
+    ...(secret
+      ? { "x-lia-signature": buildSignature(secret, body ?? "") }
+      : {}),
+    ...readHeadersConfig(input.config),
+  };
+
+  return {
+    body,
+    headers,
+    method,
+    url: urlWithQuery.toString(),
+  };
 }
 
 async function executeWebhookProvider(
@@ -948,7 +1082,7 @@ async function executeWebhookProvider(
     };
   }
 
-  const body = JSON.stringify(payload);
+  const request = buildWebhookRequest({ config, idempotencyKey, payload });
   const timeoutMs = readNumberConfig(config, "timeoutMs") ?? 15_000;
   const retryCount = clampInteger(
     readIntegerConfig(config, "retryCount") ?? 0,
@@ -960,17 +1094,10 @@ async function executeWebhookProvider(
     0,
     30_000,
   );
-  const secret = readStringConfig(config, "secret");
-  const headers = {
-    "content-type": "application/json",
-    "idempotency-key": idempotencyKey,
-    "x-lia-event": "operation.execute",
-    ...(secret ? { "x-lia-signature": buildSignature(secret, body) } : {}),
-    ...readHeadersConfig(config),
-  };
   const attempts = [];
   let lastErrorMessage = "Webhook request failed.";
   let outcomeUnknown = false;
+  let lastAttemptPayload: Record<string, unknown> = {};
 
   for (let attemptIndex = 0; attemptIndex <= retryCount; attemptIndex += 1) {
     if (attemptIndex > 0 && retryDelayMs > 0) {
@@ -978,16 +1105,18 @@ async function executeWebhookProvider(
     }
 
     const result = await postWebhookAttempt({
-      body,
-      headers,
+      body: request.body,
+      headers: request.headers,
+      method: request.method,
       timeoutMs,
-      url,
+      url: request.url,
     });
     attempts.push({
       attempt: attemptIndex + 1,
       ...result.attemptPayload,
     });
     lastErrorMessage = result.errorMessage ?? lastErrorMessage;
+    lastAttemptPayload = result.attemptPayload;
     outcomeUnknown ||= !result.outcomeKnown;
 
     if (result.ok) {
@@ -996,6 +1125,7 @@ async function executeWebhookProvider(
         responsePayload: {
           attempts,
           finalAttempt: attemptIndex + 1,
+          response: result.attemptPayload,
           retryCount,
         },
         errorMessage: undefined,
@@ -1008,6 +1138,10 @@ async function executeWebhookProvider(
     responsePayload: {
       attempts,
       finalAttempt: attempts.length,
+      ...(typeof lastAttemptPayload.errorKind === "string"
+        ? { errorKind: lastAttemptPayload.errorKind }
+        : {}),
+      response: lastAttemptPayload,
       retryCount,
     },
     errorMessage: lastErrorMessage,
@@ -1301,6 +1435,10 @@ export async function runOperationForSubmission(input: {
       attempt: existingAttempt,
       contactAttributes: replayOutput.contactAttributes,
       fields: replayOutput.fields,
+      outcome: getOperationResultOutcome({
+        attempt: existingAttempt,
+        operation,
+      }),
     };
   }
 
@@ -1369,6 +1507,7 @@ export async function runOperationForSubmission(input: {
     attempt: finalAttempt,
     contactAttributes: output.contactAttributes,
     fields: output.fields,
+    outcome: getOperationResultOutcome({ attempt: finalAttempt, operation }),
   };
 }
 
@@ -2022,6 +2161,7 @@ export async function runOperationPreview(input: {
     attempt: finalAttempt,
     contactAttributes: output.contactAttributes,
     fields: output.fields,
+    outcome: getOperationResultOutcome({ attempt: finalAttempt, operation }),
   };
 }
 
@@ -2136,6 +2276,7 @@ export async function replayOperationAttempt(input: {
     attempt: finalAttempt,
     contactAttributes: output.contactAttributes,
     fields: output.fields,
+    outcome: getOperationResultOutcome({ attempt: finalAttempt, operation }),
     sourceAttempt,
   };
 }

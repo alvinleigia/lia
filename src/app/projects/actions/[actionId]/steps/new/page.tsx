@@ -10,6 +10,7 @@ import {
   listProjectReusableActionFields,
 } from "@/lib/action-flows";
 import { listProjectMediaAssets } from "@/lib/media-assets";
+import { getOperationOutcomeKeys } from "@/lib/operation-contracts";
 import { listProjectOperations } from "@/lib/operations";
 import {
   listProjectCatalogProducts,
@@ -70,6 +71,7 @@ export default async function NewActionStepPage({
   const operations = operationRows.map((row) => ({
     id: row.operation.id,
     name: `${row.operation.name} (${row.provider.providerType})`,
+    outcomeKeys: getOperationOutcomeKeys(row.operation.settings),
   }));
   const mediaAssets = mediaAssetRows.map((asset) => ({
     id: asset.id,

@@ -62,6 +62,7 @@ import {
   knowledgeFlowNodeSettingsV1Schema,
 } from "@/lib/hybrid-flow-contracts";
 import { getProjectMediaAsset } from "@/lib/media-assets";
+import { isOperationOutcomeKey } from "@/lib/operation-contracts";
 import { getProjectOperation } from "@/lib/operations";
 import {
   getProjectCatalog,
@@ -217,6 +218,12 @@ const canvasStepBasicsSchema = z.object({
       typeof value === "string" && value.trim() === "" ? undefined : value,
     z.coerce.number().int().positive().optional(),
   ),
+  operationOutcomeRoutes: z
+    .record(
+      z.string().refine(isOperationOutcomeKey),
+      z.coerce.number().int().positive(),
+    )
+    .optional(),
   operationSuccessStepId: z.preprocess(
     (value) =>
       typeof value === "string" && value.trim() === "" ? undefined : value,
@@ -1147,6 +1154,7 @@ export async function createCanvasStepAction(
       actionId: action.id,
       failureStepId: parsed.data.operationFailureStepId,
       fieldKey: step.fieldKey ?? undefined,
+      outcomeStepIds: parsed.data.operationOutcomeRoutes,
       projectId: project.id,
       sourceStepId: step.id,
       stepType: step.stepType,
@@ -1367,6 +1375,7 @@ export async function updateCanvasStepAction(
       actionId: action.id,
       failureStepId: parsed.data.operationFailureStepId,
       fieldKey: step?.fieldKey ?? undefined,
+      outcomeStepIds: parsed.data.operationOutcomeRoutes,
       projectId: project.id,
       sourceStepId: existingStep.id,
       stepType: parsed.data.stepType,
@@ -1710,6 +1719,7 @@ export async function updateCanvasStepBasicsAction(
       actionId: action.id,
       failureStepId: parsed.data.operationFailureStepId,
       fieldKey: step.fieldKey ?? undefined,
+      outcomeStepIds: parsed.data.operationOutcomeRoutes,
       projectId: project.id,
       sourceStepId: step.id,
       stepType: step.stepType,

@@ -44,6 +44,7 @@ import {
   mergeActionStepOptions,
   parseActionStepLines,
   parseActionStepOptions,
+  parseOperationOutcomeRoutes,
 } from "@/lib/action-step-schema";
 import { buildActionStepSettings } from "@/lib/action-step-settings";
 import {
@@ -1001,6 +1002,7 @@ export async function createActionFlowStepAction(
     inputType: formData.get("inputType"),
     operationId: formData.get("operationId"),
     operationFailureStepId: formData.get("operationFailureStepId"),
+    operationOutcomeRoutes: parseOperationOutcomeRoutes(formData),
     mediaAssetId: formData.get("mediaAssetId"),
     whatsappTemplateCategory: formData.get("whatsappTemplateCategory"),
     whatsappTemplateBody: formData.get("whatsappTemplateBody"),
@@ -1154,6 +1156,7 @@ export async function createActionFlowStepAction(
       actionId: action.id,
       failureStepId: parsed.data.operationFailureStepId,
       fieldKey: step.fieldKey ?? undefined,
+      outcomeStepIds: parsed.data.operationOutcomeRoutes,
       projectId: project.id,
       sourceStepId: step.id,
       stepType: step.stepType,
@@ -1194,6 +1197,7 @@ export async function updateActionFlowStepAction(
     inputType: formData.get("inputType"),
     operationId: formData.get("operationId"),
     operationFailureStepId: formData.get("operationFailureStepId"),
+    operationOutcomeRoutes: parseOperationOutcomeRoutes(formData),
     mediaAssetId: formData.get("mediaAssetId"),
     whatsappTemplateCategory: formData.get("whatsappTemplateCategory"),
     whatsappTemplateBody: formData.get("whatsappTemplateBody"),
@@ -1363,6 +1367,7 @@ export async function updateActionFlowStepAction(
       actionId: action.id,
       failureStepId: parsed.data.operationFailureStepId,
       fieldKey: step?.fieldKey ?? undefined,
+      outcomeStepIds: parsed.data.operationOutcomeRoutes,
       projectId: project.id,
       sourceStepId: parsed.data.stepId,
       stepType: parsed.data.stepType,

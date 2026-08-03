@@ -20,6 +20,7 @@ import {
   duplicateFlowContentBlock,
   formatStepOptions,
   getInputFieldKeys,
+  getOperationOutcomeRouteTargetIds,
   getOperationRoutePresetTargetId,
   getStepChoiceDisplayMode,
   getStepLabel,
@@ -628,12 +629,17 @@ function ActionStepBasicsForm({
     step.id,
     "success",
   );
+  const outcomeStepIds = getOperationOutcomeRouteTargetIds(
+    branchRules,
+    step.id,
+  );
   const savedActionRevision = JSON.stringify({
     failureStepId,
     fieldKey: step.fieldKey,
     isEnabled: step.isEnabled,
     label: step.label,
     operationId: step.operationId,
+    outcomeStepIds,
     prompt: step.prompt,
     settings: step.settings,
     successStepId,
@@ -659,7 +665,9 @@ function ActionStepBasicsForm({
         operations={operations.map((operation) => ({
           id: operation.id,
           label: operation.name,
+          outcomeKeys: operation.outcomeKeys,
         }))}
+        outcomeStepIds={outcomeStepIds}
         projectActions={projectActions.map((action) => ({
           id: action.id,
           label: action.name,

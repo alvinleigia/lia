@@ -1,5 +1,6 @@
 import { Activity, PlugZap, Plus, Workflow } from "lucide-react";
 import Link from "next/link";
+import { ApiRequestOperationForm } from "@/components/api-request-operation-form";
 import { NoProjectState } from "@/components/no-project-state";
 import {
   ActionFormError,
@@ -17,6 +18,7 @@ import { getProjectExecutionDiagnostics } from "@/lib/execution-diagnostics";
 import {
   getOperationAttemptMappedOutput,
   getProjectOperationAttemptWithDetails,
+  getSanitizedOperationAttemptPreview,
   INTEGRATION_PROVIDER_TYPES,
   listProjectIntegrationProviders,
   listProjectOperationAttemptsWithDetails,
@@ -28,7 +30,6 @@ import {
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
 import {
-  createApiRequestOperationAction,
   createIntegrationProviderAction,
   createMetaConversionOperationAction,
   createOperationAction,
@@ -195,6 +196,12 @@ export default async function OperationsPage({
       : null;
   const previewMappedOutput = previewAttempt
     ? getOperationAttemptMappedOutput({
+        attempt: previewAttempt.attempt,
+        operation: previewAttempt.operation,
+      })
+    : null;
+  const sanitizedPreview = previewAttempt
+    ? getSanitizedOperationAttemptPreview({
         attempt: previewAttempt.attempt,
         operation: previewAttempt.operation,
       })
@@ -471,9 +478,17 @@ export default async function OperationsPage({
                     </pre>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Response</p>
+                    <p className="text-sm font-medium">Sanitized Response</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <p className="rounded-md bg-gray-50 p-2">
+                        Status: {sanitizedPreview?.status ?? "Unavailable"}
+                      </p>
+                      <p className="rounded-md bg-gray-50 p-2">
+                        Outcome: {sanitizedPreview?.outcome ?? "Unavailable"}
+                      </p>
+                    </div>
                     <pre className="max-h-80 overflow-auto rounded-md bg-gray-50 p-3 text-xs">
-                      {formatJson(previewAttempt.attempt.responsePayload)}
+                      {formatJson(sanitizedPreview?.body ?? null)}
                     </pre>
                   </div>
                 </div>
@@ -699,160 +714,7 @@ export default async function OperationsPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ActionStateForm
-              action={createApiRequestOperationAction}
-              className="space-y-4"
-            >
-              <ActionFormError />
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="apiRequestName">Name</Label>
-                  <Input
-                    id="apiRequestName"
-                    name="name"
-                    placeholder="Check Availability"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apiRequestProviderType">Provider</Label>
-                  <select
-                    id="apiRequestProviderType"
-                    name="providerType"
-                    className={selectClassName}
-                    defaultValue="webhook"
-                  >
-                    <option value="webhook">Webhook</option>
-                    <option value="n8n_webhook">n8n Webhook</option>
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="apiRequestUrl">Endpoint URL</Label>
-                <Input
-                  id="apiRequestUrl"
-                  name="url"
-                  placeholder="https://example.com/api/check-availability"
-                  type="url"
-                  required
-                />
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="apiRequestTimeoutMs">Timeout</Label>
-                  <Input
-                    id="apiRequestTimeoutMs"
-                    name="timeoutMs"
-                    type="number"
-                    min="1000"
-                    max="30000"
-                    step="1000"
-                    defaultValue="15000"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apiRequestRetryCount">Retries</Label>
-                  <Input
-                    id="apiRequestRetryCount"
-                    name="retryCount"
-                    type="number"
-                    min="0"
-                    max="5"
-                    defaultValue="0"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apiRequestSecret">Secret</Label>
-                  <Input
-                    id="apiRequestSecret"
-                    name="secret"
-                    placeholder="optional signing secret"
-                  />
-                </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <label
-                  htmlFor="apiRequestAutoRetryEnabled"
-                  className="flex items-center gap-2 pt-8 text-sm"
-                >
-                  <input
-                    id="apiRequestAutoRetryEnabled"
-                    name="autoRetryEnabled"
-                    type="checkbox"
-                  />
-                  Auto retry failed attempts
-                </label>
-                <div className="space-y-2">
-                  <Label htmlFor="apiRequestAutoRetryMaxAttempts">
-                    Queued Retries
-                  </Label>
-                  <Input
-                    id="apiRequestAutoRetryMaxAttempts"
-                    name="autoRetryMaxAttempts"
-                    type="number"
-                    min="0"
-                    max="10"
-                    defaultValue="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apiRequestAutoRetryDelayMinutes">
-                    Retry Delay
-                  </Label>
-                  <Input
-                    id="apiRequestAutoRetryDelayMinutes"
-                    name="autoRetryDelayMinutes"
-                    type="number"
-                    min="0"
-                    max="10080"
-                    defaultValue="5"
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Queued retries are separate from immediate delivery retries.
-                They only replay failed attempts linked to live submissions.
-              </p>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="apiRequestInputMapping">Input Mapping</Label>
-                  <Textarea
-                    id="apiRequestInputMapping"
-                    name="inputMapping"
-                    placeholder={
-                      '{\n  "email": "guestEmail",\n  "date": "preferredDate"\n}'
-                    }
-                    rows={5}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apiRequestOutputMapping">
-                    Output Mapping
-                  </Label>
-                  <Textarea
-                    id="apiRequestOutputMapping"
-                    name="outputMapping"
-                    placeholder={
-                      '{\n  "fields.available": "status",\n  "fields.referenceId": "responsePayload.attempts.0.body.id"\n}'
-                    }
-                    rows={5}
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                The request is sent as a signed POST. Add the created operation
-                to an inline API Request flow block, then use success/failure
-                routes or mapped fields to continue the conversation.
-              </p>
-              <FormSubmitButton
-                className="w-full"
-                label="Create API Request"
-                pendingLabel="Creating..."
-                icon={<Plus className="h-4 w-4" />}
-              />
-            </ActionStateForm>
+            <ApiRequestOperationForm />
           </CardContent>
         </Card>
 

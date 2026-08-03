@@ -13,6 +13,7 @@ import {
   listProjectReusableActionFields,
 } from "@/lib/action-flows";
 import { listProjectMediaAssets } from "@/lib/media-assets";
+import { getOperationOutcomeKeys } from "@/lib/operation-contracts";
 import { listProjectOperations } from "@/lib/operations";
 import {
   listProjectCatalogProducts,
@@ -44,6 +45,19 @@ function getOperationRoutePresetTargetId(
   return (
     rules.find((rule) => rule.settings.operationRoutePreset === preset)
       ?.targetStepId ?? null
+  );
+}
+
+function getOperationOutcomeRouteTargetIds(
+  rules: Awaited<ReturnType<typeof listActionFlowBranchRulesForStep>>,
+) {
+  return Object.fromEntries(
+    rules
+      .filter((rule) => typeof rule.settings.operationOutcomeRoute === "string")
+      .map((rule) => [
+        String(rule.settings.operationOutcomeRoute),
+        rule.targetStepId,
+      ]),
   );
 }
 
@@ -105,6 +119,7 @@ export default async function EditActionStepPage({
   const operations = operationRows.map((row) => ({
     id: row.operation.id,
     name: `${row.operation.name} (${row.provider.providerType})`,
+    outcomeKeys: getOperationOutcomeKeys(row.operation.settings),
   }));
   const mediaAssets = mediaAssetRows.map((asset) => ({
     id: asset.id,
@@ -185,6 +200,7 @@ export default async function EditActionStepPage({
                   branchRules,
                   "success",
                 ),
+                outcomeStepIds: getOperationOutcomeRouteTargetIds(branchRules),
               }}
               routeStepOptions={steps}
             />

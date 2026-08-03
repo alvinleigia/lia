@@ -33,6 +33,7 @@ import {
   type HybridFlowCompilerIssue,
 } from "@/lib/hybrid-flow-compiler";
 import type { CompiledHybridFlowGraphV1 } from "@/lib/hybrid-flow-contracts";
+import { isOperationOutcomeKey } from "@/lib/operation-contracts";
 
 export type {
   ActionBranchOperator,
@@ -173,6 +174,7 @@ export type ActionFlowRouteValidationIssue = {
 
 export type OperationRoutePresetTargetInput = {
   failureStepId?: number | null;
+  outcomeStepIds?: Record<string, number | null | undefined>;
   projectId: number;
   actionId: number;
   sourceStepId: number;
@@ -1332,6 +1334,89 @@ async function syncOperationRoutePreset(input: {
   return createActionFlowBranchRule(values);
 }
 
+async function syncOperationOutcomeRoutes(input: {
+  actionId: number;
+  outcomeStepIds: Record<string, number | null | undefined>;
+  projectId: number;
+  sourceStepId: number;
+  statusFieldKey: string;
+}) {
+  const branchRules = await listActionFlowBranchRulesForStep(
+    input.projectId,
+    input.actionId,
+    input.sourceStepId,
+  );
+  const existingRules = branchRules.filter(
+    (rule) => typeof rule.settings.operationOutcomeRoute === "string",
+  );
+  const requestedEntries = Object.entries(input.outcomeStepIds).filter(
+    ([outcome]) => isOperationOutcomeKey(outcome),
+  );
+  const requestedOutcomes = new Set(
+    requestedEntries.map(([outcome]) => outcome),
+  );
+
+  for (const rule of existingRules) {
+    const outcome = String(rule.settings.operationOutcomeRoute);
+    if (!requestedOutcomes.has(outcome)) {
+      await deleteActionFlowBranchRule(
+        input.projectId,
+        input.actionId,
+        rule.id,
+      );
+    }
+  }
+
+  let nextSortOrder =
+    branchRules.reduce((max, rule) => Math.max(max, rule.sortOrder), 0) + 1;
+  const synced = [];
+
+  for (const [outcome, targetStepId] of requestedEntries) {
+    if (!targetStepId) {
+      continue;
+    }
+    if (targetStepId === input.sourceStepId) {
+      throw new Error("Operation route target cannot point to itself.");
+    }
+
+    const targetStep = await getActionFlowStep(
+      input.projectId,
+      input.actionId,
+      targetStepId,
+    );
+    if (!targetStep) {
+      throw new Error("Operation route target must belong to this action.");
+    }
+
+    const existingRule =
+      existingRules.find(
+        (rule) => rule.settings.operationOutcomeRoute === outcome,
+      ) ?? null;
+    const values = {
+      actionId: input.actionId,
+      comparisonValue: outcome,
+      isEnabled: true,
+      operator: "equals" as ActionBranchOperator,
+      projectId: input.projectId,
+      settings: { operationOutcomeRoute: outcome },
+      sortOrder: existingRule?.sortOrder ?? nextSortOrder,
+      sourceFieldKey: `${input.statusFieldKey}_outcome`,
+      sourceStepId: input.sourceStepId,
+      targetStepId,
+    };
+    const rule = existingRule
+      ? await updateActionFlowBranchRule({ ...values, ruleId: existingRule.id })
+      : await createActionFlowBranchRule(values);
+
+    synced.push(rule);
+    if (!existingRule) {
+      nextSortOrder += 1;
+    }
+  }
+
+  return synced;
+}
+
 export async function syncOperationRoutePresets(
   input: OperationRoutePresetTargetInput,
 ) {
@@ -1408,6 +1493,7 @@ export async function syncOperationStepRoutePresets(input: {
   actionId: number;
   failureStepId?: number | null;
   fieldKey?: string | null;
+  outcomeStepIds?: Record<string, number | null | undefined>;
   projectId: number;
   sourceStepId: number;
   stepType: string;
@@ -1417,15 +1503,25 @@ export async function syncOperationStepRoutePresets(input: {
     return [];
   }
 
-  return syncOperationRoutePresets({
+  const statusFieldKey =
+    input.fieldKey?.trim() || `operation_${input.sourceStepId}_status`;
+  const legacyRoutes = await syncOperationRoutePresets({
     actionId: input.actionId,
     failureStepId: input.failureStepId ?? null,
     projectId: input.projectId,
     sourceStepId: input.sourceStepId,
-    statusFieldKey:
-      input.fieldKey?.trim() || `operation_${input.sourceStepId}_status`,
+    statusFieldKey,
     successStepId: input.successStepId ?? null,
   });
+  const outcomeRoutes = await syncOperationOutcomeRoutes({
+    actionId: input.actionId,
+    outcomeStepIds: input.outcomeStepIds ?? {},
+    projectId: input.projectId,
+    sourceStepId: input.sourceStepId,
+    statusFieldKey,
+  });
+
+  return [...legacyRoutes, ...outcomeRoutes];
 }
 
 export async function validateActionFlowRoutes(

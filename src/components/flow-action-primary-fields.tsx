@@ -15,10 +15,12 @@ import {
   type FlowActionStepType,
   getFlowActionFamilyDefinition,
 } from "@/lib/flow-action-editor";
+import { formatOperationOutcomeLabel } from "@/lib/operation-contracts";
 
 type Option = {
   id: number;
   label: string;
+  outcomeKeys?: string[];
 };
 
 type FlowActionPrimaryFieldsProps = {
@@ -30,6 +32,7 @@ type FlowActionPrimaryFieldsProps = {
   failureStepId?: string;
   idPrefix: string;
   operations: Option[];
+  outcomeStepIds?: Record<string, string>;
   projectActions: Option[];
   reusableFieldKeys: string[];
   routeSteps: Option[];
@@ -110,6 +113,7 @@ export function FlowActionPrimaryFields({
   failureStepId = "",
   idPrefix,
   operations,
+  outcomeStepIds = {},
   projectActions,
   reusableFieldKeys,
   routeSteps,
@@ -125,6 +129,12 @@ export function FlowActionPrimaryFields({
   const [operationExecutionMode, setOperationExecutionMode] = useState<
     "inline" | "post_submit"
   >(savedOperationExecutionMode);
+  const [selectedOperationId, setSelectedOperationId] = useState(
+    defaultOperationId ? String(defaultOperationId) : "",
+  );
+  const selectedOperation = operations.find(
+    (operation) => String(operation.id) === selectedOperationId,
+  );
 
   useEffect(() => {
     setOperationExecutionMode(savedOperationExecutionMode);
@@ -312,7 +322,8 @@ export function FlowActionPrimaryFields({
               id={`${idPrefix}-operation`}
               name="operationId"
               required
-              defaultValue={defaultOperationId ?? ""}
+              value={selectedOperationId}
+              onChange={(event) => setSelectedOperationId(event.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
               <option value="">Select an integration</option>
@@ -397,12 +408,40 @@ export function FlowActionPrimaryFields({
                   className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 />
               </div>
+              {operationExecutionMode === "inline" &&
+                selectedOperation?.outcomeKeys?.map((outcome) => (
+                  <div className="space-y-2" key={outcome}>
+                    <label
+                      className="text-sm font-medium"
+                      htmlFor={`${idPrefix}-operation-outcome-${outcome}`}
+                    >
+                      On {formatOperationOutcomeLabel(outcome)}
+                    </label>
+                    <select
+                      id={`${idPrefix}-operation-outcome-${outcome}`}
+                      name={`operationOutcomeRoute:${outcome}`}
+                      defaultValue={outcomeStepIds[outcome] ?? ""}
+                      className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    >
+                      <option value="">Continue normally</option>
+                      {routeSteps.map((routeStep) => (
+                        <option key={routeStep.id} value={routeStep.id}>
+                          {routeStep.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                The completed and failed selectors below are retained for
+                compatibility with older published flows.
+              </p>
               <div className="space-y-2">
                 <label
                   className="text-sm font-medium"
                   htmlFor={`${idPrefix}-operation-success`}
                 >
-                  On success
+                  Legacy completed route
                 </label>
                 <select
                   id={`${idPrefix}-operation-success`}
@@ -423,7 +462,7 @@ export function FlowActionPrimaryFields({
                   className="text-sm font-medium"
                   htmlFor={`${idPrefix}-operation-failure`}
                 >
-                  On failure
+                  Legacy failed route
                 </label>
                 <select
                   id={`${idPrefix}-operation-failure`}

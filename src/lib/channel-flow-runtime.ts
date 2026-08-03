@@ -1004,6 +1004,7 @@ async function advanceFlowToNextStep(input: {
     if (isInlineOperationStep(step)) {
       const operationStatusFieldKey =
         step.fieldKey?.trim() || `operation_${step.id}_status`;
+      const operationOutcomeFieldKey = `${operationStatusFieldKey}_outcome`;
       const operationResult =
         step.operationId === null
           ? null
@@ -1017,9 +1018,11 @@ async function advanceFlowToNextStep(input: {
               traceId: submission.traceId,
             });
       const operationStatus = operationResult?.attempt.status ?? "failed";
+      const operationOutcome = operationResult?.outcome ?? "server_error";
       const nextFields = {
         ...submission.fields,
         ...(operationResult?.fields ?? {}),
+        [operationOutcomeFieldKey]: operationOutcome,
         [operationStatusFieldKey]: operationStatus,
       };
       const contactId =
@@ -1051,6 +1054,8 @@ async function advanceFlowToNextStep(input: {
             attemptId: operationResult?.attempt.id ?? null,
             contactAttributeKeys: Object.keys(mappedContactAttributes),
             fieldKey: operationStatusFieldKey,
+            outcome: operationOutcome,
+            outcomeFieldKey: operationOutcomeFieldKey,
             mappedFieldKeys: Object.keys(operationResult?.fields ?? {}),
             operationId: step.operationId,
             status: operationStatus,

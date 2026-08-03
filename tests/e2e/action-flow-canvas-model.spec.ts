@@ -3,8 +3,10 @@ import {
   buildEdges,
   countBlockingDiagnostics,
   countWarningDiagnostics,
+  getBranchConditionText,
   getCanvasPosition,
   getDefaultTaskOutcomeRoutes,
+  getOperationOutcomeRouteTargetIds,
   moveFlowContentBlock,
 } from "../../src/components/action-flow-canvas/model";
 import type {
@@ -71,6 +73,18 @@ test("business task outcomes default to terminal routes", () => {
     completed: "end",
     needs_team_help: "end",
   });
+});
+
+test("operation outcome routes keep named output labels and destinations", () => {
+  const customRoute = createBranchRule(41, 7, 9);
+  customRoute.settings = { operationOutcomeRoute: "status_409" };
+  const timeoutRoute = createBranchRule(42, 7, 10);
+  timeoutRoute.settings = { operationOutcomeRoute: "timeout" };
+
+  expect(getBranchConditionText(customRoute)).toBe("operation http 409");
+  expect(
+    getOperationOutcomeRouteTargetIds([customRoute, timeoutRoute], 7),
+  ).toEqual({ status_409: "9", timeout: "10" });
 });
 
 test("canvas edges preserve explicit routes, branches, and ordered fallbacks", () => {

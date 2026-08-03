@@ -38,6 +38,7 @@ import {
   readConversationalTaskFlowNodeSettings,
   readKnowledgeFlowNodeSettings,
 } from "@/lib/hybrid-flow-compiler";
+import { formatOperationOutcomeLabel } from "@/lib/operation-contracts";
 
 export const CANVAS_INPUT_TYPES = [
   "text",
@@ -197,6 +198,14 @@ export function getBranchRuleSettingText(rule: BranchRule, key: string) {
 }
 
 export function getBranchConditionText(rule: BranchRule) {
+  const operationOutcome = getBranchRuleSettingText(
+    rule,
+    "operationOutcomeRoute",
+  );
+  if (operationOutcome) {
+    return `operation ${formatOperationOutcomeLabel(operationOutcome).toLowerCase()}`;
+  }
+
   if (rule.settings.operationRoutePreset === "success") {
     return "operation success";
   }
@@ -219,6 +228,37 @@ export function getBranchConditionText(rule: BranchRule) {
   });
 
   return conditions.join(parsed.group.combinator === "and" ? " and " : " or ");
+}
+
+export function getOperationOutcomeRouteTargetIds(
+  rules: BranchRule[],
+  sourceStepId: number,
+) {
+  return Object.fromEntries(
+    rules
+      .filter((rule) => rule.sourceStepId === sourceStepId)
+      .map((rule) => [
+        getBranchRuleSettingText(rule, "operationOutcomeRoute"),
+        String(rule.targetStepId),
+      ])
+      .filter(([key]) => Boolean(key)),
+  );
+}
+
+function readOperationOutcomeRoutes(formData: FormData) {
+  return Object.fromEntries(
+    Array.from(formData.entries())
+      .filter(
+        ([key, value]) =>
+          key.startsWith("operationOutcomeRoute:") &&
+          typeof value === "string" &&
+          value.trim(),
+      )
+      .map(([key, value]) => [
+        key.slice("operationOutcomeRoute:".length),
+        String(value),
+      ]),
+  );
 }
 
 export function getBranchLabel(rule: BranchRule) {
@@ -610,6 +650,7 @@ export function readStepForm(form: HTMLFormElement): CanvasStepInput {
       formData.get("operationFailureStepId") ?? "",
     ),
     operationId: String(formData.get("operationId") ?? ""),
+    operationOutcomeRoutes: readOperationOutcomeRoutes(formData),
     operationSuccessStepId: String(
       formData.get("operationSuccessStepId") ?? "",
     ),
@@ -709,6 +750,7 @@ export function readStepBasicsForm(
       formData.get("operationFailureStepId") ?? "",
     ),
     operationId: String(formData.get("operationId") ?? ""),
+    operationOutcomeRoutes: readOperationOutcomeRoutes(formData),
     operationSuccessStepId: String(
       formData.get("operationSuccessStepId") ?? "",
     ),

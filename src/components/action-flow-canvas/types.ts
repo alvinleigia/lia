@@ -21,6 +21,7 @@ export type CanvasNode = Node<CanvasNodeData>;
 export type OperationOption = {
   id: number;
   name: string;
+  outcomeKeys: string[];
 };
 
 export type MediaAssetOption = {
@@ -160,6 +161,7 @@ export type CanvasStepInput = {
   operationExecutionMode: string;
   operationFailureStepId: string;
   operationId: string;
+  operationOutcomeRoutes: Record<string, string>;
   operationSuccessStepId: string;
   options: string;
   productCatalogId: string;
@@ -223,6 +225,7 @@ export type CanvasStepBasicsInput = {
   operationExecutionMode?: string;
   operationFailureStepId?: string;
   operationId?: string;
+  operationOutcomeRoutes?: Record<string, string>;
   operationSuccessStepId?: string;
   options: string;
   optionsChanged: boolean;

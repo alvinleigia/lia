@@ -11,6 +11,7 @@ import {
   listEnabledStepFlowComponents,
 } from "@/lib/flow-components";
 import { isFlowInputStepType } from "@/lib/flow-input-editor";
+import { formatOperationOutcomeLabel } from "@/lib/operation-contracts";
 import { ActionFormError, ActionStateForm } from "./ui/action-state-form";
 import { FormSubmitButton } from "./ui/form-submit-button";
 import { Input } from "./ui/input";
@@ -20,6 +21,7 @@ import { Textarea } from "./ui/textarea";
 type OperationOption = {
   id: number;
   name: string;
+  outcomeKeys: string[];
 };
 
 type MediaAssetOption = {
@@ -94,6 +96,7 @@ type ActionStepFormProps = {
   nextSortOrder?: number;
   operationRoutePresets?: {
     failureStepId?: number | null;
+    outcomeStepIds?: Record<string, number | null>;
     successStepId?: number | null;
   };
   routeStepOptions?: RouteStepOption[];
@@ -288,6 +291,9 @@ export function ActionStepForm({
   routeStepOptions = [],
   step,
 }: ActionStepFormProps) {
+  const selectedOperation = operations.find(
+    (operation) => operation.id === step?.operationId,
+  );
   const isEdit = mode === "edit";
   const settings = step?.settings ?? {};
   const nextStepOptions = routeStepOptions.filter(
@@ -703,8 +709,30 @@ export function ActionStepForm({
       </div>
 
       <div className="grid gap-4 rounded-md border p-4 md:grid-cols-2">
+        {selectedOperation?.outcomeKeys.map((outcome) => (
+          <div className="space-y-2" key={outcome}>
+            <Label htmlFor={`operationOutcomeRoute-${outcome}`}>
+              {formatOperationOutcomeLabel(outcome)} Route
+            </Label>
+            <select
+              id={`operationOutcomeRoute-${outcome}`}
+              name={`operationOutcomeRoute:${outcome}`}
+              defaultValue={
+                operationRoutePresets?.outcomeStepIds?.[outcome] ?? ""
+              }
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="">Continue normally</option>
+              {nextStepOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {formatStepLabel(option)}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
         <div className="space-y-2">
-          <Label htmlFor="operationSuccessStepId">Success Route</Label>
+          <Label htmlFor="operationSuccessStepId">Legacy Completed Route</Label>
           <select
             id="operationSuccessStepId"
             name="operationSuccessStepId"
@@ -720,7 +748,7 @@ export function ActionStepForm({
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="operationFailureStepId">Failure Route</Label>
+          <Label htmlFor="operationFailureStepId">Legacy Failed Route</Label>
           <select
             id="operationFailureStepId"
             name="operationFailureStepId"

@@ -352,7 +352,9 @@ export function getActionFlowFieldTypes(steps: ActionFlowCompilerStep[]) {
 
     if (step.stepType === "operation") {
       if (step.settings.operationExecutionMode === "inline") {
-        fieldTypes[step.fieldKey || `operation_${step.id}_status`] = "string";
+        const statusFieldKey = step.fieldKey || `operation_${step.id}_status`;
+        fieldTypes[statusFieldKey] = "string";
+        fieldTypes[`${statusFieldKey}_outcome`] = "string";
       }
       continue;
     }

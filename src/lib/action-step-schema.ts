@@ -4,6 +4,7 @@ import {
   ACTION_STEP_TYPES,
 } from "@/lib/action-flow-constants";
 import { isFlowInputStepType } from "@/lib/flow-input-editor";
+import { isOperationOutcomeKey } from "@/lib/operation-contracts";
 
 const optionalNumber = (schema: z.ZodType<number>) =>
   z.preprocess(
@@ -27,6 +28,12 @@ const actionStepSchemaShape = {
   operationId: optionalNumber(z.coerce.number().int().positive()),
   operationExecutionMode: z.enum(["post_submit", "inline"]).optional(),
   operationFailureStepId: optionalNumber(z.coerce.number().int().positive()),
+  operationOutcomeRoutes: z
+    .record(
+      z.string().refine(isOperationOutcomeKey, "Invalid operation outcome."),
+      z.coerce.number().int().positive(),
+    )
+    .optional(),
   operationSuccessStepId: optionalNumber(z.coerce.number().int().positive()),
   mediaAssetId: optionalNumber(z.coerce.number().int().positive()),
   whatsappTemplateCategory: z
@@ -125,6 +132,22 @@ export function parseActionStepLines(value?: string) {
       ?.split(/[\n,]/)
       .map((item) => item.trim())
       .filter(Boolean) ?? []
+  );
+}
+
+export function parseOperationOutcomeRoutes(formData: FormData) {
+  return Object.fromEntries(
+    Array.from(formData.entries())
+      .filter(
+        ([key, value]) =>
+          key.startsWith("operationOutcomeRoute:") &&
+          typeof value === "string" &&
+          value.trim(),
+      )
+      .map(([key, value]) => [
+        key.slice("operationOutcomeRoute:".length),
+        String(value),
+      ]),
   );
 }
 
