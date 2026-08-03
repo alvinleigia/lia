@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import type { RuntimeActionStep } from "@/lib/action-runtime";
+import {
+  getActionStepChoicePresentation,
+  getActionStepOptions,
+  groupActionStepOptionsBySection,
+  type RuntimeActionStep,
+} from "@/lib/action-runtime";
 import { buildRuntimeRepliesForStep } from "@/lib/channel-flow-runtime";
 import { buildFlowContentDocument } from "@/lib/flow-content-blocks";
 
@@ -105,4 +110,89 @@ test("emits composed content in stored array order", () => {
       },
     ],
   });
+});
+
+test("preserves list chrome and groups stable options for browser controls", () => {
+  const step: RuntimeActionStep = {
+    fieldKey: "selection",
+    id: 43,
+    inputType: "text",
+    isEnabled: true,
+    isRequired: true,
+    label: "Selection",
+    nextStepId: null,
+    operationId: null,
+    options: [],
+    prompt: "Choose",
+    settings: {
+      contentDocument: buildFlowContentDocument([
+        {
+          displayMode: "list",
+          footer: "Choose one service",
+          header: "Spa services",
+          id: "services",
+          options: [
+            {
+              description: "Classic treatment",
+              id: "classic",
+              label: "Classic Facial",
+              section: "Facials",
+              value: "service_classic_facial",
+            },
+            {
+              description: "Deep pressure",
+              id: "deep",
+              label: "Deep Tissue Massage",
+              section: "Massages",
+              value: "service_deep_tissue",
+            },
+            {
+              description: "Another facial",
+              id: "express",
+              label: "Express Facial",
+              section: "Facials",
+              value: "service_express_facial",
+            },
+          ],
+          text: "Pick a service",
+          type: "choice",
+        },
+      ]),
+    },
+    sortOrder: 1,
+    stepType: "collect_input",
+  };
+
+  expect(getActionStepChoicePresentation(step)).toEqual({
+    displayMode: "list",
+    footer: "Choose one service",
+    header: "Spa services",
+  });
+  expect(groupActionStepOptionsBySection(getActionStepOptions(step))).toEqual([
+    {
+      options: [
+        expect.objectContaining({
+          id: "classic",
+          label: "Classic Facial",
+          value: "service_classic_facial",
+        }),
+        expect.objectContaining({
+          id: "express",
+          label: "Express Facial",
+          value: "service_express_facial",
+        }),
+      ],
+      title: "Facials",
+    },
+    {
+      options: [
+        expect.objectContaining({
+          id: "deep",
+          label: "Deep Tissue Massage",
+          value: "service_deep_tissue",
+        }),
+      ],
+      title: "Massages",
+    },
+  ]);
 });

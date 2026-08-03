@@ -33,13 +33,18 @@ import type {
 
 export type ProductDisplayLayout = "featured" | "grid" | "list";
 
-type RuntimeActionOption = {
+export type RuntimeActionOption = {
   description?: string;
   id?: string;
   label: string;
   metadata?: Record<string, unknown>;
   section?: string;
   value: unknown;
+};
+
+export type RuntimeActionOptionSection = {
+  options: RuntimeActionOption[];
+  title: string | null;
 };
 
 type ProductSelectionAnswerValue = {
@@ -570,20 +575,47 @@ function doesProductSelectionOptionMatch(
 }
 
 export function getActionStepChoiceDisplayMode(step: RuntimeActionStep) {
+  return getActionStepChoicePresentation(step).displayMode;
+}
+
+export function getActionStepChoicePresentation(step: RuntimeActionStep) {
   const contentChoice = getFlowChoiceContentBlock(step.settings);
   if (contentChoice) {
-    return contentChoice.displayMode;
+    return {
+      displayMode: contentChoice.displayMode,
+      footer: contentChoice.footer,
+      header: contentChoice.header,
+    };
   }
 
   if (step.settings.choiceDisplayMode === "list") {
-    return "list";
+    return { displayMode: "list" as const, footer: "", header: "" };
   }
 
   if (step.settings.choiceDisplayMode === "text") {
-    return "text";
+    return { displayMode: "text" as const, footer: "", header: "" };
   }
 
-  return "buttons";
+  return { displayMode: "buttons" as const, footer: "", header: "" };
+}
+
+export function groupActionStepOptionsBySection(
+  options: RuntimeActionOption[],
+): RuntimeActionOptionSection[] {
+  const sections: RuntimeActionOptionSection[] = [];
+
+  for (const option of options) {
+    const title = option.section?.trim() || null;
+    const existing = sections.find((section) => section.title === title);
+
+    if (existing) {
+      existing.options.push(option);
+    } else {
+      sections.push({ options: [option], title });
+    }
+  }
+
+  return sections;
 }
 
 export function getActionStepProductDisplayLayout(

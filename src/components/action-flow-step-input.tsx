@@ -6,12 +6,14 @@ import {
   buildProductSelectionAnswerValue,
   buildProductSelectionCartAnswerValue,
   getActionStepChoiceDisplayMode,
+  getActionStepChoicePresentation,
   getActionStepInputType,
   getActionStepOptions,
   getActionStepProductDisplayLayout,
   getActionStepProductSelectionAllowMultiple,
   getActionStepProductSelectionAllowQuantity,
   getActionStepPrompt,
+  groupActionStepOptionsBySection,
   type RuntimeActionStep,
 } from "@/lib/action-runtime";
 import { getFlowFileAcceptAttribute } from "@/lib/flow-file-validation";
@@ -422,6 +424,7 @@ export function ActionFlowStepOptions({
 }: ActionFlowStepOptionsProps) {
   const options = getActionStepOptions(step, fields);
   const displayMode = getActionStepChoiceDisplayMode(step);
+  const choicePresentation = getActionStepChoicePresentation(step);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [selectedProducts, setSelectedProducts] = useState<
     Record<string, boolean>
@@ -597,29 +600,45 @@ export function ActionFlowStepOptions({
   }
 
   if (displayMode === "list") {
+    const sections = groupActionStepOptionsBySection(options);
+
     return (
       <div className="flex flex-col gap-2 pt-2">
-        {options.map((option, index) => (
-          <button
-            key={String(option.value)}
-            type="button"
-            className="flex items-start gap-3 rounded-md border bg-white px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50"
-            onClick={() => onSelect(String(option.value))}
-            disabled={disabled}
-          >
-            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs text-white">
-              {index + 1}
-            </span>
-            <span className="min-w-0">
-              <span className="block font-medium">{option.label}</span>
-              {option.description && (
-                <span className="block text-xs text-muted-foreground">
-                  {option.description}
+        {choicePresentation.header && (
+          <p className="text-sm font-semibold">{choicePresentation.header}</p>
+        )}
+        {sections.map((section) => (
+          <div className="space-y-2" key={section.title ?? "default"}>
+            {section.title && (
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {section.title}
+              </p>
+            )}
+            {section.options.map((option) => (
+              <button
+                key={option.id ?? String(option.value)}
+                type="button"
+                className="flex w-full items-start gap-3 rounded-md border bg-white px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50"
+                onClick={() => onSelect(String(option.value))}
+                disabled={disabled}
+              >
+                <span className="min-w-0">
+                  <span className="block font-medium">{option.label}</span>
+                  {option.description && (
+                    <span className="block text-xs text-muted-foreground">
+                      {option.description}
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-          </button>
+              </button>
+            ))}
+          </div>
         ))}
+        {choicePresentation.footer && (
+          <p className="text-xs text-muted-foreground">
+            {choicePresentation.footer}
+          </p>
+        )}
       </div>
     );
   }
