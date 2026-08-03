@@ -1419,7 +1419,10 @@ export async function updateCanvasStepBasicsAction(
   }
 
   if (choiceContent && parsed.data.contentBlocksChanged) {
-    options = parseActionStepOptions(choiceContent.options.join("\n"));
+    options = choiceContent.options.map((option) => ({
+      label: option.label,
+      value: option.value,
+    }));
   } else if (
     existingChoiceContent &&
     !choiceContent &&

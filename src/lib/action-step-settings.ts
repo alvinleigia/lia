@@ -3,6 +3,7 @@ import type {
   SelectMediaAsset,
   SelectProductCatalog,
 } from "@/lib/db-schema";
+import { buildWhatsAppTemplateBodyComponent } from "@/lib/whatsapp-template-metadata";
 
 type ConnectedAction = {
   id: number;
@@ -160,7 +161,7 @@ export function buildActionStepSettings(input: ActionStepSettingsInput) {
     }
   }
 
-  const templateKeys = [
+  const templateInputKeys = [
     "whatsappTemplateBody",
     "whatsappTemplateCategory",
     "whatsappTemplateLanguage",
@@ -168,8 +169,12 @@ export function buildActionStepSettings(input: ActionStepSettingsInput) {
     "whatsappTemplateStatus",
     "whatsappTemplateVariables",
   ] as const;
+  const templateSettingKeys = [
+    ...templateInputKeys,
+    "whatsappTemplateComponents",
+  ] as const;
 
-  if (hasAnyOwn(input, [...templateKeys])) {
+  if (hasAnyOwn(input, [...templateInputKeys])) {
     if (input.stepType === "template_message") {
       updateStringSetting(
         settings,
@@ -196,8 +201,14 @@ export function buildActionStepSettings(input: ActionStepSettingsInput) {
       } else {
         delete settings.whatsappTemplateVariables;
       }
+      settings.whatsappTemplateComponents = [
+        buildWhatsAppTemplateBodyComponent(
+          input.whatsappTemplateBody ?? "",
+          variables,
+        ),
+      ];
     } else {
-      deleteSettings(settings, [...templateKeys]);
+      deleteSettings(settings, [...templateSettingKeys]);
     }
   }
 

@@ -18,10 +18,20 @@ type FlowTextContentBlock = {
   type: "text";
 };
 
+export type FlowChoiceOption = {
+  description: string;
+  id: string;
+  label: string;
+  section: string;
+  value: string;
+};
+
 type FlowChoiceContentBlock = {
   displayMode: "buttons" | "list" | "text";
+  footer: string;
+  header: string;
   id: string;
-  options: string[];
+  options: FlowChoiceOption[];
   text: string;
   type: "choice";
 };
@@ -110,6 +120,43 @@ function parseChoiceDisplayMode(value: unknown) {
   return value === "list" || value === "text" || value === "buttons"
     ? value
     : "buttons";
+}
+
+function parseChoiceOption(
+  value: unknown,
+  index: number,
+  blockId: string,
+): FlowChoiceOption | null {
+  if (typeof value === "string") {
+    const label = getText(value, 160);
+    return label
+      ? {
+          description: "",
+          id: `${blockId}-option-${index + 1}`,
+          label,
+          section: "",
+          value: label,
+        }
+      : null;
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const option = value as Record<string, unknown>;
+  const label = getText(option.label, 160);
+  if (!label) {
+    return null;
+  }
+
+  return {
+    description: getText(option.description, 240),
+    id: getText(option.id, 80) || `${blockId}-option-${index + 1}`,
+    label,
+    section: getText(option.section, 80),
+    value: getText(option.value, 160) || label,
+  };
 }
 
 function parseProductLayout(value: unknown) {
@@ -228,11 +275,14 @@ export function parseFlowContentBlocks(value: unknown): FlowContentBlock[] {
 
       if (block.type === "choice") {
         const text = getText(block.text, 1000);
+        const blockId = getBlockId(block.id, index);
         const options = Array.isArray(block.options)
           ? block.options
               .slice(0, MAX_OPTIONS_PER_BLOCK)
-              .map((option) => getText(option, 160))
-              .filter(Boolean)
+              .map((option, optionIndex) =>
+                parseChoiceOption(option, optionIndex, blockId),
+              )
+              .filter((option): option is FlowChoiceOption => Boolean(option))
           : [];
 
         if (!text || options.length === 0) {
@@ -241,7 +291,9 @@ export function parseFlowContentBlocks(value: unknown): FlowContentBlock[] {
 
         return {
           displayMode: parseChoiceDisplayMode(block.displayMode),
-          id: getBlockId(block.id, index),
+          footer: getText(block.footer, 60),
+          header: getText(block.header, 60),
+          id: blockId,
           options,
           text,
           type: "choice",
@@ -383,6 +435,83 @@ export function getFlowResponseCollectorCompatibilityIssue(
   }
 
   return null;
+}
+
+export function getFlowContentReadinessIssues(
+  settings: Record<string, unknown>,
+) {
+  const hasDocument = Object.hasOwn(settings, "contentDocument");
+  const storedDocument = hasDocument ? settings.contentDocument : null;
+  const storedBlocks = hasDocument
+    ? storedDocument &&
+      typeof storedDocument === "object" &&
+      !Array.isArray(storedDocument) &&
+      Array.isArray((storedDocument as Record<string, unknown>).blocks)
+      ? ((storedDocument as Record<string, unknown>).blocks as unknown[])
+      : null
+    : Array.isArray(settings.contentBlocks)
+      ? settings.contentBlocks
+      : [];
+
+  if (hasDocument && !parseFlowContentDocument(storedDocument)) {
+    return ["Content uses an unsupported or malformed document version."];
+  }
+
+  const blocks = getFlowContentBlocks(settings);
+  const issues = getFlowContentCompositionIssues(blocks).map(
+    (issue) => issue.message,
+  );
+  if (
+    storedBlocks &&
+    (storedBlocks.length > MAX_FLOW_CONTENT_BLOCKS ||
+      parseFlowContentBlocks(storedBlocks).length !== storedBlocks.length)
+  ) {
+    issues.push("Content contains an incomplete or unsupported block.");
+  }
+
+  const blockIds = new Set<string>();
+  for (const block of blocks) {
+    if (blockIds.has(block.id)) {
+      issues.push("Content block IDs must be unique.");
+      break;
+    }
+    blockIds.add(block.id);
+  }
+
+  for (const block of blocks) {
+    if (block.type === "choice") {
+      const optionIds = new Set(block.options.map((option) => option.id));
+      const optionValues = new Set(block.options.map((option) => option.value));
+      if (optionIds.size !== block.options.length) {
+        issues.push("Response option IDs must be unique.");
+      }
+      if (optionValues.size !== block.options.length) {
+        issues.push("Response option stored values must be unique.");
+      }
+    }
+
+    if (block.type === "media" && !block.media) {
+      issues.push("Media content must reference an available asset.");
+    }
+
+    if (block.type === "catalog") {
+      if (!block.catalog) {
+        issues.push("Product content must reference an available catalog.");
+      } else if (
+        block.displayMode === "single_product" &&
+        block.products.length !== 1
+      ) {
+        issues.push("Single product content needs exactly one product.");
+      } else if (
+        block.displayMode === "multiple_products" &&
+        block.products.length === 0
+      ) {
+        issues.push("Multiple product content needs at least one product.");
+      }
+    }
+  }
+
+  return [...new Set(issues)];
 }
 
 export function getFlowChoiceContentBlock(settings: Record<string, unknown>) {

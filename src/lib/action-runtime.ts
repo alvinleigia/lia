@@ -35,8 +35,10 @@ export type ProductDisplayLayout = "featured" | "grid" | "list";
 
 type RuntimeActionOption = {
   description?: string;
+  id?: string;
   label: string;
   metadata?: Record<string, unknown>;
+  section?: string;
   value: unknown;
 };
 
@@ -64,7 +66,7 @@ export type RuntimeActionStep = {
   operationId: number | null;
   nextStepId: number | null;
   options: unknown;
-  settings: ActionDataSourceSettings;
+  settings: ActionDataSourceSettings & Record<string, unknown>;
 };
 
 export type RuntimeActionBranchRule = {
@@ -480,8 +482,11 @@ export function getActionStepOptions(
   const contentChoice = getFlowChoiceContentBlock(step.settings);
   if (contentChoice) {
     return contentChoice.options.map((option) => ({
-      label: option,
-      value: option,
+      description: option.description || undefined,
+      id: option.id,
+      label: option.label,
+      section: option.section || undefined,
+      value: option.value,
     }));
   }
 
@@ -698,6 +703,10 @@ export function buildActionStepChannelMessage(step: RuntimeActionStep) {
   const prompt = getActionStepPrompt(step);
 
   return additionalText ? [prompt, additionalText].join("\n\n") : prompt;
+}
+
+export function buildActionStepPrimaryMessage(step: RuntimeActionStep) {
+  return getActionStepPrompt(step);
 }
 
 function appendFlowContentBlockText(step: RuntimeActionStep, text: string) {

@@ -15,7 +15,11 @@ export default defineConfig({
     "conversational-task-schema.spec.ts",
     "flow-content-components.spec.ts",
     "flow-content-contracts.spec.ts",
+    "flow-content-lifecycle.spec.ts",
+    "flow-content-runtime.spec.ts",
+    "flow-message-editor.spec.ts",
     "hybrid-flow.spec.ts",
+    "whatsapp-template-contracts.spec.ts",
   ],
   timeout: 30_000,
 });

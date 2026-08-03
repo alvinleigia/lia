@@ -14,6 +14,7 @@ import {
 import {
   buildActionReviewSummary,
   buildActionStepChannelMessage,
+  buildActionStepPrimaryMessage,
   buildActionStepTextFallbackMessage,
   buildInvalidStepAnswerMessage,
   buildStepAnswerResult,
@@ -52,8 +53,9 @@ import { executeContactMutationStep } from "@/lib/contact-flow-mutations";
 import { setContactAttribute } from "@/lib/contacts";
 import type { SelectActionSubmission } from "@/lib/db-schema";
 import {
-  getFlowCatalogContentBlocks,
-  getFlowMediaContentBlocks,
+  type FlowContentBlock,
+  getFlowChoiceContentBlock,
+  getFlowContentBlocks,
 } from "@/lib/flow-content-blocks";
 import {
   type FlowMediaUploadValue,
@@ -226,8 +228,11 @@ function formatStepPrompt(
 function buildRuntimeReplyForStep(
   step: RuntimeActionStep,
   fields: Record<string, unknown>,
+  includeComposedContent = true,
 ) {
-  const prompt = buildActionStepChannelMessage(step);
+  const prompt = includeComposedContent
+    ? buildActionStepChannelMessage(step)
+    : buildActionStepPrimaryMessage(step);
   const options = isActionInputStep(step)
     ? getActionStepOptions(step, fields)
     : [];
@@ -275,50 +280,81 @@ function buildRuntimeReplyForStep(
 
   const replyOptions: RuntimeReplyOption[] = options.map((option, index) => ({
     description: option.description,
-    id: `${step.id}-${index + 1}`,
+    id: option.id ?? `${step.id}-${index + 1}`,
     label: option.label,
+    section: option.section,
     value: String(option.value),
   }));
+  const choiceContent = getFlowChoiceContentBlock(step.settings);
 
   return createChoiceReply({
     displayMode: getActionStepChoiceDisplayMode(step),
+    footer: choiceContent?.footer,
+    header: choiceContent?.header,
     options: replyOptions,
     text: prompt,
   });
 }
 
-function buildRuntimeRepliesForStep(
+function buildRuntimeReplyForContentBlock(
+  block: FlowContentBlock,
+): RuntimeReply | null {
+  if (block.type === "text") {
+    return createTextReply(block.text);
+  }
+
+  if (block.type === "choice") {
+    return createChoiceReply({
+      displayMode: block.displayMode,
+      footer: block.footer,
+      header: block.header,
+      options: block.options.map((option) => ({
+        description: option.description || undefined,
+        id: option.id,
+        label: option.label,
+        section: option.section || undefined,
+        value: option.value,
+      })),
+      text: block.text,
+    });
+  }
+
+  if (block.type === "media") {
+    return block.media
+      ? createMediaReply({ media: block.media, text: block.text })
+      : null;
+  }
+
+  return block.products.length > 0
+    ? createProductReply({
+        catalog: block.catalog,
+        mode: block.displayMode,
+        products: block.products,
+        text: block.text || "View products",
+      })
+    : null;
+}
+
+export function buildRuntimeRepliesForStep(
   step: RuntimeActionStep,
   fields: Record<string, unknown>,
 ) {
-  const primaryReply = buildRuntimeReplyForStep(step, fields);
-  const contentReplies: RuntimeReply[] = [];
-
-  for (const block of getFlowMediaContentBlocks(step.settings)) {
-    if (block.media) {
-      contentReplies.push(
-        createMediaReply({ media: block.media, text: block.text }),
-      );
-    }
+  const contentBlocks = getFlowContentBlocks(step.settings);
+  if (contentBlocks.length === 0) {
+    return [buildRuntimeReplyForStep(step, fields)];
   }
 
-  for (const block of getFlowCatalogContentBlocks(step.settings)) {
-    if (block.products.length > 0) {
-      contentReplies.push(
-        createProductReply({
-          catalog: block.catalog,
-          mode: block.displayMode,
-          products: block.products,
-          text: block.text || "View products",
-        }),
-      );
-    }
-  }
+  const hasContentCollector = contentBlocks.some(
+    (block) => block.type === "choice",
+  );
+  const primaryReply = hasContentCollector
+    ? createTextReply(buildActionStepPrimaryMessage(step))
+    : buildRuntimeReplyForStep(step, fields, false);
+  const contentReplies = contentBlocks
+    .map(buildRuntimeReplyForContentBlock)
+    .filter((reply): reply is RuntimeReply => reply !== null);
 
-  return isActionInputStep(step) &&
-    getActionStepOptions(step, fields).length > 0
-    ? [...contentReplies, primaryReply]
-    : [primaryReply, ...contentReplies];
+  return [primaryReply, ...contentReplies];
 }
 
 export function buildChannelFlowResumeReplies(input: {

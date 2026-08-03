@@ -67,12 +67,12 @@ function CanvasContentBlockPreview({ block }: { block: FlowContentBlock }) {
           {block.text}
         </p>
         <div className="flex flex-wrap gap-1.5">
-          {block.options.slice(0, 3).map((option, optionIndex) => (
+          {block.options.slice(0, 3).map((option) => (
             <span
-              key={`${block.id}-${option}-${optionIndex}`}
+              key={option.id}
               className="max-w-full truncate rounded-md border bg-white px-2 py-1 text-[11px] leading-none text-gray-700"
             >
-              {option}
+              {option.label}
             </span>
           ))}
           {block.options.length > 3 && (
@@ -283,7 +283,8 @@ function CanvasStepNodeContent({
     : formatStepOptions(step.options)
         .split("\n")
         .filter((option) => option.trim());
-  const storedChoices = choiceBlock?.options ?? storedManualChoices;
+  const storedChoices =
+    choiceBlock?.options.map((option) => option.label) ?? storedManualChoices;
   const storedChoicesKey = storedChoices.join("\n");
   const canQuickEditChoices =
     !hasDynamicChoices &&
@@ -356,7 +357,20 @@ function CanvasStepNodeContent({
     const nextContentBlocks = choiceBlock
       ? contentBlocks.map((block) =>
           block.id === choiceBlock.id && block.type === "choice"
-            ? { ...block, options: choices }
+            ? {
+                ...block,
+                options: choices.map((label, index) =>
+                  block.options[index]
+                    ? { ...block.options[index], label }
+                    : {
+                        description: "",
+                        id: `${block.id}-option-${index + 1}`,
+                        label,
+                        section: "",
+                        value: label,
+                      },
+                ),
+              }
             : block,
         )
       : contentBlocks;

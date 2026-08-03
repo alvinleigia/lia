@@ -704,6 +704,10 @@ function getRuntimeReplyOptions(reply: RuntimeReply) {
             ? optionRecord.id
             : `option-${index + 1}`,
         label,
+        section:
+          typeof optionRecord.section === "string"
+            ? optionRecord.section
+            : undefined,
         value,
       };
     })
@@ -953,6 +957,8 @@ function buildWhatsAppButtonBody(input: {
 }
 
 function buildWhatsAppListBody(input: {
+  footer?: string;
+  header?: string;
   options: RuntimeReplyOption[];
   text: string;
   to: string;
@@ -960,6 +966,10 @@ function buildWhatsAppListBody(input: {
   if (input.options.length === 0 || input.options.length > 10) {
     return null;
   }
+
+  const sectionNames = [
+    ...new Set(input.options.map((option) => option.section || "Options")),
+  ];
 
   return {
     messaging_product: "whatsapp",
@@ -971,12 +981,24 @@ function buildWhatsAppListBody(input: {
       body: {
         text: truncateWhatsAppText(input.text, 1024),
       },
+      ...(input.footer
+        ? { footer: { text: truncateWhatsAppText(input.footer, 60) } }
+        : {}),
+      ...(input.header
+        ? {
+            header: {
+              text: truncateWhatsAppText(input.header, 60),
+              type: "text" as const,
+            },
+          }
+        : {}),
       action: {
         button: "Choose",
-        sections: [
-          {
-            title: "Options",
-            rows: input.options.map((option) => ({
+        sections: sectionNames.map((section) => ({
+          title: truncateWhatsAppText(section, 24),
+          rows: input.options
+            .filter((option) => (option.section || "Options") === section)
+            .map((option) => ({
               id: truncateWhatsAppText(option.value, 200),
               title: truncateWhatsAppText(option.label, 24),
               ...(option.description
@@ -985,8 +1007,7 @@ function buildWhatsAppListBody(input: {
                   }
                 : {}),
             })),
-          },
-        ],
+        })),
       },
     },
   };
@@ -1241,6 +1262,14 @@ export function createWhatsAppChannelAdapter(): ChannelReplyAdapter<
             })
           : reply.type === "list"
             ? buildWhatsAppListBody({
+                footer:
+                  typeof reply.payload?.footer === "string"
+                    ? reply.payload.footer
+                    : undefined,
+                header:
+                  typeof reply.payload?.header === "string"
+                    ? reply.payload.header
+                    : undefined,
                 options,
                 text: reply.text,
                 to: context.to,

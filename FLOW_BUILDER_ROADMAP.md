@@ -88,8 +88,8 @@ database, backup, and provider readiness work.
 Current phase: Priority 2, Phase 9 of 18. Phase 8 and Priority 1 completed
 implementation, automated verification, and manual UAT by 2026-08-03.
 
-Current target: complete structured choice rows, stable stored values, and the
-remaining rich-message authoring controls from the Flow Builder v2 examples.
+Current target: complete Phase 9 automated certification and focused manual
+UAT for composed-content authoring, persistence, and runtime presentation.
 
 ## Product Direction
 
@@ -705,17 +705,17 @@ structured interactions.
 - [x] Prevent incompatible or ambiguous response collectors.
 - [x] Show every universal Add Content option in one menu.
 - [x] Keep inapplicable content visible with a plain-language disabled reason.
-- [ ] Complete Text and Buttons.
-- [ ] Complete Media and Buttons.
-- [ ] Complete structured lists with sections and rows.
-- [ ] Complete Catalog, Single Product, and Multiple Product messages.
-- [ ] Complete media for image, video, audio, and documents.
-- [ ] Complete typed template components and variable mappings.
-- [ ] Keep visible labels separate from stable IDs and stored values.
-- [ ] Preserve content order through save, reload, preview, publish, export, import, and runtime.
-- [ ] Keep provider identifiers and channel restrictions out of primary universal fields.
-- [ ] Add publish blockers for incomplete content.
-- [ ] Confirm every deterministic message example in `docs/Flow Builder v2.pdf` can be authored without raw JSON.
+- [x] Complete Text and Buttons.
+- [x] Complete Media and Buttons.
+- [x] Complete structured lists with sections and rows.
+- [x] Complete Catalog, Single Product, and Multiple Product messages.
+- [x] Complete media for image, video, audio, and documents.
+- [x] Complete typed template components and variable mappings.
+- [x] Keep visible labels separate from stable IDs and stored values.
+- [x] Preserve content order through save, reload, preview, publish, export, import, and runtime.
+- [x] Keep provider identifiers and channel restrictions out of primary universal fields.
+- [x] Add publish blockers for incomplete content.
+- [x] Confirm every deterministic message example in `docs/Flow Builder v2.pdf` can be authored without raw JSON.
 
 Phase 9 Checkpoint 1 status: Complete on 2026-08-03. Ordered node content now
 uses a version 1 `contentDocument` envelope with stable block IDs and normative
@@ -740,6 +740,15 @@ stored legacy collectors. Both editor menus continue to show every registered
 option and now expose the specific incompatibility reason. Fifteen focused
 content/menu checks, the canvas save/reload scenario, and the 128-test fast
 release certification passed.
+
+Phase 9 Checkpoint 4 implementation status: Complete on 2026-08-03. Choice
+content now preserves separate labels, stable IDs, stored values, descriptions,
+sections, headers, and footers. Media, catalog, and typed WhatsApp template
+content use universal structured contracts; ordered content is preserved through
+save, reload, preview, publish, export, import, and runtime. Publish validation
+blocks incomplete resources and conflicting stable identifiers. The focused
+canvas save/reload scenario and the 137-test fast release certification passed.
+Full offline certification and focused manual UAT remain before Phase 9 closure.
 
 Phase 9 exit gate: explicit nodes provide complete composed-content control
 when a business needs exact interaction wording or presentation.

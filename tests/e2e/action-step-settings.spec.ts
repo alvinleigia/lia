@@ -74,3 +74,27 @@ test("changing step families removes managed incompatible settings", () => {
   expect(settings).not.toHaveProperty("whatsappTemplateStatus");
   expect(settings).toHaveProperty("contentBlocks");
 });
+
+test("template settings retain typed body variable mappings", () => {
+  const settings = buildActionStepSettings({
+    existingSettings: {},
+    stepType: "template_message",
+    whatsappTemplateBody: "Hello {{1}} on {{2}}",
+    whatsappTemplateCategory: "utility",
+    whatsappTemplateLanguage: "en_US",
+    whatsappTemplateName: "booking",
+    whatsappTemplateStatus: "approved",
+    whatsappTemplateVariables: "{{guestName}}\nTomorrow",
+  });
+
+  expect(settings.whatsappTemplateComponents).toEqual([
+    {
+      parameters: [
+        { index: 1, source: "field", value: "guestName" },
+        { index: 2, source: "literal", value: "Tomorrow" },
+      ],
+      text: "Hello {{1}} on {{2}}",
+      type: "body",
+    },
+  ]);
+});

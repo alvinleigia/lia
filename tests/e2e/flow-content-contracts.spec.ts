@@ -7,6 +7,7 @@ import {
   getFlowContentBlocks,
   getFlowContentCompositionIssues,
   getFlowContentDocument,
+  getFlowContentReadinessIssues,
   getFlowResponseCollectorBlocks,
   getFlowResponseCollectorCompatibilityIssue,
   parseFlowContentDocument,
@@ -21,7 +22,24 @@ const orderedBlocks: FlowContentBlock[] = [
   {
     id: "answer",
     displayMode: "buttons",
-    options: ["Book", "Ask a question"],
+    footer: "",
+    header: "",
+    options: [
+      {
+        description: "",
+        id: "book",
+        label: "Book",
+        section: "",
+        value: "book",
+      },
+      {
+        description: "",
+        id: "ask",
+        label: "Ask a question",
+        section: "",
+        value: "ask",
+      },
+    ],
     text: "What would you like to do?",
     type: "choice",
   },
@@ -73,6 +91,37 @@ test("reads legacy content arrays as a version 1 document", () => {
   expect(getFlowContentDocument({ contentBlocks: orderedBlocks })).toEqual({
     blocks: orderedBlocks,
     schemaVersion: FLOW_CONTENT_SCHEMA_VERSION,
+  });
+});
+
+test("upgrades legacy string choices to stable labels and stored values", () => {
+  const blocks = getFlowContentBlocks({
+    contentBlocks: [
+      {
+        displayMode: "list",
+        id: "legacy-list",
+        options: ["Sales", "Support"],
+        text: "Choose a team",
+        type: "choice",
+      },
+    ],
+  });
+
+  expect(blocks[0]).toMatchObject({
+    footer: "",
+    header: "",
+    options: [
+      {
+        id: "legacy-list-option-1",
+        label: "Sales",
+        value: "Sales",
+      },
+      {
+        id: "legacy-list-option-2",
+        label: "Support",
+        value: "Support",
+      },
+    ],
   });
 });
 
@@ -177,4 +226,46 @@ test("rejects a collector beside manual choices but permits editing a stored col
       isInputStep: true,
     }),
   ).toBeNull();
+});
+
+test("blocks incomplete resources and duplicate stable option values", () => {
+  const choice = orderedBlocks.find((block) => block.type === "choice");
+  expect(choice).toBeTruthy();
+  if (!choice) {
+    return;
+  }
+
+  expect(
+    getFlowContentReadinessIssues({
+      contentDocument: buildFlowContentDocument([
+        {
+          id: "media",
+          media: null,
+          mediaAssetId: 12,
+          text: "Preview",
+          type: "media",
+        },
+        {
+          ...choice,
+          options: choice.options.map((option) => ({
+            ...option,
+            value: "duplicate",
+          })),
+        },
+      ]),
+    }),
+  ).toEqual(
+    expect.arrayContaining([
+      "Media content must reference an available asset.",
+      "Response option stored values must be unique.",
+    ]),
+  );
+});
+
+test("accepts complete structured content resources", () => {
+  expect(
+    getFlowContentReadinessIssues({
+      contentDocument: buildFlowContentDocument(orderedBlocks),
+    }),
+  ).toEqual([]);
 });

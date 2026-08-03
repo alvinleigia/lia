@@ -348,7 +348,13 @@ test("WhatsApp adapter uses native delivery within provider limits", async () =>
     context,
     reply: createChoiceReply({
       displayMode: "list",
-      options: createOptions(10),
+      footer: "Select one",
+      header: "Teams",
+      options: createOptions(10).map((option, index) => ({
+        ...option,
+        description: `Description ${index + 1}`,
+        section: index < 5 ? "Sales" : "Support",
+      })),
       text: "Choose from the list",
     }),
   });
@@ -367,6 +373,18 @@ test("WhatsApp adapter uses native delivery within provider limits", async () =>
   expect(fallbackButton.delivery.body.type).toBe("text");
   expect(nativeList.mode).toBe("native");
   expect(nativeList.delivery.body.type).toBe("interactive");
+  expect(nativeList.delivery.body).toMatchObject({
+    interactive: {
+      action: {
+        sections: [
+          { rows: expect.any(Array), title: "Sales" },
+          { rows: expect.any(Array), title: "Support" },
+        ],
+      },
+      footer: { text: "Select one" },
+      header: { text: "Teams", type: "text" },
+    },
+  });
   expect(fallbackList.mode).toBe("fallback");
   expect(fallbackList.delivery.body.type).toBe("text");
 });
@@ -436,6 +454,37 @@ test("WhatsApp adapter falls back when rich payload requirements are missing", a
   expect(nativeMedia.delivery.body.type).toBe("image");
   expect(fallbackMedia.mode).toBe("fallback");
   expect(fallbackMedia.delivery.body.type).toBe("text");
+});
+
+test("WhatsApp adapter supports image, video, audio, and document media", async () => {
+  const adapter = createWhatsAppChannelAdapter();
+  const context = { serviceWindowOpen: true, to: "15550001111" };
+
+  for (const [index, mediaType] of [
+    "image",
+    "video",
+    "audio",
+    "file",
+  ].entries()) {
+    const adapted = await adapter.adaptReply({
+      context,
+      reply: createMediaReply({
+        media: {
+          id: 800 + index,
+          mediaType,
+          mimeType: "application/octet-stream",
+          originalName: `${mediaType}.bin`,
+          publicPath: `https://cdn.example.test/${mediaType}.bin`,
+        },
+        text: `${mediaType} attachment`,
+      }),
+    });
+
+    expect(adapted.mode).toBe("native");
+    expect(adapted.delivery.body.type).toBe(
+      mediaType === "file" ? "document" : mediaType,
+    );
+  }
 });
 
 test("WhatsApp adapter enforces the service window and permits approved templates", async () => {

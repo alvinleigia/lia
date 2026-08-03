@@ -25,6 +25,7 @@ import {
 } from "@/lib/db-schema";
 import { resolveTraceId } from "@/lib/execution-trace";
 import { getFlowStepChannelCapabilityIssues } from "@/lib/flow-channel-capabilities";
+import { getFlowContentReadinessIssues } from "@/lib/flow-content-blocks";
 import { getInvalidAllowedFileTypeTokens } from "@/lib/flow-file-validation";
 import { isFlowInputStepType } from "@/lib/flow-input-editor";
 import {
@@ -472,6 +473,13 @@ function getStepConfigIssues(step: {
   }
 
   issues.push(...getValidationSettingsIssuesForStep(step));
+  issues.push(
+    ...getFlowContentReadinessIssues(step.settings).map((message) => ({
+      message: `Step ${step.sortOrder}: ${message}`,
+      source: "step_config" as const,
+      stepId: step.id,
+    })),
+  );
 
   return issues;
 }

@@ -7,6 +7,38 @@ export type WhatsAppTemplateMetadataIssue = {
   severity: "info" | "warning";
 };
 
+export type WhatsAppTemplateVariableMapping = {
+  index: number;
+  source: "field" | "literal";
+  value: string;
+};
+
+export type WhatsAppTemplateBodyComponent = {
+  parameters: WhatsAppTemplateVariableMapping[];
+  text: string;
+  type: "body";
+};
+
+export function buildWhatsAppTemplateBodyComponent(
+  body: string,
+  variables: string[],
+): WhatsAppTemplateBodyComponent {
+  return {
+    parameters: variables.map((variable, index) => {
+      const value = variable.trim();
+      const fieldMatch = /^\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}$/.exec(value);
+
+      return {
+        index: index + 1,
+        source: fieldMatch ? "field" : "literal",
+        value: fieldMatch?.[1] ?? value,
+      };
+    }),
+    text: body.trim(),
+    type: "body",
+  };
+}
+
 export function extractWhatsAppTemplateBodyParameterIndexes(body: string) {
   const indexes = new Set<number>();
   const pattern = /\{\{\s*(\d+)\s*\}\}/g;

@@ -1037,6 +1037,11 @@ test("universal Add Content menu explains availability in both canvas editors", 
   ).toBeVisible();
   await expect(inlineListPresentation).toHaveAttribute("aria-pressed", "true");
   await expect(questionNode.getByLabel("Option 1")).toBeVisible();
+  await questionNode.getByLabel("List header").fill("Available teams");
+  await questionNode.getByLabel("List footer").fill("Choose one team");
+  await questionNode.getByLabel("Stored value 1").fill("team_sales");
+  await questionNode.getByLabel("Description 1").fill("Talk to sales");
+  await questionNode.getByLabel("Section 1").fill("Teams");
   await expect(
     questionNode.getByRole("button", { name: "Add option" }),
   ).toBeVisible();
@@ -1052,6 +1057,19 @@ test("universal Add Content menu explains availability in both canvas editors", 
   await expect(
     editDialog.getByRole("button", { name: "List", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+  await expect(editDialog.getByLabel("List header")).toHaveValue(
+    "Available teams",
+  );
+  await expect(editDialog.getByLabel("List footer")).toHaveValue(
+    "Choose one team",
+  );
+  await expect(editDialog.getByLabel("Stored value 1")).toHaveValue(
+    "team_sales",
+  );
+  await expect(editDialog.getByLabel("Description 1")).toHaveValue(
+    "Talk to sales",
+  );
+  await expect(editDialog.getByLabel("Section 1")).toHaveValue("Teams");
   await editDialog.getByRole("button", { name: "Add content" }).click();
   contentMenu = page.locator('[data-slot="popover-content"]:visible').last();
   await expect(

@@ -13,6 +13,7 @@ export type RuntimeReplyOption = {
   description?: string;
   id: string;
   label: string;
+  section?: string;
   value: string;
 };
 
@@ -81,6 +82,8 @@ function buildChoiceFallbackText(input: {
 
 export function createChoiceReply(input: {
   displayMode: "buttons" | "list" | "text";
+  footer?: string;
+  header?: string;
   options: RuntimeReplyOption[];
   text: string;
 }): RuntimeReply {
@@ -91,6 +94,8 @@ export function createChoiceReply(input: {
       fallbackText,
       payload: {
         displayMode: input.displayMode,
+        footer: input.footer,
+        header: input.header,
         options: input.options,
       },
       text: input.text,
@@ -102,6 +107,8 @@ export function createChoiceReply(input: {
     fallbackText,
     payload: {
       displayMode: input.displayMode,
+      footer: input.footer,
+      header: input.header,
       options: input.options,
     },
     text: input.text,

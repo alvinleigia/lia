@@ -6,26 +6,49 @@ import {
   getFlowMessageFamilyDefinition,
 } from "../../src/lib/flow-message-editor";
 
+const options = [
+  {
+    description: "",
+    id: "sales",
+    label: "Sales",
+    section: "",
+    value: "sales",
+  },
+  {
+    description: "",
+    id: "support",
+    label: "Support",
+    section: "",
+    value: "support",
+  },
+];
+
 const blocks: FlowContentBlock[] = [
   { id: "text", text: "Hello", type: "text" },
   {
     displayMode: "buttons",
+    footer: "",
+    header: "",
     id: "buttons",
-    options: ["Sales", "Support"],
+    options,
     text: "Choose one",
     type: "choice",
   },
   {
     displayMode: "list",
+    footer: "",
+    header: "",
     id: "list",
-    options: ["Sales", "Support"],
+    options,
     text: "Choose one",
     type: "choice",
   },
   {
     displayMode: "text",
+    footer: "",
+    header: "",
     id: "typed",
-    options: ["Sales", "Support"],
+    options,
     text: "Choose one",
     type: "choice",
   },

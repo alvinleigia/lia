@@ -203,7 +203,7 @@ function FlowContentBlocksEditor({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    disabled={blocks.length >= 10}
+                    disabled={blocks.length >= 10 || block.type === "choice"}
                     title={`Duplicate content ${blockIndex + 1}`}
                     onClick={() => {
                       const nextBlocks = [...blocks];

@@ -792,8 +792,18 @@ export function createFlowContentBlock(input: {
   if (component.blockType === "choice") {
     return {
       displayMode: component.defaultChoiceDisplayMode ?? "buttons",
+      footer: "",
+      header: "",
       id,
-      options: ["Option 1"],
+      options: [
+        {
+          description: "",
+          id: `${id}-option-1`,
+          label: "Option 1",
+          section: "",
+          value: "option_1",
+        },
+      ],
       text: "Choose an option",
       type: "choice",
     };
@@ -859,7 +869,14 @@ export function duplicateFlowContentBlock(
   const id = `content-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   if (block.type === "choice") {
-    return { ...block, id, options: [...block.options] };
+    return {
+      ...block,
+      id,
+      options: block.options.map((option, index) => ({
+        ...option,
+        id: `${id}-option-${index + 1}`,
+      })),
+    };
   }
 
   if (block.type === "catalog") {

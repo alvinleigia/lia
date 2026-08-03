@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type {
   FlowCatalogContentBlock,
+  FlowChoiceOption,
   FlowContentBlock,
   FlowMediaContentBlock,
 } from "@/lib/flow-content-blocks";
@@ -57,7 +58,11 @@ function getFamilyIcon(block: FlowContentBlock) {
   return MessageSquareText;
 }
 
-function moveOption(options: string[], fromIndex: number, toIndex: number) {
+function moveOption(
+  options: FlowChoiceOption[],
+  fromIndex: number,
+  toIndex: number,
+) {
   if (
     fromIndex === toIndex ||
     fromIndex < 0 ||
@@ -367,6 +372,49 @@ export function FlowMessageContentEditor({
             </div>
           </fieldset>
 
+          {block.displayMode === "list" && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-medium"
+                  htmlFor={`message-list-header-${block.id}`}
+                >
+                  Header
+                </label>
+                <input
+                  id={`message-list-header-${block.id}`}
+                  aria-label="List header"
+                  value={block.header}
+                  maxLength={60}
+                  placeholder="Services"
+                  onChange={(event) =>
+                    onChange({ ...block, header: event.target.value })
+                  }
+                  className="flex h-10 w-full rounded-md border border-input bg-white px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-medium"
+                  htmlFor={`message-list-footer-${block.id}`}
+                >
+                  Footer
+                </label>
+                <input
+                  id={`message-list-footer-${block.id}`}
+                  aria-label="List footer"
+                  value={block.footer}
+                  maxLength={60}
+                  placeholder="Select one option"
+                  onChange={(event) =>
+                    onChange({ ...block, footer: event.target.value })
+                  }
+                  className="flex h-10 w-full rounded-md border border-input bg-white px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-medium">Options</p>
@@ -378,79 +426,140 @@ export function FlowMessageContentEditor({
             <div className="space-y-2">
               {block.options.map((option, optionIndex) => (
                 <div
-                  key={`${block.id}-friendly-option-${optionIndex}`}
-                  className="flex items-center gap-1.5 rounded-md border bg-white p-1.5"
+                  key={option.id}
+                  className="space-y-2 rounded-md border bg-white p-2"
                 >
-                  <input
-                    aria-label={`Option ${optionIndex + 1}`}
-                    value={option}
-                    maxLength={160}
-                    placeholder={`Option ${optionIndex + 1}`}
-                    onChange={(event) => {
-                      const options = [...block.options];
-                      options[optionIndex] = event.target.value;
-                      onChange({ ...block, options });
-                    }}
-                    className="h-9 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={optionIndex === 0}
-                    title={`Move option ${optionIndex + 1} up`}
-                    onClick={() =>
-                      onChange({
-                        ...block,
-                        options: moveOption(
-                          block.options,
-                          optionIndex,
-                          optionIndex - 1,
-                        ),
-                      })
-                    }
-                  >
-                    <ArrowUp className="h-4 w-4" />
-                    <span className="sr-only">Move option up</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={optionIndex === block.options.length - 1}
-                    title={`Move option ${optionIndex + 1} down`}
-                    onClick={() =>
-                      onChange({
-                        ...block,
-                        options: moveOption(
-                          block.options,
-                          optionIndex,
-                          optionIndex + 1,
-                        ),
-                      })
-                    }
-                  >
-                    <ArrowDown className="h-4 w-4" />
-                    <span className="sr-only">Move option down</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    disabled={block.options.length === 1}
-                    title={`Remove option ${optionIndex + 1}`}
-                    onClick={() =>
-                      onChange({
-                        ...block,
-                        options: block.options.filter(
-                          (_, index) => index !== optionIndex,
-                        ),
-                      })
-                    }
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove option</span>
-                  </Button>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="px-1 text-xs font-medium text-muted-foreground">
+                      Option {optionIndex + 1}
+                    </span>
+                    <div className="flex items-center gap-0.5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={optionIndex === 0}
+                        title={`Move option ${optionIndex + 1} up`}
+                        onClick={() =>
+                          onChange({
+                            ...block,
+                            options: moveOption(
+                              block.options,
+                              optionIndex,
+                              optionIndex - 1,
+                            ),
+                          })
+                        }
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                        <span className="sr-only">Move option up</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={optionIndex === block.options.length - 1}
+                        title={`Move option ${optionIndex + 1} down`}
+                        onClick={() =>
+                          onChange({
+                            ...block,
+                            options: moveOption(
+                              block.options,
+                              optionIndex,
+                              optionIndex + 1,
+                            ),
+                          })
+                        }
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                        <span className="sr-only">Move option down</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={block.options.length === 1}
+                        title={`Remove option ${optionIndex + 1}`}
+                        onClick={() =>
+                          onChange({
+                            ...block,
+                            options: block.options.filter(
+                              (_, index) => index !== optionIndex,
+                            ),
+                          })
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Remove option</span>
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input
+                      aria-label={`Option ${optionIndex + 1}`}
+                      value={option.label}
+                      maxLength={160}
+                      placeholder="Visible label"
+                      onChange={(event) => {
+                        const options = [...block.options];
+                        options[optionIndex] = {
+                          ...option,
+                          label: event.target.value,
+                        };
+                        onChange({ ...block, options });
+                      }}
+                      className="h-9 min-w-0 rounded-md border px-2 text-sm outline-none"
+                    />
+                    <input
+                      aria-label={`Stored value ${optionIndex + 1}`}
+                      value={option.value}
+                      maxLength={160}
+                      placeholder="Stable stored value"
+                      onChange={(event) => {
+                        const options = [...block.options];
+                        options[optionIndex] = {
+                          ...option,
+                          value: event.target.value,
+                        };
+                        onChange({ ...block, options });
+                      }}
+                      className="h-9 min-w-0 rounded-md border px-2 text-sm outline-none"
+                    />
+                  </div>
+                  {block.displayMode === "list" && (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <input
+                        aria-label={`Description ${optionIndex + 1}`}
+                        value={option.description}
+                        maxLength={240}
+                        placeholder="Optional row description"
+                        onChange={(event) => {
+                          const options = [...block.options];
+                          options[optionIndex] = {
+                            ...option,
+                            description: event.target.value,
+                          };
+                          onChange({ ...block, options });
+                        }}
+                        className="h-9 min-w-0 rounded-md border px-2 text-sm outline-none"
+                      />
+                      <input
+                        aria-label={`Section ${optionIndex + 1}`}
+                        value={option.section}
+                        maxLength={80}
+                        placeholder="Optional section"
+                        onChange={(event) => {
+                          const options = [...block.options];
+                          options[optionIndex] = {
+                            ...option,
+                            section: event.target.value,
+                          };
+                          onChange({ ...block, options });
+                        }}
+                        className="h-9 min-w-0 rounded-md border px-2 text-sm outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -463,7 +572,16 @@ export function FlowMessageContentEditor({
               onClick={() =>
                 onChange({
                   ...block,
-                  options: [...block.options, "New option"],
+                  options: [
+                    ...block.options,
+                    {
+                      description: "",
+                      id: `${block.id}-option-${Date.now()}`,
+                      label: "New option",
+                      section: "",
+                      value: `option_${block.options.length + 1}`,
+                    },
+                  ],
                 })
               }
             >
