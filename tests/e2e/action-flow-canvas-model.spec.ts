@@ -11,6 +11,7 @@ import type {
   BranchRule,
   FlowStep,
 } from "../../src/components/action-flow-canvas/types";
+import { buildStoredActionOptionRoute } from "../../src/lib/action-option-routing";
 import type { FlowContentBlock } from "../../src/lib/flow-content-blocks";
 
 function createStep(
@@ -91,6 +92,39 @@ test("canvas edges preserve explicit routes, branches, and ordered fallbacks", (
   expect(edges.find((edge) => edge.id === "branch-20")?.label).toBe(
     "answer equals",
   );
+});
+
+test("canvas option routes use the stable option handle and current label", () => {
+  const optionRoute = createBranchRule(21, 1, 2);
+  optionRoute.comparisonValue = "deep_tissue";
+  optionRoute.settings = {
+    optionRoute: buildStoredActionOptionRoute("service-deep-tissue"),
+  };
+  const edges = buildEdges({
+    branchRules: [optionRoute],
+    routeIssues: [],
+    steps: [
+      createStep(1, 1, {
+        fieldKey: "service",
+        inputType: "text",
+        options: [
+          {
+            id: "service-deep-tissue",
+            label: "Deep Tissue Massage",
+            value: "deep_tissue",
+          },
+        ],
+        stepType: "choice",
+      }),
+      createStep(2, 2, { stepType: "submit" }),
+    ],
+  });
+  const edge = edges.find((candidate) => candidate.id === "branch-21");
+
+  expect(edge).toMatchObject({
+    label: "Deep Tissue Massage route",
+    sourceHandle: "option:service-deep-tissue",
+  });
 });
 
 test("content reordering is immutable and ignores invalid moves", () => {

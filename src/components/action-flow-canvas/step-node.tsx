@@ -1,6 +1,6 @@
 "use client";
 
-import { Position } from "@xyflow/react";
+import { Handle, Position } from "@xyflow/react";
 import {
   AlertTriangle,
   ArrowDown,
@@ -30,7 +30,9 @@ import {
   moveFlowContentBlock,
 } from "@/components/action-flow-canvas/model";
 import type {
+  BranchRule,
   CanvasNode,
+  CanvasOptionRouteChange,
   CanvasQuickEditChange,
   CanvasStepQuickSave,
   CatalogProductOption,
@@ -51,6 +53,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { ActionFlowRouteValidationIssue } from "@/lib/action-flows";
+import { getStoredActionOptionRoute } from "@/lib/action-option-routing";
+import {
+  getActionStepOptions,
+  type RuntimeActionStep,
+} from "@/lib/action-runtime";
 import {
   type FlowContentBlock,
   getFlowContentBlocks,
@@ -253,21 +260,27 @@ function CanvasContentBlockEditor({
 }
 
 function CanvasStepNodeContent({
+  branchRules,
   catalogProducts,
   issues,
   mediaAssets,
   onQuickEditChange,
+  onOptionRouteChange,
   onQuickSave,
   productCatalogs,
   step,
+  steps,
 }: {
+  branchRules: BranchRule[];
   catalogProducts: CatalogProductOption[];
   issues: ActionFlowRouteValidationIssue[];
   mediaAssets: MediaAssetOption[];
   onQuickEditChange: CanvasQuickEditChange;
+  onOptionRouteChange: CanvasOptionRouteChange;
   onQuickSave: CanvasStepQuickSave;
   productCatalogs: ProductCatalogOption[];
   step: FlowStep;
+  steps: FlowStep[];
 }) {
   const contentBlocks = getFlowContentBlocks(step.settings);
   const choiceBlock = contentBlocks.find((block) => block.type === "choice");
@@ -302,6 +315,21 @@ function CanvasStepNodeContent({
   const [localFeedback, setLocalFeedback] = useState("");
   const [isSaving, startSaving] = useTransition();
   const stepColor = getStepColor(step);
+  const supportsOptionRoutes =
+    step.stepType !== "product_selection" ||
+    (step.settings.productSelectionAllowMultiple !== true &&
+      step.settings.productSelectionAllowQuantity !== true);
+  const routeOptions = supportsOptionRoutes
+    ? getActionStepOptions(step as RuntimeActionStep)
+    : [];
+  const optionRouteTargets = new Map(
+    branchRules.flatMap((rule) => {
+      const optionRoute = getStoredActionOptionRoute(rule.settings);
+      return optionRoute
+        ? [[optionRoute.sourceOptionId, rule.targetStepId] as const]
+        : [];
+    }),
+  );
 
   useEffect(() => {
     onQuickEditChange(step.id, isEditing);
@@ -558,11 +586,19 @@ function CanvasStepNodeContent({
                   size="icon"
                   disabled={choices.length === 1}
                   title={`Remove choice ${index + 1}`}
-                  onClick={() =>
+                  onClick={() => {
+                    const routeOption = routeOptions[index];
+                    if (routeOption && optionRouteTargets.has(routeOption.id)) {
+                      setLocalFeedback(
+                        `Clear the Go to route for "${routeOption.label}" before deleting it.`,
+                      );
+                      return;
+                    }
+
                     setChoices(
                       choices.filter((_, choiceIndex) => choiceIndex !== index),
-                    )
-                  }
+                    );
+                  }}
                 >
                   <Trash2 className="h-4 w-4" />
                   <span className="sr-only">Remove choice</span>
@@ -652,6 +688,59 @@ function CanvasStepNodeContent({
         <p className="line-clamp-3 break-words rounded-md border bg-white p-2.5 text-xs leading-snug text-gray-700">
           {step.prompt}
         </p>
+      )}
+      {routeOptions.length > 0 && step.fieldKey && (
+        <div className="nodrag nopan nowheel space-y-2 rounded-md border bg-gray-50 p-2.5">
+          <p className="text-[11px] font-medium uppercase text-muted-foreground">
+            Option routes
+          </p>
+          {routeOptions.map((option) => (
+            <div
+              key={option.id}
+              className="flex items-center gap-2 rounded-md bg-white px-2 py-1.5"
+            >
+              <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                {option.label}
+              </span>
+              <select
+                aria-label={`Go to for ${option.label}`}
+                className="h-7 min-w-0 max-w-36 rounded-md border border-input bg-white px-2 text-[11px]"
+                value={optionRouteTargets.get(option.id) ?? ""}
+                onChange={(event) => {
+                  const targetStepId = Number(event.currentTarget.value);
+                  onOptionRouteChange(
+                    step.id,
+                    option.id,
+                    Number.isInteger(targetStepId) && targetStepId > 0
+                      ? targetStepId
+                      : null,
+                  );
+                }}
+                onClick={stopCanvasInteraction}
+                onPointerDown={stopCanvasInteraction}
+              >
+                <option value="">Use default / no match</option>
+                {steps
+                  .filter((candidate) => candidate.id !== step.id)
+                  .map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {getStepLabel(candidate)}
+                    </option>
+                  ))}
+              </select>
+              <Handle
+                id={option.outputPort}
+                type="source"
+                position={Position.Right}
+                className="!relative !right-auto !top-auto !h-3 !w-3 !translate-x-0 !translate-y-0 !border-2 !border-white !bg-blue-600"
+                title={`Connect ${option.label}`}
+              />
+            </div>
+          ))}
+          <p className="text-[11px] leading-4 text-muted-foreground">
+            Choose a destination or drag an option handle to a step.
+          </p>
+        </div>
       )}
       {contentBlocks.length > 0 && (
         <div className="nodrag nopan nowheel max-h-64 space-y-2 overflow-y-auto pr-1">
@@ -839,9 +928,11 @@ function CanvasStepNodeContent({
 }
 
 export function buildNodes(input: {
+  branchRules: BranchRule[];
   catalogProducts: CatalogProductOption[];
   mediaAssets: MediaAssetOption[];
   onQuickEditChange: CanvasQuickEditChange;
+  onOptionRouteChange: CanvasOptionRouteChange;
   onQuickSave: CanvasStepQuickSave;
   productCatalogs: ProductCatalogOption[];
   routeIssues: ActionFlowRouteValidationIssue[];
@@ -871,13 +962,18 @@ export function buildNodes(input: {
       data: {
         label: (
           <CanvasStepNodeContent
+            branchRules={input.branchRules.filter(
+              (rule) => rule.sourceStepId === step.id,
+            )}
             catalogProducts={input.catalogProducts}
             issues={issues}
             mediaAssets={input.mediaAssets}
             onQuickEditChange={input.onQuickEditChange}
+            onOptionRouteChange={input.onOptionRouteChange}
             onQuickSave={input.onQuickSave}
             productCatalogs={input.productCatalogs}
             step={step}
+            steps={input.steps}
           />
         ),
       },

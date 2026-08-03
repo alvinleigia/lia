@@ -13,6 +13,11 @@ import type {
 } from "@/components/action-flow-canvas/types";
 import { getStoredActionFlowConditionGroup } from "@/lib/action-flow-compiler";
 import type { ActionFlowRouteValidationIssue } from "@/lib/action-flows";
+import { getStoredActionOptionRoute } from "@/lib/action-option-routing";
+import {
+  getActionStepOptions,
+  type RuntimeActionStep,
+} from "@/lib/action-runtime";
 import {
   formatFlowComponentLabel,
   getFlowComponentColor,
@@ -375,7 +380,7 @@ export function buildEdges(input: {
       id: `default-${step.id}-${step.nextStepId}`,
       source: String(step.id),
       target: String(step.nextStepId),
-      label: "default route",
+      label: "default / no match",
       markerEnd: { type: MarkerType.ArrowClosed },
       style: {
         stroke: step.isEnabled ? "#111827" : "#9ca3af",
@@ -385,26 +390,39 @@ export function buildEdges(input: {
       ...CANVAS_EDGE_LABEL_PROPS,
     }));
 
-  const branchEdges = input.branchRules.map<Edge>((rule) => ({
-    id: `branch-${rule.id}`,
-    source: String(rule.sourceStepId),
-    target: String(rule.targetStepId),
-    label: rule.isEnabled
-      ? getBranchLabel(rule)
-      : `${getBranchLabel(rule)} (off)`,
-    markerEnd: { type: MarkerType.ArrowClosed },
-    style: {
-      stroke: issueRuleIds.has(rule.id)
-        ? "#d97706"
-        : rule.isEnabled
-          ? "#2563eb"
-          : "#9ca3af",
-      strokeDasharray: rule.isEnabled ? undefined : "5 5",
-      strokeWidth: 1.6,
-    },
-    type: "smoothstep",
-    ...CANVAS_EDGE_LABEL_PROPS,
-  }));
+  const branchEdges = input.branchRules.map<Edge>((rule) => {
+    const optionRoute = getStoredActionOptionRoute(rule.settings);
+    const sourceStep = getStepById(input.steps, rule.sourceStepId);
+    const sourceOption =
+      optionRoute && sourceStep
+        ? getActionStepOptions(sourceStep as RuntimeActionStep).find(
+            (option) => option.id === optionRoute.sourceOptionId,
+          )
+        : null;
+    const label = sourceOption
+      ? `${sourceOption.label} route`
+      : getBranchLabel(rule);
+
+    return {
+      id: `branch-${rule.id}`,
+      source: String(rule.sourceStepId),
+      sourceHandle: sourceOption ? optionRoute?.sourceOutputPort : undefined,
+      target: String(rule.targetStepId),
+      label: rule.isEnabled ? label : `${label} (off)`,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      style: {
+        stroke: issueRuleIds.has(rule.id)
+          ? "#d97706"
+          : rule.isEnabled
+            ? "#2563eb"
+            : "#9ca3af",
+        strokeDasharray: rule.isEnabled ? undefined : "5 5",
+        strokeWidth: 1.6,
+      },
+      type: "smoothstep",
+      ...CANVAS_EDGE_LABEL_PROPS,
+    };
+  });
 
   return [
     ...defaultEdges,
@@ -503,6 +521,7 @@ export function readBranchRuleForm(
     operator: String(formData.get("operator") ?? "equals"),
     sortOrder: Number(formData.get("sortOrder")),
     sourceFieldKey: String(formData.get("sourceFieldKey") ?? ""),
+    sourceOptionId: String(formData.get("sourceOptionId") ?? ""),
     sourceStepId: Number(formData.get("sourceStepId")),
     targetStepId: Number(formData.get("targetStepId")),
   };

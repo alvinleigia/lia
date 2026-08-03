@@ -113,6 +113,7 @@ export type CanvasBranchRuleInput = {
   operator: string;
   sortOrder: number;
   sourceFieldKey: string;
+  sourceOptionId: string;
   sourceStepId: number;
   targetStepId: number;
 };
@@ -223,4 +224,10 @@ export type CanvasStepQuickSave = (
 export type CanvasQuickEditChange = (
   stepId: number,
   isEditing: boolean,
+) => void;
+
+export type CanvasOptionRouteChange = (
+  stepId: number,
+  optionId: string,
+  targetStepId: number | null,
 ) => void;

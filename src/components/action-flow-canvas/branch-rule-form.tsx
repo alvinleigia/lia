@@ -27,6 +27,7 @@ import {
   type StoredActionFlowConditionGroup,
 } from "@/lib/action-flow-compiler";
 import type { ActionBranchOperator } from "@/lib/action-flows";
+import { getStoredActionOptionRoute } from "@/lib/action-option-routing";
 
 export function BranchRuleForm({
   branchRules,
@@ -55,6 +56,7 @@ export function BranchRuleForm({
     availableFieldOptions[0]?.fieldKey ??
     "";
   const parsedGroup = rule ? getStoredActionFlowConditionGroup(rule) : null;
+  const optionRoute = rule ? getStoredActionOptionRoute(rule.settings) : null;
   const initialGroup = parsedGroup?.group ?? {
     combinator: "and" as const,
     conditions: [
@@ -178,6 +180,11 @@ export function BranchRuleForm({
       }}
     >
       <input type="hidden" name="sourceStepId" value={sourceStep.id} />
+      <input
+        type="hidden"
+        name="sourceOptionId"
+        value={optionRoute?.sourceOptionId ?? ""}
+      />
       <input
         type="hidden"
         name="sourceFieldKey"

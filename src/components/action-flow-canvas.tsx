@@ -31,6 +31,7 @@ import {
 } from "react";
 import {
   clearCanvasDefaultRouteAction,
+  clearCanvasOptionRouteAction,
   createCanvasBranchRuleAction,
   createCanvasStepAction,
   deleteCanvasBranchRuleAction,
@@ -39,6 +40,7 @@ import {
   saveCanvasStepPositionsAction,
   saveHybridEntryPolicyAction,
   setCanvasDefaultRouteAction,
+  setCanvasOptionRouteAction,
   updateCanvasBranchRuleAction,
   updateCanvasStepAction,
   updateCanvasStepBasicsAction,
@@ -97,6 +99,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  getActionOptionIdFromOutputPort,
+  getStoredActionOptionRoute,
+} from "@/lib/action-option-routing";
 import { isFlowActionStepType } from "@/lib/flow-action-editor";
 import { getFlowComponentLabel } from "@/lib/flow-components";
 
@@ -184,12 +190,33 @@ export function ActionFlowCanvas({
     },
     [actionId, router],
   );
+  const changeOptionRoute = useCallback(
+    (stepId: number, optionId: string, targetStepId: number | null) => {
+      runMutation(() =>
+        targetStepId === null
+          ? clearCanvasOptionRouteAction({
+              actionId,
+              sourceOptionId: optionId,
+              sourceStepId: stepId,
+            })
+          : setCanvasOptionRouteAction({
+              actionId,
+              sourceOptionId: optionId,
+              sourceStepId: stepId,
+              targetStepId,
+            }),
+      );
+    },
+    [actionId, runMutation],
+  );
   const initialNodes = useMemo(
     () =>
       buildNodes({
+        branchRules,
         catalogProducts,
         mediaAssets,
         onQuickEditChange: handleQuickEditChange,
+        onOptionRouteChange: changeOptionRoute,
         onQuickSave: quickSaveStep,
         productCatalogs,
         routeIssues,
@@ -197,6 +224,8 @@ export function ActionFlowCanvas({
       }),
     [
       catalogProducts,
+      branchRules,
+      changeOptionRoute,
       handleQuickEditChange,
       mediaAssets,
       productCatalogs,
@@ -229,6 +258,9 @@ export function ActionFlowCanvas({
       ? (branchRules.find((rule) => `branch-${rule.id}` === selection.id) ??
         null)
       : null;
+  const selectedOptionRoute = selectedBranchRule
+    ? getStoredActionOptionRoute(selectedBranchRule.settings)
+    : null;
   const selectedDefaultRoute =
     selection?.type === "edge" && selection.id.startsWith("default-")
       ? (defaultRoutes.find(
@@ -418,9 +450,17 @@ export function ActionFlowCanvas({
         return;
       }
 
+      const sourceOptionId = getActionOptionIdFromOutputPort(
+        connection.sourceHandle,
+      );
+      if (sourceOptionId) {
+        changeOptionRoute(sourceStepId, sourceOptionId, targetStepId);
+        return;
+      }
+
       saveDefaultRoute(sourceStepId, targetStepId);
     },
-    [saveDefaultRoute, steps],
+    [changeOptionRoute, saveDefaultRoute, steps],
   );
 
   const createBranchRule = useCallback(
@@ -641,6 +681,11 @@ export function ActionFlowCanvas({
                   <Pencil className="h-5 w-5" />
                   Edit Step
                 </>
+              ) : selectedOptionRoute ? (
+                <>
+                  <Route className="h-5 w-5" />
+                  Edit Option Route
+                </>
               ) : selectedBranchRule ? (
                 <>
                   <GitBranch className="h-5 w-5" />
@@ -656,9 +701,11 @@ export function ActionFlowCanvas({
             <DialogDescription>
               {selectedStep
                 ? "Update the visitor-facing content and common behavior."
-                : selectedBranchRule
-                  ? "Update this conditional route."
-                  : "Review or clear this route."}
+                : selectedOptionRoute
+                  ? "Choose the destination for this stable option output."
+                  : selectedBranchRule
+                    ? "Update this conditional route."
+                    : "Review or clear this route."}
             </DialogDescription>
           </DialogHeader>
           <FormErrorMessage error={dialogError} />
@@ -799,7 +846,69 @@ export function ActionFlowCanvas({
             </div>
           )}
 
-          {selectedBranchRule && (
+          {selectedBranchRule && selectedOptionRoute && (
+            <div className="space-y-4">
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Selected Option Output
+                </p>
+                <p className="font-medium">
+                  {selectedOptionRoute.sourceOutputPort}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Routes to{" "}
+                  {getStepRouteLabel(steps, selectedBranchRule.targetStepId)}.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-medium"
+                  htmlFor="selected-option-route-target"
+                >
+                  Go to
+                </label>
+                <select
+                  id="selected-option-route-target"
+                  className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm"
+                  value={selectedBranchRule.targetStepId}
+                  onChange={(event) =>
+                    changeOptionRoute(
+                      selectedBranchRule.sourceStepId,
+                      selectedOptionRoute.sourceOptionId,
+                      Number(event.currentTarget.value),
+                    )
+                  }
+                >
+                  {steps
+                    .filter(
+                      (step) => step.id !== selectedBranchRule.sourceStepId,
+                    )
+                    .map((step) => (
+                      <option key={step.id} value={step.id}>
+                        {getStepRouteLabel(steps, step.id)}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  changeOptionRoute(
+                    selectedBranchRule.sourceStepId,
+                    selectedOptionRoute.sourceOptionId,
+                    null,
+                  );
+                  setSelection(null);
+                }}
+              >
+                <Unlink className="h-4 w-4" />
+                Clear Option Route
+              </Button>
+            </div>
+          )}
+
+          {selectedBranchRule && !selectedOptionRoute && (
             <div className="space-y-5">
               <div className="rounded-md border p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -840,7 +949,7 @@ export function ActionFlowCanvas({
             <div className="space-y-4">
               <div className="rounded-md border p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Selected Default Route
+                  Selected Default / No-Match Route
                 </p>
                 <p className="font-medium">
                   {selectedDefaultRoute.sourceStep.sortOrder}.{" "}
@@ -852,6 +961,9 @@ export function ActionFlowCanvas({
                         selectedDefaultRoute.targetStep,
                       )}`
                     : `Routes to missing step #${selectedDefaultRoute.sourceStep.nextStepId}`}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Used when no enabled option or conditional route matches.
                 </p>
               </div>
               <Button

@@ -775,12 +775,12 @@ new task-first model.
 - [x] Ask Address, Ask Location, and Ask Media store structured values.
 - [x] Give every button, list row, product, and selectable result a stable option ID and output port.
 - [ ] Add route, URL, and phone button behavior where supported.
-- [ ] Connect each routable option through a canvas handle or `Go to` selector.
-- [ ] Make both routing controls write the same graph edge.
-- [ ] Preserve routing when labels change or are translated.
-- [ ] Add documented default and no-match outputs.
-- [ ] Warn before deleting a connected option.
-- [ ] Block duplicate, conflicting, missing, or invalid option routes.
+- [x] Connect each routable option through a canvas handle or `Go to` selector.
+- [x] Make both routing controls write the same graph edge.
+- [x] Preserve routing when labels change or are translated.
+- [x] Add documented default and no-match outputs.
+- [x] Warn before deleting a connected option.
+- [x] Block duplicate, conflicting, missing, or invalid option routes.
 - [ ] Add a first-class boolean input.
 - [ ] Add retry count, retry message, and retry-exhausted output.
 - [ ] Add no-reply reminder, timeout, and output.
@@ -797,6 +797,16 @@ stored values when labels change or options are reordered, while legacy values
 remain readable and receive persistent IDs on their next save. No database
 migration was required. Nine focused option/runtime checks, TypeScript, lint,
 tenant-scope analysis, cron validation, and all 139 channel contracts passed.
+
+Phase 10 Checkpoint 2 status: Complete on 2026-08-03. Every runtime-resolvable
+choice or product option now exposes a stable canvas handle and a `Go to`
+selector; both controls upsert the same option-tagged branch-rule edge. The
+compiler blocks malformed identity metadata, missing or stale options, value
+mismatches, duplicate routes, and conflicting destinations. Route labels are
+resolved from the current option label, the fallback edge is explicitly shown
+as `default / no match`, and connected options must have their route cleared
+before removal. No database migration was required. TypeScript and 21 focused
+compiler/canvas checks passed.
 
 Phase 10 exit gate: businesses can choose either flexible task collection or
 fully scripted collection with stable per-option routes.

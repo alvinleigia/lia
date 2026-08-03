@@ -1,7 +1,14 @@
+import { resolveActionDataSourceOptions } from "@/lib/action-data-sources";
 import {
   ACTION_BRANCH_OPERATORS,
   type ActionBranchOperator,
 } from "@/lib/action-flow-constants";
+import {
+  ACTION_OPTION_ROUTE_SETTINGS_KEY,
+  getActionOptionIdentity,
+  getStoredActionOptionRoute,
+  getStoredActionOptions,
+} from "@/lib/action-option-routing";
 
 export const ACTION_FLOW_CONDITION_VALUE_TYPES = [
   "string",
@@ -47,6 +54,7 @@ export type ActionFlowCompilerStep = {
   inputType: string | null;
   isEnabled: boolean;
   nextStepId: number | null;
+  options?: unknown;
   settings: Record<string, unknown>;
   sortOrder: number;
   stepType: string;
@@ -71,7 +79,8 @@ export type ActionFlowCompilerIssueSource =
   | "graph_cycle"
   | "graph_entry"
   | "graph_reachability"
-  | "graph_terminal";
+  | "graph_terminal"
+  | "option_route";
 
 export type ActionFlowCompilerIssueCode =
   | "branch_condition_group_invalid"
@@ -91,7 +100,13 @@ export type ActionFlowCompilerIssueCode =
   | "graph_cycle_detected"
   | "graph_entry_missing"
   | "graph_terminal_unreachable"
-  | "graph_step_unreachable";
+  | "graph_step_unreachable"
+  | "option_route_conflict"
+  | "option_route_duplicate"
+  | "option_route_option_missing"
+  | "option_route_settings_invalid"
+  | "option_route_source_field_mismatch"
+  | "option_route_value_mismatch";
 
 export type ActionFlowCompilerIssue = {
   code: ActionFlowCompilerIssueCode;
@@ -177,9 +192,67 @@ function isRunnableStep(step: ActionFlowCompilerStep) {
   );
 }
 
+function getCompilerStepOptions(step: ActionFlowCompilerStep) {
+  const storedOptions = getStoredActionOptions(step.options);
+  if (storedOptions.length > 0) {
+    return storedOptions;
+  }
+
+  const dynamicOptions = resolveActionDataSourceOptions(step.settings);
+  if (dynamicOptions.length > 0) {
+    return dynamicOptions.map((option, index) => ({
+      ...getActionOptionIdentity({
+        fallbackId: `source-option-${index + 1}`,
+        id: option.value,
+      }),
+      label: option.label,
+      value: option.value,
+    }));
+  }
+
+  const products = step.settings.products;
+  if (!Array.isArray(products)) {
+    return [];
+  }
+
+  return products.flatMap((product) => {
+    if (!product || typeof product !== "object" || Array.isArray(product)) {
+      return [];
+    }
+
+    const record = product as Record<string, unknown>;
+    if (
+      typeof record.id !== "number" ||
+      typeof record.name !== "string" ||
+      !record.name.trim()
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        ...getActionOptionIdentity({
+          fallbackId: `product-${record.id}`,
+          id: `product-${record.id}`,
+        }),
+        label: record.name.trim(),
+        value: String(record.id),
+      },
+    ];
+  });
+}
+
 function inferStepFieldType(
   step: ActionFlowCompilerStep,
 ): ActionFlowConditionValueType | null {
+  if (
+    step.stepType === "product_selection" &&
+    step.settings.productSelectionAllowMultiple !== true &&
+    step.settings.productSelectionAllowQuantity !== true
+  ) {
+    return "string";
+  }
+
   if (step.stepType === "number") {
     return "number";
   }
@@ -658,6 +731,7 @@ export function compileActionFlowGraph(input: {
   const edges: CompiledActionFlowEdge[] = [];
   const outgoing = new Map<number, number[]>();
   const hasFallback = new Set<number>();
+  const optionRouteTargets = new Map<string, number>();
 
   function addEdge(edge: CompiledActionFlowEdge) {
     edges.push(edge);
@@ -726,6 +800,88 @@ export function compileActionFlowGraph(input: {
         source: "branch_rule",
       });
       continue;
+    }
+
+    if (ACTION_OPTION_ROUTE_SETTINGS_KEY in rule.settings) {
+      const optionRoute = getStoredActionOptionRoute(rule.settings);
+      const sourceStep = stepById.get(rule.sourceStepId);
+
+      if (!optionRoute) {
+        issues.push({
+          code: "option_route_settings_invalid",
+          message: `Option route #${rule.id} has invalid option identity metadata.`,
+          ruleId: rule.id,
+          severity: "error",
+          source: "option_route",
+          stepId: rule.sourceStepId,
+        });
+        continue;
+      }
+
+      if (
+        !sourceStep?.fieldKey ||
+        rule.sourceFieldKey !== sourceStep.fieldKey ||
+        rule.operator !== "equals"
+      ) {
+        issues.push({
+          code: "option_route_source_field_mismatch",
+          message: `Option route #${rule.id} must compare the source step field with equals.`,
+          ruleId: rule.id,
+          severity: "error",
+          source: "option_route",
+          stepId: rule.sourceStepId,
+        });
+        continue;
+      }
+
+      const sourceOptions = getCompilerStepOptions(sourceStep);
+      const sourceOption = sourceOptions.find(
+        (option) => option.id === optionRoute.sourceOptionId,
+      );
+      if (!sourceOption) {
+        issues.push({
+          code: "option_route_option_missing",
+          message: `Option route #${rule.id} points to an option that no longer exists.`,
+          ruleId: rule.id,
+          severity: "error",
+          source: "option_route",
+          stepId: rule.sourceStepId,
+        });
+        continue;
+      }
+
+      if (rule.comparisonValue !== String(sourceOption.value)) {
+        issues.push({
+          code: "option_route_value_mismatch",
+          message: `Option route #${rule.id} no longer matches its stored option value.`,
+          ruleId: rule.id,
+          severity: "error",
+          source: "option_route",
+          stepId: rule.sourceStepId,
+        });
+        continue;
+      }
+
+      const routeKey = `${rule.sourceStepId}:${optionRoute.sourceOptionId}`;
+      const existingTarget = optionRouteTargets.get(routeKey);
+      if (existingTarget !== undefined) {
+        issues.push({
+          code:
+            existingTarget === rule.targetStepId
+              ? "option_route_duplicate"
+              : "option_route_conflict",
+          message:
+            existingTarget === rule.targetStepId
+              ? `Option route #${rule.id} duplicates an existing route for the same option.`
+              : `Option route #${rule.id} conflicts with another destination for the same option.`,
+          ruleId: rule.id,
+          severity: "error",
+          source: "option_route",
+          stepId: rule.sourceStepId,
+        });
+        continue;
+      }
+      optionRouteTargets.set(routeKey, rule.targetStepId);
     }
 
     const compiled = compileConditionGroup({ fieldTypes, rule });

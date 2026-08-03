@@ -16,6 +16,7 @@ import {
   getActionFlowBranchRule,
   getActionFlowStep,
   getProjectAction,
+  listActionFlowBranchRulesForStep,
   listActionFlowSteps,
   setActionFlowStepDefaultRoute,
   setActionFlowStepSettings,
@@ -24,6 +25,16 @@ import {
   updateActionFlowStep,
   updateProjectAction,
 } from "@/lib/action-flows";
+import {
+  ACTION_OPTION_ROUTE_SETTINGS_KEY,
+  buildStoredActionOptionRoute,
+  getStoredActionOptionRoute,
+  getStoredActionOptions,
+} from "@/lib/action-option-routing";
+import {
+  getActionStepOptions,
+  type RuntimeActionStep,
+} from "@/lib/action-runtime";
 import {
   createActionStepSchema,
   mergeActionStepOptions,
@@ -76,6 +87,12 @@ const canvasRouteSchema = z.object({
 });
 
 const clearCanvasRouteSchema = canvasRouteSchema.omit({ targetStepId: true });
+const canvasOptionRouteSchema = canvasRouteSchema.extend({
+  sourceOptionId: z.string().trim().min(1).max(160),
+});
+const clearCanvasOptionRouteSchema = canvasOptionRouteSchema.omit({
+  targetStepId: true,
+});
 const canvasStepPositionsSchema = z.object({
   actionId: z.coerce.number().int().positive(),
   positions: z
@@ -198,6 +215,11 @@ const canvasBranchRuleSchema = z
     ruleId: z.coerce.number().int().positive().optional(),
     sourceStepId: z.coerce.number().int().positive(),
     sourceFieldKey: z.string().trim().min(1).max(80),
+    sourceOptionId: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() === "" ? undefined : value,
+      z.string().trim().min(1).max(160).optional(),
+    ),
     operator: z.enum(ACTION_BRANCH_OPERATORS),
     comparisonValue: z.string().trim().max(240).optional(),
     branchLabel: z.string().trim().max(80).optional(),
@@ -298,6 +320,7 @@ function buildBranchRuleSettings(
   existingSettings: Record<string, unknown> | undefined,
   branchLabel: string | undefined,
   conditionGroup: string | undefined,
+  sourceOptionId: string | undefined,
 ) {
   const settings = { ...(existingSettings ?? {}) };
 
@@ -317,6 +340,11 @@ function buildBranchRuleSettings(
     if (parsed.group) {
       settings.conditionGroup = parsed.group;
     }
+  }
+
+  if (sourceOptionId !== undefined) {
+    settings[ACTION_OPTION_ROUTE_SETTINGS_KEY] =
+      buildStoredActionOptionRoute(sourceOptionId);
   }
 
   return settings;
@@ -386,6 +414,40 @@ async function requireCanvasStep(input: {
   stepId: number;
 }) {
   return getActionFlowStep(input.projectId, input.actionId, input.stepId);
+}
+
+async function getRemovedConnectedOptionLabel(input: {
+  actionId: number;
+  existingOptions: unknown;
+  nextOptions: unknown;
+  projectId: number;
+  stepId: number;
+}) {
+  const nextOptionIds = new Set(
+    getStoredActionOptions(input.nextOptions).map((option) => option.id),
+  );
+  const removedOptions = getStoredActionOptions(input.existingOptions).filter(
+    (option) => !nextOptionIds.has(option.id),
+  );
+  if (removedOptions.length === 0) {
+    return null;
+  }
+
+  const rules = await listActionFlowBranchRulesForStep(
+    input.projectId,
+    input.actionId,
+    input.stepId,
+  );
+  const connectedOptionIds = new Set(
+    rules
+      .map((rule) => getStoredActionOptionRoute(rule.settings)?.sourceOptionId)
+      .filter((optionId): optionId is string => Boolean(optionId)),
+  );
+
+  return (
+    removedOptions.find((option) => connectedOptionIds.has(option.id))?.label ??
+    null
+  );
 }
 
 async function requireCanvasOperation(input: {
@@ -1170,6 +1232,23 @@ export async function updateCanvasStepAction(
     };
   }
 
+  const options = isInputStep
+    ? mergeActionStepOptions(parsed.data.options, existingStep.options)
+    : [];
+  const connectedRemovedOption = await getRemovedConnectedOptionLabel({
+    actionId: action.id,
+    existingOptions: existingStep.options,
+    nextOptions: options,
+    projectId: project.id,
+    stepId: existingStep.id,
+  });
+  if (connectedRemovedOption) {
+    return {
+      ok: false,
+      message: `Clear the Go to route for "${connectedRemovedOption}" before deleting it.`,
+    };
+  }
+
   try {
     const step = await updateActionFlowStep({
       projectId: project.id,
@@ -1192,9 +1271,7 @@ export async function updateCanvasStepAction(
       nextStepId: existingStep.nextStepId,
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled ?? true,
-      options: isInputStep
-        ? mergeActionStepOptions(parsed.data.options, existingStep.options)
-        : [],
+      options,
       settings: buildActionStepSettings({
         stepType: parsed.data.stepType,
         choiceDisplayMode: parsed.data.choiceDisplayMode,
@@ -1451,6 +1528,20 @@ export async function updateCanvasStepBasicsAction(
     options.length === 0
   ) {
     return { ok: false, message: "Add at least one choice before saving." };
+  }
+
+  const connectedRemovedOption = await getRemovedConnectedOptionLabel({
+    actionId: action.id,
+    existingOptions: existingStep.options,
+    nextOptions: options,
+    projectId: project.id,
+    stepId: existingStep.id,
+  });
+  if (connectedRemovedOption) {
+    return {
+      ok: false,
+      message: `Clear the Go to route for "${connectedRemovedOption}" before deleting it.`,
+    };
   }
 
   let settings = { ...existingStep.settings };
@@ -1736,6 +1827,208 @@ export async function clearCanvasDefaultRouteAction(
   return { ok: true, message: "Default route cleared." };
 }
 
+export async function setCanvasOptionRouteAction(
+  input: unknown,
+): Promise<CanvasRouteActionResult> {
+  const parsed = canvasOptionRouteSchema.safeParse(input);
+  if (
+    !parsed.success ||
+    parsed.data.sourceStepId === parsed.data.targetStepId
+  ) {
+    return { ok: false, message: "Please check the option route." };
+  }
+
+  const context = await resolveCanvasAction(parsed.data.actionId);
+  if ("error" in context) {
+    return { ok: false, message: context.error ?? "Action not found." };
+  }
+
+  const { action, project } = context;
+  const [sourceStep, targetStep, sourceRules] = await Promise.all([
+    requireCanvasStep({
+      projectId: project.id,
+      actionId: action.id,
+      stepId: parsed.data.sourceStepId,
+    }),
+    requireCanvasStep({
+      projectId: project.id,
+      actionId: action.id,
+      stepId: parsed.data.targetStepId,
+    }),
+    listActionFlowBranchRulesForStep(
+      project.id,
+      action.id,
+      parsed.data.sourceStepId,
+    ),
+  ]);
+
+  if (!sourceStep || !targetStep || !sourceStep.fieldKey) {
+    return {
+      ok: false,
+      message: "The option and destination must belong to this action.",
+    };
+  }
+
+  if (
+    sourceStep.stepType === "product_selection" &&
+    (sourceStep.settings.productSelectionAllowMultiple === true ||
+      sourceStep.settings.productSelectionAllowQuantity === true)
+  ) {
+    return {
+      ok: false,
+      message:
+        "Per-product routes require a single product selection without quantity.",
+    };
+  }
+
+  const option = getActionStepOptions(sourceStep as RuntimeActionStep).find(
+    (candidate) => candidate.id === parsed.data.sourceOptionId,
+  );
+  if (!option) {
+    return {
+      ok: false,
+      message: "This option is no longer available on the source step.",
+    };
+  }
+
+  const matchingRules = sourceRules.filter(
+    (rule) =>
+      getStoredActionOptionRoute(rule.settings)?.sourceOptionId === option.id,
+  );
+  if (matchingRules.length > 1) {
+    return {
+      ok: false,
+      message: "Resolve the duplicate option routes before changing this one.",
+    };
+  }
+
+  const settings = {
+    [ACTION_OPTION_ROUTE_SETTINGS_KEY]: buildStoredActionOptionRoute(option.id),
+  };
+  const existingRule = matchingRules[0] ?? null;
+  try {
+    const rule = existingRule
+      ? await updateActionFlowBranchRule({
+          projectId: project.id,
+          actionId: action.id,
+          ruleId: existingRule.id,
+          sourceStepId: sourceStep.id,
+          sourceFieldKey: sourceStep.fieldKey,
+          operator: "equals",
+          comparisonValue: String(option.value),
+          targetStepId: targetStep.id,
+          sortOrder: existingRule.sortOrder,
+          isEnabled: true,
+          settings,
+        })
+      : await createActionFlowBranchRule({
+          projectId: project.id,
+          actionId: action.id,
+          sourceStepId: sourceStep.id,
+          sourceFieldKey: sourceStep.fieldKey,
+          operator: "equals",
+          comparisonValue: String(option.value),
+          targetStepId: targetStep.id,
+          sortOrder:
+            sourceRules.reduce(
+              (highest, candidate) => Math.max(highest, candidate.sortOrder),
+              0,
+            ) + 1,
+          isEnabled: true,
+          settings,
+        });
+
+    if (!rule) {
+      return { ok: false, message: "The option route could not be saved." };
+    }
+
+    await writeAuditLog({
+      ...context,
+      action: existingRule
+        ? "chatbot_action.canvas_option_route_updated"
+        : "chatbot_action.canvas_option_route_created",
+      targetType: "action_flow_branch_rule",
+      targetId: rule.id,
+      metadata: {
+        actionId: action.id,
+        sourceOptionId: option.id,
+        sourceOutputPort: option.outputPort,
+        sourceStepId: sourceStep.id,
+        targetStepId: targetStep.id,
+      },
+    });
+  } catch {
+    return {
+      ok: false,
+      message: "The option route conflicted with another saved route.",
+    };
+  }
+
+  revalidateCanvasPaths(action.id);
+  return { ok: true, message: "Option route saved." };
+}
+
+export async function clearCanvasOptionRouteAction(
+  input: unknown,
+): Promise<CanvasRouteActionResult> {
+  const parsed = clearCanvasOptionRouteSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Please check the option route." };
+  }
+
+  const context = await resolveCanvasAction(parsed.data.actionId);
+  if ("error" in context) {
+    return { ok: false, message: context.error ?? "Action not found." };
+  }
+
+  const { action, project } = context;
+  const sourceStep = await requireCanvasStep({
+    projectId: project.id,
+    actionId: action.id,
+    stepId: parsed.data.sourceStepId,
+  });
+  if (!sourceStep) {
+    return { ok: false, message: "Source step not found." };
+  }
+
+  const sourceRules = await listActionFlowBranchRulesForStep(
+    project.id,
+    action.id,
+    sourceStep.id,
+  );
+  const matchingRules = sourceRules.filter(
+    (rule) =>
+      getStoredActionOptionRoute(rule.settings)?.sourceOptionId ===
+      parsed.data.sourceOptionId,
+  );
+
+  if (matchingRules.length !== 1) {
+    return {
+      ok: false,
+      message:
+        matchingRules.length > 1
+          ? "Resolve the duplicate option routes before clearing this one."
+          : "This option does not have a saved route.",
+    };
+  }
+
+  await deleteActionFlowBranchRule(project.id, action.id, matchingRules[0].id);
+  await writeAuditLog({
+    ...context,
+    action: "chatbot_action.canvas_option_route_cleared",
+    targetType: "action_flow_branch_rule",
+    targetId: matchingRules[0].id,
+    metadata: {
+      actionId: action.id,
+      sourceOptionId: parsed.data.sourceOptionId,
+      sourceStepId: sourceStep.id,
+    },
+  });
+
+  revalidateCanvasPaths(action.id);
+  return { ok: true, message: "Option route cleared." };
+}
+
 export async function createCanvasBranchRuleAction(
   input: unknown,
 ): Promise<CanvasRouteActionResult> {
@@ -1783,6 +2076,7 @@ export async function createCanvasBranchRuleAction(
         undefined,
         parsed.data.branchLabel,
         parsed.data.conditionGroup,
+        parsed.data.sourceOptionId,
       ),
     });
 
@@ -1863,6 +2157,7 @@ export async function updateCanvasBranchRuleAction(
         existingRule.settings,
         parsed.data.branchLabel,
         parsed.data.conditionGroup,
+        parsed.data.sourceOptionId,
       ),
     });
 

@@ -6,6 +6,7 @@ import {
   evaluateCompiledActionFlowConditionGroup,
   type StoredActionFlowConditionGroup,
 } from "../../src/lib/action-flow-compiler";
+import { buildStoredActionOptionRoute } from "../../src/lib/action-option-routing";
 import {
   getNextActionStepDecision,
   type RuntimeAction,
@@ -283,6 +284,196 @@ test("compiler blocks routes that start from terminal steps", () => {
       expect.objectContaining({ code: "default_source_step_terminal" }),
     ]),
   );
+});
+
+test("compiler keeps an option route valid when its label changes", () => {
+  const graph = compileActionFlowGraph({
+    branchRules: [
+      createRule(33, 1, 3, {
+        comparisonValue: "service_deep_tissue",
+        settings: {
+          optionRoute: buildStoredActionOptionRoute("service-option-2"),
+        },
+        sourceFieldKey: "service",
+      }),
+    ],
+    steps: [
+      createStep(1, 1, {
+        fieldKey: "service",
+        options: [
+          {
+            id: "service-option-2",
+            label: "Massage des tissus profonds",
+            value: "service_deep_tissue",
+          },
+        ],
+        stepType: "choice",
+      }),
+      createStep(2, 2, { stepType: "submit" }),
+      createStep(3, 3, { stepType: "submit" }),
+    ],
+  });
+
+  expect(graph.issues).toEqual([]);
+  expect(graph.edges).toContainEqual(
+    expect.objectContaining({
+      ruleId: 33,
+      sourceStepId: 1,
+      targetStepId: 3,
+      type: "branch",
+    }),
+  );
+});
+
+test("compiler blocks missing and stale option route identities", () => {
+  const graph = compileActionFlowGraph({
+    branchRules: [
+      createRule(34, 1, 2, {
+        comparisonValue: "service_facial",
+        settings: {
+          optionRoute: buildStoredActionOptionRoute("missing-option"),
+        },
+        sourceFieldKey: "service",
+      }),
+      createRule(35, 1, 2, {
+        comparisonValue: "old_value",
+        settings: {
+          optionRoute: buildStoredActionOptionRoute("service-option-1"),
+        },
+        sortOrder: 2,
+        sourceFieldKey: "service",
+      }),
+    ],
+    steps: [
+      createStep(1, 1, {
+        fieldKey: "service",
+        options: [
+          {
+            id: "service-option-1",
+            label: "Classic Facial",
+            value: "service_facial",
+          },
+        ],
+        stepType: "choice",
+      }),
+      createStep(2, 2, { stepType: "submit" }),
+    ],
+  });
+
+  expect(graph.issues).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        code: "option_route_option_missing",
+        ruleId: 34,
+      }),
+      expect.objectContaining({
+        code: "option_route_value_mismatch",
+        ruleId: 35,
+      }),
+    ]),
+  );
+});
+
+test("compiler blocks duplicate and conflicting option destinations", () => {
+  const settings = {
+    optionRoute: buildStoredActionOptionRoute("service-option-1"),
+  };
+  const graph = compileActionFlowGraph({
+    branchRules: [
+      createRule(36, 1, 2, {
+        comparisonValue: "service_facial",
+        settings,
+        sourceFieldKey: "service",
+      }),
+      createRule(37, 1, 2, {
+        comparisonValue: "service_facial",
+        settings,
+        sortOrder: 2,
+        sourceFieldKey: "service",
+      }),
+      createRule(38, 1, 3, {
+        comparisonValue: "service_facial",
+        settings,
+        sortOrder: 3,
+        sourceFieldKey: "service",
+      }),
+    ],
+    steps: [
+      createStep(1, 1, {
+        fieldKey: "service",
+        options: [
+          {
+            id: "service-option-1",
+            label: "Classic Facial",
+            value: "service_facial",
+          },
+        ],
+        stepType: "choice",
+      }),
+      createStep(2, 2, { stepType: "submit" }),
+      createStep(3, 3, { stepType: "submit" }),
+    ],
+  });
+
+  expect(graph.issues).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        code: "option_route_duplicate",
+        ruleId: 37,
+      }),
+      expect.objectContaining({
+        code: "option_route_conflict",
+        ruleId: 38,
+      }),
+    ]),
+  );
+});
+
+test("compiler validates dynamic catalogue and product option identities", () => {
+  const dynamicGraph = compileActionFlowGraph({
+    branchRules: [
+      createRule(39, 1, 2, {
+        comparisonValue: "spa_deep_tissue_massage",
+        settings: {
+          optionRoute: buildStoredActionOptionRoute("spa_deep_tissue_massage"),
+        },
+        sourceFieldKey: "service",
+      }),
+    ],
+    steps: [
+      createStep(1, 1, {
+        fieldKey: "service",
+        settings: {
+          sourceConfig: { catalogId: "cat_spa_services" },
+          sourceType: "catalog_items",
+        },
+        stepType: "choice",
+      }),
+      createStep(2, 2, { stepType: "submit" }),
+    ],
+  });
+  const productGraph = compileActionFlowGraph({
+    branchRules: [
+      createRule(40, 1, 2, {
+        comparisonValue: "42",
+        settings: {
+          optionRoute: buildStoredActionOptionRoute("product-42"),
+        },
+        sourceFieldKey: "product",
+      }),
+    ],
+    steps: [
+      createStep(1, 1, {
+        fieldKey: "product",
+        settings: { products: [{ id: 42, name: "Classic Facial" }] },
+        stepType: "product_selection",
+      }),
+      createStep(2, 2, { stepType: "submit" }),
+    ],
+  });
+
+  expect(dynamicGraph.issues).toEqual([]);
+  expect(productGraph.issues).toEqual([]);
 });
 
 test("runtime evaluates compiled OR conditions before the ordered fallback", () => {
