@@ -126,6 +126,20 @@ export type ActionFlowImportResult = {
   stepCount: number;
 };
 
+export function sanitizeActionFlowExportValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeActionFlowExportValue);
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+      key,
+      /secret|password|token|api.?key|authorization|credential/i.test(key)
+        ? "[REDACTED]"
+        : sanitizeActionFlowExportValue(entry),
+    ]),
+  );
+}
+
 export async function buildProjectActionFlowExport(input: {
   actionId: number;
   project: Pick<SelectProject, "id" | "name">;
@@ -145,7 +159,10 @@ export async function buildProjectActionFlowExport(input: {
       description: action.description,
       id: action.id,
       name: action.name,
-      settings: action.settings,
+      settings: sanitizeActionFlowExportValue(action.settings) as Record<
+        string,
+        unknown
+      >,
       status: action.status,
       triggerPhrases: action.triggerPhrases,
     },
@@ -154,7 +171,10 @@ export async function buildProjectActionFlowExport(input: {
       id: rule.id,
       isEnabled: rule.isEnabled,
       operator: rule.operator,
-      settings: rule.settings,
+      settings: sanitizeActionFlowExportValue(rule.settings) as Record<
+        string,
+        unknown
+      >,
       sortOrder: rule.sortOrder,
       sourceFieldKey: rule.sourceFieldKey,
       sourceStepId: rule.sourceStepId,
@@ -337,7 +357,10 @@ function buildPortableExportStepSettings(step: {
     step.stepType !== "connect_flow" &&
     step.stepType !== "conversational_task"
   ) {
-    return step.settings;
+    return sanitizeActionFlowExportValue(step.settings) as Record<
+      string,
+      unknown
+    >;
   }
 
   const settings = { ...step.settings };
@@ -348,7 +371,7 @@ function buildPortableExportStepSettings(step: {
     delete settings.conversationalTask;
     settings.conversationalTaskExportNote =
       "Published task versions are project-specific. Select a published task version after import.";
-    return settings;
+    return sanitizeActionFlowExportValue(settings) as Record<string, unknown>;
   }
 
   const connectedActionId = toPositiveNumber(settings.connectedActionId);
@@ -362,7 +385,7 @@ function buildPortableExportStepSettings(step: {
   settings.connectedActionExportNote =
     "Connected flow links are environment-specific. Reconnect this step after import.";
 
-  return settings;
+  return sanitizeActionFlowExportValue(settings) as Record<string, unknown>;
 }
 
 function buildImportedStepSettings(

@@ -131,7 +131,7 @@ function parseHttpStatusCodes(value: string | undefined) {
   const codes = value
     .split(/[\s,]+/)
     .filter(Boolean)
-    .map((item) => Number.parseInt(item, 10));
+    .map(Number);
   if (
     codes.some((code) => !Number.isInteger(code) || code < 100 || code > 599)
   ) {

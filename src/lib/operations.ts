@@ -22,6 +22,7 @@ import { resolveTraceId } from "@/lib/execution-trace";
 import { HTTP_METHODS, type HttpMethod } from "@/lib/operation-contracts";
 import {
   hydrateProviderConfig,
+  listMissingProviderSecretNames,
   prepareProviderConfig,
 } from "@/lib/provider-secrets";
 
@@ -517,6 +518,126 @@ export async function getProjectOperation(
     .limit(1);
 
   return row ?? null;
+}
+
+function isStringRecord(value: unknown) {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.entries(value as Record<string, unknown>).every(
+      ([key, entry]) => key.trim() && typeof entry === "string",
+    )
+  );
+}
+
+function hasUnsafeMappingPath(value: string) {
+  return value
+    .split(".")
+    .some((part) => ["__proto__", "constructor", "prototype"].includes(part));
+}
+
+export function getOperationConfigurationIssues(
+  context: NonNullable<Awaited<ReturnType<typeof getProjectOperation>>>,
+) {
+  const issues: string[] = [];
+  const { operation, provider } = context;
+
+  if (operation.status !== "active" || provider.status !== "active") {
+    issues.push("The operation and its provider must both be active.");
+  }
+  if (operation.operationType !== "api_request") return issues;
+
+  const url = readStringConfig(provider.config, "url");
+  try {
+    const parsedUrl = new URL(url ?? "");
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      throw new Error("Unsupported protocol.");
+    }
+  } catch {
+    issues.push("The API endpoint must be a valid HTTP or HTTPS URL.");
+  }
+
+  const method =
+    readStringConfig(provider.config, "method")?.toUpperCase() ?? "POST";
+  if (!HTTP_METHODS.includes(method as HttpMethod)) {
+    issues.push("The API request method is invalid.");
+  }
+  if (
+    provider.config.queryParameters !== undefined &&
+    !isStringRecord(provider.config.queryParameters)
+  ) {
+    issues.push("Query parameters must contain named text values.");
+  }
+  if (
+    provider.config.headers !== undefined &&
+    !isStringRecord(provider.config.headers)
+  ) {
+    issues.push("Headers must contain named text values.");
+  }
+
+  for (const [label, mapping] of [
+    ["Input", operation.inputMapping],
+    ["Output", operation.outputMapping],
+  ] as const) {
+    if (!isStringRecord(mapping)) {
+      issues.push(`${label} mapping must contain named field paths.`);
+      continue;
+    }
+    if (
+      Object.entries(mapping).some(
+        ([target, source]) =>
+          hasUnsafeMappingPath(target) || hasUnsafeMappingPath(String(source)),
+      )
+    ) {
+      issues.push(`${label} mapping contains an unsafe field path.`);
+    }
+  }
+  if (
+    Object.keys(operation.outputMapping).some(
+      (target) =>
+        !target.startsWith("fields.") &&
+        !target.startsWith("contactAttributes."),
+    )
+  ) {
+    issues.push(
+      "Output mapping targets must start with fields. or contactAttributes..",
+    );
+  }
+
+  const customStatusCodes = operation.settings.customStatusCodes;
+  if (
+    customStatusCodes !== undefined &&
+    (!Array.isArray(customStatusCodes) ||
+      customStatusCodes.some(
+        (status) =>
+          typeof status !== "number" ||
+          !Number.isInteger(status) ||
+          status < 100 ||
+          status > 599,
+      ) ||
+      new Set(customStatusCodes).size !== customStatusCodes.length)
+  ) {
+    issues.push(
+      "Custom HTTP status outputs must be unique codes from 100 to 599.",
+    );
+  }
+
+  return issues;
+}
+
+export async function getOperationCredentialIssues(
+  context: NonNullable<Awaited<ReturnType<typeof getProjectOperation>>>,
+) {
+  const missing = await listMissingProviderSecretNames({
+    config: context.provider.config,
+    projectId: context.operation.projectId,
+    providerId: context.provider.id,
+  });
+  return missing.map(
+    (name) =>
+      `The API credential ${name} is unavailable and must be saved again.`,
+  );
 }
 
 export async function listOperationAttemptsForSubmission(

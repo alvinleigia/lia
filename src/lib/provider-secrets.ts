@@ -33,6 +33,50 @@ function isProviderSecretReference(
   );
 }
 
+export function listProviderSecretReferenceNames(
+  config: Record<string, unknown>,
+) {
+  const names = new Set<string>();
+
+  function visit(value: unknown) {
+    if (isProviderSecretReference(value)) {
+      names.add(value[PROVIDER_SECRET_REFERENCE_KEY]);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (value && typeof value === "object") {
+      Object.values(value as Record<string, unknown>).forEach(visit);
+    }
+  }
+
+  visit(config);
+  return [...names];
+}
+
+export async function listMissingProviderSecretNames(input: {
+  config: Record<string, unknown>;
+  projectId: number;
+  providerId: number;
+}) {
+  const references = listProviderSecretReferenceNames(input.config);
+  if (references.length === 0) return [];
+
+  const rows = await db
+    .select({ secretName: providerSecrets.secretName })
+    .from(providerSecrets)
+    .where(
+      and(
+        eq(providerSecrets.projectId, input.projectId),
+        eq(providerSecrets.providerId, input.providerId),
+      ),
+    );
+  const stored = new Set(rows.map((row) => row.secretName));
+  return references.filter((name) => !stored.has(name));
+}
+
 function isSensitiveConfigKey(key: string) {
   const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
 

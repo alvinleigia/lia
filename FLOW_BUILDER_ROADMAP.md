@@ -1,6 +1,6 @@
 # Lia Conversational Flow Roadmap
 
-Status date: 2026-07-28
+Status date: 2026-08-03
 
 ## Document Authority
 
@@ -67,7 +67,7 @@ database, backup, and provider readiness work.
 - [x] The later 10-phase runtime modernization program is engineering-complete.
 - [x] One shared server runtime executes project chat, widget, WhatsApp, and future-adapter flows.
 - [x] Active runs are pinned to immutable published flow versions.
-- [x] The current runtime supports 27 executable deterministic step types.
+- [x] The current runtime supports 32 executable deterministic step types.
 - [x] Current nodes persist ordered text, choice, media, and catalog content blocks.
 - [x] Current content blocks can be added, edited, reordered, duplicated, and removed.
 - [x] Friendly message, input, and action editor families exist.
@@ -82,14 +82,14 @@ database, backup, and provider readiness work.
 - [x] The LLM has a constrained, proposal-only turn and tool-request protocol.
 - [x] Grounded Q&A can enter a bounded task and return to Q&A within one version-pinned conversation.
 - [ ] Full rich-content parity with `docs/Flow Builder v2.pdf` is not complete.
-- [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
+- [x] Direct button, list-row, product, and result-to-node mapping is complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
 Current phase: Priority 2, Phase 11 of 18. Phases 8 through 10 completed
 implementation, automated verification, and manual UAT by 2026-08-03.
 
-Current target: complete the deterministic action baseline and expose every
-operational result as a named route.
+Current target: complete focused Phase 11 manual UAT for the implemented
+deterministic action baseline and named operation-result routes.
 
 ## Product Direction
 
@@ -869,19 +869,34 @@ result as a named route.
 - [x] Set Attribute and Add Tag persist contact data.
 - [x] Wait supports durable pause and resume.
 - [x] Operations support mappings, success and failure routing, retries, timeouts, idempotency, encrypted secrets, and attempt history.
-- [ ] Add Remove Tag, Subscribe, Unsubscribe, Assign Agent, and Assign Team where permissions permit.
-- [ ] Add HTTP method selection for GET, POST, PUT, PATCH, and DELETE.
-- [ ] Add friendly query parameter, header, and body editing.
-- [ ] Add safe test requests with test values.
-- [ ] Preview sanitized response status and response body.
-- [ ] Map nested response values through a friendly selector.
-- [ ] Add custom HTTP status-code outputs.
-- [ ] Add success, client-error, server-error, timeout, and network-failure outputs.
-- [ ] Connect every API output directly to a specific node.
-- [ ] Keep credentials out of flow exports and diagnostics.
-- [ ] Add publish blockers for invalid URL, method, mapping, secret, and output configuration.
+- [x] Add Remove Tag, Subscribe, Unsubscribe, Assign Agent, and Assign Team where permissions permit.
+- [x] Add HTTP method selection for GET, POST, PUT, PATCH, and DELETE.
+- [x] Add friendly query parameter, header, and body editing.
+- [x] Add safe test requests with test values.
+- [x] Preview sanitized response status and response body.
+- [x] Map nested response values through a friendly selector.
+- [x] Add custom HTTP status-code outputs.
+- [x] Add success, client-error, server-error, timeout, and network-failure outputs.
+- [x] Connect every API output directly to a specific node.
+- [x] Keep credentials out of flow exports and diagnostics.
+- [x] Add publish blockers for invalid URL, method, mapping, secret, and output configuration.
 - [ ] Confirm every action in `docs/Flow Builder v2.pdf` can be configured and executed.
-- [ ] Add focused runtime and tenant-isolation tests for every result path.
+- [x] Add focused runtime and tenant-isolation tests for every result path.
+
+Phase 11 engineering status: Complete on 2026-08-03; focused manual UAT is
+pending. The runtime now supports all five remaining contact mutations, five
+HTTP methods, friendly request and nested response mapping, isolated test
+requests, sanitized previews, five standard result outputs, custom HTTP status
+outputs, and direct named output-to-node routes. Credentials are encrypted at
+rest and redacted from previews and exports. Publication blocks unavailable or
+invalid operations, credentials, mappings, methods, endpoints, and output
+routes. TypeScript and lint pass, 47 focused contract/editor/compiler checks
+pass, and the scoped contact and named-route database checks pass, including
+cross-project rejection. The five existing conversational-operation database
+regressions and all 143 shared channel/runtime contracts also pass. No
+migration was required. Complete the six detailed
+steps in `docs/UAT_TEST_PLAN.md` before checking the remaining reference-action
+confirmation and declaring the Phase 11 exit gate complete.
 
 Phase 11 exit gate: explicit actions and conversational tasks use the same
 approved operation, security, durability, and routing boundaries.

@@ -6,6 +6,7 @@ import {
 } from "../../src/lib/operation-contracts";
 import {
   buildWebhookRequest,
+  getOperationConfigurationIssues,
   getOperationResultOutcome,
   getSanitizedOperationAttemptPreview,
 } from "../../src/lib/operations";
@@ -31,6 +32,47 @@ function getOutcome(input: {
 }
 
 test.describe("HTTP operation contracts", () => {
+  test("blocks invalid API configuration while preserving legacy POST defaults", () => {
+    const validLegacy = getOperationConfigurationIssues({
+      operation: {
+        inputMapping: {},
+        operationType: "api_request",
+        outputMapping: {},
+        settings: {},
+        status: "active",
+      },
+      provider: {
+        config: { url: "https://example.test/bookings" },
+        status: "active",
+      },
+    } as never);
+    expect(validLegacy).toEqual([]);
+
+    const invalid = getOperationConfigurationIssues({
+      operation: {
+        inputMapping: { booking: "__proto__.value" },
+        operationType: "api_request",
+        outputMapping: { bookingId: "response.body.id" },
+        settings: { customStatusCodes: [409, 409, 999] },
+        status: "active",
+      },
+      provider: {
+        config: { headers: [], method: "TRACE", url: "file:///private" },
+        status: "active",
+      },
+    } as never);
+    expect(invalid).toEqual(
+      expect.arrayContaining([
+        "The API endpoint must be a valid HTTP or HTTPS URL.",
+        "The API request method is invalid.",
+        "Headers must contain named text values.",
+        "Input mapping contains an unsafe field path.",
+        "Output mapping targets must start with fields. or contactAttributes..",
+        "Custom HTTP status outputs must be unique codes from 100 to 599.",
+      ]),
+    );
+  });
+
   test("builds method-aware requests with friendly query and header values", () => {
     const getRequest = buildWebhookRequest({
       config: {

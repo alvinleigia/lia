@@ -126,6 +126,7 @@ function buildOutputMapping(pairs: Pair[]) {
 }
 
 export function ApiRequestOperationForm() {
+  const [method, setMethod] = useState<(typeof HTTP_METHODS)[number]>("POST");
   const [queryParameters, setQueryParameters] = useState<Pair[]>([]);
   const [headers, setHeaders] = useState<Pair[]>([]);
   const [bodyFields, setBodyFields] = useState<Pair[]>([
@@ -154,7 +155,9 @@ export function ApiRequestOperationForm() {
       <input
         type="hidden"
         name="inputMapping"
-        value={JSON.stringify(pairsToRecord(bodyFields))}
+        value={JSON.stringify(
+          method === "GET" ? {} : pairsToRecord(bodyFields),
+        )}
       />
       <input
         type="hidden"
@@ -178,7 +181,10 @@ export function ApiRequestOperationForm() {
             id="apiRequestMethod"
             name="method"
             className={selectClassName}
-            defaultValue="POST"
+            value={method}
+            onChange={(event) =>
+              setMethod(event.target.value as (typeof HTTP_METHODS)[number])
+            }
           >
             {HTTP_METHODS.map((method) => (
               <option key={method} value={method}>
@@ -228,18 +234,25 @@ export function ApiRequestOperationForm() {
           encrypted and excluded from exports and diagnostics.
         </p>
       </div>
-      <div className="space-y-2">
-        <p className="text-sm font-medium">JSON body</p>
-        <PairEditor
-          addLabel="body field"
-          keyLabel="Request field"
-          keyPlaceholder="guestEmail"
-          pairs={bodyFields}
-          setPairs={setBodyFields}
-          valueLabel="Flow field"
-          valuePlaceholder="guestEmail"
-        />
-      </div>
+      {method === "GET" ? (
+        <p className="rounded-md border bg-gray-50 p-3 text-xs text-muted-foreground">
+          GET requests do not send a JSON body. Add values as query parameters
+          above.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">JSON body</p>
+          <PairEditor
+            addLabel="body field"
+            keyLabel="Request field"
+            keyPlaceholder="guestEmail"
+            pairs={bodyFields}
+            setPairs={setBodyFields}
+            valueLabel="Flow field"
+            valuePlaceholder="guestEmail"
+          />
+        </div>
+      )}
       <div className="space-y-2">
         <p className="text-sm font-medium">Response mapping</p>
         <PairEditor

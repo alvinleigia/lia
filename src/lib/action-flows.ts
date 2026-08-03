@@ -33,7 +33,15 @@ import {
   type HybridFlowCompilerIssue,
 } from "@/lib/hybrid-flow-compiler";
 import type { CompiledHybridFlowGraphV1 } from "@/lib/hybrid-flow-contracts";
-import { isOperationOutcomeKey } from "@/lib/operation-contracts";
+import {
+  getOperationOutcomeKeys,
+  isOperationOutcomeKey,
+} from "@/lib/operation-contracts";
+import {
+  getOperationConfigurationIssues,
+  getOperationCredentialIssues,
+  getProjectOperation,
+} from "@/lib/operations";
 
 export type {
   ActionBranchOperator,
@@ -1356,6 +1364,21 @@ async function syncOperationOutcomeRoutes(input: {
     requestedEntries.map(([outcome]) => outcome),
   );
 
+  for (const [, targetStepId] of requestedEntries) {
+    if (!targetStepId) continue;
+    if (targetStepId === input.sourceStepId) {
+      throw new Error("Operation route target cannot point to itself.");
+    }
+    const targetStep = await getActionFlowStep(
+      input.projectId,
+      input.actionId,
+      targetStepId,
+    );
+    if (!targetStep) {
+      throw new Error("Operation route target must belong to this action.");
+    }
+  }
+
   for (const rule of existingRules) {
     const outcome = String(rule.settings.operationOutcomeRoute);
     if (!requestedOutcomes.has(outcome)) {
@@ -1375,19 +1398,6 @@ async function syncOperationOutcomeRoutes(input: {
     if (!targetStepId) {
       continue;
     }
-    if (targetStepId === input.sourceStepId) {
-      throw new Error("Operation route target cannot point to itself.");
-    }
-
-    const targetStep = await getActionFlowStep(
-      input.projectId,
-      input.actionId,
-      targetStepId,
-    );
-    if (!targetStep) {
-      throw new Error("Operation route target must belong to this action.");
-    }
-
     const existingRule =
       existingRules.find(
         (rule) => rule.settings.operationOutcomeRoute === outcome,
@@ -1642,6 +1652,48 @@ export async function validateActionFlowRoutes(
           stepId: step.id,
           message: `Step ${step.sortOrder} points to an unavailable connected flow.`,
         });
+      }
+    }
+
+    if (step.stepType === "operation" && step.operationId) {
+      const operation = await getProjectOperation(projectId, step.operationId);
+      if (!operation) {
+        issues.push({
+          source: "step_config",
+          stepId: step.id,
+          message: `Step ${step.sortOrder} points to an unavailable operation.`,
+        });
+      } else {
+        const operationIssues = [
+          ...getOperationConfigurationIssues(operation),
+          ...(await getOperationCredentialIssues(operation)),
+        ];
+        issues.push(
+          ...operationIssues.map((message) => ({
+            source: "step_config" as const,
+            stepId: step.id,
+            message: `Step ${step.sortOrder}: ${message}`,
+          })),
+        );
+
+        const allowedOutcomes = new Set(
+          getOperationOutcomeKeys(operation.operation.settings),
+        );
+        for (const rule of branchRules.filter(
+          (candidate) =>
+            candidate.sourceStepId === step.id &&
+            typeof candidate.settings.operationOutcomeRoute === "string",
+        )) {
+          const outcome = String(rule.settings.operationOutcomeRoute);
+          if (!allowedOutcomes.has(outcome)) {
+            issues.push({
+              ruleId: rule.id,
+              source: "step_config",
+              stepId: step.id,
+              message: `Step ${step.sortOrder} uses unavailable operation output ${outcome}.`,
+            });
+          }
+        }
       }
     }
   }

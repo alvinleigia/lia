@@ -2,6 +2,7 @@ import { Activity, PlugZap, Plus, Workflow } from "lucide-react";
 import Link from "next/link";
 import { ApiRequestOperationForm } from "@/components/api-request-operation-form";
 import { NoProjectState } from "@/components/no-project-state";
+import { OperationPreviewForm } from "@/components/operation-preview-form";
 import {
   ActionFormError,
   ActionStateForm,
@@ -33,7 +34,6 @@ import {
   createIntegrationProviderAction,
   createMetaConversionOperationAction,
   createOperationAction,
-  previewOperationAction,
   processOperationRetryQueueAction,
   replayOperationAttemptAction,
   updateIntegrationProviderStatusAction,
@@ -402,51 +402,12 @@ export default async function OperationsPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ActionStateForm
-              action={previewOperationAction}
-              className="space-y-4"
-            >
-              <ActionFormError />
-              <div className="space-y-2">
-                <Label htmlFor="previewOperationId">Operation</Label>
-                <select
-                  id="previewOperationId"
-                  name="operationId"
-                  className={selectClassName}
-                  disabled={operationRows.length === 0}
-                  required
-                >
-                  {operationRows.map(({ operation, provider }) => (
-                    <option key={operation.id} value={operation.id}>
-                      {operation.name} ({provider.providerType})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="previewFields">Sample Fields JSON</Label>
-                <Textarea
-                  id="previewFields"
-                  name="fields"
-                  placeholder={
-                    '{\n  "guestEmail": "test@example.com",\n  "preferredDate": "2026-08-15"\n}'
-                  }
-                  rows={5}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Sandbox runs create an operation attempt without linking to a
-                live submission. Webhook and n8n providers still call the
-                configured endpoint.
-              </p>
-              <FormSubmitButton
-                className="w-full"
-                disabled={operationRows.length === 0}
-                label="Run Preview"
-                pendingLabel="Running..."
-                icon={<Workflow className="h-4 w-4" />}
-              />
-            </ActionStateForm>
+            <OperationPreviewForm
+              operations={operationRows.map(({ operation, provider }) => ({
+                id: operation.id,
+                label: `${operation.name} (${provider.providerType})`,
+              }))}
+            />
 
             {previewAttempt && (
               <div className="space-y-3 border-t pt-4">

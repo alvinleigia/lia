@@ -24,6 +24,9 @@ let fixture:
       actionId: number;
       companyId: number;
       operationStepId: number;
+      otherActionId: number;
+      otherProjectId: number;
+      otherStepId: number;
       projectId: number;
       successStepId: number;
       timeoutStepId: number;
@@ -61,6 +64,14 @@ test.beforeAll(async () => {
       workspaceId: workspace.id,
     })
     .returning();
+  const [otherProject] = await db
+    .insert(projects)
+    .values({
+      name: `Other Operation Routes ${suffix}`,
+      ownerUserId: user.id,
+      workspaceId: workspace.id,
+    })
+    .returning();
   const action = await createProjectAction({
     name: "Operation outcome routing",
     projectId: project.id,
@@ -84,11 +95,24 @@ test.beforeAll(async () => {
     sortOrder: 3,
     stepType: "submit",
   });
+  const otherAction = await createProjectAction({
+    name: "Other operation routing",
+    projectId: otherProject.id,
+  });
+  const otherStep = await createActionFlowStep({
+    actionId: otherAction.id,
+    projectId: otherProject.id,
+    sortOrder: 1,
+    stepType: "submit",
+  });
 
   fixture = {
     actionId: action.id,
     companyId: company.id,
     operationStepId: operationStep.id,
+    otherActionId: otherAction.id,
+    otherProjectId: otherProject.id,
+    otherStepId: otherStep.id,
     projectId: project.id,
     successStepId: successStep.id,
     timeoutStepId: timeoutStep.id,
@@ -106,9 +130,16 @@ test.afterAll(async () => {
     .delete(actionFlowSteps)
     .where(eq(actionFlowSteps.actionId, fixture.actionId));
   await db
+    .delete(actionFlowSteps)
+    .where(eq(actionFlowSteps.actionId, fixture.otherActionId));
+  await db
     .delete(projectActions)
     .where(eq(projectActions.id, fixture.actionId));
+  await db
+    .delete(projectActions)
+    .where(eq(projectActions.id, fixture.otherActionId));
   await db.delete(projects).where(eq(projects.id, fixture.projectId));
+  await db.delete(projects).where(eq(projects.id, fixture.otherProjectId));
   await db.delete(workspaces).where(eq(workspaces.id, fixture.workspaceId));
   await db.delete(companies).where(eq(companies.id, fixture.companyId));
   await db.delete(users).where(eq(users.id, fixture.userId));
@@ -174,4 +205,25 @@ test("syncs and removes granular operation routes without changing legacy routes
   );
   expect(remainingRules).toHaveLength(1);
   expect(remainingRules[0].settings.operationOutcomeRoute).toBe("success");
+
+  await expect(
+    syncOperationStepRoutePresets({
+      actionId: fixture.actionId,
+      fieldKey: "booking_status",
+      outcomeStepIds: { success: fixture.otherStepId },
+      projectId: fixture.projectId,
+      sourceStepId: fixture.operationStepId,
+      stepType: "operation",
+    }),
+  ).rejects.toThrow("must belong to this action");
+  const rulesAfterRejectedCrossProjectRoute =
+    await listActionFlowBranchRulesForStep(
+      fixture.projectId,
+      fixture.actionId,
+      fixture.operationStepId,
+    );
+  expect(rulesAfterRejectedCrossProjectRoute).toHaveLength(1);
+  expect(rulesAfterRejectedCrossProjectRoute[0].targetStepId).toBe(
+    fixture.successStepId,
+  );
 });

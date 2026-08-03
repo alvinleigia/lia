@@ -2,6 +2,344 @@
 
 ## Current Test
 
+Phase 11 of 18: actions, API operations, and deterministic outcomes.
+
+Status: Implementation and focused automated verification complete on
+2026-08-03. Focused manual UAT is pending. No database migration is required.
+
+Automated evidence:
+
+- TypeScript and lint pass; lint reports only the three established image and
+  sidebar-cookie warnings.
+- Forty-seven focused editor, schema, compiler, HTTP, export-security, and
+  result-contract scenarios pass.
+- All 143 shared channel and runtime contract scenarios pass.
+- Database checks pass for all six contact mutations, scoped contact changes,
+  named operation-route persistence, removal, and cross-project rejection.
+- All five existing conversational-operation database regressions pass,
+  including explicit confirmation, durable completion, lease recovery,
+  uncertain outcomes, and reconciled failure routing.
+- HTTP request contracts cover GET, POST, PUT, PATCH, and DELETE selection,
+  query parameters, headers, body mapping, nested response mapping, sanitized
+  previews, custom HTTP outputs, and the five standard result outputs.
+
+Use the exact project, action names, labels, and test values below. Both actions
+and the API operation are disposable. Do not modify an existing customer flow.
+Keep the terminal running `npm run dev` open. The API preview uses the public
+HTTPBin test service, so the machine must have internet access for Steps 1, 2,
+and 5. If HTTPBin is unavailable, record an environment blocker instead of
+changing the endpoint to a production service.
+
+## Step 1 of 6 - Create A Friendly API Request
+
+1. Open [the local application](http://localhost:3000) and sign in with the UAT
+   account.
+2. In the header, click the pill beginning with `Selected Project:`. In the
+   `Select a Project` dialog, search for `Ewissen Infra`, then select the row
+   whose ID is `194`.
+3. Verify the header says `Selected Project: Ewissen Infra`.
+4. Click `Automation` in the header, then click `Operations`.
+5. On `Operations: Ewissen Infra`, scroll to `Create API Request`.
+6. Complete the first row:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Name` | `Phase 11 Echo API` |
+   | `HTTP Method` | `POST` |
+   | `Endpoint URL` | `https://httpbin.org/anything` |
+
+7. Under `Query parameters`, click `Add query parameter`, then enter:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Parameter` | `source` |
+   | `Value` | `phase11-uat` |
+
+8. Under `Request headers`, click `Add header` twice. Complete both rows:
+
+   | Row | `Header` | `Value` |
+   | --- | --- | --- |
+   | 1 | `X-UAT-Run` | `phase11` |
+   | 2 | `Authorization` | `Bearer phase11-test-secret` |
+
+9. Under `JSON body`, complete the existing row:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Request field` | `guestEmail` |
+   | `Flow field` | `guestEmail` |
+
+10. Under `Response mapping`, complete the existing row, then click
+    `Add response mapping` and complete the second row:
+
+    | Row | `Save as flow field` | `Response body path` |
+    | --- | --- | --- |
+    | 1 | `echoedEmail` | `json.guestEmail` |
+    | 2 | `echoedUrl` | `url` |
+
+11. Complete the request policy fields:
+
+    | Field or control | Value |
+    | --- | --- |
+    | `Timeout (milliseconds)` | `15000` |
+    | `Immediate retries` | `0` |
+    | `Custom status outputs` | `202, 409` |
+    | `Auto retry failed attempts` | Unchecked |
+    | `Queued retries` | `0` |
+    | `Retry delay (minutes)` | `5` |
+
+12. Click `Create API Request`. Wait for the page to reload and confirm
+    `Operation created.` appears.
+13. In `Operations`, confirm `Phase 11 Echo API` is `Active`, its type is
+    `api_request`, and its provider is `Phase 11 Echo API Endpoint`.
+
+Expected result:
+
+- The API request is created without entering raw JSON.
+- POST, query, header, body, nested response, retry, and custom-output fields
+  are all represented by labelled controls.
+- The Authorization value is not displayed in the operation list, diagnostics,
+  or page URL.
+
+## Step 2 of 6 - Send An Isolated Test Request
+
+1. On the same `Operations: Ewissen Infra` page, scroll to
+   `Operation Sandbox`.
+2. In `Operation`, select `Phase 11 Echo API (webhook)`.
+3. Under `Test values`, keep the first row and enter:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Field name` | `guestEmail` |
+   | `Test value` | `phase11.preview@example.com` |
+
+4. Remove the `preferredDate` row with its trash button; only the guest-email
+   row should remain.
+5. Read the amber notice and confirm it says the preview sends a real request
+   but does not update a live flow submission.
+6. Click `Send Test Request` once and wait for the page to reload.
+7. In the preview result, confirm:
+
+   | Visible item | Expected value |
+   | --- | --- |
+   | Attempt status | `completed` |
+   | Response status | `200 OK` |
+   | Outcome | `success` |
+   | Mapped flow field `echoedEmail` | `phase11.preview@example.com` |
+   | Mapped flow field `echoedUrl` | Contains `source=phase11-uat` |
+
+8. Expand or read `Sanitized response body`. Confirm the echoed
+   `Authorization` value is `[REDACTED]` and the text
+   `phase11-test-secret` is absent.
+9. Confirm the attempt says `Not linked` rather than showing a live submission
+   number.
+
+Expected result:
+
+- One isolated attempt is recorded and the endpoint receives the named test
+  value.
+- Nested response mapping returns the approved values.
+- Response credentials are redacted, and no live submission or contact changes.
+
+## Step 3 of 6 - Create The Named-Outcome Flow
+
+1. Click `Automation` > `Actions`, then click `New Action`.
+2. Scroll to `Blank Action` and complete all three fields:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Action Name` | `Phase 11 Operation Outcomes UAT` |
+   | `Description` | `Verifies API result outputs, publish blockers, runtime routing, and credential-safe export.` |
+   | `Trigger Phrases` | `phase eleven operation check` |
+
+3. Click `Create Action`, confirm the overview heading, then click `Canvas`.
+4. In the left `Actions` block list, click `API Request`. In `Create Step`,
+   enter and select:
+
+   | Field or control | Value |
+   | --- | --- |
+   | `Step Behavior` | `API Request` |
+   | `Step name` | `Run Phase 11 API` |
+   | `Integration to run` | `Phase 11 Echo API (webhook)` |
+   | `When to run it` | `During the conversation` |
+   | `Action active` | Checked |
+
+5. Expand `Result and routing`. Enter `phase11ApiStatus` in
+   `Save result status as`. Leave every route set to `Continue normally`, then
+   click `Create Step`. This creates the operation as the first executable
+   node before its destinations exist.
+6. Create seven terminal nodes. For each row, click `Submit` in the left
+   `Actions` block list, enter the `Step name` and `Completion message`, keep
+   `Action active` checked, and click `Create Step` before starting the next:
+
+   | `Step name` | `Completion message` |
+   | --- | --- |
+   | `API success` | `Phase 11 API succeeded.` |
+   | `API client error` | `Phase 11 client error handled.` |
+   | `API server error` | `Phase 11 server error handled.` |
+   | `API timeout` | `Phase 11 timeout handled.` |
+   | `API network failure` | `Phase 11 network failure handled.` |
+   | `API accepted` | `Phase 11 HTTP 202 handled.` |
+   | `API conflict` | `Phase 11 HTTP 409 handled.` |
+
+7. Click the `Run Phase 11 API` node title to open `Edit Step`. Expand
+   `Result and routing`, confirm `phase11ApiStatus` remains in
+   `Save result status as`, then choose every named destination:
+
+   | Field label | Destination |
+   | --- | --- |
+   | `On Success` | `API success` |
+   | `On Client error` | `API client error` |
+   | `On Server error` | `API server error` |
+   | `On Timeout` | `API timeout` |
+   | `On Network failure` | `API network failure` |
+   | `On HTTP 202` | `API accepted` |
+   | `On HTTP 409` | `API conflict` |
+   | `Legacy completed route` | `Continue normally` |
+   | `Legacy failed route` | `Continue normally` |
+
+8. Click `Save changes`. Confirm the canvas contains exactly eight nodes and
+   `Run Phase 11 API` is Step 1.
+9. Confirm the canvas shows one named edge for each of the seven outputs. Do
+   not draw generic connections over those named edges.
+
+Expected result:
+
+- Selecting the API operation exposes the five standard outputs plus HTTP 202
+  and HTTP 409.
+- Every output can target a specific existing node.
+- Saving and reopening `Run Phase 11 API` preserves all seven destinations.
+
+## Step 4 of 6 - Verify Publish Blockers And Publish
+
+1. From the canvas toolbar, click `Overview`. Leave this tab open.
+2. Open a second application tab, go to `Automation` > `Operations`, scroll to
+   `Providers`, find `Phase 11 Echo API Endpoint`, and click `Disable`.
+3. Return to the action-overview tab and refresh once.
+4. Confirm `Publish readiness` reports a blocker saying the operation and its
+   provider must be active. Click `Publish` once and confirm publication does
+   not create a version.
+5. Return to the Operations tab, click `Enable` beside
+   `Phase 11 Echo API Endpoint`, and confirm its status returns to `Active`.
+6. Return to `Phase 11 Operation Outcomes UAT`, refresh, and confirm the
+   readiness panel says `Ready to publish`.
+7. Click `Publish` once. Confirm `Action published.`, `Status Active`, and
+   `Published Version v1` appear.
+8. Confirm `Draft matches runtime` appears. Do not click Publish again.
+
+Expected result:
+
+- A disabled provider blocks publication and does not create a partial version.
+- Re-enabling the same scoped provider clears the blocker.
+- Publication succeeds once and the editable draft matches the immutable v1
+  runtime snapshot.
+
+## Step 5 of 6 - Verify Runtime Routing And Credential-Safe Export
+
+1. Click `Projects` > `Chat`.
+2. At the top of `Project Chat`, click `Phase 11 Operation Outcomes UAT` once.
+   Do not type the trigger phrase; the direct action button avoids a model turn.
+3. Wait for the request to complete. Confirm the assistant displays
+   `Phase 11 API succeeded.` exactly once and none of the six error or custom
+   completion messages.
+4. Click `Automation` > `Submissions`, open the newest
+   `Phase 11 Operation Outcomes UAT` row with source `project_chat`, and confirm
+   its Fields card includes:
+
+   | Field key | Expected value |
+   | --- | --- |
+   | `phase11ApiStatus` | `completed` |
+   | `phase11ApiStatus_outcome` | `success` |
+   | `echoedUrl` | Contains `source=phase11-uat` |
+
+5. Return to `Automation` > `Actions`, open
+   `Phase 11 Operation Outcomes UAT`, and click `Export` once.
+6. Open the downloaded JSON as text without editing it. Search for
+   `phase11-test-secret` and `Bearer phase11-test-secret`; both searches must
+   return no matches.
+7. Confirm the JSON contains the operation reference and named route metadata,
+   but does not contain provider configuration or an Authorization value.
+
+Expected result:
+
+- The live request records both the legacy status and the granular success
+  outcome, then follows only the success node.
+- The test operation executes without an OpenAI model turn.
+- Exported flow data preserves routing without exporting credentials.
+
+## Step 6 of 6 - Exercise Contact Actions And Clean Up
+
+1. Click `Automation` > `Actions` > `New Action` and create a second blank
+   action with all three fields:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Action Name` | `Phase 11 Contact Actions UAT` |
+   | `Description` | `Verifies deterministic contact mutations in one scoped project-chat run.` |
+   | `Trigger Phrases` | `phase eleven contact check` |
+
+2. Click `Create Action`, then `Canvas`.
+3. Create the following seven action nodes in this exact order. For every node,
+   click the named block under `Actions`, enter the listed values, keep the
+   active checkbox checked, and click `Create Step`:
+
+   | Block | `Step name` | Additional field and value |
+   | --- | --- | --- |
+   | `Add Tag` | `Add temporary Phase 11 tag` | `Tags to add`: `Phase 11 Temporary` |
+   | `Remove Tag` | `Remove temporary Phase 11 tag` | `Tags to remove`: `Phase 11 Temporary` |
+   | `Subscribe` | `Subscribe Phase 11 contact` | No additional value |
+   | `Unsubscribe` | `Unsubscribe Phase 11 contact` | No additional value |
+   | `Assign Agent` | `Assign Phase 11 agent` | `Agent email`: `alvinaraujo@gmail.com` |
+   | `Assign Team` | `Assign Phase 11 team` | `Team or queue name`: `Phase 11 UAT` |
+   | `Submit` | `Contact actions complete` | `Completion message`: `Phase 11 contact actions completed.` |
+
+4. Confirm the canvas lists the nodes in that order. The ordered fallback path
+   is sufficient; do not create branches. Click `Overview`.
+5. Confirm `Ready to publish`, click `Publish` once, and confirm v1 is active.
+   If `Assign Phase 11 agent` reports that the email is not an active company
+   member, stop and report that exact blocker; do not substitute an unknown
+   address.
+6. Click `Projects` > `Chat`, then click `Phase 11 Contact Actions UAT` once.
+   Confirm `Phase 11 contact actions completed.` appears exactly once.
+7. Click `Automation` > `Submissions`, open the newest
+   `Phase 11 Contact Actions UAT` submission, and confirm its event trail shows
+   the six contact-action steps in order before submission completion.
+8. Click `Projects` > `Contacts`, open the contact associated with the newest
+   project-chat conversation, and confirm `Phase 11 Temporary` is absent from
+   `Tags` because it was added and then removed.
+9. Archive both disposable actions separately:
+   1. Open `Automation` > `Actions` and select the action.
+   2. Click `Settings`.
+   3. Set `Status` to `Archived`.
+   4. Click `Save Action` and confirm `Action updated.`.
+10. Return to `Automation` > `Operations`. In `Operations`, click `Disable`
+    for `Phase 11 Echo API`; in `Providers`, click `Disable` for
+    `Phase 11 Echo API Endpoint`.
+
+Expected result:
+
+- All six contact mutation families can be configured and execute through the
+  deterministic runtime in one project-scoped run.
+- The temporary tag is not left on the contact.
+- Both actions are archived and the disposable operation/provider are disabled.
+- No unresolved Critical or High Phase 11 defect remains.
+
+## Phase 11 Sign-Off
+
+- [ ] All six focused steps pass.
+- [ ] Friendly HTTP authoring and isolated previews work without raw JSON.
+- [ ] Sanitized response mapping and credential-safe export pass.
+- [ ] All seven standard/custom operation outputs retain their named routes.
+- [ ] Invalid operation configuration blocks publication.
+- [ ] Runtime success stores and follows the granular result exactly once.
+- [ ] Contact mutation actions execute in order and remain project scoped.
+- [ ] No unresolved Critical or High Phase 11 defect remains.
+
+Record the UAT date, findings, and any corrective commit here before marking
+Phase 11 complete and moving to Phase 12.
+
+## Previous Sign-Off - Phase 10
+
 Phase 10 of 18: per-option routing and deterministic response policies.
 
 Status: Passed focused manual UAT on 2026-08-03. No database migration was
