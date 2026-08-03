@@ -63,6 +63,20 @@ const actionStepSchemaShape = {
         : value,
     z.enum(["seconds", "minutes", "hours", "days"]).optional(),
   ),
+  retryCount: optionalNumber(z.coerce.number().int().min(0).max(10)),
+  retryMessage: z.string().trim().max(500).optional(),
+  retryExhaustedStepId: optionalNumber(z.coerce.number().int().positive()),
+  validationFailureStepId: optionalNumber(z.coerce.number().int().positive()),
+  cancellationStepId: optionalNumber(z.coerce.number().int().positive()),
+  noReplyReminderMinutes: optionalNumber(
+    z.coerce.number().int().min(1).max(10_080),
+  ),
+  noReplyReminderMessage: z.string().trim().max(500).optional(),
+  noReplyTimeoutMinutes: optionalNumber(
+    z.coerce.number().int().min(1).max(10_080),
+  ),
+  noReplyTimeoutMessage: z.string().trim().max(500).optional(),
+  noReplyTimeoutStepId: optionalNumber(z.coerce.number().int().positive()),
   requiredMessage: z.string().trim().max(240).optional(),
   validationMessage: z.string().trim().max(240).optional(),
   validationAllowedFileTypes: z.string().trim().max(1000).optional(),
@@ -388,6 +402,18 @@ function refineActionStep(
         path: ["validationRegex"],
       });
     }
+  }
+
+  if (
+    data.noReplyReminderMinutes !== undefined &&
+    data.noReplyTimeoutMinutes !== undefined &&
+    data.noReplyReminderMinutes >= data.noReplyTimeoutMinutes
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      message: "The no-reply reminder must run before the timeout.",
+      path: ["noReplyReminderMinutes"],
+    });
   }
 }
 

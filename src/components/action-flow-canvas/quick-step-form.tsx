@@ -41,6 +41,7 @@ import type {
 import { FlowActionPrimaryFields } from "@/components/flow-action-primary-fields";
 import { FlowInputFamilySummary } from "@/components/flow-input-primary-fields";
 import { FlowMessageContentEditor } from "@/components/flow-message-content-editor";
+import { FlowResponsePolicyFields } from "@/components/flow-response-policy-fields";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -288,6 +289,7 @@ function ContentStepBasicsForm({
   onSubmit,
   productCatalogs,
   step,
+  steps,
 }: {
   catalogProducts: CatalogProductOption[];
   isPending: boolean;
@@ -295,6 +297,7 @@ function ContentStepBasicsForm({
   onSubmit: (input: CanvasStepBasicsInput) => void;
   productCatalogs: ProductCatalogOption[];
   step: FlowStep;
+  steps: FlowStep[];
 }) {
   const collectsAnswer = step.inputType !== null;
   const dynamicSourceType = getStepSettingText(step, "sourceType");
@@ -536,6 +539,17 @@ function ContentStepBasicsForm({
         </div>
       )}
 
+      {collectsAnswer && (
+        <FlowResponsePolicyFields
+          idPrefix={`quick-input-policy-${step.id}`}
+          routeSteps={getStepOptions(steps, step.id).map((targetStep) => ({
+            id: targetStep.id,
+            label: `${targetStep.sortOrder}. ${getStepLabel(targetStep)}`,
+          }))}
+          settings={step.settings}
+        />
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2">
         {collectsAnswer && (
           <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
@@ -717,6 +731,7 @@ export function StepBasicsForm({
       onSubmit={onSubmit}
       productCatalogs={productCatalogs}
       step={step}
+      steps={steps}
     />
   );
 }

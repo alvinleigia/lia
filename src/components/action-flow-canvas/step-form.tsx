@@ -43,6 +43,7 @@ import {
   FlowInputPrimaryFields,
 } from "@/components/flow-input-primary-fields";
 import { FlowInputValidationFields } from "@/components/flow-input-validation-fields";
+import { FlowResponsePolicyFields } from "@/components/flow-response-policy-fields";
 import { FlowTemplateMessageFields } from "@/components/flow-template-message-fields";
 import {
   Accordion,
@@ -312,27 +313,52 @@ export function StepCreateForm({
         ) : null}
 
         {isInputStep && (
-          <FlowInputValidationFields
-            defaultAllowedFileTypes={getStepSettingText(
-              step,
-              "validationAllowedFileTypes",
-            )}
-            defaultInvalidMessage={getStepSettingText(
-              step,
-              "validationMessage",
-            )}
-            defaultMaxDate={getStepSettingText(step, "validationMaxDate")}
-            defaultMaxLength={getStepSettingNumber(step, "validationMaxLength")}
-            defaultMaxNumber={getStepSettingNumber(step, "validationMaxNumber")}
-            defaultMinDate={getStepSettingText(step, "validationMinDate")}
-            defaultMinLength={getStepSettingNumber(step, "validationMinLength")}
-            defaultMinNumber={getStepSettingNumber(step, "validationMinNumber")}
-            defaultRegex={getStepSettingText(step, "validationRegex")}
-            defaultRequiredMessage={getStepSettingText(step, "requiredMessage")}
-            idPrefix="canvas-input"
-            inputType={selectedInputType}
-            stepType={selectedStepType}
-          />
+          <>
+            <FlowInputValidationFields
+              defaultAllowedFileTypes={getStepSettingText(
+                step,
+                "validationAllowedFileTypes",
+              )}
+              defaultInvalidMessage={getStepSettingText(
+                step,
+                "validationMessage",
+              )}
+              defaultMaxDate={getStepSettingText(step, "validationMaxDate")}
+              defaultMaxLength={getStepSettingNumber(
+                step,
+                "validationMaxLength",
+              )}
+              defaultMaxNumber={getStepSettingNumber(
+                step,
+                "validationMaxNumber",
+              )}
+              defaultMinDate={getStepSettingText(step, "validationMinDate")}
+              defaultMinLength={getStepSettingNumber(
+                step,
+                "validationMinLength",
+              )}
+              defaultMinNumber={getStepSettingNumber(
+                step,
+                "validationMinNumber",
+              )}
+              defaultRegex={getStepSettingText(step, "validationRegex")}
+              defaultRequiredMessage={getStepSettingText(
+                step,
+                "requiredMessage",
+              )}
+              idPrefix="canvas-input"
+              inputType={selectedInputType}
+              stepType={selectedStepType}
+            />
+            <FlowResponsePolicyFields
+              idPrefix="canvas-input-policy"
+              routeSteps={targetSteps.map((targetStep) => ({
+                id: targetStep.id,
+                label: `${targetStep.sortOrder}. ${getStepLabel(targetStep)}`,
+              }))}
+              settings={step?.settings}
+            />
+          </>
         )}
 
         {!isInputStep && !isActionStep && (

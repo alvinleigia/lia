@@ -132,6 +132,7 @@ export type BranchFieldOption = {
 };
 
 export type CanvasStepInput = {
+  cancellationStepId: string;
   choiceDisplayMode: string;
   contactAttributeFieldKey: string;
   contactAttributeKey: string;
@@ -149,6 +150,11 @@ export type CanvasStepInput = {
   isRequired: boolean;
   label: string;
   mediaAssetId: string;
+  noReplyReminderMessage: string;
+  noReplyReminderMinutes: string;
+  noReplyTimeoutMessage: string;
+  noReplyTimeoutMinutes: string;
+  noReplyTimeoutStepId: string;
   operationExecutionMode: string;
   operationFailureStepId: string;
   operationId: string;
@@ -161,6 +167,9 @@ export type CanvasStepInput = {
   productSelectionAllowQuantity: boolean;
   prompt: string;
   requiredMessage: string;
+  retryCount: string;
+  retryExhaustedStepId: string;
+  retryMessage: string;
   stepType: string;
   validationAllowedFileTypes: string;
   validationMaxDate: string;
@@ -171,6 +180,7 @@ export type CanvasStepInput = {
   validationMinLength: string;
   validationMinNumber: string;
   validationRegex: string;
+  validationFailureStepId: string;
   waitAmount: string;
   waitUnit: string;
   whatsappTemplateBody: string;
@@ -182,6 +192,7 @@ export type CanvasStepInput = {
 };
 
 export type CanvasStepBasicsInput = {
+  cancellationStepId?: string;
   choiceDisplayMode: string;
   contactAttributeFieldKey?: string;
   contactAttributeKey?: string;
@@ -200,6 +211,11 @@ export type CanvasStepBasicsInput = {
   isEnabled: boolean;
   isRequired: boolean;
   label: string;
+  noReplyReminderMessage?: string;
+  noReplyReminderMinutes?: string;
+  noReplyTimeoutMessage?: string;
+  noReplyTimeoutMinutes?: string;
+  noReplyTimeoutStepId?: string;
   operationExecutionMode?: string;
   operationFailureStepId?: string;
   operationId?: string;
@@ -207,8 +223,12 @@ export type CanvasStepBasicsInput = {
   options: string;
   optionsChanged: boolean;
   prompt: string;
+  retryCount?: string;
+  retryExhaustedStepId?: string;
+  retryMessage?: string;
   waitAmount?: string;
   waitUnit?: string;
+  validationFailureStepId?: string;
 };
 
 export type CanvasMutationResult = {

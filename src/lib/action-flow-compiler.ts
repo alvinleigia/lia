@@ -10,6 +10,11 @@ import {
   getStoredActionOptionRoute,
   getStoredActionOptions,
 } from "@/lib/action-option-routing";
+import {
+  ACTION_RESPONSE_POLICY_OUTPUTS,
+  getActionResponsePolicy,
+  getActionResponsePolicyTarget,
+} from "@/lib/action-response-policy";
 import { getFlowChoiceContentBlock } from "@/lib/flow-content-blocks";
 
 export const ACTION_FLOW_CONDITION_VALUE_TYPES = [
@@ -82,7 +87,8 @@ export type ActionFlowCompilerIssueSource =
   | "graph_entry"
   | "graph_reachability"
   | "graph_terminal"
-  | "option_route";
+  | "option_route"
+  | "response_policy";
 
 export type ActionFlowCompilerIssueCode =
   | "branch_condition_group_invalid"
@@ -108,7 +114,10 @@ export type ActionFlowCompilerIssueCode =
   | "option_route_option_missing"
   | "option_route_settings_invalid"
   | "option_route_source_field_mismatch"
-  | "option_route_value_mismatch";
+  | "option_route_value_mismatch"
+  | "response_policy_target_missing"
+  | "response_policy_target_not_runnable"
+  | "response_policy_timing_invalid";
 
 export type ActionFlowCompilerIssue = {
   code: ActionFlowCompilerIssueCode;
@@ -124,7 +133,8 @@ export type CompiledActionFlowEdge = {
   ruleId?: number;
   sourceStepId: number;
   targetStepId: number;
-  type: "branch" | "default" | "ordered";
+  outputPort?: string;
+  type: "branch" | "default" | "ordered" | "policy";
 };
 
 export type CompiledActionFlowGraph = {
@@ -942,6 +952,52 @@ export function compileActionFlowGraph(input: {
   }
 
   for (const [stepIndex, step] of orderedSteps.entries()) {
+    const policy = getActionResponsePolicy(step.settings);
+    if (
+      policy.noReplyReminderMinutes !== null &&
+      policy.noReplyTimeoutMinutes !== null &&
+      policy.noReplyReminderMinutes >= policy.noReplyTimeoutMinutes
+    ) {
+      issues.push({
+        code: "response_policy_timing_invalid",
+        message: `Step ${step.sortOrder} no-reply reminder must run before its timeout.`,
+        severity: "error",
+        source: "response_policy",
+        stepId: step.id,
+      });
+    }
+    for (const output of ACTION_RESPONSE_POLICY_OUTPUTS) {
+      const targetStepId = getActionResponsePolicyTarget(policy, output);
+      if (targetStepId === null) {
+        continue;
+      }
+
+      if (!allStepIds.has(targetStepId)) {
+        issues.push({
+          code: "response_policy_target_missing",
+          message: `Step ${step.sortOrder} ${output} output points to a missing step.`,
+          severity: "error",
+          source: "response_policy",
+          stepId: step.id,
+        });
+      } else if (!runnableStepIdSet.has(targetStepId)) {
+        issues.push({
+          code: "response_policy_target_not_runnable",
+          message: `Step ${step.sortOrder} ${output} output points to a disabled or deferred step.`,
+          severity: "error",
+          source: "response_policy",
+          stepId: step.id,
+        });
+      } else {
+        addEdge({
+          outputPort: output,
+          sourceStepId: step.id,
+          targetStepId,
+          type: "policy",
+        });
+      }
+    }
+
     if (TERMINAL_STEP_TYPES.has(step.stepType)) {
       if (step.nextStepId !== null) {
         issues.push({

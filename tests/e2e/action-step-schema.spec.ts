@@ -62,6 +62,28 @@ test("input validation rejects inverted ranges and invalid regex", () => {
   );
 });
 
+test("response policy requires a reminder before its timeout", () => {
+  const result = canvasStepSchema.safeParse({
+    actionId: 1,
+    fieldKey: "guestName",
+    inputType: "text",
+    label: "Guest name",
+    noReplyReminderMinutes: 5,
+    noReplyTimeoutMinutes: 5,
+    prompt: "What is your name?",
+    stepType: "collect_input",
+  });
+
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: ["noReplyReminderMinutes"] }),
+      ]),
+    );
+  }
+});
+
 test("detailed steps can use dynamic choices while canvas creation needs manual choices", () => {
   const dynamicChoice = {
     actionId: 1,

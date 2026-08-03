@@ -5,6 +5,10 @@ import {
   getActionSubmission,
   updateActionSubmission,
 } from "@/lib/action-flows";
+import {
+  ACTION_RESPONSE_POLICY_STATE_METADATA_KEY,
+  type ActionResponsePolicyState,
+} from "@/lib/action-response-policy";
 import { isRunnableActionStep } from "@/lib/action-runtime";
 import { db } from "@/lib/db-config";
 import {
@@ -70,6 +74,21 @@ type PauseActionFlowSubmissionInput = {
   submissionId: number;
   traceId?: string | null;
   waitStepId: number;
+};
+
+type AwaitActionFlowResponseInput = {
+  actionVersionId: number | null;
+  channelType: string;
+  conversationId: string;
+  expectedRevision: number;
+  externalUserId?: string | null;
+  fields: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  projectId: number;
+  responseState: ActionResponsePolicyState;
+  source: string;
+  submissionId: number;
+  traceId?: string | null;
 };
 
 export class ActionSubmissionConflictError extends Error {
@@ -274,6 +293,103 @@ export async function pauseActionFlowSubmission(
   });
 }
 
+export async function awaitActionFlowResponse(
+  input: AwaitActionFlowResponseInput,
+) {
+  const traceId = resolveTraceId(input.traceId);
+  const nextRevision = input.expectedRevision + 1;
+  const metadata = {
+    ...input.metadata,
+    [ACTION_RESPONSE_POLICY_STATE_METADATA_KEY]: input.responseState,
+  };
+
+  return db.transaction(async (tx) => {
+    const [submission] = await tx
+      .update(actionSubmissions)
+      .set({
+        currentStepId: input.responseState.stepId,
+        fields: input.fields,
+        metadata,
+        revision: sql`${actionSubmissions.revision} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(actionSubmissions.projectId, input.projectId),
+          eq(actionSubmissions.id, input.submissionId),
+          eq(actionSubmissions.status, "in_progress"),
+          eq(actionSubmissions.revision, input.expectedRevision),
+        ),
+      )
+      .returning();
+
+    if (!submission) {
+      throw new ActionSubmissionConflictError();
+    }
+
+    const jobs = [
+      input.responseState.reminderAt
+        ? {
+            availableAt: new Date(input.responseState.reminderAt),
+            kind: "reminder" as const,
+          }
+        : null,
+      input.responseState.timeoutAt
+        ? {
+            availableAt: new Date(input.responseState.timeoutAt),
+            kind: "timeout" as const,
+          }
+        : null,
+    ].filter(
+      (job): job is { availableAt: Date; kind: "reminder" | "timeout" } =>
+        job !== null,
+    );
+
+    if (jobs.length > 0) {
+      await tx
+        .insert(durableJobs)
+        .values(
+          jobs.map((job) => ({
+            availableAt: job.availableAt,
+            dedupeKey: `submission:${input.submissionId}:revision:${nextRevision}:response:${job.kind}`,
+            jobType: "flow_response_policy",
+            payload: {
+              actionVersionId: input.actionVersionId,
+              channelType: input.channelType,
+              conversationId: input.conversationId,
+              expectedRevision: nextRevision,
+              externalUserId: input.externalUserId ?? null,
+              kind: job.kind,
+              source: input.source,
+              stepId: input.responseState.stepId,
+            },
+            projectId: input.projectId,
+            submissionId: input.submissionId,
+            traceId,
+          })),
+        )
+        .onConflictDoNothing();
+    }
+
+    await tx.insert(actionSubmissionEvents).values({
+      eventType: "flow.awaiting_response",
+      message: "Flow is waiting for a visitor response.",
+      payload: {
+        actionVersionId: input.actionVersionId,
+        attemptCount: input.responseState.attemptCount,
+        reminderAt: input.responseState.reminderAt,
+        stepId: input.responseState.stepId,
+        timeoutAt: input.responseState.timeoutAt,
+      },
+      projectId: input.projectId,
+      submissionId: input.submissionId,
+      traceId,
+    });
+
+    return submission;
+  });
+}
+
 export async function submitActionFlowSubmission(
   input: SubmitActionFlowSubmissionInput,
 ) {
@@ -361,7 +477,7 @@ export async function cancelActionFlowSubmission(
       and(
         eq(durableJobs.projectId, input.projectId),
         eq(durableJobs.submissionId, updatedSubmission.id),
-        eq(durableJobs.jobType, "flow_resume"),
+        inArray(durableJobs.jobType, ["flow_resume", "flow_response_policy"]),
         inArray(durableJobs.status, ["queued", "processing"]),
       ),
     );

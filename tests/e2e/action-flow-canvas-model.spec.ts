@@ -127,6 +127,33 @@ test("canvas option routes use the stable option handle and current label", () =
   });
 });
 
+test("canvas shows named response-policy routes", () => {
+  const edges = buildEdges({
+    branchRules: [],
+    routeIssues: [],
+    steps: [
+      createStep(1, 1, {
+        settings: {
+          responsePolicy: {
+            cancellationStepId: 2,
+            retryExhaustedStepId: 2,
+            schemaVersion: 1,
+          },
+        },
+        stepType: "email",
+      }),
+      createStep(2, 2, { stepType: "submit" }),
+    ],
+  });
+
+  expect(edges).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ label: "cancelled" }),
+      expect.objectContaining({ label: "retry exhausted" }),
+    ]),
+  );
+});
+
 test("content reordering is immutable and ignores invalid moves", () => {
   const blocks: FlowContentBlock[] = [
     { id: "first", text: "First", type: "text" },

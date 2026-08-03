@@ -15,6 +15,11 @@ import { getStoredActionFlowConditionGroup } from "@/lib/action-flow-compiler";
 import type { ActionFlowRouteValidationIssue } from "@/lib/action-flows";
 import { getStoredActionOptionRoute } from "@/lib/action-option-routing";
 import {
+  ACTION_RESPONSE_POLICY_OUTPUTS,
+  getActionResponsePolicy,
+  getActionResponsePolicyTarget,
+} from "@/lib/action-response-policy";
+import {
   getActionStepOptions,
   isActionReplyOption,
   type RuntimeActionStep,
@@ -364,6 +369,36 @@ function buildHybridEdges(steps: FlowStep[]) {
   return edges;
 }
 
+function buildResponsePolicyEdges(steps: FlowStep[]) {
+  const availableStepIds = new Set(steps.map((step) => step.id));
+  return steps.flatMap<Edge>((step) => {
+    const policy = getActionResponsePolicy(step.settings);
+    return ACTION_RESPONSE_POLICY_OUTPUTS.flatMap<Edge>((output) => {
+      const targetStepId = getActionResponsePolicyTarget(policy, output);
+      if (targetStepId === null || !availableStepIds.has(targetStepId)) {
+        return [];
+      }
+
+      return [
+        {
+          ...CANVAS_EDGE_LABEL_PROPS,
+          id: `response-policy-${step.id}-${output}-${targetStepId}`,
+          label: output.replaceAll("_", " "),
+          markerEnd: { type: MarkerType.ArrowClosed },
+          source: String(step.id),
+          style: {
+            stroke: "#d97706",
+            strokeDasharray: "4 3",
+            strokeWidth: 1.6,
+          },
+          target: String(targetStepId),
+          type: "smoothstep",
+        },
+      ];
+    });
+  });
+}
+
 export function buildEdges(input: {
   branchRules: BranchRule[];
   routeIssues: ActionFlowRouteValidationIssue[];
@@ -430,6 +465,7 @@ export function buildEdges(input: {
   return [
     ...defaultEdges,
     ...branchEdges,
+    ...buildResponsePolicyEdges(input.steps),
     ...buildHybridEdges(input.steps),
     ...buildOrderedFallbackEdges(input.steps),
   ];
@@ -534,6 +570,7 @@ export function readStepForm(form: HTMLFormElement): CanvasStepInput {
   const formData = new FormData(form);
 
   return {
+    cancellationStepId: String(formData.get("cancellationStepId") ?? ""),
     choiceDisplayMode: String(formData.get("choiceDisplayMode") ?? "buttons"),
     contactAttributeFieldKey: String(
       formData.get("contactAttributeFieldKey") ?? "",
@@ -555,6 +592,15 @@ export function readStepForm(form: HTMLFormElement): CanvasStepInput {
     isRequired: formData.get("isRequired") === "on",
     label: String(formData.get("label") ?? ""),
     mediaAssetId: String(formData.get("mediaAssetId") ?? ""),
+    noReplyReminderMessage: String(
+      formData.get("noReplyReminderMessage") ?? "",
+    ),
+    noReplyReminderMinutes: String(
+      formData.get("noReplyReminderMinutes") ?? "",
+    ),
+    noReplyTimeoutMessage: String(formData.get("noReplyTimeoutMessage") ?? ""),
+    noReplyTimeoutMinutes: String(formData.get("noReplyTimeoutMinutes") ?? ""),
+    noReplyTimeoutStepId: String(formData.get("noReplyTimeoutStepId") ?? ""),
     operationExecutionMode: String(
       formData.get("operationExecutionMode") ?? "post_submit",
     ),
@@ -577,6 +623,9 @@ export function readStepForm(form: HTMLFormElement): CanvasStepInput {
       formData.get("productSelectionAllowQuantity") === "on",
     prompt: String(formData.get("prompt") ?? ""),
     requiredMessage: String(formData.get("requiredMessage") ?? ""),
+    retryCount: String(formData.get("retryCount") ?? ""),
+    retryExhaustedStepId: String(formData.get("retryExhaustedStepId") ?? ""),
+    retryMessage: String(formData.get("retryMessage") ?? ""),
     stepType: String(formData.get("stepType") ?? "collect_input"),
     validationAllowedFileTypes: String(
       formData.get("validationAllowedFileTypes") ?? "",
@@ -589,6 +638,9 @@ export function readStepForm(form: HTMLFormElement): CanvasStepInput {
     validationMinLength: String(formData.get("validationMinLength") ?? ""),
     validationMinNumber: String(formData.get("validationMinNumber") ?? ""),
     validationRegex: String(formData.get("validationRegex") ?? ""),
+    validationFailureStepId: String(
+      formData.get("validationFailureStepId") ?? "",
+    ),
     waitAmount: String(formData.get("waitAmount") ?? ""),
     waitUnit: String(formData.get("waitUnit") ?? "minutes"),
     whatsappTemplateBody: String(formData.get("whatsappTemplateBody") ?? ""),
@@ -614,6 +666,7 @@ export function readStepBasicsForm(
   const formData = new FormData(form);
 
   return {
+    cancellationStepId: String(formData.get("cancellationStepId") ?? ""),
     choiceDisplayMode: String(formData.get("choiceDisplayMode") ?? "buttons"),
     contactAttributeFieldKey: String(
       formData.get("contactAttributeFieldKey") ?? "",
@@ -636,6 +689,15 @@ export function readStepBasicsForm(
     isEnabled: formData.get("isEnabled") === "on",
     isRequired: formData.get("isRequired") === "on",
     label: String(formData.get("label") ?? ""),
+    noReplyReminderMessage: String(
+      formData.get("noReplyReminderMessage") ?? "",
+    ),
+    noReplyReminderMinutes: String(
+      formData.get("noReplyReminderMinutes") ?? "",
+    ),
+    noReplyTimeoutMessage: String(formData.get("noReplyTimeoutMessage") ?? ""),
+    noReplyTimeoutMinutes: String(formData.get("noReplyTimeoutMinutes") ?? ""),
+    noReplyTimeoutStepId: String(formData.get("noReplyTimeoutStepId") ?? ""),
     operationExecutionMode: String(
       formData.get("operationExecutionMode") ?? "post_submit",
     ),
@@ -649,8 +711,14 @@ export function readStepBasicsForm(
     options: String(formData.get("options") ?? ""),
     optionsChanged: formData.get("optionsChanged") === "true",
     prompt: String(formData.get("prompt") ?? ""),
+    retryCount: String(formData.get("retryCount") ?? ""),
+    retryExhaustedStepId: String(formData.get("retryExhaustedStepId") ?? ""),
+    retryMessage: String(formData.get("retryMessage") ?? ""),
     waitAmount: String(formData.get("waitAmount") ?? ""),
     waitUnit: String(formData.get("waitUnit") ?? "minutes"),
+    validationFailureStepId: String(
+      formData.get("validationFailureStepId") ?? "",
+    ),
   };
 }
 

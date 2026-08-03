@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { and, eq } from "drizzle-orm";
 import {
   countBlockingActionFlowIssues,
   createActionFlowBranchRule,
@@ -29,7 +30,10 @@ import {
 import { logChatRequest } from "../../src/lib/chat-logs";
 import { getOrCreateDefaultCompanyForUser } from "../../src/lib/companies";
 import { addContactTag, setContactAttribute } from "../../src/lib/contacts";
+import { db } from "../../src/lib/db-config";
+import { durableJobs } from "../../src/lib/db-schema";
 import { getProjectSourceDocuments } from "../../src/lib/documents";
+import { processProjectFlowResponsePolicyQueue } from "../../src/lib/durable-flow-response-policy";
 import { processProjectFlowResumeQueue } from "../../src/lib/durable-flow-resume";
 import { getFlowStepChannelCapabilityIssues } from "../../src/lib/flow-channel-capabilities";
 import { listProjectMediaAssets } from "../../src/lib/media-assets";
@@ -3003,6 +3007,201 @@ test("durable wait resumes and completes its pinned flow version", async ({
     expect.arrayContaining([
       "flow.paused",
       "flow.resumed",
+      "submission.submitted",
+    ]),
+  );
+});
+
+test("durable response policies retry, route, cancel, and time out on the pinned version", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-response-policy-${runId}@example.test`;
+  const projectName = `E2E Response Policy Project ${runId}`;
+  const triggerPhrase = `response policy ${runId}`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Response Policy User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(page, projectName);
+  const user = await getUserByEmail(email);
+  if (!user) {
+    throw new Error("Expected the response-policy test user to exist.");
+  }
+
+  const action = await createChatbotAction({
+    description: "Certifies deterministic response policies.",
+    name: `E2E Response Policy Action ${runId}`,
+    projectId,
+    status: "active",
+    triggerPhrases: [triggerPhrase],
+  });
+  const failureStep = await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Response Policy Outcome",
+    projectId,
+    prompt: "The response policy output was followed.",
+    sortOrder: 2,
+    stepType: "message",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Submit Response Policy Request",
+    projectId,
+    prompt: "The response policy request is complete.",
+    sortOrder: 3,
+    stepType: "submit",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "policyEmail",
+    inputType: "email",
+    isRequired: true,
+    label: "Policy Email",
+    projectId,
+    prompt: "What is your email address?",
+    settings: {
+      responsePolicy: {
+        cancellationStepId: failureStep.id,
+        noReplyReminderMessage: "Please reply when ready.",
+        noReplyReminderMinutes: null,
+        noReplyTimeoutMessage: "The response window expired.",
+        noReplyTimeoutMinutes: 1,
+        noReplyTimeoutStepId: failureStep.id,
+        retryCount: 1,
+        retryExhaustedStepId: failureStep.id,
+        retryMessage: "Enter a valid email and try again.",
+        schemaVersion: 1,
+        validationFailureStepId: null,
+      },
+    },
+    sortOrder: 1,
+    stepType: "email",
+  });
+  const publishedVersion = await createPublishedActionFlowVersion({
+    actionId: action.id,
+    projectId,
+    publishedByUserId: user.id,
+  });
+  if (!publishedVersion) {
+    throw new Error("Expected the response-policy flow to be published.");
+  }
+
+  const start = async (conversationId: string) => {
+    await recordChannelInboundMessage({
+      channelType: "widget",
+      externalConversationId: conversationId,
+      externalUserId: conversationId,
+      projectId,
+      text: triggerPhrase,
+    });
+    await processChannelFlowText({
+      activeSubmission: null,
+      conversationId,
+      projectId,
+      source: "widget_chat",
+      text: triggerPhrase,
+    });
+    const submission = await getActiveActionSubmissionForConversation({
+      conversationId,
+      projectId,
+      source: "widget_chat",
+    });
+    if (!submission) {
+      throw new Error("Expected an active response-policy submission.");
+    }
+    expect(submission.actionVersionId).toBe(publishedVersion.id);
+    return submission;
+  };
+
+  const retryConversationId = `response-policy-retry-${runId}`;
+  let retrySubmission = await start(retryConversationId);
+  const firstInvalid = await processChannelFlowText({
+    activeSubmission: retrySubmission,
+    conversationId: retryConversationId,
+    projectId,
+    source: "widget_chat",
+    text: "not-an-email",
+  });
+  expect(firstInvalid.replies[0]?.fallbackText).toContain(
+    "Enter a valid email and try again.",
+  );
+  retrySubmission =
+    (await getActiveActionSubmissionForConversation({
+      conversationId: retryConversationId,
+      projectId,
+      source: "widget_chat",
+    })) ?? retrySubmission;
+  const exhausted = await processChannelFlowText({
+    activeSubmission: retrySubmission,
+    conversationId: retryConversationId,
+    projectId,
+    source: "widget_chat",
+    text: "still-not-an-email",
+  });
+  expect(
+    exhausted.replies.map((reply) => reply.fallbackText).join("\n"),
+  ).toContain("The response policy output was followed.");
+
+  const cancelConversationId = `response-policy-cancel-${runId}`;
+  const cancelSubmission = await start(cancelConversationId);
+  const cancelled = await processChannelFlowText({
+    activeSubmission: cancelSubmission,
+    conversationId: cancelConversationId,
+    projectId,
+    source: "widget_chat",
+    text: "cancel",
+  });
+  expect(
+    cancelled.replies.map((reply) => reply.fallbackText).join("\n"),
+  ).toContain("The response policy output was followed.");
+
+  const timeoutConversationId = `response-policy-timeout-${runId}`;
+  const timeoutSubmission = await start(timeoutConversationId);
+  await db
+    .update(durableJobs)
+    .set({ availableAt: new Date(0) })
+    .where(
+      and(
+        eq(durableJobs.projectId, projectId),
+        eq(durableJobs.submissionId, timeoutSubmission.id),
+        eq(durableJobs.jobType, "flow_response_policy"),
+      ),
+    );
+  const queue = await processProjectFlowResponsePolicyQueue({
+    maxJobs: 1,
+    projectId,
+    workerId: `response-policy-worker-${runId}`,
+  });
+  expect(queue).toMatchObject({
+    completed: 1,
+    failed: 0,
+    processed: 1,
+    rescheduled: 0,
+    skipped: 0,
+  });
+
+  const submissions = await listActionSubmissions(projectId, action.id);
+  const completedTimeout = submissions.find(
+    (submission) => submission.id === timeoutSubmission.id,
+  );
+  expect(completedTimeout).toMatchObject({
+    actionVersionId: publishedVersion.id,
+    status: "submitted",
+  });
+  const timeoutEvents = await listActionSubmissionEvents(
+    projectId,
+    timeoutSubmission.id,
+  );
+  expect(timeoutEvents.map((event) => event.eventType)).toEqual(
+    expect.arrayContaining([
+      "flow.awaiting_response",
+      "flow.no_reply_timeout",
       "submission.submitted",
     ]),
   );

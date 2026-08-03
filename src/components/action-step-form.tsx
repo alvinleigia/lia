@@ -3,12 +3,14 @@ import {
   createActionFlowStepAction,
   updateActionFlowStepAction,
 } from "@/app/projects/actions/actions";
+import { FlowResponsePolicyFields } from "@/components/flow-response-policy-fields";
 import { ACTION_STEP_INPUT_TYPES } from "@/lib/action-flow-constants";
 import {
   formatFlowComponentLabel,
   getFlowComponentLabel,
   listEnabledStepFlowComponents,
 } from "@/lib/flow-components";
+import { isFlowInputStepType } from "@/lib/flow-input-editor";
 import { ActionFormError, ActionStateForm } from "./ui/action-state-form";
 import { FormSubmitButton } from "./ui/form-submit-button";
 import { Input } from "./ui/input";
@@ -291,6 +293,7 @@ export function ActionStepForm({
   const nextStepOptions = routeStepOptions.filter(
     (option) => option.id !== step?.id,
   );
+  const isInputStep = isFlowInputStepType(step?.stepType ?? "collect_input");
   const stepComponents = listEnabledStepFlowComponents();
   const reusableFieldSuggestions = reusableFields.slice(0, 8);
 
@@ -1014,6 +1017,17 @@ export function ActionStepForm({
           options.
         </p>
       </div>
+
+      {isInputStep && (
+        <FlowResponsePolicyFields
+          idPrefix="step-response-policy"
+          routeSteps={nextStepOptions.map((routeStep) => ({
+            id: routeStep.id,
+            label: `${routeStep.sortOrder}. ${routeStep.label || routeStep.fieldKey || getFlowComponentLabel(routeStep.stepType)}`,
+          }))}
+          settings={settings}
+        />
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="choiceDisplayMode">Choice Display</Label>

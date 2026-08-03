@@ -361,6 +361,52 @@ test("compiler routes first-class boolean outputs as typed values", () => {
   );
 });
 
+test("compiler includes valid response-policy outputs and blocks stale targets", () => {
+  const graph = compileActionFlowGraph({
+    branchRules: [],
+    steps: [
+      createStep(1, 1, {
+        fieldKey: "email",
+        settings: {
+          responsePolicy: {
+            cancellationStepId: 2,
+            noReplyTimeoutStepId: 99,
+            retryExhaustedStepId: 2,
+            schemaVersion: 1,
+          },
+        },
+        stepType: "email",
+      }),
+      createStep(2, 2, { stepType: "submit" }),
+    ],
+  });
+
+  expect(graph.edges).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        outputPort: "cancelled",
+        sourceStepId: 1,
+        targetStepId: 2,
+        type: "policy",
+      }),
+      expect.objectContaining({
+        outputPort: "retry_exhausted",
+        sourceStepId: 1,
+        targetStepId: 2,
+        type: "policy",
+      }),
+    ]),
+  );
+  expect(graph.issues).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        code: "response_policy_target_missing",
+        stepId: 1,
+      }),
+    ]),
+  );
+});
+
 test("compiler blocks missing and stale option route identities", () => {
   const graph = compileActionFlowGraph({
     branchRules: [

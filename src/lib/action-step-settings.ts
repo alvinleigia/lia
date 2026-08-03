@@ -1,3 +1,7 @@
+import {
+  ACTION_RESPONSE_POLICY_SETTINGS_KEY,
+  buildActionResponsePolicy,
+} from "@/lib/action-response-policy";
 import type {
   SelectCatalogProduct,
   SelectMediaAsset,
@@ -11,6 +15,7 @@ type ConnectedAction = {
 };
 
 export type ActionStepSettingsInput = {
+  cancellationStepId?: number;
   catalogId?: string;
   choiceDisplayMode?: "buttons" | "list" | "text";
   connectedAction?: ConnectedAction | null;
@@ -33,6 +38,14 @@ export type ActionStepSettingsInput = {
   productSelectionAllowQuantity?: boolean;
   products?: SelectCatalogProduct[];
   requiredMessage?: string;
+  noReplyReminderMessage?: string;
+  noReplyReminderMinutes?: number;
+  noReplyTimeoutMessage?: string;
+  noReplyTimeoutMinutes?: number;
+  noReplyTimeoutStepId?: number;
+  retryCount?: number;
+  retryExhaustedStepId?: number;
+  retryMessage?: string;
   sourceType?: string;
   stepType?: string;
   validationAllowedFileTypes?: string;
@@ -44,6 +57,7 @@ export type ActionStepSettingsInput = {
   validationMinLength?: number;
   validationMinNumber?: number;
   validationRegex?: string;
+  validationFailureStepId?: number;
   waitAmount?: number;
   waitUnit?: "seconds" | "minutes" | "hours" | "days";
   whatsappTemplateBody?: string;
@@ -116,6 +130,57 @@ function deleteSettings(settings: Record<string, unknown>, keys: string[]) {
 
 export function buildActionStepSettings(input: ActionStepSettingsInput) {
   const settings = toSettingsRecord(input.existingSettings);
+
+  const responsePolicyKeys = [
+    "cancellationStepId",
+    "noReplyReminderMessage",
+    "noReplyReminderMinutes",
+    "noReplyTimeoutMessage",
+    "noReplyTimeoutMinutes",
+    "noReplyTimeoutStepId",
+    "retryCount",
+    "retryExhaustedStepId",
+    "retryMessage",
+    "validationFailureStepId",
+  ] as const;
+
+  if (hasAnyOwn(input, [...responsePolicyKeys])) {
+    if (
+      input.stepType &&
+      [
+        "address",
+        "boolean",
+        "choice",
+        "collect_input",
+        "date",
+        "date_range",
+        "email",
+        "file_upload",
+        "location",
+        "number",
+        "phone",
+        "product_selection",
+        "time",
+      ].includes(input.stepType)
+    ) {
+      settings[ACTION_RESPONSE_POLICY_SETTINGS_KEY] = buildActionResponsePolicy(
+        {
+          cancellationStepId: input.cancellationStepId ?? null,
+          noReplyReminderMessage: input.noReplyReminderMessage ?? "",
+          noReplyReminderMinutes: input.noReplyReminderMinutes ?? null,
+          noReplyTimeoutMessage: input.noReplyTimeoutMessage ?? "",
+          noReplyTimeoutMinutes: input.noReplyTimeoutMinutes ?? null,
+          noReplyTimeoutStepId: input.noReplyTimeoutStepId ?? null,
+          retryCount: input.retryCount ?? 2,
+          retryExhaustedStepId: input.retryExhaustedStepId ?? null,
+          retryMessage: input.retryMessage ?? "",
+          validationFailureStepId: input.validationFailureStepId ?? null,
+        },
+      );
+    } else {
+      delete settings[ACTION_RESPONSE_POLICY_SETTINGS_KEY];
+    }
+  }
 
   if (hasOwn(input, "choiceDisplayMode")) {
     if (input.choiceDisplayMode) {

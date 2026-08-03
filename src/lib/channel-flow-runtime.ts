@@ -1,5 +1,6 @@
 import {
   ActionSubmissionConflictError,
+  awaitActionFlowResponse,
   cancelActionFlowSubmission,
   pauseActionFlowSubmission,
   recordActionFlowProgress,
@@ -11,6 +12,15 @@ import {
   getActionSubmission,
   markActionSubmissionForReview,
 } from "@/lib/action-flows";
+import {
+  type ActionResponsePolicyOutput,
+  buildActionResponsePolicyState,
+  clearActionResponsePolicyState,
+  getActionResponsePolicy,
+  getActionResponsePolicyFailureOutput,
+  getActionResponsePolicyState,
+  getActionResponsePolicyTarget,
+} from "@/lib/action-response-policy";
 import {
   buildActionReviewSummary,
   buildActionStepChannelMessage,
@@ -82,6 +92,7 @@ import {
 
 const CONFIRM_WORDS = new Set(["confirm", "yes", "y", "submit", "ok", "okay"]);
 const CANCEL_WORDS = new Set(["cancel", "stop", "no", "exit"]);
+const INPUT_CANCEL_WORDS = new Set(["cancel", "stop", "exit"]);
 const MAX_CONNECTED_FLOW_DEPTH = 5;
 const FLOW_EDIT_POSITION_KEY = "flowEditPosition";
 const FLOW_EDIT_STEP_IDS_KEY = "flowEditStepIds";
@@ -113,6 +124,37 @@ function getFlowWaitMetadata(submission: SelectActionSubmission) {
 function getSubmissionContactId(submission: SelectActionSubmission) {
   const contactId = submission.metadata.contactId;
   return typeof contactId === "number" ? contactId : null;
+}
+
+async function awaitResponseAtStep(input: {
+  action: RuntimeAction;
+  attemptCount?: number;
+  projectId: number;
+  step: RuntimeActionStep;
+  submission: SelectActionSubmission;
+}) {
+  const policy = getActionResponsePolicy(input.step.settings);
+  const responseState = buildActionResponsePolicyState({
+    actionVersionId: input.action.versionId,
+    attemptCount: input.attemptCount,
+    policy,
+    stepId: input.step.id,
+  });
+
+  return awaitActionFlowResponse({
+    actionVersionId: input.action.versionId,
+    channelType: getChannelTypeForFlowSource(input.submission.source),
+    conversationId:
+      input.submission.conversationId ?? `submission-${input.submission.id}`,
+    expectedRevision: input.submission.revision,
+    fields: input.submission.fields,
+    metadata: input.submission.metadata,
+    projectId: input.projectId,
+    responseState,
+    source: input.submission.source,
+    submissionId: input.submission.id,
+    traceId: input.submission.traceId,
+  });
 }
 
 function getHybridBoundaryNode(action: RuntimeAction, stepId: number) {
@@ -1074,14 +1116,13 @@ async function advanceFlowToNextStep(input: {
     }
 
     if (isActionInputStep(step)) {
-      const updatedSubmission = await recordActionFlowProgress({
+      const updatedSubmission = await awaitResponseAtStep({
+        action: input.action,
         projectId: input.projectId,
-        submissionId: submission.id,
-        currentStepId: step.id,
-        fields: submission.fields,
-        expectedRevision: submission.revision,
+        step,
+        submission,
       });
-      submission = updatedSubmission ?? submission;
+      submission = updatedSubmission;
       replies.push(...buildRuntimeRepliesForStep(step, submission.fields));
       return { replies };
     }
@@ -1374,6 +1415,81 @@ export async function startChannelFlowEdit(input: {
   };
 }
 
+async function routeResponsePolicyOutput(input: {
+  action: RuntimeAction;
+  contactId?: number | null;
+  output: ActionResponsePolicyOutput;
+  projectId: number;
+  reply: string;
+  step: RuntimeActionStep;
+  submission: SelectActionSubmission;
+}) {
+  const policy = getActionResponsePolicy(input.step.settings);
+  const targetStepId = getActionResponsePolicyTarget(policy, input.output);
+  const targetStepIndex = findStepIndexById(input.action, targetStepId);
+
+  if (targetStepId === null || targetStepIndex < 0) {
+    await addActionSubmissionEvent({
+      eventType: `flow.${input.output}`,
+      message: `Flow reached the ${input.output} response policy output.`,
+      payload: {
+        output: input.output,
+        sourceStepId: input.step.id,
+        targetStepId: null,
+      },
+      projectId: input.projectId,
+      submissionId: input.submission.id,
+    });
+    await cancelActionFlowSubmission({
+      expectedRevision: input.submission.revision,
+      projectId: input.projectId,
+      submissionId: input.submission.id,
+    });
+    if (input.output === "cancelled") {
+      await cancelParentReturnFlow({
+        projectId: input.projectId,
+        submission: input.submission,
+      });
+    }
+    return { replies: [createTextReply(input.reply)] };
+  }
+
+  const updatedSubmission = await recordActionFlowProgress({
+    currentStepId: targetStepId,
+    event: {
+      eventType: `flow.${input.output}`,
+      message: `Flow followed the ${input.output} response policy output.`,
+      payload: {
+        output: input.output,
+        sourceStepId: input.step.id,
+        targetStepId,
+      },
+    },
+    expectedRevision: input.submission.revision,
+    fields: input.submission.fields,
+    metadata: clearActionResponsePolicyState(input.submission.metadata),
+    projectId: input.projectId,
+    submissionId: input.submission.id,
+  });
+
+  if (!updatedSubmission) {
+    throw new ActionSubmissionConflictError();
+  }
+
+  const result = await advanceFlowToNextStep({
+    action: input.action,
+    contactId: input.contactId ?? getSubmissionContactId(updatedSubmission),
+    projectId: input.projectId,
+    stepIndex: targetStepIndex,
+    submission: updatedSubmission,
+  });
+
+  return {
+    boundaryNodeId: result.boundaryNodeId,
+    replies: [createTextReply(input.reply), ...result.replies],
+  };
+}
+
 async function continueChannelFlow(input: {
   action: RuntimeAction;
   answer: string;
@@ -1446,6 +1562,19 @@ async function continueChannelFlow(input: {
     });
   }
 
+  const policy = getActionResponsePolicy(step.settings);
+  if (INPUT_CANCEL_WORDS.has(normalizedAnswer)) {
+    return routeResponsePolicyOutput({
+      action: input.action,
+      contactId: input.contactId,
+      output: "cancelled",
+      projectId: input.projectId,
+      reply: "No problem. I cancelled this request.",
+      step,
+      submission: input.submission,
+    });
+  }
+
   const parsedAnswer = validateStepAnswer(
     step,
     input.answer,
@@ -1472,10 +1601,44 @@ async function continueChannelFlow(input: {
       },
     });
 
+    const responseState = getActionResponsePolicyState(
+      input.submission.metadata,
+    );
+    const nextAttemptCount =
+      responseState &&
+      responseState.stepId === step.id &&
+      responseState.actionVersionId === input.action.versionId
+        ? responseState.attemptCount + 1
+        : 1;
+
+    const failureOutput = getActionResponsePolicyFailureOutput(
+      policy,
+      nextAttemptCount,
+    );
+    if (failureOutput) {
+      return routeResponsePolicyOutput({
+        action: input.action,
+        contactId: input.contactId,
+        output: failureOutput,
+        projectId: input.projectId,
+        reply: invalidMessage,
+        step,
+        submission: input.submission,
+      });
+    }
+
+    await awaitResponseAtStep({
+      action: input.action,
+      attemptCount: nextAttemptCount,
+      projectId: input.projectId,
+      step,
+      submission: input.submission,
+    });
+
     return {
       replies: [
         createTextReply(
-          `${invalidMessage}\n\n${formatStepPrompt(
+          `${invalidMessage}\n\n${policy.retryMessage}\n\n${formatStepPrompt(
             step,
             input.submission.fields,
           )}`,
@@ -1516,10 +1679,10 @@ async function continueChannelFlow(input: {
     expectedRevision: input.submission.revision,
     metadata: editState
       ? updateFlowEditMetadata(
-          input.submission.metadata,
+          clearActionResponsePolicyState(input.submission.metadata),
           nextEditStepIndex === null ? null : nextEditPosition,
         )
-      : input.submission.metadata,
+      : clearActionResponsePolicyState(input.submission.metadata),
     event: {
       eventType: "field.collected",
       message: fieldKey ? `Collected ${fieldKey}.` : "Collected flow field.",
@@ -1624,10 +1787,45 @@ async function continueChannelFlowMedia(input: {
       },
     });
 
+    const policy = getActionResponsePolicy(step.settings);
+    const responseState = getActionResponsePolicyState(
+      input.submission.metadata,
+    );
+    const nextAttemptCount =
+      responseState &&
+      responseState.stepId === step.id &&
+      responseState.actionVersionId === input.action.versionId
+        ? responseState.attemptCount + 1
+        : 1;
+
+    const failureOutput = getActionResponsePolicyFailureOutput(
+      policy,
+      nextAttemptCount,
+    );
+    if (failureOutput) {
+      return routeResponsePolicyOutput({
+        action: input.action,
+        contactId: input.contactId,
+        output: failureOutput,
+        projectId: input.projectId,
+        reply: invalidMessage,
+        step,
+        submission: input.submission,
+      });
+    }
+
+    await awaitResponseAtStep({
+      action: input.action,
+      attemptCount: nextAttemptCount,
+      projectId: input.projectId,
+      step,
+      submission: input.submission,
+    });
+
     return {
       replies: [
         createTextReply(
-          `${invalidMessage}\n\n${formatStepPrompt(
+          `${invalidMessage}\n\n${policy.retryMessage}\n\n${formatStepPrompt(
             step,
             input.submission.fields,
           )}`,
@@ -1668,10 +1866,10 @@ async function continueChannelFlowMedia(input: {
     expectedRevision: input.submission.revision,
     metadata: editState
       ? updateFlowEditMetadata(
-          input.submission.metadata,
+          clearActionResponsePolicyState(input.submission.metadata),
           nextEditStepIndex === null ? null : nextEditPosition,
         )
-      : input.submission.metadata,
+      : clearActionResponsePolicyState(input.submission.metadata),
     event: {
       eventType: "field.collected",
       message: fieldKey ? `Collected ${fieldKey}.` : "Collected flow field.",
@@ -1859,5 +2057,40 @@ export async function processChannelFlowMedia(input: {
     media: input.media,
     projectId: input.projectId,
     submission: input.activeSubmission,
+  });
+}
+
+export async function processChannelFlowResponsePolicy(input: {
+  action: RuntimeAction;
+  kind: "reminder" | "timeout";
+  projectId: number;
+  submission: SelectActionSubmission;
+}) {
+  const step = getRunnableActionSteps(input.action).find(
+    (candidate) => candidate.id === input.submission.currentStepId,
+  );
+  if (!step || !isActionInputStep(step)) {
+    return { replies: [] };
+  }
+
+  const policy = getActionResponsePolicy(step.settings);
+  if (input.kind === "reminder") {
+    await addActionSubmissionEvent({
+      eventType: "flow.no_reply_reminder",
+      message: "No-reply reminder sent.",
+      payload: { stepId: step.id },
+      projectId: input.projectId,
+      submissionId: input.submission.id,
+    });
+    return { replies: [createTextReply(policy.noReplyReminderMessage)] };
+  }
+
+  return routeResponsePolicyOutput({
+    action: input.action,
+    output: "no_reply_timeout",
+    projectId: input.projectId,
+    reply: policy.noReplyTimeoutMessage,
+    step,
+    submission: input.submission,
   });
 }

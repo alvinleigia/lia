@@ -8,6 +8,7 @@ export const DURABLE_JOB_TYPES = [
   "operation_delivery",
   "outbox_delivery",
   "flow_resume",
+  "flow_response_policy",
 ] as const;
 export const DURABLE_JOB_STATUSES = [
   "queued",

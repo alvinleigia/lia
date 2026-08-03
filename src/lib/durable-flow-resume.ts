@@ -1,18 +1,12 @@
 import { getActionSubmission } from "@/lib/action-flows";
 import { runBrowserFlowText } from "@/lib/browser-flow-runtime";
-import {
-  CHANNEL_TYPES,
-  type ChannelType,
-  getChannelConversation,
-  listProjectChannels,
-} from "@/lib/channels";
+import { CHANNEL_TYPES, type ChannelType } from "@/lib/channels";
+import { deliverDurableFlowReplies } from "@/lib/durable-flow-delivery";
 import {
   claimNextDurableJob,
   completeDurableJob,
   failDurableJob,
 } from "@/lib/durable-jobs";
-import { enqueueWhatsAppRuntimeReplies } from "@/lib/outbox";
-import { normalizeWhatsAppConfig } from "@/lib/whatsapp";
 
 type FlowResumePayload = {
   channelType: ChannelType;
@@ -123,41 +117,12 @@ export async function processProjectFlowResumeQueue(input: {
       });
 
       if (payload.channelType === "whatsapp" && result.replies.length > 0) {
-        const [conversation, channels] = await Promise.all([
-          getChannelConversation({
-            channelType: "whatsapp",
-            externalConversationId: payload.conversationId,
-            projectId: input.projectId,
-          }),
-          listProjectChannels(input.projectId),
-        ]);
-        const conversationChannelId = conversation?.metadata.channelId;
-        const channel = channels.find(
-          (candidate) =>
-            candidate.channelType === "whatsapp" &&
-            candidate.status === "active" &&
-            (typeof conversationChannelId !== "number" ||
-              candidate.id === conversationChannelId),
-        );
-        const phoneNumberId = channel
-          ? normalizeWhatsAppConfig(channel.config).phoneNumberId ||
-            channel.externalId ||
-            ""
-          : "";
-
-        if (!channel || !phoneNumberId) {
-          throw new Error(
-            "The active WhatsApp channel for this resumed flow is unavailable.",
-          );
-        }
-
-        await enqueueWhatsAppRuntimeReplies({
-          channelId: channel.id,
-          externalConversationId: payload.conversationId,
-          phoneNumberId,
+        await deliverDurableFlowReplies({
+          channelType: payload.channelType,
+          conversationId: payload.conversationId,
+          externalUserId: payload.externalUserId,
           projectId: input.projectId,
           replies: result.replies,
-          to: payload.externalUserId || payload.conversationId,
           traceId: job.traceId,
         });
       }

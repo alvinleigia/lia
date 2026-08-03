@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, lte, or } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import { durableJobs, outboxMessages } from "@/lib/db-schema";
+import { processProjectFlowResponsePolicyQueue } from "@/lib/durable-flow-response-policy";
 import { processProjectFlowResumeQueue } from "@/lib/durable-flow-resume";
 import { processProjectDurableOperationQueue } from "@/lib/operations";
 import { processProjectOutboxQueue } from "@/lib/outbox";
@@ -93,13 +94,24 @@ export async function processDurableExecutionQueue(input?: {
       projectId,
       workerId: projectWorkerId,
     });
+    const responsePolicies = await processProjectFlowResponsePolicyQueue({
+      maxJobs: maxItemsPerQueue,
+      projectId,
+      workerId: projectWorkerId,
+    });
     const outbox = await processProjectOutboxQueue({
       maxMessages: maxItemsPerQueue,
       projectId,
       workerId: projectWorkerId,
     });
 
-    projects.push({ operations, outbox, projectId, resumes });
+    projects.push({
+      operations,
+      outbox,
+      projectId,
+      responsePolicies,
+      resumes,
+    });
   }
 
   return {

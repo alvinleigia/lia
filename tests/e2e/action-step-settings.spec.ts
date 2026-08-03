@@ -98,3 +98,37 @@ test("template settings retain typed body variable mappings", () => {
     },
   ]);
 });
+
+test("input response policies are versioned and removed from other families", () => {
+  const settings = buildActionStepSettings({
+    cancellationStepId: 5,
+    existingSettings: {},
+    noReplyReminderMessage: "Still there?",
+    noReplyReminderMinutes: 2,
+    noReplyTimeoutMessage: "Timed out.",
+    noReplyTimeoutMinutes: 5,
+    noReplyTimeoutStepId: 6,
+    retryCount: 2,
+    retryExhaustedStepId: 4,
+    retryMessage: "Try again.",
+    stepType: "collect_input",
+    validationFailureStepId: 3,
+  });
+
+  expect(settings.responsePolicy).toMatchObject({
+    cancellationStepId: 5,
+    noReplyReminderMinutes: 2,
+    noReplyTimeoutStepId: 6,
+    retryCount: 2,
+    retryExhaustedStepId: 4,
+    schemaVersion: 1,
+    validationFailureStepId: 3,
+  });
+  expect(
+    buildActionStepSettings({
+      cancellationStepId: undefined,
+      existingSettings: settings,
+      stepType: "message",
+    }),
+  ).not.toHaveProperty("responsePolicy");
+});

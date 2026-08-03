@@ -160,6 +160,9 @@ const hybridEntryPolicySchema = z.object({
 });
 const canvasStepBasicsSchema = z.object({
   actionId: z.coerce.number().int().positive(),
+  cancellationStepId: optionalValidationNumber(
+    z.coerce.number().int().positive(),
+  ),
   choiceDisplayMode: z.enum(["buttons", "list", "text"]),
   contactAttributeFieldKey: z.string().trim().max(120).optional(),
   contactAttributeKey: z.string().trim().max(120).optional(),
@@ -190,6 +193,17 @@ const canvasStepBasicsSchema = z.object({
   isEnabled: z.coerce.boolean(),
   isRequired: z.coerce.boolean(),
   label: z.string().trim().max(160),
+  noReplyReminderMessage: z.string().trim().max(500).optional(),
+  noReplyReminderMinutes: optionalValidationNumber(
+    z.coerce.number().int().min(1).max(10_080),
+  ),
+  noReplyTimeoutMessage: z.string().trim().max(500).optional(),
+  noReplyTimeoutMinutes: optionalValidationNumber(
+    z.coerce.number().int().min(1).max(10_080),
+  ),
+  noReplyTimeoutStepId: optionalValidationNumber(
+    z.coerce.number().int().positive(),
+  ),
   operationExecutionMode: z.enum(["post_submit", "inline"]).optional(),
   operationFailureStepId: z.preprocess(
     (value) =>
@@ -209,6 +223,14 @@ const canvasStepBasicsSchema = z.object({
   options: z.string().max(4000),
   optionsChanged: z.coerce.boolean(),
   prompt: z.string().trim().max(1000),
+  retryCount: optionalValidationNumber(z.coerce.number().int().min(0).max(10)),
+  retryExhaustedStepId: optionalValidationNumber(
+    z.coerce.number().int().positive(),
+  ),
+  retryMessage: z.string().trim().max(500).optional(),
+  validationFailureStepId: optionalValidationNumber(
+    z.coerce.number().int().positive(),
+  ),
 });
 const canvasBranchRuleSchema = z
   .object({
@@ -1068,6 +1090,7 @@ export async function createCanvasStepAction(
       options: isInputStep ? parseActionStepOptions(parsed.data.options) : [],
       settings: buildActionStepSettings({
         stepType: parsed.data.stepType,
+        cancellationStepId: parsed.data.cancellationStepId,
         choiceDisplayMode: parsed.data.choiceDisplayMode,
         contactAttributeFieldKey: parsed.data.contactAttributeFieldKey,
         contactAttributeKey: parsed.data.contactAttributeKey,
@@ -1079,6 +1102,11 @@ export async function createCanvasStepAction(
         handoffNotifyTeam: parsed.data.handoffNotifyTeam,
         handoffPriority: parsed.data.handoffPriority,
         handoffQueue: parsed.data.handoffQueue,
+        noReplyReminderMessage: parsed.data.noReplyReminderMessage,
+        noReplyReminderMinutes: parsed.data.noReplyReminderMinutes,
+        noReplyTimeoutMessage: parsed.data.noReplyTimeoutMessage,
+        noReplyTimeoutMinutes: parsed.data.noReplyTimeoutMinutes,
+        noReplyTimeoutStepId: parsed.data.noReplyTimeoutStepId,
         waitAmount: parsed.data.waitAmount,
         waitUnit: parsed.data.waitUnit,
         mediaAsset,
@@ -1095,6 +1123,9 @@ export async function createCanvasStepAction(
         productSelectionAllowQuantity:
           parsed.data.productSelectionAllowQuantity,
         requiredMessage: parsed.data.requiredMessage,
+        retryCount: parsed.data.retryCount,
+        retryExhaustedStepId: parsed.data.retryExhaustedStepId,
+        retryMessage: parsed.data.retryMessage,
         validationAllowedFileTypes: parsed.data.validationAllowedFileTypes,
         validationMaxDate: parsed.data.validationMaxDate,
         validationMaxLength: parsed.data.validationMaxLength,
@@ -1104,6 +1135,7 @@ export async function createCanvasStepAction(
         validationMinLength: parsed.data.validationMinLength,
         validationMinNumber: parsed.data.validationMinNumber,
         validationRegex: parsed.data.validationRegex,
+        validationFailureStepId: parsed.data.validationFailureStepId,
         ...productConfig,
       }),
     });
@@ -1275,6 +1307,7 @@ export async function updateCanvasStepAction(
       options,
       settings: buildActionStepSettings({
         stepType: parsed.data.stepType,
+        cancellationStepId: parsed.data.cancellationStepId,
         choiceDisplayMode: parsed.data.choiceDisplayMode,
         contactAttributeFieldKey: parsed.data.contactAttributeFieldKey,
         contactAttributeKey: parsed.data.contactAttributeKey,
@@ -1287,6 +1320,11 @@ export async function updateCanvasStepAction(
         handoffNotifyTeam: parsed.data.handoffNotifyTeam,
         handoffPriority: parsed.data.handoffPriority,
         handoffQueue: parsed.data.handoffQueue,
+        noReplyReminderMessage: parsed.data.noReplyReminderMessage,
+        noReplyReminderMinutes: parsed.data.noReplyReminderMinutes,
+        noReplyTimeoutMessage: parsed.data.noReplyTimeoutMessage,
+        noReplyTimeoutMinutes: parsed.data.noReplyTimeoutMinutes,
+        noReplyTimeoutStepId: parsed.data.noReplyTimeoutStepId,
         waitAmount: parsed.data.waitAmount,
         waitUnit: parsed.data.waitUnit,
         mediaAsset,
@@ -1303,6 +1341,9 @@ export async function updateCanvasStepAction(
         productSelectionAllowQuantity:
           parsed.data.productSelectionAllowQuantity,
         requiredMessage: parsed.data.requiredMessage,
+        retryCount: parsed.data.retryCount,
+        retryExhaustedStepId: parsed.data.retryExhaustedStepId,
+        retryMessage: parsed.data.retryMessage,
         validationAllowedFileTypes: parsed.data.validationAllowedFileTypes,
         validationMaxDate: parsed.data.validationMaxDate,
         validationMaxLength: parsed.data.validationMaxLength,
@@ -1312,6 +1353,7 @@ export async function updateCanvasStepAction(
         validationMinLength: parsed.data.validationMinLength,
         validationMinNumber: parsed.data.validationMinNumber,
         validationRegex: parsed.data.validationRegex,
+        validationFailureStepId: parsed.data.validationFailureStepId,
         ...productConfig,
       }),
     });
@@ -1571,8 +1613,9 @@ export async function updateCanvasStepBasicsAction(
     settings.choiceDisplayMode = parsed.data.choiceDisplayMode;
   }
 
-  if (isActionStep) {
+  if (isActionStep || isInputStep) {
     settings = buildActionStepSettings({
+      cancellationStepId: parsed.data.cancellationStepId,
       contactAttributeFieldKey: parsed.data.contactAttributeFieldKey,
       contactAttributeKey: parsed.data.contactAttributeKey,
       contactAttributeValue: parsed.data.contactAttributeValue,
@@ -1584,10 +1627,19 @@ export async function updateCanvasStepBasicsAction(
       handoffNotifyTeam: parsed.data.handoffNotifyTeam,
       handoffPriority: parsed.data.handoffPriority,
       handoffQueue: parsed.data.handoffQueue,
+      noReplyReminderMessage: parsed.data.noReplyReminderMessage,
+      noReplyReminderMinutes: parsed.data.noReplyReminderMinutes,
+      noReplyTimeoutMessage: parsed.data.noReplyTimeoutMessage,
+      noReplyTimeoutMinutes: parsed.data.noReplyTimeoutMinutes,
+      noReplyTimeoutStepId: parsed.data.noReplyTimeoutStepId,
       waitAmount: parsed.data.waitAmount,
       waitUnit: parsed.data.waitUnit,
       operationExecutionMode: parsed.data.operationExecutionMode,
+      retryCount: parsed.data.retryCount,
+      retryExhaustedStepId: parsed.data.retryExhaustedStepId,
+      retryMessage: parsed.data.retryMessage,
       stepType: existingStep.stepType,
+      validationFailureStepId: parsed.data.validationFailureStepId,
     });
   }
 

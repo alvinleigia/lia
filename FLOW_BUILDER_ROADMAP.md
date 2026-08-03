@@ -819,6 +819,22 @@ JSON continues to round-trip without acquiring new default fields. No database
 migration was required. TypeScript, lint, and 55 focused content, runtime,
 compiler, adapter, input-family, and channel-certification checks passed.
 
+Phase 10 Checkpoint 4 implementation status: Complete on 2026-08-03. Every
+deterministic input now stores a versioned response policy with bounded retry
+count and message, validation-failure, retry-exhausted, cancellation, and
+no-reply-timeout destinations. Awaited-response state, attempt counts, pinned
+action-version identity, reminder deadlines, and timeout deadlines are stored
+durably on the submission; reminder and timeout work is scheduled through the
+existing leased job queue. Stale scheduled work is skipped after any visitor
+answer or route change, and browser and WhatsApp delivery share the same
+scheduled-reply boundary. Named policy routes are visible on the canvas and
+invalid destinations block publication. No database migration was required
+because the versioned policy and state use existing JSON contracts and the job
+type column is already extensible. TypeScript, lint, and 43 offline focused
+checks passed. The database-backed retry/cancel/timeout lifecycle regression is
+prepared and remains part of the final gate once the local app and database are
+available.
+
 Phase 10 exit gate: businesses can choose either flexible task collection or
 fully scripted collection with stable per-option routes.
 
