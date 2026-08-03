@@ -88,8 +88,8 @@ database, backup, and provider readiness work.
 Current phase: Priority 2, Phase 9 of 18. Phase 8 and Priority 1 completed
 implementation, automated verification, and manual UAT by 2026-08-03.
 
-Current target: complete Phase 9 automated certification and focused manual
-UAT for composed-content authoring, persistence, and runtime presentation.
+Current target: complete focused manual UAT for Phase 9 composed-content
+authoring, persistence, and runtime presentation.
 
 ## Product Direction
 
@@ -748,7 +748,12 @@ content use universal structured contracts; ordered content is preserved through
 save, reload, preview, publish, export, import, and runtime. Publish validation
 blocks incomplete resources and conflicting stable identifiers. The focused
 canvas save/reload scenario and the 137-test fast release certification passed.
-Full offline certification and focused manual UAT remain before Phase 9 closure.
+
+Phase 9 Checkpoint 5 automated status: Complete on 2026-08-03. The production
+build, 138 contract tests, 225 offline browser and database tests, tenant
+isolation checks, and both serialized live OpenAI smoke scenarios passed. The
+focused six-step manual plan is ready in `docs/UAT_TEST_PLAN.md`; its sign-off
+is the only remaining Phase 9 exit requirement.
 
 Phase 9 exit gate: explicit nodes provide complete composed-content control
 when a business needs exact interaction wording or presentation.

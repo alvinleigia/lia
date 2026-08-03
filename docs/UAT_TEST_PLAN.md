@@ -2,6 +2,171 @@
 
 ## Current Test
 
+Phase 9 of 18: composed content and explicit interaction controls.
+
+Status: Ready for focused manual UAT on 2026-08-03. No database migration is
+required.
+
+Automated evidence:
+
+- Lint, TypeScript, tenant-scope analysis, and cron configuration passed.
+- All 138 channel and universal content contract tests passed.
+- The production build passed.
+- All 225 offline browser and database scenarios passed, including canvas
+  save/reload, ordered runtime replies, export/import preservation, publish
+  blockers, project chat, widget runtime, and form feedback.
+- Tenant-isolation database checks passed.
+- Both serialized live OpenAI smoke scenarios passed: document ingestion and
+  grounded project Q&A.
+
+This UAT is intentionally focused on the new deterministic authoring surface.
+Live WhatsApp credentials, approved-template delivery, and device rendering
+remain part of the later cross-channel certification phase.
+
+Use a disposable action in `Ewissen Infra (#194)` or another non-production
+project that has at least one active media asset, catalog, and product. Do not
+modify a live customer flow.
+
+## Step 1 of 6 - Create A Small Valid Test Flow
+
+1. Open `Automation` > `Actions` > `New Action`.
+2. Under `Blank Action`, create `Phase 9 Composed Content UAT` with a unique
+   trigger phrase such as `phase nine content check`.
+3. Open its `Canvas`.
+4. Add `Ask Question` and `Submit` blocks and connect the question to the
+   completion block.
+5. Set the question label to `Choose a service`, its field key to
+   `phase9Service`, and its first message to `What would you like to book?`.
+
+Expected result:
+
+- The canvas shows one answer-collecting step followed by one finish step.
+- The toolbar reports no route or finish-path blocker once they are connected.
+- Saving stays at the current canvas/form position and shows immediate toast
+  feedback.
+
+## Step 2 of 6 - Compose Content In An Exact Order
+
+1. On `Choose a service`, open `Add content`.
+2. Confirm the menu always lists `Text message`, `Text + buttons`, `List
+   message`, `Media`, `Catalogue message`, `Single product`, `Multiple
+   products`, `Template`, and `Request intervention`.
+3. Add, in this order, a `Text message`, `Media`, `Catalogue message`, and
+   `List message`.
+4. Enter distinct copy in the text message, select one active media asset, and
+   select one active catalog.
+5. For the list, enter header `Spa services` and footer `Choose one service`.
+6. Configure two rows:
+
+```text
+Label: Classic Facial
+Stored value: service_classic_facial
+Description: A classic facial treatment
+Section: Facials
+
+Label: Deep Tissue Massage
+Stored value: service_deep_tissue
+Description: A deep pressure massage
+Section: Massages
+```
+
+Expected result:
+
+- Every Add Content option remains visible; unavailable items explain why.
+- The node displays the base question followed by the four content blocks in
+  the authored order.
+- Visible labels are independent from stored values.
+- After the list is present, both `Text + buttons` and `List message` are
+  disabled with the one-response-collector explanation.
+
+## Step 3 of 6 - Verify Editing And Persistence
+
+1. Move the media below the catalogue, then move it back above the catalogue.
+2. Duplicate the text block, edit the duplicate so its copy is unique, then
+   remove the duplicate.
+3. Save the step and refresh the browser.
+4. Reopen `Choose a service` in the full `Edit Step` dialog.
+5. Review the list header, footer, both labels, stored values, descriptions,
+   and sections.
+
+Expected result:
+
+- Move, duplicate, edit, and remove controls affect only the selected block.
+- Refresh preserves the final order: text, media, catalogue, list.
+- All structured list fields retain their exact values.
+- The stored value does not change when a visible label is edited.
+
+## Step 4 of 6 - Verify Publish Blockers And Recovery
+
+1. Temporarily give both list rows the stored value
+   `service_classic_facial`, save, and return to `Overview`.
+2. Review `Publish readiness` and attempt to publish if the button is enabled.
+3. Return to the canvas, restore the second value to
+   `service_deep_tissue`, and save.
+4. Return to `Overview` and publish the corrected flow.
+
+Expected result:
+
+- The duplicate stable value produces a clear content/publish blocker and an
+  invalid draft cannot be published.
+- Correcting the value removes that blocker.
+- Publishing creates an immutable version without changing the authored order.
+
+## Step 5 of 6 - Verify Runtime Presentation And Collection
+
+1. Open `Test Flow` for the published version, start a clean test, and follow
+   the published route through its completion target.
+2. Open `Project Chat`, start `Phase 9 Composed Content UAT` from the available
+   action button, and confirm the visitor receives, in order: the base
+   question, the additional text, the media, the catalogue, and the structured
+   list.
+3. Choose `Deep Tissue Massage` and complete the flow.
+4. Start it once more using the unique trigger phrase and repeat the selection.
+
+Expected result:
+
+- The published graph test reaches its completion target, and project chat
+  preserves the authored content order.
+- The list shows its header, footer, two sections, descriptions, and visible
+  labels without exposing internal IDs.
+- Choosing the visible label is accepted as the stable
+  `service_deep_tissue` answer and the flow reaches its completion step once.
+- No raw JSON or provider-specific identifier is required in the primary
+  authoring fields.
+
+## Step 6 of 6 - Verify Export And Import Preservation
+
+1. Export the published action from `Overview` or `Canvas`.
+2. Open `Automation` > `Actions` > `Import` and import the downloaded file
+   under a name such as `Phase 9 Composed Content UAT Import`.
+3. Open the imported action's canvas and edit `Choose a service`.
+4. Compare its content order and structured list fields with the source.
+5. Archive or clearly label both disposable actions after recording the result.
+
+Expected result:
+
+- Import succeeds without editing the exported JSON.
+- The imported draft preserves the base message and the exact text, media,
+  catalogue, and list order.
+- Labels, stable values, descriptions, sections, header, and footer match the
+  source action.
+- No unresolved Critical or High Phase 9 defect remains.
+
+## Phase 9 Sign-Off
+
+- [ ] All six focused steps pass.
+- [ ] Universal Add Content visibility and disabled reasons are correct.
+- [ ] Ordered content and structured choices survive save and refresh.
+- [ ] Incomplete or conflicting content blocks publication.
+- [ ] Published preview and project chat preserve order and stable selection.
+- [ ] Export/import preserves the universal content contract without raw JSON.
+- [ ] No unresolved Critical or High Phase 9 defect remains.
+
+Record screenshots or concise defect notes under the failed step. Phase 9 is
+not closed until these checks are signed off.
+
+## Previous Sign-Off - Phase 8, Checkpoint 6
+
 Phase 8 of 18, Checkpoint 6 of 6: final reference booking scenario and
 Priority 1 closure.
 
