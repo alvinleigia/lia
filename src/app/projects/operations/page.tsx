@@ -246,9 +246,11 @@ export default async function OperationsPage({
               />
             )}
             {params.operationUpdated && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Operation updated.
-              </p>
+              <FlashToast
+                clearParams="operationUpdated"
+                id="operation-updated"
+                message="Operation updated."
+              />
             )}
             {params.operationReplayed && (
               <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
@@ -290,6 +292,7 @@ export default async function OperationsPage({
                       <form
                         action={updateOperationStatusAction}
                         className="flex items-center gap-2"
+                        data-preserve-scroll
                       >
                         <input
                           type="hidden"

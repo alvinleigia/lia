@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  CheckCircle2,
   FlaskConical,
   LayoutTemplate,
   Save,
@@ -14,6 +13,7 @@ import {
   ActionStateForm,
 } from "@/components/ui/action-state-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FlashToast } from "@/components/ui/flash-toast";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,10 +134,11 @@ export default async function ActionSettingsPage({
           </CardHeader>
           <CardContent className="space-y-4">
             {query.updated === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                <CheckCircle2 className="h-4 w-4 inline mr-2" />
-                Action updated.
-              </p>
+              <FlashToast
+                clearParams="updated"
+                id="action-updated"
+                message="Action updated."
+              />
             )}
             {query.error && (
               <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">
