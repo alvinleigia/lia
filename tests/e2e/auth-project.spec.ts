@@ -2384,6 +2384,10 @@ test("project chat resumes an active flow after refresh without duplicate writes
   await sendProjectChatMessage(page, "+919988776655");
   await expect(page.getByText("Thanks. I saved this request.")).toBeVisible();
 
+  await page.reload();
+  await expect(page.getByText("Recovery Guest", { exact: true })).toBeVisible();
+  await expect(page.getByText("Thanks. I saved this request.")).toBeVisible();
+
   const duplicateConversationId = `duplicate-${runId}`;
   const duplicateCommandId = `duplicate-command-${runId}`;
   const firstResult = await runBrowserFlowText({

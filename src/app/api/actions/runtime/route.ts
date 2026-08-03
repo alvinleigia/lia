@@ -4,10 +4,15 @@ import {
   isInactiveAccountError,
   resolveUserAndProject,
 } from "@/lib/auth-project";
+import { browserChannelMessagesToFlowMessages } from "@/lib/browser-channel-adapter";
 import {
   BrowserFlowCommandError,
   runBrowserFlowText,
 } from "@/lib/browser-flow-runtime";
+import {
+  getChannelConversation,
+  listRecentChannelMessages,
+} from "@/lib/channels";
 
 const requestSchema = z
   .object({
@@ -30,6 +35,29 @@ async function readJsonBody(req: Request) {
   } catch {
     return { body: null, isValidJson: false } as const;
   }
+}
+
+async function loadProjectChatHistory(input: {
+  conversationId: string;
+  projectId: number;
+}) {
+  const conversation = await getChannelConversation({
+    channelType: "project_chat",
+    externalConversationId: input.conversationId,
+    projectId: input.projectId,
+  });
+  if (!conversation) {
+    return [];
+  }
+
+  return browserChannelMessagesToFlowMessages(
+    "project_chat",
+    await listRecentChannelMessages({
+      conversationId: conversation.id,
+      limit: 50,
+      projectId: input.projectId,
+    }),
+  );
 }
 
 export async function POST(req: Request) {
@@ -71,6 +99,12 @@ export async function POST(req: Request) {
       source: "project_chat",
       text: parsed.data.text,
     });
+    const history = parsed.data.resume
+      ? await loadProjectChatHistory({
+          conversationId: parsed.data.conversationId,
+          projectId: project.id,
+        })
+      : undefined;
 
     if (parsed.data.actionId && !result.handled) {
       return NextResponse.json(
@@ -90,7 +124,9 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json(
+      history === undefined ? result : { ...result, history },
+    );
   } catch (error) {
     if (error instanceof BrowserFlowCommandError) {
       return NextResponse.json(

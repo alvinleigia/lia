@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { createBrowserChannelAdapter } from "../../src/lib/browser-channel-adapter";
+import {
+  browserChannelMessagesToFlowMessages,
+  createBrowserChannelAdapter,
+} from "../../src/lib/browser-channel-adapter";
 import {
   CHANNEL_REPLY_CAPABILITIES,
   getRuntimeReplyCapability,
@@ -170,6 +173,52 @@ test("browser adapters preserve validated runtime input requests", () => {
     options: [],
     required: true,
   });
+});
+
+test("browser history restores visitor roles and persisted rich replies", () => {
+  const history = browserChannelMessagesToFlowMessages("project_chat", [
+    {
+      direction: "inbound",
+      id: 1,
+      messageType: "text",
+      payload: {},
+      text: "Alpha",
+    },
+    {
+      direction: "outbound",
+      id: 2,
+      messageType: "buttons",
+      payload: {
+        displayMode: "buttons",
+        options: createOptions(2),
+      },
+      text: "Choose a route\n\n1. Option 1\n2. Option 2",
+    },
+    {
+      direction: "outbound",
+      id: 3,
+      messageType: "text",
+      payload: {},
+      text: "The request timed out.",
+    },
+  ]);
+
+  expect(history).toEqual([
+    { id: "channel-1", role: "user", text: "Alpha" },
+    expect.objectContaining({
+      id: "channel-2",
+      role: "assistant",
+      text: "Choose a route",
+    }),
+    {
+      id: "channel-3",
+      media: undefined,
+      productMode: undefined,
+      products: undefined,
+      role: "assistant",
+      text: "The request timed out.",
+    },
+  ]);
 });
 
 test("WhatsApp keeps typed input requests as a text fallback", async () => {

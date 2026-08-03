@@ -114,12 +114,18 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
         return (await response.json()) as BrowserFlowRuntimeResult;
       })
       .then((result) => {
-        if (!isCurrent || !result.handled) {
+        if (!isCurrent) {
           return;
         }
 
         setFlowMessages(
-          browserRuntimeRepliesToFlowMessages("project_chat", result.replies),
+          result.history ??
+            (result.handled
+              ? browserRuntimeRepliesToFlowMessages(
+                  "project_chat",
+                  result.replies,
+                )
+              : []),
         );
         setActiveFlow(result.activeFlow);
         setServerActiveAction(result.activeFlow ? result.action : null);

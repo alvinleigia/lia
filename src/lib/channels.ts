@@ -203,6 +203,8 @@ export async function listRecentChannelMessages(input: {
     .select({
       direction: channelMessages.direction,
       id: channelMessages.id,
+      messageType: channelMessages.messageType,
+      payload: channelMessages.payload,
       text: channelMessages.text,
     })
     .from(channelMessages)

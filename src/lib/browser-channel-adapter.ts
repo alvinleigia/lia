@@ -18,6 +18,24 @@ import type {
 
 type BrowserChannelType = Extract<ChannelType, "project_chat" | "widget">;
 
+type StoredBrowserChannelMessage = {
+  direction: string;
+  id: number;
+  messageType: string;
+  payload: Record<string, unknown>;
+  text: string | null;
+};
+
+const RUNTIME_REPLY_TYPES = new Set<RuntimeReply["type"]>([
+  "buttons",
+  "catalog",
+  "handoff",
+  "list",
+  "media",
+  "template",
+  "text",
+]);
+
 export type BrowserChannelDelivery = FlowChatMessage;
 
 function getPayloadMedia(reply: RuntimeReply) {
@@ -132,4 +150,54 @@ export function browserRuntimeRepliesToFlowMessages(
   return adaptBrowserRuntimeReplies(channelType, replies).map(
     (adapted) => adapted.delivery,
   );
+}
+
+function getStoredBrowserReplyText(message: StoredBrowserChannelMessage) {
+  const text = message.text ?? "";
+
+  return ["buttons", "catalog", "list", "media"].includes(message.messageType)
+    ? (text.split("\n\n")[0] ?? text)
+    : text;
+}
+
+export function browserChannelMessagesToFlowMessages(
+  channelType: BrowserChannelType,
+  messages: StoredBrowserChannelMessage[],
+): FlowChatMessage[] {
+  const adapter = createBrowserChannelAdapter(channelType);
+
+  return messages.flatMap<FlowChatMessage>((message) => {
+    if (!message.text) {
+      return [];
+    }
+
+    if (message.direction === "inbound") {
+      return [
+        {
+          id: `channel-${message.id}`,
+          role: "user" as const,
+          text: message.text,
+        },
+      ];
+    }
+
+    const type = RUNTIME_REPLY_TYPES.has(
+      message.messageType as RuntimeReply["type"],
+    )
+      ? (message.messageType as RuntimeReply["type"])
+      : "text";
+    const reply: RuntimeReply = {
+      fallbackText: message.text,
+      payload: message.payload,
+      text: getStoredBrowserReplyText(message),
+      type,
+    };
+
+    return [
+      adapter.adaptReply({
+        context: { messageId: `channel-${message.id}` },
+        reply,
+      }).delivery,
+    ];
+  });
 }
