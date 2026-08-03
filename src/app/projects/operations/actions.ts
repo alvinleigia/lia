@@ -273,7 +273,7 @@ export async function createApiRequestOperationAction(
     providerType: formData.get("providerType") || "webhook",
     queryParameters: formData.get("queryParameters"),
     retryCount: formData.get("retryCount") || 0,
-    secret: formData.get("secret"),
+    secret: formData.get("secret") ?? undefined,
     timeoutMs: formData.get("timeoutMs") || 15000,
     url: formData.get("url"),
   });
