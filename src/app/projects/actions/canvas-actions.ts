@@ -39,6 +39,7 @@ import {
 import {
   createActionStepSchema,
   mergeActionStepOptions,
+  optionalActionEmailSchema,
   parseActionStepOptions,
 } from "@/lib/action-step-schema";
 import { buildActionStepSettings } from "@/lib/action-step-settings";
@@ -169,7 +170,7 @@ const canvasStepBasicsSchema = z.object({
   contactAttributeKey: z.string().trim().max(120).optional(),
   contactAttributeValue: z.string().trim().max(1000).optional(),
   contactAttributeValueSource: z.enum(["field", "static"]).optional(),
-  contactAgentEmail: z.string().trim().email().max(320).optional(),
+  contactAgentEmail: optionalActionEmailSchema,
   contactTagNames: z.string().trim().max(1000).optional(),
   contactTeamName: z.string().trim().max(120).optional(),
   connectedActionId: z.preprocess(

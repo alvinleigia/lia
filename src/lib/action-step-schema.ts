@@ -13,6 +13,12 @@ const optionalNumber = (schema: z.ZodType<number>) =>
     schema.optional(),
   );
 
+export const optionalActionEmailSchema = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  z.string().trim().email().max(320).optional(),
+);
+
 const actionStepSchemaShape = {
   actionId: z.coerce.number().int().positive(),
   stepId: z.coerce.number().int().positive().optional(),
@@ -56,11 +62,7 @@ const actionStepSchemaShape = {
   contactAttributeFieldKey: z.string().trim().max(120).optional(),
   contactAttributeValue: z.string().trim().max(1000).optional(),
   contactAttributeValueSource: z.enum(["field", "static"]).optional(),
-  contactAgentEmail: z.preprocess(
-    (value) =>
-      typeof value === "string" && value.trim() === "" ? undefined : value,
-    z.string().trim().email().max(320).optional(),
-  ),
+  contactAgentEmail: optionalActionEmailSchema,
   contactTagNames: z.string().trim().max(1000).optional(),
   contactTeamName: z.string().trim().max(120).optional(),
   connectedActionId: optionalNumber(z.coerce.number().int().positive()),
