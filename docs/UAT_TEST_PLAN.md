@@ -74,7 +74,7 @@ changing the endpoint to a production service.
 
     | Row | `Save as flow field` | `Response body path` |
     | --- | --- | --- |
-    | 1 | `echoedEmail` | `json.guestEmail` |
+    | 1 | `echoedEmail` | `json.payload.guestEmail` |
     | 2 | `echoedUrl` | `url` |
 
 11. Complete the request policy fields:
@@ -123,7 +123,7 @@ Expected result:
    | Visible item | Expected value |
    | --- | --- |
    | Attempt status | `completed` |
-   | Response status | `200 OK` |
+   | Response status | `200` |
    | Outcome | `success` |
    | Mapped flow field `echoedEmail` | `phase11.preview@example.com` |
    | Mapped flow field `echoedUrl` | Contains `source=phase11-uat` |
