@@ -2,9 +2,334 @@
 
 ## Current Test
 
-Phase 9 of 18: composed content and explicit interaction controls.
+Phase 10 of 18: per-option routing and deterministic response policies.
 
 Status: Ready for focused manual UAT on 2026-08-03. No database migration is
+required.
+
+Automated evidence:
+
+- Lint, TypeScript, tenant-scope analysis, and cron configuration passed.
+- All 142 channel and universal-content contract tests passed.
+- The production build passed.
+- All 244 offline browser and database scenarios passed, including stable
+  option routing, website and telephone actions, typed boolean values,
+  retries, cancellation, durable reminders and timeouts, version pinning,
+  canvas persistence, and the existing project-chat and widget journeys.
+- Tenant-isolation database checks passed.
+
+Use the exact project, action name, labels, and values below. The action is
+disposable. Do not modify an existing customer flow. Keep the terminal running
+`npm run dev` open throughout the test. Step 6 also requires a second
+PowerShell terminal opened at the repository root.
+
+## Step 1 of 6 - Create The Routed Response-Policy Flow
+
+1. Open [the local application](http://localhost:3000) and sign in with the UAT
+   account.
+2. In the header, click the pill beginning with `Selected Project:`. In the
+   `Select a Project` dialog, search for `Ewissen Infra`, then select the row
+   whose ID is `194`.
+3. Verify the header says `Selected Project: Ewissen Infra`.
+4. Click `Automation` in the header, then click `Actions`.
+5. On `Actions: Ewissen Infra`, click `New Action`.
+6. Scroll to the `Blank Action` form and enter all three fields:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Action Name` | `Phase 10 Routing Policy UAT` |
+   | `Description` | `Verifies stable routes, button behavior, retries, cancellation, reminders, and timeout.` |
+   | `Trigger Phrases` | `phase ten routing check` |
+
+7. Click `Create Action`. Wait for the overview to load and confirm the heading
+   is `Phase 10 Routing Policy UAT`.
+8. Click `Canvas` in the action header.
+9. In the left `Blocks` panel under `Actions`, click `Ask Question`. Complete
+   the `Create Step` dialog:
+
+   | Field or control | Value |
+   | --- | --- |
+   | `Step Behavior` | `Ask Question` |
+   | `Step name` | `Choose Phase 10 route` |
+   | `Question shown to the visitor` | `Which Phase 10 route should run?` |
+   | `Answer format` | `Text` |
+   | `Answer required` | Checked |
+   | `Step active` | Checked |
+
+10. Expand `Advanced options`, enter `phase10Route` in `Save answer as`, then
+    click `Create Step`. Confirm the canvas shows `Choose Phase 10 route`.
+11. Create five terminal nodes. For each row below, click `Submit` under
+    `Actions`, fill the visible `Create Step` fields, keep `Action active`
+    checked, and click `Create Step` before creating the next row:
+
+    | `Step name` | `Completion message` |
+    | --- | --- |
+    | `Alpha route complete` | `Alpha route completed.` |
+    | `Beta route complete` | `Beta route completed.` |
+    | `Invalid answer handled` | `Invalid answer route completed.` |
+    | `Cancellation handled` | `Cancellation route completed.` |
+    | `No reply handled` | `No reply route completed.` |
+
+12. Confirm the canvas contains exactly six nodes. Do not draw a generic
+    connection between them; the named option and policy outputs are connected
+    in Steps 2 and 3.
+13. If you reposition nodes, click `Save Layout` and wait until the button is
+    disabled again.
+
+Expected result:
+
+- The canvas shows one Ask Question node and five Submit nodes with the exact
+  names above.
+- Each `Create Step` submission closes the dialog, shows immediate success
+  feedback, and keeps the canvas usable.
+- No existing action or published version was changed.
+
+## Step 2 of 6 - Add Stable Reply, Website, And Phone Options
+
+1. On `Choose Phase 10 route`, click `Add content`, then click
+   `Text + buttons`.
+2. In the inline editor, enter `Choose one Phase 10 action.` in `Message`.
+3. Complete Option 1:
+
+   | Field or control | Value |
+   | --- | --- |
+   | `Option 1` | `Alpha` |
+   | `Stored value 1` | `route_alpha` |
+   | `Button behavior 1` | `Reply and continue` |
+
+4. Click `Add option` and complete Option 2:
+
+   | Field or control | Value |
+   | --- | --- |
+   | `Option 2` | `Beta` |
+   | `Stored value 2` | `route_beta` |
+   | `Button behavior 2` | `Reply and continue` |
+
+5. Click `Add option` and complete Option 3:
+
+   | Field or control | Value |
+   | --- | --- |
+   | `Option 3` | `Open help` |
+   | `Stored value 3` | `help_url` |
+   | `Button behavior 3` | `Open website` |
+   | `Button destination 3` | `https://example.com/phase-10-help` |
+
+6. Click `Add option` and complete Option 4:
+
+   | Field or control | Value |
+   | --- | --- |
+   | `Option 4` | `Call help` |
+   | `Stored value 4` | `help_phone` |
+   | `Button behavior 4` | `Call phone number` |
+   | `Button destination 4` | `+919876543210` |
+
+7. Click the inline `Save` button and wait for the editor to close.
+8. In the `Option routes` panel now shown inside `Choose Phase 10 route`, set:
+
+   | Visible option | Destination selected in its dropdown |
+   | --- | --- |
+   | `Alpha` | `Alpha route complete` |
+   | `Beta` | `Beta route complete` |
+
+   Each dropdown saves immediately. Wait for the save indicator to finish
+   before changing the next dropdown.
+9. Confirm `Open help` and `Call help` do not have route dropdowns or output
+   connectors. They are calls to action, not visitor replies.
+10. Click the `Choose Phase 10 route` node title to open `Edit Step`. In the
+    `Text + buttons` editor, change only `Option 1` from `Alpha` to
+    `Alpha renamed`. Confirm `Stored value 1` remains `route_alpha`, then click
+    `Save changes`.
+11. Confirm the node's `Option routes` panel now says `Alpha renamed` and its
+    destination is still `Alpha route complete`.
+
+Expected result:
+
+- Four visible actions are saved, but only the two `Reply and continue`
+  options are routable.
+- Renaming the visible Alpha label does not change `route_alpha`, remove its
+  connector, or lose its destination.
+- The canvas shows named Alpha and Beta edges plus the explicit
+  `default / no match` fallback presentation.
+
+## Step 3 of 6 - Configure And Publish The Response Policy
+
+1. Click the `Choose Phase 10 route` node title to open `Edit Step`.
+2. Scroll to `Answer rules` and enter:
+
+   | Field label | Value |
+   | --- | --- |
+   | `When no answer is provided` | `Choose Alpha renamed or Beta.` |
+   | `When the answer is invalid` | `That is not a valid Phase 10 option.` |
+
+3. Scroll to `Response policy` and enter every value exactly:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Retry count` | `1` |
+   | `Retry message` | `Please use one of the visible reply buttons.` |
+   | `Validation failure output` | `Retry this question` |
+   | `Retries exhausted output` | `Invalid answer handled` |
+   | `Cancellation output` | `Cancellation handled` |
+   | `No-reply reminder after (minutes)` | `1` |
+   | `Reminder message` | `Phase 10 is still waiting for your choice.` |
+   | `No-reply timeout after (minutes)` | `3` |
+   | `Timeout message` | `Phase 10 version 1 timed out.` |
+   | `No-reply timeout output` | `No reply handled` |
+
+4. Click `Save changes`. Reopen the node and verify all values and destinations
+   persist, then close the dialog without changing them.
+5. In the canvas toolbar, click `Overview`.
+6. Confirm the `Publish readiness` panel is green and says `Ready to publish`.
+   If it names a missing or conflicting route, stop and report the exact
+   blocker instead of bypassing it.
+7. Click `Publish`. Wait for the overview to reload and confirm
+   `Action published.` appears.
+8. Record the number in `Published Version`; a newly created action should show
+   `v1`.
+
+Expected result:
+
+- The response-policy fields save and reload with the exact values above.
+- The canvas/readiness check recognizes option, retry-exhausted,
+  cancellation, and timeout destinations as valid named outputs.
+- Publication succeeds only after every routed destination is valid.
+
+## Step 4 of 6 - Verify Reply Routes And Non-Reply Calls To Action
+
+1. Click `Projects` in the header, then click `Chat`.
+2. At the top of `Project Chat`, click `Phase 10 Routing Policy UAT`. Do not
+   type the trigger phrase; the action button avoids an unnecessary model call.
+3. Confirm the assistant shows `Which Phase 10 route should run?`,
+   `Choose one Phase 10 action.`, and four controls: `Alpha renamed`, `Beta`,
+   `Open help`, and `Call help`.
+4. Click `Open help`. Confirm a new browser tab or window targets
+   `https://example.com/phase-10-help`. The destination does not need to load
+   on an offline machine. Return to the Project Chat tab.
+5. Confirm the flow is still waiting at the same question and has not displayed
+   any completion message.
+6. Inspect `Call help` without placing a call. Confirm its link destination
+   begins with `tel:` and contains `+919876543210`.
+7. Click `Alpha renamed`. Confirm the visitor bubble displays
+   `Alpha renamed`, not `route_alpha`, and the assistant displays
+   `Alpha route completed.` exactly once.
+8. Click the `Phase 10 Routing Policy UAT` action button again to start a fresh
+   run, then click `Beta`.
+9. Confirm the visitor bubble displays `Beta`, not `route_beta`, and the
+   assistant displays `Beta route completed.` exactly once.
+10. Click `Automation` > `Submissions`. Open the two newest
+    `Phase 10 Routing Policy UAT` rows whose source is `project_chat`. Confirm
+    their `Fields` cards store `phase10Route` as `route_alpha` and
+    `route_beta`, respectively.
+
+Expected result:
+
+- Website and phone controls expose safe destinations without answering or
+  advancing the flow.
+- Each reply follows its own named route.
+- Project Chat displays visitor labels while submissions retain stable stored
+  values.
+
+## Step 5 of 6 - Verify Bounded Retry And Cancellation Routes
+
+1. Return to `Projects` > `Chat` and click
+   `Phase 10 Routing Policy UAT` to start a new run.
+2. In `What would you like to know?`, type `not-an-option`, then click the send
+   button once.
+3. Confirm the assistant displays all three parts: `That is not a valid Phase
+   10 option.`, `Please use one of the visible reply buttons.`, and the original
+   question. Confirm neither `Invalid answer route completed.` nor another
+   terminal completion appears yet.
+4. Enter `not-an-option` a second time and click send.
+5. Confirm the flow now displays `Invalid answer route completed.` exactly
+   once. This is the configured `Retries exhausted output` after one allowed
+   retry.
+6. Click the action button again to start another run. Enter `cancel` in
+   `What would you like to know?` and click send.
+7. Confirm the assistant first acknowledges cancellation and then displays
+   `Cancellation route completed.` exactly once. Confirm it does not display
+   the Alpha, Beta, invalid-answer, or no-reply completion message.
+
+Expected result:
+
+- The first invalid answer increments durable attempt state and repeats the
+  same published question with the configured retry wording.
+- The second invalid answer follows the retry-exhausted output exactly once.
+- The explicit word `cancel` follows the cancellation output; a normal choice
+  such as `Beta` is not mistaken for cancellation.
+
+## Step 6 of 6 - Verify Durable No-Reply Timing And Version Pinning
+
+1. In Project Chat, click `Phase 10 Routing Policy UAT` to start one final run.
+   Do not click a reply button and do not type a message. Note the start time.
+2. Immediately test version pinning while that request remains active:
+   1. Click `Automation` > `Actions`, open `Phase 10 Routing Policy UAT`, click
+      `Canvas`, and open `Choose Phase 10 route`.
+   2. In `Response policy`, change only `Timeout message` to
+      `Phase 10 version 2 timed out.`, then click `Save changes`.
+   3. Click `Overview`, confirm `Ready to publish`, then click `Publish`.
+   4. Confirm the published version increments from `v1` to `v2` (or by
+      exactly one if the disposable action began at a different version).
+   5. Return to `Projects` > `Chat`. Do not start the action again; the existing
+      unanswered request must remain active.
+3. Once at least 65 seconds have elapsed since item 1, open a second PowerShell
+   terminal at `C:\xampp\htdocs\ls-chatbot` and run this command exactly. It
+   reads the worker secret without printing it and processes only due local
+   durable work:
+
+   ```powershell
+   node -e "require('dotenv').config({path:'.env.local'});const secret=process.env.DURABLE_QUEUE_SECRET||process.env.CRON_SECRET;if(!secret)throw new Error('Set DURABLE_QUEUE_SECRET or CRON_SECRET in .env.local');fetch('http://localhost:3000/api/durable/process-next',{method:'POST',headers:{Authorization:'Bearer '+secret}}).then(async response=>{if(!response.ok)throw new Error('Durable worker returned '+response.status);console.log('Durable queue processed.');})"
+   ```
+
+4. Confirm the terminal says `Durable queue processed.`. Refresh Project Chat
+   once and confirm `Phase 10 is still waiting for your choice.` appears
+   exactly once. The flow must still be waiting and must not show the timeout
+   or a completion message.
+5. Wait until at least 190 seconds have elapsed since item 1, then run the same
+   PowerShell command from item 3 again.
+6. Return to Project Chat and refresh once. Confirm the already-running request
+   displays `Phase 10 version 1 timed out.` followed by
+   `No reply route completed.` exactly once. It must not use the newly
+   published `Phase 10 version 2 timed out.` wording.
+7. Verify the direct validation-failure output on the new version:
+   1. Open `Automation` > `Actions` > `Phase 10 Routing Policy UAT` > `Canvas`.
+   2. Open `Choose Phase 10 route` and set `Validation failure output` to
+      `Invalid answer handled`.
+   3. Click `Save changes`, click `Overview`, then click `Publish`.
+   4. Return to `Projects` > `Chat`, start the action, enter
+      `not-an-option` once, and click send.
+   5. Confirm it immediately displays `Invalid answer route completed.`
+      without showing the retry message.
+8. Archive the disposable action: open `Automation` > `Actions` >
+    `Phase 10 Routing Policy UAT`, click `Settings`, set `Status` to
+    `Archived`, click `Save Action`, and confirm `Action updated.` appears.
+
+Expected result:
+
+- Reminder and timeout work survives idle time and is delivered only when the
+  local durable worker processes a due job.
+- The reminder does not advance the flow; the timeout follows its named route.
+- The active run remains pinned to version 1 after version 2 is published.
+- A configured `Validation failure output` takes precedence and routes the
+  first invalid answer directly.
+- The disposable action ends archived and no Critical or High Phase 10 defect
+  remains.
+
+## Phase 10 Sign-Off
+
+- [ ] All six focused steps pass.
+- [ ] Stable option routes survive label changes and store stable values.
+- [ ] URL and phone controls do not advance the flow.
+- [ ] Retry-exhausted, cancellation, validation-failure, reminder, and timeout
+  behavior match the published policy.
+- [ ] Reminder and timeout state survives idle time and stays pinned to the
+  version that started the run.
+- [ ] No unresolved Critical or High Phase 10 defect remains.
+
+## Previous Sign-Off - Phase 9
+
+Phase 9 of 18: composed content and explicit interaction controls.
+
+Status: Passed focused manual UAT on 2026-08-03. No database migration was
 required.
 
 Automated evidence:

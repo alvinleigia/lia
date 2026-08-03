@@ -782,12 +782,12 @@ new task-first model.
 - [x] Warn before deleting a connected option.
 - [x] Block duplicate, conflicting, missing, or invalid option routes.
 - [x] Add a first-class boolean input.
-- [ ] Add retry count, retry message, and retry-exhausted output.
-- [ ] Add no-reply reminder, timeout, and output.
-- [ ] Add cancellation and validation-failure outputs.
-- [ ] Keep retry, no-reply, cancellation, and collection state durable.
-- [ ] Keep deterministic response policies pinned to the active published version.
-- [ ] Confirm every deterministic input example in `docs/Flow Builder v2.pdf` has complete success and failure behavior.
+- [x] Add retry count, retry message, and retry-exhausted output.
+- [x] Add no-reply reminder, timeout, and output.
+- [x] Add cancellation and validation-failure outputs.
+- [x] Keep retry, no-reply, cancellation, and collection state durable.
+- [x] Keep deterministic response policies pinned to the active published version.
+- [x] Confirm every deterministic input example in `docs/Flow Builder v2.pdf` has complete success and failure behavior.
 
 Phase 10 Checkpoint 1 status: Complete on 2026-08-03. One shared option
 identity contract now gives composed buttons and list rows, manual and dynamic
@@ -831,9 +831,27 @@ scheduled-reply boundary. Named policy routes are visible on the canvas and
 invalid destinations block publication. No database migration was required
 because the versioned policy and state use existing JSON contracts and the job
 type column is already extensible. TypeScript, lint, and 43 offline focused
-checks passed. The database-backed retry/cancel/timeout lifecycle regression is
-prepared and remains part of the final gate once the local app and database are
-available.
+checks passed. The database-backed retry, cancellation, reminder, timeout, and
+published-version-pinning lifecycle regression also passed.
+
+Phase 10 Checkpoint 5 status: Complete on 2026-08-03. The deterministic input
+examples in the supplied Flow Builder v2 reference were audited against the
+implemented contracts: Ask Address and Ask Location store validated structured
+values; Ask Question covers free text, numbers, dates, booleans, email, and
+custom regex; and Ask Media covers image, audio, video, and file input with
+allowed-type validation. Every family now shares the same required, invalid,
+retry, exhausted, cancellation, reminder, and timeout behavior. The reference's
+previously unclear media "attempts" concept is represented explicitly as the
+bounded retry count rather than an implicit channel-specific counter.
+
+Phase 10 Checkpoint 6 automated status: Complete on 2026-08-03. The production
+build, 142 channel and universal-content contracts, all 244 offline browser and
+database scenarios, and tenant-isolation checks passed. The only initial
+browser failure exposed an accessible-label collision between an option input
+and its route selector; the route selector now has an unambiguous label and its
+focused browser regression passes. The exact six-step manual UAT is prepared
+in `docs/UAT_TEST_PLAN.md`; manual sign-off remains the Phase 10 exit
+requirement. No database migration is required.
 
 Phase 10 exit gate: businesses can choose either flexible task collection or
 fully scripted collection with stable per-option routes.
