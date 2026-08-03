@@ -55,7 +55,6 @@ export default async function ImportActionFlowPage({
             <ActionStateForm
               action={importActionFlowBuilderAction}
               className="space-y-4"
-              encType="multipart/form-data"
             >
               <ActionFormError />
               <input

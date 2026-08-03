@@ -573,6 +573,39 @@ test("company owner can apply a bundled action template", async ({ page }) => {
   expect(download.suggestedFilename()).toMatch(/\.json$/);
   expect(page.url()).toBe(overviewUrl);
 
+  const downloadPath = await download.path();
+  expect(downloadPath).not.toBeNull();
+
+  const importConsoleErrors: string[] = [];
+  const captureImportConsoleError = (message: {
+    text: () => string;
+    type: () => string;
+  }) => {
+    if (
+      message.type() === "error" &&
+      message.text().includes("Cannot specify a encType or method")
+    ) {
+      importConsoleErrors.push(message.text());
+    }
+  };
+  page.on("console", captureImportConsoleError);
+  await page.goto("/projects/actions/import");
+  await expect(
+    page.getByText(`Import Action Flow: ${projectName}`, { exact: true }),
+  ).toBeVisible();
+  expect(importConsoleErrors).toEqual([]);
+
+  await page.getByLabel("Exported Flow JSON").setInputFiles(downloadPath ?? "");
+  await page
+    .getByLabel("Imported Action Name")
+    .fill(`Imported Support Ticket ${runId}`);
+  await page.getByRole("button", { name: "Import Flow" }).click();
+  await expect(page).toHaveURL(/\/projects\/actions\/\d+\?created=1/);
+  await expect(
+    page.getByText(`Imported Support Ticket ${runId}`, { exact: true }).first(),
+  ).toBeVisible();
+  page.off("console", captureImportConsoleError);
+
   await page.goto("/projects/actions");
   await expect(page.getByText(`Actions: ${projectName}`)).toBeVisible();
   await expect(page.getByText("Create Support Ticket").first()).toBeVisible();

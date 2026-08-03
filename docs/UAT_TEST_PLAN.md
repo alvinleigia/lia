@@ -348,7 +348,8 @@ Expected result:
    navigate, remain in a `Rendering...` state, or require another click. Do not
    open or edit the JSON.
 3. Click `Automation` > `Actions` to return to `Actions: Ewissen Infra`, then
-   click `Import`.
+   click `Import`. Confirm `Import Action Flow: Ewissen Infra` loads without a
+   red Next.js issue indicator or runtime error.
 4. On `Import Action Flow: Ewissen Infra`, complete both fields:
 
    | Field label | Value |
