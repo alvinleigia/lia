@@ -697,7 +697,7 @@ function CanvasStepNodeContent({
           <p className="text-[11px] font-medium uppercase text-muted-foreground">
             Option routes
           </p>
-          {routeOptions.map((option) => (
+          {routeOptions.map((option, optionIndex) => (
             <div
               key={option.id}
               className="flex items-center gap-2 rounded-md bg-white px-2 py-1.5"
@@ -706,7 +706,7 @@ function CanvasStepNodeContent({
                 {option.label}
               </span>
               <select
-                aria-label={`Go to for ${option.label}`}
+                aria-label={`Route destination ${optionIndex + 1}`}
                 className="h-7 min-w-0 max-w-36 rounded-md border border-input bg-white px-2 text-[11px]"
                 value={optionRouteTargets.get(option.id) ?? ""}
                 onChange={(event) => {
