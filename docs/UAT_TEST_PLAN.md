@@ -23,71 +23,187 @@ This UAT is intentionally focused on the new deterministic authoring surface.
 Live WhatsApp credentials, approved-template delivery, and device rendering
 remain part of the later cross-channel certification phase.
 
-Use a disposable action in `Ewissen Infra (#194)` or another non-production
-project that has at least one active media asset, catalog, and product. Do not
-modify a live customer flow.
+Use the exact project and values below. The action is disposable; do not modify
+an existing customer flow.
 
 ## Step 1 of 6 - Create A Small Valid Test Flow
 
-1. Open `Automation` > `Actions` > `New Action`.
-2. Under `Blank Action`, create `Phase 9 Composed Content UAT` with a unique
-   trigger phrase such as `phase nine content check`.
-3. Open its `Canvas`.
-4. Add `Ask Question` and `Submit` blocks and connect the question to the
-   completion block.
-5. Set the question label to `Choose a service`, its field key to
-   `phase9Service`, and its first message to `What would you like to book?`.
+1. Open [the local application](http://localhost:3000) and sign in with the UAT
+   account.
+2. In the header, click the pill beginning with `Selected Project:`. In the
+   `Select a Project` dialog, use `Search projects...` to find `Ewissen Infra`.
+   Select the row whose ID is `194`.
+3. Verify the header now says `Selected Project: Ewissen Infra`.
+4. Confirm the required media resource:
+   1. Click `Projects` in the header, then click `Media Library`.
+   2. On `Media Library: Ewissen Infra`, confirm `Active Assets` is at least
+      `1`.
+   3. If it is `0`, under `Upload Media`, use the `File` input to choose one
+      small, non-sensitive image, then click `Upload Asset`.
+   4. Under `Assets`, record the filename of the first asset. This is the file
+      to select in Step 2.
+5. Confirm the required catalog resource:
+   1. Click `Projects` > `Product Catalog`.
+   2. On `Product Catalog: Ewissen Infra`, confirm `Active Catalogs` and
+      `Active Products` are both at least `1`.
+   3. Under `Catalogs`, confirm `Facial` is listed. Under `Products`, confirm
+      `Classic Facial` is listed. If either is missing, stop and report a
+      missing UAT prerequisite instead of creating different test data.
+6. Click `Automation` in the header, then click `Actions`.
+7. On `Actions: Ewissen Infra`, click `New Action`.
+8. Scroll to the `Blank Action` form and enter every field exactly as follows:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Action Name` | `Phase 9 Composed Content UAT` |
+   | `Description` | `Verifies ordered text, media, catalogue, and structured list content.` |
+   | `Trigger Phrases` | `phase nine content check` |
+
+9. Click `Create Action`. Wait for the new action overview page to load and
+   confirm its heading is `Phase 9 Composed Content UAT`.
+10. Click `Canvas` in the action header.
+11. In the left `Blocks` panel, find `Actions` and click `Ask Question`.
+12. In the `Create Step` dialog, complete the visible fields:
+
+    | Field or control | Value |
+    | --- | --- |
+    | `Step Behavior` | `Ask Question` |
+    | `Step name` | `Choose a service` |
+    | `Question shown to the visitor` | `What would you like to book?` |
+    | `Answer format` | `Text` |
+    | `Answer required` | Checked |
+    | `Step active` | Checked |
+
+13. In the same dialog, expand `Advanced options`. Enter
+    `phase9Service` in `Save answer as`. Leave the other advanced fields at
+    their defaults.
+14. Click `Create Step`. Wait for the dialog to close and confirm the canvas
+    shows the `Choose a service` node.
+15. In the left `Blocks` panel under `Actions`, click `Submit`.
+16. In the second `Create Step` dialog, enter:
+
+    | Field or control | Value |
+    | --- | --- |
+    | `Step Behavior` | `Submit` |
+    | `Step name` | `Complete Phase 9 test` |
+    | `Completion message` | `Thanks. Your Phase 9 selection was saved.` |
+    | `Action active` | Checked |
+
+17. Click `Create Step`. Wait for the dialog to close and confirm both nodes
+    are visible.
+18. Connect the flow: drag from the small connector on the right edge of
+    `Choose a service` to the small connector on the left edge of
+    `Complete Phase 9 test`. Confirm a connecting line appears.
+19. If you reposition either node, click `Save Layout` in the canvas toolbar
+    and wait until it becomes disabled again. Route connections save
+    immediately; `Save Layout` saves only node positions.
 
 Expected result:
 
-- The canvas shows one answer-collecting step followed by one finish step.
-- The toolbar reports no route or finish-path blocker once they are connected.
-- Saving stays at the current canvas/form position and shows immediate toast
-  feedback.
+- The canvas contains exactly the two new nodes and one connection.
+- `Choose a service` shows `Ask Question`; `Complete Phase 9 test` shows
+  `Submit`.
+- The toolbar shows `Nodes 2`, and `Blockers` becomes `0` after the connection
+  is saved.
+- Each `Create Step` submission closes its dialog and displays successful
+  save/create feedback without scrolling the page away from the canvas.
 
 ## Step 2 of 6 - Compose Content In An Exact Order
 
-1. On `Choose a service`, open `Add content`.
-2. Confirm the menu always lists `Text message`, `Text + buttons`, `List
-   message`, `Media`, `Catalogue message`, `Single product`, `Multiple
-   products`, `Template`, and `Request intervention`.
-3. Add, in this order, a `Text message`, `Media`, `Catalogue message`, and
-   `List message`.
-4. Enter distinct copy in the text message, select one active media asset, and
-   select one active catalog.
-5. For the list, enter header `Spa services` and footer `Choose one service`.
-6. Configure two rows:
+1. If you are not already on the canvas, click `Automation` > `Actions`, open
+   `Phase 9 Composed Content UAT`, then click `Canvas`.
+2. On the `Choose a service` node, click `Add content`.
+3. Before selecting anything, confirm this one menu contains all nine labels:
+   `Text message`, `Text + buttons`, `List message`, `Media`, `Catalogue
+   message`, `Single product`, `Multiple products`, `Template`, and `Request
+   intervention`.
+4. In that menu, click `Text message`. The inline editor opens on the node.
+   Enter `Our available spa experiences are shown below.` in `Message`, then
+   click the inline `Save` button. Wait for the editor to close.
+5. Click `Add content` > `Media`. In the inline editor:
 
-```text
-Label: Classic Facial
-Stored value: service_classic_facial
-Description: A classic facial treatment
-Section: Facials
+   | Field label | Value |
+   | --- | --- |
+   | `Caption` | `A preview of our spa experience.` |
+   | `Media file` | Select the filename recorded in Step 1 |
 
-Label: Deep Tissue Massage
-Stored value: service_deep_tissue
-Description: A deep pressure massage
-Section: Massages
-```
+   Click the inline `Save` button and wait for the editor to close.
+6. Click `Add content` > `Catalogue message`. In the inline editor enter:
+
+   | Field or control | Value |
+   | --- | --- |
+   | `Introduction` | `Browse the full spa catalogue.` |
+   | `Product catalog` | `Facial` |
+   | `Card layout` | `Grid` |
+
+   Click the inline `Save` button and wait for the editor to close.
+7. Click `Add content` > `List message`. In the inline editor enter:
+
+   | Field or control | Value |
+   | --- | --- |
+   | `Question or introduction` | `Select the service you want to book.` |
+   | `Presentation` | `List` |
+   | `Header` | `Spa services` |
+   | `Footer` | `Choose one service` |
+   | `Option 1` | `Classic Facial` |
+   | `Stored value 1` | `service_classic_facial` |
+   | `Description 1` | `A classic facial treatment` |
+   | `Section 1` | `Facials` |
+
+8. Click `Add option`. Complete the new row:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Option 2` | `Deep Tissue Massage` |
+   | `Stored value 2` | `service_deep_tissue` |
+   | `Description 2` | `A deep pressure massage` |
+   | `Section 2` | `Massages` |
+
+9. Click the inline `Save` button and wait for the editor to close.
+10. Click `Add content` again. Confirm `Text + buttons` and `List message` are
+    disabled and the menu displays `This step already has a response collector
+    (buttons or list).` Close the menu by clicking `Add content` again.
 
 Expected result:
 
 - Every Add Content option remains visible; unavailable items explain why.
-- The node displays the base question followed by the four content blocks in
-  the authored order.
+- The node displays `What would you like to book?` followed by text, media,
+  catalogue, and list content in that exact order.
 - Visible labels are independent from stored values.
 - After the list is present, both `Text + buttons` and `List message` are
   disabled with the one-response-collector explanation.
+- Each content block remains visible only after its inline `Save` succeeds.
 
 ## Step 3 of 6 - Verify Editing And Persistence
 
-1. Move the media below the catalogue, then move it back above the catalogue.
-2. Duplicate the text block, edit the duplicate so its copy is unique, then
-   remove the duplicate.
-3. Save the step and refresh the browser.
-4. Reopen `Choose a service` in the full `Edit Step` dialog.
-5. Review the list header, footer, both labels, stored values, descriptions,
-   and sections.
+1. Stay on the canvas and locate the four content previews inside
+   `Choose a service`.
+2. On the `Media` preview, click the icon whose tooltip is `Move content down`.
+   Wait for the save to finish and confirm Media moves below Product catalog.
+3. On the same `Media` preview, click `Move content up`. Wait for the save to
+   finish and confirm the original text, media, catalogue, list order returns.
+4. On the first `Text message` preview, click the icon whose tooltip is
+   `Duplicate content`. A second text inline editor opens.
+5. In the duplicate's `Message` field, replace the copy with
+   `This duplicate will be removed after persistence is checked.` and click
+   the inline `Save` button.
+6. Refresh the browser. Confirm the duplicate text is still visible directly
+   after the original text.
+7. On the duplicate preview, click `Edit text message`, then click the red
+   trash icon whose tooltip is `Remove content`. Wait for the duplicate to
+   disappear.
+8. Refresh the browser again. Confirm the final order is text, media,
+   catalogue, list and the duplicate remains removed.
+9. Click the `Choose a service` node title to open the full `Edit Step` dialog.
+10. Scroll to the `List message` editor and confirm every field still contains
+    the Step 2 value: `Spa services`, `Choose one service`, both labels, both
+    stored values, both descriptions, and both sections.
+11. Change only `Option 1` from `Classic Facial` to `Classic Facial UAT`.
+    Confirm `Stored value 1` still reads `service_classic_facial`, then click
+    `Save changes`.
+12. Reopen `Choose a service`. Confirm `Option 1` is `Classic Facial UAT` and
+    `Stored value 1` is still `service_classic_facial`.
+13. Change `Option 1` back to `Classic Facial` and click `Save changes` again.
 
 Expected result:
 
@@ -95,15 +211,28 @@ Expected result:
 - Refresh preserves the final order: text, media, catalogue, list.
 - All structured list fields retain their exact values.
 - The stored value does not change when a visible label is edited.
+- Both full-editor submissions close the dialog and show immediate successful
+  feedback without changing the canvas scroll position.
 
 ## Step 4 of 6 - Verify Publish Blockers And Recovery
 
-1. Temporarily give both list rows the stored value
-   `service_classic_facial`, save, and return to `Overview`.
-2. Review `Publish readiness` and attempt to publish if the button is enabled.
-3. Return to the canvas, restore the second value to
-   `service_deep_tissue`, and save.
-4. Return to `Overview` and publish the corrected flow.
+1. On the canvas, click the `Choose a service` node title to open `Edit Step`.
+2. In `List message`, change only `Stored value 2` from
+   `service_deep_tissue` to `service_classic_facial`. Leave `Stored value 1`
+   unchanged, so both rows now have the same stored value.
+3. Click `Save changes` and wait for the dialog to close.
+4. In the canvas toolbar, click `Overview`.
+5. Find the amber `Publish readiness` panel. Confirm it reports the duplicate
+   choice stored value. Confirm the `Publish` button is disabled; do not try to
+   bypass it.
+6. Click `Canvas`. Click the `Choose a service` node title, restore
+   `Stored value 2` to `service_deep_tissue`, and click `Save changes`.
+7. Click `Overview` again. Confirm the readiness panel is now green and says
+   `Ready to publish`.
+8. Click `Publish`. Wait for the page to reload and confirm the green message
+   `Action published.` appears.
+9. In the summary cards, confirm `Status` is `active` and `Published Version`
+   is `v1` or the next version number if this named UAT action was reused.
 
 Expected result:
 
@@ -111,17 +240,42 @@ Expected result:
   invalid draft cannot be published.
 - Correcting the value removes that blocker.
 - Publishing creates an immutable version without changing the authored order.
+- The save and publish confirmations appear immediately; no manual page refresh
+  is needed to make them appear.
 
 ## Step 5 of 6 - Verify Runtime Presentation And Collection
 
-1. Open `Test Flow` for the published version, start a clean test, and follow
-   the published route through its completion target.
-2. Open `Project Chat`, start `Phase 9 Composed Content UAT` from the available
-   action button, and confirm the visitor receives, in order: the base
-   question, the additional text, the media, the catalogue, and the structured
-   list.
-3. Choose `Deep Tissue Massage` and complete the flow.
-4. Start it once more using the unique trigger phrase and repeat the selection.
+1. On the `Phase 9 Composed Content UAT` overview, click `Test Flow`.
+2. On `Published Flow Test`, set `Start From` to `Normal conversation`.
+   Confirm `Entry Rule` displays `Published normal route`, then click
+   `Start Test`.
+3. Under `Current Node`, confirm the first node is `Choose a service`. Under
+   `Simulate This Node`, click the available route button leading to
+   `Complete Phase 9 test`. Continue through the available finish route until
+   the page displays `Flow completed`.
+4. Click `Projects` in the header, then click `Chat`.
+5. At the top of `Project Chat`, click the action button named
+   `Phase 9 Composed Content UAT`. Do not type the trigger phrase; using the
+   action button keeps this deterministic UAT from spending an unnecessary
+   model call.
+6. Read the assistant output from top to bottom and confirm this exact order:
+   1. `What would you like to book?`
+   2. `Our available spa experiences are shown below.`
+   3. `A preview of our spa experience.` with the recorded media asset
+   4. `Browse the full spa catalogue.` with the `Facial` product cards
+   5. `Select the service you want to book.` followed by the structured list
+7. In the list control, confirm header `Spa services`, section `Facials`, row
+   `Classic Facial`, section `Massages`, row `Deep Tissue Massage`, both row
+   descriptions, and footer `Choose one service` are visible.
+8. Click the visible `Deep Tissue Massage` row. Wait for the flow to continue
+   and confirm the assistant displays
+   `Thanks. Your Phase 9 selection was saved.` exactly once.
+9. Click `Automation` > `Submissions`.
+10. Open the newest row named `Phase 9 Composed Content UAT` with source
+    `project_chat`.
+11. In the `Fields` card, confirm key `phase9Service` has value
+    `service_deep_tissue`. The visible label must not be stored in place of the
+    stable value.
 
 Expected result:
 
@@ -133,15 +287,49 @@ Expected result:
   `service_deep_tissue` answer and the flow reaches its completion step once.
 - No raw JSON or provider-specific identifier is required in the primary
   authoring fields.
+- The deterministic action-button path completes without an additional OpenAI
+  model turn.
 
 ## Step 6 of 6 - Verify Export And Import Preservation
 
-1. Export the published action from `Overview` or `Canvas`.
-2. Open `Automation` > `Actions` > `Import` and import the downloaded file
-   under a name such as `Phase 9 Composed Content UAT Import`.
-3. Open the imported action's canvas and edit `Choose a service`.
-4. Compare its content order and structured list fields with the source.
-5. Archive or clearly label both disposable actions after recording the result.
+1. Click `Automation` > `Actions`, then open
+   `Phase 9 Composed Content UAT`.
+2. On its overview, click `Export`. Confirm the browser downloads one `.json`
+   file. Do not open or edit the JSON.
+3. Click `Automation` > `Actions` to return to `Actions: Ewissen Infra`, then
+   click `Import`.
+4. On `Import Action Flow: Ewissen Infra`, complete both fields:
+
+   | Field label | Value |
+   | --- | --- |
+   | `Exported Flow JSON` | Select the `.json` file downloaded in item 2 |
+   | `Imported Action Name` | `Phase 9 Composed Content UAT Import` |
+
+5. Click `Import Flow`. Wait for the imported action overview to load and
+   confirm its heading is `Phase 9 Composed Content UAT Import`.
+6. Click `Canvas`, then click the `Choose a service` node title to open
+   `Edit Step`.
+7. Confirm the base field values are unchanged:
+
+   | Field label | Expected value |
+   | --- | --- |
+   | `Step name` | `Choose a service` |
+   | `Question shown to the visitor` | `What would you like to book?` |
+   | `Answer format` | `Text` |
+
+8. Confirm the content order remains text, media, catalogue, list. In the
+   `List message`, confirm header, footer, labels, stored values, descriptions,
+   and sections exactly match Step 2. Close the dialog without changing data.
+9. Archive the imported test action:
+   1. From the canvas toolbar, click `Overview`, then click `Settings`.
+   2. In `Action Settings`, set `Status` to `Archived`.
+   3. Leave the other fields unchanged and click `Save Action`.
+   4. Confirm `Action updated.` appears.
+10. Archive the source test action:
+    1. Click `Automation` > `Actions` and open
+       `Phase 9 Composed Content UAT`.
+    2. Click `Settings`, set `Status` to `Archived`, and click `Save Action`.
+    3. Confirm `Action updated.` appears.
 
 Expected result:
 
@@ -150,6 +338,7 @@ Expected result:
   catalogue, and list order.
 - Labels, stable values, descriptions, sections, header, and footer match the
   source action.
+- Both disposable actions end with `Status` set to `Archived`.
 - No unresolved Critical or High Phase 9 defect remains.
 
 ## Phase 9 Sign-Off
