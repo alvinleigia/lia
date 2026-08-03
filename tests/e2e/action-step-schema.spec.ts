@@ -132,6 +132,21 @@ test("step-specific resources remain required", () => {
   ).toBe(false);
 });
 
+test("empty agent email does not invalidate unrelated step families", () => {
+  expect(
+    canvasStepSchema.safeParse({
+      actionId: 1,
+      contactAgentEmail: "",
+      fieldKey: "phase11ApiStatus",
+      label: "Run Phase 11 API",
+      operationExecutionMode: "inline",
+      operationId: 1052,
+      operationOutcomeRoutes: {},
+      stepType: "operation",
+    }).success,
+  ).toBe(true);
+});
+
 test("shared option parsing trims commas, lines, and empty values", () => {
   expect(
     parseActionStepLines(" Massage,\n\nFacials, Body Treatments "),

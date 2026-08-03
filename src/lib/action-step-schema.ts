@@ -56,7 +56,11 @@ const actionStepSchemaShape = {
   contactAttributeFieldKey: z.string().trim().max(120).optional(),
   contactAttributeValue: z.string().trim().max(1000).optional(),
   contactAttributeValueSource: z.enum(["field", "static"]).optional(),
-  contactAgentEmail: z.string().trim().email().max(320).optional(),
+  contactAgentEmail: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.string().trim().email().max(320).optional(),
+  ),
   contactTagNames: z.string().trim().max(1000).optional(),
   contactTeamName: z.string().trim().max(120).optional(),
   connectedActionId: optionalNumber(z.coerce.number().int().positive()),
