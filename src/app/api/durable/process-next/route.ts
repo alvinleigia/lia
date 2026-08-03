@@ -14,13 +14,18 @@ function isAuthorized(req: Request) {
   );
 }
 
-function getBoundedInteger(
+export function getBoundedInteger(
   url: URL,
   name: string,
   fallback: number,
   maximum: number,
 ) {
-  const value = Number(url.searchParams.get(name));
+  const rawValue = url.searchParams.get(name);
+  if (rawValue === null || rawValue.trim() === "") {
+    return fallback;
+  }
+
+  const value = Number(rawValue);
 
   if (!Number.isFinite(value)) {
     return fallback;

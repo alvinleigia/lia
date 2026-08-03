@@ -277,7 +277,7 @@ Expected result:
    durable work:
 
    ```powershell
-   node -e "require('dotenv').config({path:'.env.local'});const secret=process.env.DURABLE_QUEUE_SECRET||process.env.CRON_SECRET;if(!secret)throw new Error('Set DURABLE_QUEUE_SECRET or CRON_SECRET in .env.local');fetch('http://localhost:3000/api/durable/process-next',{method:'POST',headers:{Authorization:'Bearer '+secret}}).then(async response=>{if(!response.ok)throw new Error('Durable worker returned '+response.status);console.log('Durable queue processed.');})"
+   node -e "require('dotenv').config({path:'.env.local'});const secret=process.env.DURABLE_QUEUE_SECRET||process.env.CRON_SECRET;if(!secret)throw new Error('Set DURABLE_QUEUE_SECRET or CRON_SECRET in .env.local');fetch('http://localhost:3000/api/durable/process-next?maxItems=25&maxProjects=50',{method:'POST',headers:{Authorization:'Bearer '+secret}}).then(async response=>{if(!response.ok)throw new Error('Durable worker returned '+response.status);console.log('Durable queue processed.');})"
    ```
 
 4. Confirm the terminal says `Durable queue processed.`. Refresh Project Chat

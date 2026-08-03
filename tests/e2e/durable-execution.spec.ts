@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { getBoundedInteger } from "../../src/app/api/durable/process-next/route";
 import { getDurableRetryDelayMs } from "../../src/lib/durable-jobs";
 import {
   decryptSecretValue,
@@ -15,6 +16,23 @@ import {
 import { prepareProviderConfig } from "../../src/lib/provider-secrets";
 
 test.describe("durable execution contracts", () => {
+  test("uses worker batch defaults only when query limits are absent or invalid", () => {
+    const defaults = new URL("http://localhost/api/durable/process-next");
+    const explicit = new URL(
+      "http://localhost/api/durable/process-next?maxItems=25&maxProjects=75",
+    );
+    const invalid = new URL(
+      "http://localhost/api/durable/process-next?maxItems=&maxProjects=invalid",
+    );
+
+    expect(getBoundedInteger(defaults, "maxItems", 10, 25)).toBe(10);
+    expect(getBoundedInteger(defaults, "maxProjects", 10, 50)).toBe(10);
+    expect(getBoundedInteger(explicit, "maxItems", 10, 25)).toBe(25);
+    expect(getBoundedInteger(explicit, "maxProjects", 10, 50)).toBe(50);
+    expect(getBoundedInteger(invalid, "maxItems", 10, 25)).toBe(10);
+    expect(getBoundedInteger(invalid, "maxProjects", 10, 50)).toBe(10);
+  });
+
   test("rejects unauthenticated durable worker requests", async ({
     request,
   }) => {
