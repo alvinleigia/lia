@@ -804,7 +804,7 @@ function CanvasStepNodeContent({
               allowsAnswerCollection,
               blockCount: contentBlocks.length,
               catalogProductCount: catalogProducts.length,
-              hasChoiceBlock: Boolean(choiceBlock),
+              hasResponseCollector: Boolean(choiceBlock),
               mediaAssetCount: mediaAssets.length,
               productCatalogCount: productCatalogs.length,
             }}

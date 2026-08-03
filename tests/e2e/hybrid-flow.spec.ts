@@ -1468,3 +1468,18 @@ test("compiler rejects hybrid nodes that no published entry can reach", () => {
     }),
   );
 });
+
+test("compiler rejects published paths beyond the traversal depth limit", () => {
+  const result = compileHybridFlowGraph({
+    branchRules,
+    maxTraversalDepth: 1,
+    steps,
+  });
+
+  expect(result.issues).toContainEqual(
+    expect.objectContaining({
+      code: "hybrid_depth_exceeded",
+      severity: "error",
+    }),
+  );
+});

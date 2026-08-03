@@ -183,21 +183,6 @@ export default async function ProjectCatalogPage({
                 {params.error}
               </p>
             )}
-            {params.catalogCreated === "1" && (
-              <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
-                Catalog created.
-              </p>
-            )}
-            {params.productCreated === "1" && (
-              <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
-                Product created.
-              </p>
-            )}
-            {params.catalogDeleted === "1" && (
-              <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
-                Catalog permanently deleted.
-              </p>
-            )}
             <p className="text-sm text-muted-foreground">
               Manage reusable products once for project chat, widgets, WhatsApp,
               and future channels. WhatsApp IDs are optional channel mappings;

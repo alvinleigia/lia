@@ -74,7 +74,7 @@ function FlowContentBlocksEditor({
   productCatalogs: ProductCatalogOption[];
 }) {
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
-  const hasChoiceBlock = blocks.some((block) => block.type === "choice");
+  const hasResponseCollector = blocks.some((block) => block.type === "choice");
 
   const addBlock = (type: FlowContentComponentKey) => {
     const block = createFlowContentBlock({
@@ -268,7 +268,7 @@ function FlowContentBlocksEditor({
               allowsAnswerCollection,
               blockCount: blocks.length,
               catalogProductCount: catalogProducts.length,
-              hasChoiceBlock,
+              hasResponseCollector,
               mediaAssetCount: mediaAssets.length,
               productCatalogCount: productCatalogs.length,
             }}

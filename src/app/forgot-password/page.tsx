@@ -33,12 +33,6 @@ export default async function ForgotPasswordPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {params.sent === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                If that email exists, a reset link has been sent.
-              </p>
-            )}
-
             {params.error && (
               <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">
                 {params.error}

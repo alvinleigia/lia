@@ -54,22 +54,6 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
                 {params.error}
               </p>
             )}
-            {params.inviteAccepted === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Invitation accepted.
-              </p>
-            )}
-            {params.inviteCancelled === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Invitation cancelled.
-              </p>
-            )}
-            {params.memberUpdated === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Member updated.
-              </p>
-            )}
-
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">
                 Members

@@ -1,18 +1,25 @@
 import { spawnSync } from "node:child_process";
 
 const full = process.argv.includes("--full");
+const offline = process.argv.includes("--offline");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const npmCliPath = process.env.npm_execpath;
+const includeDatabaseGates = full || offline;
 const gates = [
   { label: "Lint", script: "lint" },
   { label: "TypeScript", script: "typecheck" },
   { label: "Tenant-scope static analysis", script: "check:tenant-scope" },
   { label: "Cron configuration", script: "check:cron-config" },
   { label: "Channel contracts", script: "test:channel-certification" },
-  ...(full
+  ...(includeDatabaseGates
     ? [
         { label: "Production build", script: "build" },
-        { label: "Database-backed E2E", script: "test:e2e" },
+        {
+          label: offline
+            ? "Database-backed E2E (offline)"
+            : "Database-backed E2E",
+          script: offline ? "test:e2e:offline" : "test:e2e",
+        },
         {
           label: "Tenant-isolation database checks",
           script: "test:tenant-isolation",
@@ -43,7 +50,16 @@ for (const [index, gate] of gates.entries()) {
   }
 }
 
-console.log("\nAutomated release certification passed.");
+console.log(
+  offline
+    ? "\nOffline automated release certification passed."
+    : "\nAutomated release certification passed.",
+);
+if (offline) {
+  console.log(
+    "Run npm run test:openai-smoke before release UAT to verify the paid provider path.",
+  );
+}
 console.log(
   "Manual UAT sign-off is still required for widget embedding, project chat presentation, live WhatsApp credentials, phone-number ownership, approved templates, and device delivery.",
 );

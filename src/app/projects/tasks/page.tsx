@@ -62,12 +62,6 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
                 {params.error}
               </p>
             )}
-            {params.archived && (
-              <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
-                Task archived.
-              </p>
-            )}
-
             {activeTasks.length === 0 ? (
               <div className="rounded-md border bg-white p-6 text-center">
                 <p className="font-medium">No conversational tasks yet</p>

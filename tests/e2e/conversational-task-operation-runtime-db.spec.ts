@@ -40,8 +40,13 @@ import {
   workspaces,
 } from "../../src/lib/db-schema";
 import {
+  claimNextDurableJob,
+  failDurableJob,
+} from "../../src/lib/durable-jobs";
+import {
   createIntegrationProvider,
   createOperation,
+  processProjectDurableOperationQueue,
 } from "../../src/lib/operations";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
@@ -261,6 +266,10 @@ test.beforeAll(async () => {
     .returning();
 
   const manualProvider = await createIntegrationProvider({
+    config: {
+      autoRetryEnabled: true,
+      autoRetryMaxAttempts: 2,
+    },
     name: "Manual Review",
     projectId: project.id,
     providerType: "manual_review",
@@ -526,6 +535,127 @@ test("queues one durable attempt and completes from sanitized mapped output", as
   expect(exported.confirmations).toContainEqual(
     expect.objectContaining({ id: pending.id, status: "consumed" }),
   );
+});
+
+test("reclaims an interrupted operation without allowing a stale worker to overwrite it", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const run = await startReadyRun(fixture.manualTaskId);
+  const pending = await prepareTaskOperationConfirmation({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+    toolId: fixture.manualToolId,
+  });
+  await confirmTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  const queued = await executeConfirmedTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+
+  const [job] = await db
+    .select()
+    .from(durableJobs)
+    .where(
+      and(
+        eq(durableJobs.projectId, fixture.projectId),
+        eq(durableJobs.operationAttemptId, queued.attempt.id),
+      ),
+    )
+    .limit(1);
+  expect(job).toBeDefined();
+  if (!job) throw new Error("The durable operation job was not created.");
+
+  const firstClaimAt = new Date(Date.now() - 60_000);
+  await db
+    .update(durableJobs)
+    .set({ availableAt: firstClaimAt })
+    .where(
+      and(
+        eq(durableJobs.projectId, fixture.projectId),
+        eq(durableJobs.id, job.id),
+      ),
+    );
+  const workerA = `phase-8-worker-a-${suffix}`;
+  const workerB = `phase-8-worker-b-${suffix}`;
+  const claimedByA = await claimNextDurableJob({
+    jobTypes: ["operation_delivery"],
+    leaseMs: 5_000,
+    now: firstClaimAt,
+    projectId: fixture.projectId,
+    workerId: workerA,
+  });
+  const claimedByB = await claimNextDurableJob({
+    jobTypes: ["operation_delivery"],
+    leaseMs: 5_000,
+    now: new Date(firstClaimAt.getTime() + 6_000),
+    projectId: fixture.projectId,
+    workerId: workerB,
+  });
+  expect(claimedByA?.id).toBe(job.id);
+  expect(claimedByB?.id).toBe(job.id);
+
+  const staleFailure = await failDurableJob({
+    errorMessage: "Worker A finished after its lease expired.",
+    jobId: job.id,
+    projectId: fixture.projectId,
+    workerId: workerA,
+  });
+  expect(staleFailure).toBeNull();
+  const pendingAttempt = await getTaskOperationAttempt({
+    confirmationId: pending.id,
+    projectId: fixture.projectId,
+  });
+  expect(pendingAttempt?.attempt.status).toBe("pending");
+
+  const processed = await processProjectDurableOperationQueue({
+    maxJobs: 1,
+    projectId: fixture.projectId,
+    workerId: `phase-8-worker-c-${suffix}`,
+  });
+  expect(processed).toMatchObject({
+    completed: 1,
+    failed: 0,
+    processed: 1,
+    rescheduled: 0,
+  });
+
+  const [completedJob] = await db
+    .select()
+    .from(durableJobs)
+    .where(
+      and(
+        eq(durableJobs.projectId, fixture.projectId),
+        eq(durableJobs.id, job.id),
+      ),
+    )
+    .limit(1);
+  expect(completedJob).toMatchObject({
+    attempts: 3,
+    leaseOwner: null,
+    status: "completed",
+  });
+  const completedAttempt = await getTaskOperationAttempt({
+    confirmationId: pending.id,
+    projectId: fixture.projectId,
+  });
+  expect(completedAttempt?.attempt.status).toBe("completed");
+  expect(
+    await db
+      .select()
+      .from(operationAttempts)
+      .where(
+        and(
+          eq(operationAttempts.projectId, fixture.projectId),
+          eq(operationAttempts.taskConfirmationId, pending.id),
+        ),
+      ),
+  ).toHaveLength(1);
 });
 
 test("keeps an uncertain provider outcome open until manual reconciliation", async () => {

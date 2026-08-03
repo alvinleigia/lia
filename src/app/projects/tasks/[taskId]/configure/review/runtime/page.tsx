@@ -345,11 +345,14 @@ export default async function TaskRuntimeTestPage({
                 {query.error}
               </p>
             )}
-            {query.event && !operationEvent && eventMessages[query.event] && (
-              <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
-                {eventMessages[query.event]}
-              </p>
-            )}
+            {query.event &&
+              !operationEvent &&
+              !["field_saved", "field_corrected"].includes(query.event) &&
+              eventMessages[query.event] && (
+                <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
+                  {eventMessages[query.event]}
+                </p>
+              )}
             {isDifferentTask && session.snapshot && (
               <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 {isActive ? (
@@ -429,7 +432,10 @@ export default async function TaskRuntimeTestPage({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
                 {!isActive && (
-                  <form action={startTaskRuntimeTestAction}>
+                  <form
+                    action={startTaskRuntimeTestAction}
+                    data-preserve-scroll
+                  >
                     {hiddenContext(context.project.id, task.id)}
                     <Button type="submit" disabled={versions.length === 0}>
                       <Play className="h-4 w-4" />
@@ -438,7 +444,10 @@ export default async function TaskRuntimeTestPage({
                   </form>
                 )}
                 {isActive && !isAnsweringSideQuestion && (
-                  <form action={applyTaskRuntimeTestLifecycleAction}>
+                  <form
+                    action={applyTaskRuntimeTestLifecycleAction}
+                    data-preserve-scroll
+                  >
                     {hiddenContext(context.project.id, task.id)}
                     <Button
                       type="submit"
@@ -456,7 +465,10 @@ export default async function TaskRuntimeTestPage({
                   </form>
                 )}
                 {isActive && !isPaused && (
-                  <form action={applyTaskRuntimeTestLifecycleAction}>
+                  <form
+                    action={applyTaskRuntimeTestLifecycleAction}
+                    data-preserve-scroll
+                  >
                     {hiddenContext(context.project.id, task.id)}
                     <Button
                       type="submit"
@@ -476,7 +488,10 @@ export default async function TaskRuntimeTestPage({
                   </form>
                 )}
                 {isActive && (
-                  <form action={applyTaskRuntimeTestLifecycleAction}>
+                  <form
+                    action={applyTaskRuntimeTestLifecycleAction}
+                    data-preserve-scroll
+                  >
                     {hiddenContext(context.project.id, task.id)}
                     <Button
                       type="submit"
@@ -492,7 +507,7 @@ export default async function TaskRuntimeTestPage({
               </div>
 
               {runtime && (
-                <form action={resetTaskRuntimeTestAction}>
+                <form action={resetTaskRuntimeTestAction} data-preserve-scroll>
                   {hiddenContext(context.project.id, task.id)}
                   <Button type="submit" variant="destructive">
                     <Trash2 className="h-4 w-4" />
@@ -568,7 +583,10 @@ export default async function TaskRuntimeTestPage({
                         </div>
                         {isActive && !isPaused && !isAnsweringSideQuestion && (
                           <div className="flex gap-2">
-                            <form action={requestTaskRuntimeTestFieldAction}>
+                            <form
+                              action={requestTaskRuntimeTestFieldAction}
+                              data-preserve-scroll
+                            >
                               {hiddenContext(context.project.id, task.id)}
                               <input
                                 type="hidden"
@@ -580,7 +598,10 @@ export default async function TaskRuntimeTestPage({
                                 Request
                               </Button>
                             </form>
-                            <form action={clearTaskRuntimeTestFieldAction}>
+                            <form
+                              action={clearTaskRuntimeTestFieldAction}
+                              data-preserve-scroll
+                            >
                               {hiddenContext(context.project.id, task.id)}
                               <input
                                 type="hidden"
@@ -826,6 +847,7 @@ export default async function TaskRuntimeTestPage({
               <form
                 action={applyTaskRuntimeTestLifecycleAction}
                 className="flex flex-wrap gap-2"
+                data-preserve-scroll
               >
                 {hiddenContext(context.project.id, task.id)}
                 <Button
@@ -903,7 +925,7 @@ export default async function TaskRuntimeTestPage({
           </Card>
         )}
 
-        {runtime && (
+        {(runtime || session.safeAudit.length > 0) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
@@ -916,27 +938,23 @@ export default async function TaskRuntimeTestPage({
               </p>
             </CardHeader>
             <CardContent>
-              {runtime.audit.length === 0 ? (
+              {session.safeAudit.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No runtime events have been recorded.
                 </p>
               ) : (
                 <div className="divide-y rounded-md border">
-                  {runtime.audit
-                    .slice()
-                    .reverse()
-                    .slice(0, 12)
-                    .map((event) => (
-                      <div
-                        key={event.id}
-                        className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
-                      >
-                        <p className="font-medium">{event.eventType}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {event.createdAt.toLocaleString()}
-                        </p>
-                      </div>
-                    ))}
+                  {session.safeAudit.map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+                    >
+                      <p className="font-medium">{event.eventType}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {event.createdAt.toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>

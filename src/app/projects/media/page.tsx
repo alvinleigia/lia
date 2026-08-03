@@ -77,17 +77,6 @@ export default async function ProjectMediaPage({
                 {params.error}
               </p>
             )}
-            {params.uploaded === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Media asset uploaded.
-              </p>
-            )}
-            {params.archived === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Media asset archived.
-              </p>
-            )}
-
             <p className="text-sm text-muted-foreground">
               Store reusable images, videos, audio, PDFs, and common files for
               this project. These assets are the foundation for future Media and

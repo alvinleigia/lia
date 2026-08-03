@@ -127,7 +127,10 @@ export default async function TaskOutcomesPage({
                       </p>
                     )}
                   </div>
-                  <form action={removeConversationalTaskOutcomeAction}>
+                  <form
+                    action={removeConversationalTaskOutcomeAction}
+                    data-preserve-scroll
+                  >
                     <input
                       type="hidden"
                       name="projectId"

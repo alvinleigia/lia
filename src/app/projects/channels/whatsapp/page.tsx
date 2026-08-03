@@ -90,17 +90,6 @@ export default async function WhatsAppChannelPage({
                 {params.error}
               </p>
             )}
-            {params.updated && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                WhatsApp settings saved.
-              </p>
-            )}
-            {params.testSent && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Test message sent through WhatsApp Cloud API.
-              </p>
-            )}
-
             <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-md border bg-white p-4">
                 <p className="text-xs uppercase text-muted-foreground">

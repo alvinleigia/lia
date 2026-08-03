@@ -59,6 +59,24 @@ It additionally verifies:
 - A durable Wait job pauses, resumes, and submits once.
 - Database-backed tenant isolation passes.
 
+For a complete local run that does not call OpenAI while iterating, use:
+
+```bash
+npm run certify:release:offline
+```
+
+The offline gate runs the production build, deterministic browser and database
+tests, and tenant isolation while excluding only scenarios tagged
+`@live-openai`. Before release UAT, run the paid-provider smoke separately or
+use the unchanged full release command:
+
+```bash
+npm run test:openai-smoke
+```
+
+The smoke command is serialized and covers document embedding plus one
+grounded RAG answer. Passing the offline gate alone is not release approval.
+
 ## Live Sign-Off
 
 Automation does not prove ownership or health of an external account, number,

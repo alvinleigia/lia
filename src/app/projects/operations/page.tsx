@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FlashToast } from "@/components/ui/flash-toast";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -244,13 +245,11 @@ export default async function OperationsPage({
               </p>
             )}
             {params.retryQueueProcessed && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Retry queue processed {params.retryProcessed ?? "0"} attempt(s)
-                ({params.retryCompleted ?? "0"} completed,{" "}
-                {params.retryFailed ?? "0"} failed,{" "}
-                {params.retryRescheduled ?? "0"} rescheduled,{" "}
-                {params.retrySkipped ?? "0"} skipped).
-              </p>
+              <FlashToast
+                clearParams="retryQueueProcessed,retryProcessed,retryCompleted,retryFailed,retryRescheduled,retrySkipped"
+                id="operations-retry-queue"
+                message={`Retry queue processed ${params.retryProcessed ?? "0"} attempt(s) (${params.retryCompleted ?? "0"} completed, ${params.retryFailed ?? "0"} failed, ${params.retryRescheduled ?? "0"} rescheduled, ${params.retrySkipped ?? "0"} skipped).`}
+              />
             )}
 
             {operationRows.length === 0 ? (
@@ -517,7 +516,10 @@ export default async function OperationsPage({
                   have queued retries enabled.
                 </p>
               </div>
-              <form action={processOperationRetryQueueAction}>
+              <form
+                action={processOperationRetryQueueAction}
+                data-preserve-scroll
+              >
                 <FormSubmitButton
                   className="w-full md:w-auto"
                   label="Process Retry Queue"
@@ -597,6 +599,9 @@ export default async function OperationsPage({
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium">{operation.name}</p>
+                        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs tabular-nums text-slate-600">
+                          Attempt #{attempt.id}
+                        </span>
                         <span className="rounded-md border px-2 py-1 text-xs capitalize">
                           {attempt.status}
                         </span>

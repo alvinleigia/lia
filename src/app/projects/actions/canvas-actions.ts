@@ -33,9 +33,12 @@ import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
 import { getPublishedConversationalTaskOption } from "@/lib/conversational-tasks";
 import {
+  buildFlowContentDocument,
   type FlowContentBlock,
   getFlowChoiceContentBlock,
   getFlowContentBlocks,
+  getFlowContentCompositionIssues,
+  getFlowResponseCollectorBlocks,
   parseFlowContentBlocks,
 } from "@/lib/flow-content-blocks";
 import { getFlowInputType, isFlowInputStepType } from "@/lib/flow-input-editor";
@@ -1381,10 +1384,11 @@ export async function updateCanvasStepBasicsAction(
   const existingChoiceContent = getFlowChoiceContentBlock(
     existingStep.settings,
   );
-  const choiceContent =
-    contentBlocks.find((block) => block.type === "choice") ?? null;
-  if (contentBlocks.filter((block) => block.type === "choice").length > 1) {
-    return { ok: false, message: "A step can contain one choice block." };
+  const responseCollectors = getFlowResponseCollectorBlocks(contentBlocks);
+  const choiceContent = responseCollectors[0] ?? null;
+  const compositionIssue = getFlowContentCompositionIssues(contentBlocks)[0];
+  if (compositionIssue) {
+    return { ok: false, message: compositionIssue.message };
   }
 
   const dynamicSourceType =
@@ -1437,8 +1441,10 @@ export async function updateCanvasStepBasicsAction(
   let settings = { ...existingStep.settings };
   if (parsed.data.contentBlocksChanged) {
     if (contentBlocks.length > 0) {
-      settings.contentBlocks = contentBlocks;
+      settings.contentDocument = buildFlowContentDocument(contentBlocks);
+      delete settings.contentBlocks;
     } else {
+      delete settings.contentDocument;
       delete settings.contentBlocks;
     }
   }

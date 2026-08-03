@@ -208,13 +208,6 @@ export default async function HandoffsPage({
                 {params.error}
               </p>
             )}
-            {params.updated && (
-              <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
-                Updated {params.updated} handoff
-                {params.updated === "1" ? "" : "s"}.
-              </p>
-            )}
-
             <div className="grid gap-3 md:grid-cols-4">
               <div className="rounded-md border bg-white p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">

@@ -1,5 +1,4 @@
 import {
-  CheckCircle2,
   ClipboardCheck,
   ClipboardList,
   MessageSquare,
@@ -18,18 +17,12 @@ type ProjectLandingPageProps = {
   params: Promise<{
     projectId: string;
   }>;
-  searchParams: Promise<{
-    created?: string;
-    renamed?: string;
-  }>;
 };
 
 export default async function ProjectLandingPage({
   params,
-  searchParams,
 }: ProjectLandingPageProps) {
   const { projectId } = await params;
-  const query = await searchParams;
   const parsedProjectId = Number(projectId);
   if (!Number.isInteger(parsedProjectId) || parsedProjectId <= 0) {
     notFound();
@@ -59,19 +52,6 @@ export default async function ProjectLandingPage({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {query.created === "1" && (
-                <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                  <CheckCircle2 className="h-4 w-4 inline mr-2" />
-                  Project created.
-                </p>
-              )}
-              {query.renamed === "1" && (
-                <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                  <CheckCircle2 className="h-4 w-4 inline mr-2" />
-                  Project renamed.
-                </p>
-              )}
-
               <p className="text-sm text-muted-foreground">
                 Choose what you want to do for this project.
               </p>

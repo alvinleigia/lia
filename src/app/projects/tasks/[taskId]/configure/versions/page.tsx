@@ -137,7 +137,7 @@ export default async function TaskVersionsPage({
                 </ul>
               </div>
             )}
-            <form action={publishConversationalTaskAction}>
+            <form action={publishConversationalTaskAction} data-preserve-scroll>
               <input
                 type="hidden"
                 name="projectId"

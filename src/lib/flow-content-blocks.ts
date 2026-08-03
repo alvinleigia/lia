@@ -57,6 +57,24 @@ export type FlowContentBlock =
   | FlowMediaContentBlock
   | FlowTextContentBlock;
 
+export type FlowContentBlockRole = "presentation" | "response_collector";
+export type FlowResponseCollectorBlock = Extract<
+  FlowContentBlock,
+  { type: "choice" }
+>;
+
+export type FlowContentCompositionIssue = {
+  code: "multiple_response_collectors";
+  message: string;
+};
+
+export const FLOW_CONTENT_SCHEMA_VERSION = 1 as const;
+
+export type FlowContentDocumentV1 = {
+  blocks: FlowContentBlock[];
+  schemaVersion: typeof FLOW_CONTENT_SCHEMA_VERSION;
+};
+
 export const MAX_FLOW_CONTENT_BLOCKS = 10;
 const MAX_OPTIONS_PER_BLOCK = 20;
 const MAX_PRODUCTS_PER_BLOCK = 50;
@@ -271,8 +289,75 @@ export function parseFlowContentBlocks(value: unknown): FlowContentBlock[] {
     .filter((block): block is FlowContentBlock => block !== null);
 }
 
+export function buildFlowContentDocument(
+  blocks: FlowContentBlock[],
+): FlowContentDocumentV1 {
+  return {
+    blocks: [...blocks],
+    schemaVersion: FLOW_CONTENT_SCHEMA_VERSION,
+  };
+}
+
+export function parseFlowContentDocument(
+  value: unknown,
+): FlowContentDocumentV1 | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const document = value as Record<string, unknown>;
+  if (
+    document.schemaVersion !== FLOW_CONTENT_SCHEMA_VERSION ||
+    !Array.isArray(document.blocks)
+  ) {
+    return null;
+  }
+
+  return buildFlowContentDocument(parseFlowContentBlocks(document.blocks));
+}
+
+export function getFlowContentDocument(
+  settings: Record<string, unknown>,
+): FlowContentDocumentV1 | null {
+  if (Object.hasOwn(settings, "contentDocument")) {
+    return parseFlowContentDocument(settings.contentDocument);
+  }
+
+  return buildFlowContentDocument(
+    parseFlowContentBlocks(settings.contentBlocks),
+  );
+}
+
 export function getFlowContentBlocks(settings: Record<string, unknown>) {
-  return parseFlowContentBlocks(settings.contentBlocks);
+  return getFlowContentDocument(settings)?.blocks ?? [];
+}
+
+export function getFlowContentBlockRole(
+  block: FlowContentBlock,
+): FlowContentBlockRole {
+  return block.type === "choice" ? "response_collector" : "presentation";
+}
+
+export function getFlowResponseCollectorBlocks(
+  blocks: FlowContentBlock[],
+): FlowResponseCollectorBlock[] {
+  return blocks.filter(
+    (block): block is FlowResponseCollectorBlock =>
+      getFlowContentBlockRole(block) === "response_collector",
+  );
+}
+
+export function getFlowContentCompositionIssues(
+  blocks: FlowContentBlock[],
+): FlowContentCompositionIssue[] {
+  return getFlowResponseCollectorBlocks(blocks).length > 1
+    ? [
+        {
+          code: "multiple_response_collectors",
+          message: "A step can contain one response collector.",
+        },
+      ]
+    : [];
 }
 
 export function getFlowChoiceContentBlock(settings: Record<string, unknown>) {

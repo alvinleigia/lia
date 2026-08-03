@@ -7,6 +7,7 @@ import {
 } from "@/lib/conversational-task-runtime";
 import { db } from "@/lib/db-config";
 import {
+  conversationalTaskAuditEvents,
   conversationalTaskRuns,
   conversationalTaskVersions,
   conversationExecutionStates,
@@ -27,12 +28,13 @@ export async function getConversationTaskRuntimeSession(input: {
       conversation: null,
       execution: null,
       runtime: null,
+      safeAudit: [],
       snapshot: null,
       version: null,
     };
   }
 
-  const [execution, latestRun] = await Promise.all([
+  const [execution, latestRun, safeAudit] = await Promise.all([
     db
       .select()
       .from(conversationExecutionStates)
@@ -56,6 +58,21 @@ export async function getConversationTaskRuntimeSession(input: {
       .orderBy(desc(conversationalTaskRuns.id))
       .limit(1)
       .then(([row]) => row ?? null),
+    db
+      .select({
+        createdAt: conversationalTaskAuditEvents.createdAt,
+        eventType: conversationalTaskAuditEvents.eventType,
+        id: conversationalTaskAuditEvents.id,
+      })
+      .from(conversationalTaskAuditEvents)
+      .where(
+        and(
+          eq(conversationalTaskAuditEvents.projectId, input.projectId),
+          eq(conversationalTaskAuditEvents.conversationId, conversation.id),
+        ),
+      )
+      .orderBy(desc(conversationalTaskAuditEvents.id))
+      .limit(50),
   ]);
   const taskRunId = execution?.activeTaskRunId ?? latestRun?.id ?? null;
   if (!taskRunId) {
@@ -63,6 +80,7 @@ export async function getConversationTaskRuntimeSession(input: {
       conversation,
       execution,
       runtime: null,
+      safeAudit,
       snapshot: null,
       version: null,
     };
@@ -77,6 +95,7 @@ export async function getConversationTaskRuntimeSession(input: {
       conversation,
       execution,
       runtime: null,
+      safeAudit,
       snapshot: null,
       version: null,
     };
@@ -100,6 +119,7 @@ export async function getConversationTaskRuntimeSession(input: {
     conversation,
     execution: runtime.execution,
     runtime,
+    safeAudit,
     snapshot,
     version: version ?? null,
   };

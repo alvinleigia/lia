@@ -253,7 +253,10 @@ export default async function TaskToolsPage({
                           .
                         </p>
                       </div>
-                      <form action={unbindConversationalTaskToolAction}>
+                      <form
+                        action={unbindConversationalTaskToolAction}
+                        data-preserve-scroll
+                      >
                         <input
                           type="hidden"
                           name="projectId"

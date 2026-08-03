@@ -131,7 +131,10 @@ export default async function TaskFieldsPage({
                 <p className="text-sm text-muted-foreground">
                   No fields configured yet.
                 </p>
-                <form action={applyReferenceBookingTaskAction}>
+                <form
+                  action={applyReferenceBookingTaskAction}
+                  data-preserve-scroll
+                >
                   <input
                     type="hidden"
                     name="projectId"

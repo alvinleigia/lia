@@ -73,11 +73,6 @@ export default async function PlatformPage({
                 {params.error}
               </p>
             )}
-            {params.updated === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Tenant updated.
-              </p>
-            )}
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-md border bg-white p-4">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">

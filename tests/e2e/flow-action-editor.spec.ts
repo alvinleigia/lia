@@ -45,9 +45,11 @@ test("route and planned families describe honest availability", () => {
   }
 
   const plannedComponents = listPlannedFlowComponents();
-  for (const key of ["ai_knowledge"]) {
-    const component = plannedComponents.find((item) => item.key === key);
-    expect(component?.disabledReason).toBeTruthy();
+  expect(plannedComponents.map((component) => component.key)).toEqual([
+    "text_buttons",
+    "list_message",
+  ]);
+  for (const component of plannedComponents) {
     expect(component?.stepType).toBeUndefined();
   }
 

@@ -1626,34 +1626,143 @@ async function recordDurableOperationResult(input: {
     )
     .returning();
 
-  if (input.attempt.submissionId && input.final) {
-    await addOperationSubmissionEvent({
-      eventType:
-        input.status === "completed"
-          ? "operation.completed"
-          : input.status === "outcome_unknown"
-            ? "operation.outcome_unknown"
-            : "operation.failed",
-      message:
-        input.status === "completed"
-          ? `Operation "${input.operation.name}" completed.`
-          : input.status === "outcome_unknown"
-            ? `Operation "${input.operation.name}" needs reconciliation.`
-            : `Operation "${input.operation.name}" failed after durable retries.`,
-      payload: {
-        attemptId: input.attempt.id,
-        operationId: input.operation.id,
-        operationType: input.operation.operationType,
-        providerId: input.attempt.providerId,
-        providerType: input.providerType,
-      },
-      projectId: input.projectId,
-      submissionId: input.attempt.submissionId,
-      traceId: input.traceId,
-    });
+  if (input.final) {
+    await addDurableOperationResultEvent(input);
   }
 
   return attempt ?? input.attempt;
+}
+
+function getDurableOperationResultEvent(input: {
+  attempt: SelectOperationAttempt;
+  operation: SelectOperation;
+  projectId: number;
+  providerType: string;
+  status: "completed" | "failed" | "outcome_unknown";
+  traceId: string;
+}) {
+  if (!input.attempt.submissionId) {
+    return null;
+  }
+
+  return {
+    eventType:
+      input.status === "completed"
+        ? "operation.completed"
+        : input.status === "outcome_unknown"
+          ? "operation.outcome_unknown"
+          : "operation.failed",
+    message:
+      input.status === "completed"
+        ? `Operation "${input.operation.name}" completed.`
+        : input.status === "outcome_unknown"
+          ? `Operation "${input.operation.name}" needs reconciliation.`
+          : `Operation "${input.operation.name}" failed after durable retries.`,
+    payload: {
+      attemptId: input.attempt.id,
+      operationId: input.operation.id,
+      operationType: input.operation.operationType,
+      providerId: input.attempt.providerId,
+      providerType: input.providerType,
+    },
+    projectId: input.projectId,
+    submissionId: input.attempt.submissionId,
+    traceId: input.traceId,
+  };
+}
+
+async function addDurableOperationResultEvent(input: {
+  attempt: SelectOperationAttempt;
+  operation: SelectOperation;
+  projectId: number;
+  providerType: string;
+  status: "completed" | "failed" | "outcome_unknown";
+  traceId: string;
+}) {
+  const event = getDurableOperationResultEvent(input);
+  if (event) {
+    await addOperationSubmissionEvent(event);
+  }
+}
+
+async function finalizeDurableOperationResult(input: {
+  attempt: SelectOperationAttempt;
+  errorMessage?: string | null;
+  jobId: number;
+  operation: SelectOperation;
+  projectId: number;
+  providerType: string;
+  responsePayload: Record<string, unknown>;
+  status: "completed" | "outcome_unknown";
+  traceId: string;
+  workerId: string;
+}) {
+  const finishedAt = new Date();
+  const finalizedAttempt = await db.transaction(async (tx) => {
+    const [completedJob] = await tx
+      .update(durableJobs)
+      .set({
+        completedAt: finishedAt,
+        lastError: null,
+        leaseExpiresAt: null,
+        leaseOwner: null,
+        result: {
+          operationAttemptId: input.attempt.id,
+          status: input.status,
+        },
+        status: "completed",
+        updatedAt: finishedAt,
+      })
+      .where(
+        and(
+          eq(durableJobs.projectId, input.projectId),
+          eq(durableJobs.id, input.jobId),
+          eq(durableJobs.status, "processing"),
+          eq(durableJobs.leaseOwner, input.workerId.trim()),
+        ),
+      )
+      .returning();
+
+    if (!completedJob) {
+      return null;
+    }
+
+    const [attempt] = await tx
+      .update(operationAttempts)
+      .set({
+        errorMessage: input.errorMessage ?? null,
+        finishedAt,
+        responsePayload: input.responsePayload,
+        status: input.status,
+      })
+      .where(
+        and(
+          eq(operationAttempts.projectId, input.projectId),
+          eq(operationAttempts.id, input.attempt.id),
+        ),
+      )
+      .returning();
+
+    if (!attempt) {
+      throw new Error("Durable operation attempt was not found.");
+    }
+
+    const event = getDurableOperationResultEvent({
+      ...input,
+      attempt,
+    });
+    if (event) {
+      await tx.insert(actionSubmissionEvents).values(event);
+    }
+
+    return attempt;
+  });
+
+  if (!finalizedAttempt) {
+    return null;
+  }
+
+  return finalizedAttempt;
 }
 
 export async function processProjectDurableOperationQueue(input: {
@@ -1695,13 +1804,15 @@ export async function processProjectDurableOperationQueue(input: {
 
       const { attempt, operation, provider } = context;
       if (attempt.status === "completed") {
-        await completeDurableJob({
+        const completedJob = await completeDurableJob({
           jobId: job.id,
           projectId: input.projectId,
           result: { operationAttemptId: attempt.id, status: attempt.status },
           workerId: input.workerId,
         });
-        completed += 1;
+        if (completedJob) {
+          completed += 1;
+        }
         continue;
       }
 
@@ -1720,49 +1831,40 @@ export async function processProjectDurableOperationQueue(input: {
       });
 
       if (result.status === "completed") {
-        await recordDurableOperationResult({
+        const finalizedAttempt = await finalizeDurableOperationResult({
           attempt,
-          final: true,
+          jobId: job.id,
           operation,
           projectId: input.projectId,
           providerType: provider.providerType,
           responsePayload: result.responsePayload,
           status: "completed",
           traceId: job.traceId,
-        });
-        await completeDurableJob({
-          jobId: job.id,
-          projectId: input.projectId,
-          result: { operationAttemptId: attempt.id, status: "completed" },
           workerId: input.workerId,
         });
-        completed += 1;
+        if (finalizedAttempt) {
+          completed += 1;
+        }
         continue;
       }
 
       if (result.status === "outcome_unknown") {
-        await recordDurableOperationResult({
+        const finalizedAttempt = await finalizeDurableOperationResult({
           attempt,
           errorMessage:
             result.errorMessage ?? "The provider outcome is unknown.",
-          final: true,
+          jobId: job.id,
           operation,
           projectId: input.projectId,
           providerType: provider.providerType,
           responsePayload: result.responsePayload,
           status: "outcome_unknown",
           traceId: job.traceId,
-        });
-        await completeDurableJob({
-          jobId: job.id,
-          projectId: input.projectId,
-          result: {
-            operationAttemptId: attempt.id,
-            status: "outcome_unknown",
-          },
           workerId: input.workerId,
         });
-        failed += 1;
+        if (finalizedAttempt) {
+          failed += 1;
+        }
         continue;
       }
 
@@ -1772,7 +1874,10 @@ export async function processProjectDurableOperationQueue(input: {
         projectId: input.projectId,
         workerId: input.workerId,
       });
-      const exhausted = failedJob?.status === "failed";
+      if (!failedJob) {
+        continue;
+      }
+      const exhausted = failedJob.status === "failed";
       await recordDurableOperationResult({
         attempt,
         errorMessage: result.errorMessage,
@@ -1799,7 +1904,11 @@ export async function processProjectDurableOperationQueue(input: {
         workerId: input.workerId,
       });
 
-      if (failedJob?.status === "failed") {
+      if (!failedJob) {
+        continue;
+      }
+
+      if (failedJob.status === "failed") {
         if (job.operationAttemptId) {
           await db
             .update(operationAttempts)

@@ -4,6 +4,9 @@ import { Suspense } from "react";
 import { Navigation } from "@/components/navigation";
 import { NavigationProgress } from "@/components/navigation-progress";
 import { NavigationShell } from "@/components/navigation-shell";
+import { FormScrollRestoration } from "@/components/ui/form-scroll-restoration";
+import { Toaster } from "@/components/ui/sonner";
+import { UrlFlashToasts } from "@/components/ui/url-flash-toasts";
 import "@xyflow/react/dist/style.css";
 import "./globals.css";
 
@@ -34,11 +37,14 @@ export default function RootLayout({
       >
         <Suspense fallback={null}>
           <NavigationProgress />
+          <FormScrollRestoration />
+          <UrlFlashToasts />
         </Suspense>
         <NavigationShell>
           <Navigation />
         </NavigationShell>
         {children}
+        <Toaster closeButton position="bottom-right" richColors />
       </body>
     </html>
   );

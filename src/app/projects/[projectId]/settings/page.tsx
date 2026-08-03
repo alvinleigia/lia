@@ -2,7 +2,6 @@ import {
   Archive,
   ArrowLeft,
   Bot,
-  CheckCircle2,
   RotateCcw,
   Save,
   Settings,
@@ -99,30 +98,6 @@ export default async function ProjectSettingsPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {query.renamed === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                <CheckCircle2 className="h-4 w-4 inline mr-2" />
-                Project renamed.
-              </p>
-            )}
-            {query.archived === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                <CheckCircle2 className="h-4 w-4 inline mr-2" />
-                Project archived and widget disabled.
-              </p>
-            )}
-            {query.unarchived === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                <CheckCircle2 className="h-4 w-4 inline mr-2" />
-                Project unarchived.
-              </p>
-            )}
-            {query.aiSettings === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                <CheckCircle2 className="h-4 w-4 inline mr-2" />
-                AI behavior settings saved.
-              </p>
-            )}
             {query.error && (
               <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">
                 {query.error}

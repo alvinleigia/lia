@@ -85,13 +85,11 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 1, Phase 8 of 18, Step 3 of 6. Phases 1-7 and the
-first two Phase 8 checkpoints completed their implementation and manual UAT
-gates by 2026-07-31.
+Current phase: Priority 2, Phase 9 of 18. Phase 8 and Priority 1 completed
+implementation, automated verification, and manual UAT by 2026-08-03.
 
-Current target: complete focused manual UAT for task correction, grounded side
-questions, cancellation, confirmation, and completion, then continue provider
-operations and interruption recovery in Step 4.
+Current target: prevent incompatible or ambiguous response collectors across
+content blocks, typed step inputs, and manual or dynamic choice sources.
 
 ## Product Direction
 
@@ -608,15 +606,21 @@ Phase 8 execution checkpoints:
 
 - [x] Step 1 of 6: temporal normalization and channel-adaptive typed inputs.
 - [x] Step 2 of 6: reference catalog dependencies and deterministic lookups.
-- [ ] Step 3 of 6: corrections, side questions, cancellation, confirmation,
-  and completion (implementation and automated checks complete; focused manual
-  UAT pending).
-- [ ] Step 4 of 6: provider operations, outcomes, idempotency, and interruption
+- [x] Step 3 of 6: corrections, side questions, cancellation, confirmation,
+  and completion.
+- [x] Step 4 of 6: provider operations, outcomes, idempotency, and interruption
   recovery.
-- [ ] Step 5 of 6: tenant safety, security, degraded behavior, retention, and
+- [x] Step 5 of 6: tenant safety, security, degraded behavior, retention, and
   observability.
-- [ ] Step 6 of 6: complete scenario verification, manual UAT, and Priority 1
+- [x] Step 6 of 6: complete scenario verification, manual UAT, and Priority 1
   closure.
+
+Checkpoint 6 closure verification passed on 2026-08-03: all eight release
+gates, 110 channel and conversation contract tests, the production build, 205
+post-UAT offline database-backed browser scenarios, two serialized live OpenAI
+scenarios for document ingestion and grounded Q&A, and tenant-isolation
+database checks completed successfully. All six focused manual UAT steps passed
+and are signed off in `docs/UAT_TEST_PLAN.md`.
 
 - [x] Build the reference task using the project service catalog.
 - [x] Keep the Lia project catalog as the channel-independent source of truth.
@@ -628,12 +632,12 @@ Phase 8 execution checkpoints:
   by a draft or immutable published flow or task version.
 - [x] Keep every catalog lifecycle read, write, dependency scan, and audit
   event explicitly project-scoped.
-- [ ] Start the reference journey in grounded Q&A, answer a normal project question, and then recognize a booking request.
-- [ ] Enter `Book Spa Service` only after the server approves the task recommendation.
-- [ ] Carry only fresh, whitelisted candidate values into the task and validate them before use.
-- [ ] Collect all seven reference fields through one task node.
-- [ ] Accept several valid details in one visitor message.
-- [ ] Ask only for missing, invalid, ambiguous, or stale details.
+- [x] Start the reference journey in grounded Q&A, answer a normal project question, and then recognize a booking request.
+- [x] Enter `Book Spa Service` only after the server approves the task recommendation.
+- [x] Carry only fresh, whitelisted candidate values into the task and validate them before use.
+- [x] Collect all seven reference fields through one task node.
+- [x] Accept several valid details in one visitor message.
+- [x] Ask only for missing, invalid, ambiguous, or stale details.
 - [x] Resolve supported relative dates such as `today` and `tomorrow` from the trusted turn timestamp and project timezone.
 - [x] Store accepted dates and times in canonical channel-independent formats.
 - [x] Ask for clarification when a relative date or time cannot be resolved unambiguously.
@@ -643,41 +647,45 @@ Phase 8 execution checkpoints:
 - [x] Verify unsupported channel capabilities fall back without changing the task contract or collected value.
 - [x] Resolve category and service dependencies.
 - [x] Look up current price, duration, and availability.
-- [ ] Correct one field without restarting the task.
-- [ ] Answer a project side question during booking and resume the same requested field.
-- [ ] Cancel the task and return to ordinary Q&A without ending the conversation.
-- [ ] Complete the task and return to the configured Q&A or deterministic continuation.
-- [ ] Clarify an ambiguous task request instead of choosing a task silently.
-- [ ] Verify an explicit button or list route enters its mapped task without semantic rerouting.
-- [ ] Invalidate and refresh dependent availability after date, time, or service changes.
-- [ ] Show a canonical confirmation summary.
-- [ ] Submit one idempotent booking operation after confirmation.
-- [ ] Exercise completed, cancelled, unavailable, validation-failed, timeout, provider-failed, and handoff outcomes.
-- [ ] Resume the correct task after refresh, Wait, and a simulated worker interruption.
-- [ ] Verify model failure uses the deterministic fallback.
-- [ ] Verify prompt injection cannot change fields, tools, operations, or routes.
-- [ ] Verify tool data cannot override task instructions.
-- [ ] Verify retrieved content cannot start a task, invoke a tool, or change the configured return target.
-- [ ] Verify anonymous sessions remain isolated and contact or cross-channel state links only after the configured verification rule.
-- [ ] Verify duplicate, delayed, and out-of-order inbound events cannot overwrite newer task state or repeat an operation.
-- [ ] Verify retention, export, and deletion policies cover conversation messages, task fields, model traces, and operation records.
-- [ ] Verify blocked or abusive content follows the published safety outcome without mutating business state.
-- [ ] Verify an ambiguous provider response enters reconciliation and never produces a false success message.
-- [ ] Verify human takeover prevents dual replies and authorized release resumes the correct version-pinned target.
-- [ ] Verify recursive task entry and excessive task-switch or connected-flow depth are rejected.
-- [ ] Exercise deterministic degraded behavior for model, retrieval, business-tool, and outbound-channel outages.
-- [ ] Verify logs and diagnostics do not expose secrets or unnecessary PII.
-- [ ] Add deterministic model fixtures and live-provider smoke tests.
-- [ ] Add scenario tests with explicit success criteria for expected fields, tool calls, routes, replies, and terminal outcomes.
-- [ ] Add safe mocked outcomes for synchronous, asynchronous, timeout, rejected, provider-failed, outcome-unknown, and reconciled tools.
-- [ ] Trace assistant policy version, conversation-owner transitions, task/stage, return reason, field changes, tool calls, routes, model usage, latency, and cost with PII redaction.
-- [ ] Add database-backed cross-tenant tests.
+- [x] Correct one field without restarting the task.
+- [x] Answer a project side question during booking and resume the same requested field.
+- [x] Cancel the task and return to ordinary Q&A without ending the conversation.
+- [x] Complete the task and return to the configured Q&A or deterministic continuation.
+- [x] Clarify an ambiguous task request instead of choosing a task silently.
+- [x] Verify an explicit button or list route enters its mapped task without semantic rerouting.
+- [x] Invalidate and refresh dependent availability after date, time, or service changes.
+- [x] Show a canonical confirmation summary.
+- [x] Submit one idempotent booking operation after confirmation.
+- [x] Exercise completed, cancelled, unavailable, validation-failed, timeout, provider-failed, and handoff outcomes.
+- [x] Resume the correct task after refresh, Wait, and a simulated worker interruption.
+- [x] Verify model failure uses the deterministic fallback.
+- [x] Verify prompt injection cannot change fields, tools, operations, or routes.
+- [x] Verify tool data cannot override task instructions.
+- [x] Verify retrieved content cannot start a task, invoke a tool, or change the configured return target.
+- [x] Verify anonymous sessions remain isolated and contact or cross-channel state links only after the configured verification rule.
+- [x] Verify duplicate, delayed, and out-of-order inbound events cannot overwrite newer task state or repeat an operation.
+- [x] Verify retention, export, and deletion policies cover conversation messages, task fields, model traces, and operation records.
+- [x] Verify blocked or abusive content follows the published safety outcome without mutating business state.
+- [x] Verify an ambiguous provider response enters reconciliation and never produces a false success message.
+- [x] Verify human takeover prevents dual replies and authorized release resumes the correct version-pinned target.
+- [x] Verify recursive task entry and excessive task-switch or connected-flow depth are rejected.
+- [x] Exercise deterministic degraded behavior for model, retrieval, business-tool, and outbound-channel outages.
+- [x] Verify logs and diagnostics do not expose secrets or unnecessary PII.
+- [x] Add deterministic model fixtures and live-provider smoke tests.
+- [x] Add scenario tests with explicit success criteria for expected fields, tool calls, routes, replies, and terminal outcomes.
+- [x] Add safe mocked outcomes for synchronous, asynchronous, timeout, rejected, provider-failed, outcome-unknown, and reconciled tools.
+- [x] Trace assistant policy version, conversation-owner transitions, task/stage, return reason, field changes, tool calls, routes, model usage, latency, and cost with PII redaction.
+- [x] Add database-backed cross-tenant tests.
 - [x] Update the conversational-task phases in `docs/UAT_TEST_PLAN.md` for
   completed Phase 8 checkpoints.
-- [ ] Record no unresolved Critical or High Priority 1 defect.
+- [x] Record no unresolved Critical or High Priority 1 defect.
 
 Priority 1 exit gate: Lia can complete a real booking through a bounded,
 versioned, resumable, and tenant-safe natural conversation.
+
+Phase 8 status: Complete. The final reference booking journey, safety boundary,
+seven-field persistence and correction, exactly-once operation, safe audit, and
+cleanup passed manual UAT on 2026-08-03.
 
 # Priority 2: Deterministic Controls And Channel Readiness
 
@@ -692,8 +700,8 @@ structured interactions.
 
 - [x] Existing nodes can combine ordered text, choice, media, and catalog content.
 - [x] Existing content can be reordered, duplicated, edited, and removed.
-- [ ] Finalize the versioned universal node and ordered-content contracts.
-- [ ] Allow several compatible presentation blocks and one response collector in a node.
+- [x] Finalize the versioned universal node and ordered-content contracts.
+- [x] Allow several compatible presentation blocks and one response collector in a node.
 - [ ] Prevent incompatible or ambiguous response collectors.
 - [ ] Show every universal Add Content option in one menu.
 - [ ] Keep inapplicable content visible with a plain-language disabled reason.
@@ -708,6 +716,22 @@ structured interactions.
 - [ ] Keep provider identifiers and channel restrictions out of primary universal fields.
 - [ ] Add publish blockers for incomplete content.
 - [ ] Confirm every deterministic message example in `docs/Flow Builder v2.pdf` can be authored without raw JSON.
+
+Phase 9 Checkpoint 1 status: Complete on 2026-08-03. Ordered node content now
+uses a version 1 `contentDocument` envelope with stable block IDs and normative
+array order. Existing `contentBlocks` arrays remain readable, edited content is
+migrated on save, and unsupported explicit document versions cannot silently
+fall through to stale legacy content. Six focused content-contract tests, three
+catalog dependency checks, the existing canvas save/reload scenario, and the
+119-test fast release certification passed.
+
+Phase 9 Checkpoint 2 status: Complete on 2026-08-03. Text, media, and catalog
+blocks now share an explicit presentation role, while buttons and lists share
+one response-collector role. The authoritative composition contract accepts
+several presentations plus one collector and rejects a second collector; both
+editor menus and the server save boundary use the same rule. Thirteen focused
+content/menu checks, the canvas save/reload scenario, and the 126-test fast
+release certification passed.
 
 Phase 9 exit gate: explicit nodes provide complete composed-content control
 when a business needs exact interaction wording or presentation.

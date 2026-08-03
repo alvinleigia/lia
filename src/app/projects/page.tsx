@@ -53,21 +53,6 @@ export default async function ProjectsPage({
               handled from the header badge.
             </p>
 
-            {params.created === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Project created.
-              </p>
-            )}
-            {params.archived === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Project archived and widget disabled.
-              </p>
-            )}
-            {params.unarchived === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Project unarchived.
-              </p>
-            )}
             {params.error && (
               <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">
                 {params.error}

@@ -12,16 +12,7 @@ import { formatCompanyRole } from "@/lib/company-roles";
 import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
 import { updateProfileAction } from "./actions";
 
-type ProfilePageProps = {
-  searchParams: Promise<{
-    error?: string;
-    emailSent?: string;
-    profileUpdated?: string;
-  }>;
-};
-
-export default async function ProfilePage({ searchParams }: ProfilePageProps) {
-  const params = await searchParams;
+export default async function ProfilePage() {
   const { user, company, membership } = await resolvePageUserAndWorkspace();
   const canManageCompany = canAccess(membership, "company.members.manage");
 
@@ -74,11 +65,6 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {params.profileUpdated === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Profile updated.
-              </p>
-            )}
             <ActionStateForm action={updateProfileAction} className="space-y-4">
               <ActionFormError />
               <div className="grid gap-4 sm:grid-cols-2">

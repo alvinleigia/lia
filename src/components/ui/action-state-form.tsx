@@ -21,6 +21,7 @@ type ActionStateFormAction = (
 type ActionStateFormProps = Omit<ComponentProps<"form">, "action" | "ref"> & {
   action: ActionStateFormAction;
   children: ReactNode;
+  preserveScroll?: boolean;
   resetKey?: Key;
 };
 
@@ -141,6 +142,7 @@ function StatefulActionStateForm({
   action,
   children,
   onSubmit,
+  preserveScroll = true,
   ...props
 }: Omit<ActionStateFormProps, "resetKey">) {
   const [state, formAction] = useActionState(action, {});
@@ -163,6 +165,7 @@ function StatefulActionStateForm({
     <FormStateContext.Provider value={state}>
       <form
         action={formAction}
+        data-preserve-scroll={preserveScroll ? "true" : undefined}
         onSubmit={handleSubmit}
         ref={formRef}
         {...props}

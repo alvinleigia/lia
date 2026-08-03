@@ -25,7 +25,7 @@ export type FlowContentRequirement =
   | "catalog_product"
   | "media_asset"
   | "product_catalog"
-  | "single_choice_block";
+  | "single_response_collector";
 
 export type FlowContentComponentDefinition = {
   blockType: FlowContentBlockType | null;
@@ -47,7 +47,7 @@ export type FlowContentEligibilityContext = {
   allowsAnswerCollection: boolean;
   blockCount: number;
   catalogProductCount: number;
-  hasChoiceBlock: boolean;
+  hasResponseCollector: boolean;
   mediaAssetCount: number;
   productCatalogCount: number;
 };
@@ -75,7 +75,7 @@ export const FLOW_CONTENT_COMPONENTS = [
     group: "message",
     key: "choice_buttons",
     label: "Text + buttons",
-    requirements: ["single_choice_block", "answer_collection"],
+    requirements: ["single_response_collector", "answer_collection"],
     target: "content_block",
   },
   {
@@ -85,7 +85,7 @@ export const FLOW_CONTENT_COMPONENTS = [
     group: "message",
     key: "list",
     label: "List message",
-    requirements: ["single_choice_block", "answer_collection"],
+    requirements: ["single_response_collector", "answer_collection"],
     target: "content_block",
   },
   {
@@ -168,9 +168,9 @@ function getRequirementReason(
       return context.allowsAnswerCollection
         ? null
         : "Available on steps that collect a compatible visitor answer.";
-    case "single_choice_block":
-      return context.hasChoiceBlock
-        ? "This step already has a choice or list block."
+    case "single_response_collector":
+      return context.hasResponseCollector
+        ? "This step already has a response collector (buttons or list)."
         : null;
     case "media_asset":
       return context.mediaAssetCount > 0

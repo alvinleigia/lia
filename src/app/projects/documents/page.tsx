@@ -68,16 +68,6 @@ export default async function ProjectDocumentsPage({
                 {params.error}
               </p>
             )}
-            {params.deleted === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Document deleted.
-              </p>
-            )}
-            {params.deletedAll === "1" && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                All documents deleted for selected project.
-              </p>
-            )}
             {processedCount > 0 && (
               <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
                 Processed {processedCount} queued document

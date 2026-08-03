@@ -18,6 +18,7 @@ import {
   startConversationalTaskRun,
   switchConversationalTaskRun,
 } from "../../src/lib/conversational-task-runtime";
+import { getConversationTaskRuntimeSession } from "../../src/lib/conversational-task-runtime-session";
 import { resolveProjectTaskToolDefinition } from "../../src/lib/conversational-task-tools";
 import { db } from "../../src/lib/db-config";
 import {
@@ -770,6 +771,17 @@ test("corrects dependencies, clears fields, and quarantines stale turns", async 
     disposition: "quarantined",
     reason: "out_of_order_provider_sequence",
   });
+
+  const delayedWithoutSequence = await applyConversationalTaskEvent({
+    ...eventEnvelope("delayed-without-sequence", 7),
+    providerSequence: null,
+    type: "field.requested",
+    fieldKey: "guestName",
+  });
+  expect(delayedWithoutSequence).toMatchObject({
+    disposition: "quarantined",
+    reason: "out_of_order_occurred_at",
+  });
 });
 
 test("serializes concurrent turns and records authenticated tool results", async () => {
@@ -1057,6 +1069,14 @@ test("pauses, rotates the session, resumes, and switches tasks", async () => {
     responseOwner: "task",
     sessionId: `rotated-${suffix}`,
   });
+  const session = await getConversationTaskRuntimeSession({
+    channelType: "project_chat",
+    externalConversationId: `runtime-${suffix}`,
+    projectId: fixture?.projectId as number,
+  });
+  expect(session.safeAudit.map((event) => event.eventType)).toEqual(
+    expect.arrayContaining(["task.cancel", "task.started"]),
+  );
 });
 
 test("keeps runtime reads and writes inside the project boundary", async () => {

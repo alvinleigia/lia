@@ -8,7 +8,7 @@ const readyContext = {
   allowsAnswerCollection: true,
   blockCount: 0,
   catalogProductCount: 2,
-  hasChoiceBlock: false,
+  hasResponseCollector: false,
   mediaAssetCount: 1,
   productCatalogCount: 1,
 };
@@ -59,16 +59,16 @@ test("ready content data enables every inline content family", () => {
   ).toBe(true);
 });
 
-test("choice requirements disable both choice presentations consistently", () => {
+test("one response collector disables both collector presentations consistently", () => {
   const menu = resolveFlowContentMenu({
     ...readyContext,
-    hasChoiceBlock: true,
+    hasResponseCollector: true,
   });
 
   for (const key of ["choice_buttons", "list"] as const) {
     const item = menu.find((entry) => entry.component.key === key);
     expect(item?.enabled).toBe(false);
-    expect(item?.disabledReason).toContain("already has a choice or list");
+    expect(item?.disabledReason).toContain("already has a response collector");
   }
 });
 

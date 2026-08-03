@@ -315,12 +315,6 @@ export default async function ActionBuilderPage({
                 {params.error}
               </p>
             )}
-            {params.deleted && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Action deleted.
-              </p>
-            )}
-
             {actions.length === 0 ? (
               <div className="rounded-md border bg-white p-4">
                 <p className="text-sm text-muted-foreground">

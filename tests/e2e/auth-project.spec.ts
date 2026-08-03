@@ -149,18 +149,23 @@ async function signUpOrUseExistingAccount(
   await page.getByLabel("Email").fill(input.email);
   await page.getByLabel("Password", { exact: true }).fill(input.password);
   await page.getByLabel("Confirm Password").fill(input.password);
-  await Promise.all([
-    page.waitForURL(/\/sign-(in|up)\?/),
-    page.getByRole("button", { name: "Create Account" }).click(),
-  ]);
+  await page.getByRole("button", { name: "Create Account" }).click();
 
-  if (page.url().includes("/sign-up")) {
-    await expect(page.getByText("Email is already registered.")).toBeVisible();
+  const registeredError = page.getByText("Email is already registered.");
+  await expect(
+    registeredError.or(
+      page.getByRole("button", { name: "Sign In with Email" }),
+    ),
+  ).toBeVisible();
+
+  if (await registeredError.isVisible()) {
     return;
   }
 
-  await expect(page).toHaveURL(/\/sign-in\?registered=1/);
-  await expect(page.getByText("Account created successfully.")).toBeVisible();
+  await expect(page).toHaveURL(/\/sign-in$/);
+  await expect(
+    page.getByText("Account created successfully. Please sign in."),
+  ).toBeVisible();
 }
 
 async function signInWithEmail(page: Page, email: string) {
@@ -183,9 +188,10 @@ async function finishInviteSignUpFromCurrentPage(
   await page.getByLabel("Password", { exact: true }).fill(input.password);
   await page.getByLabel("Confirm Password").fill(input.password);
   await Promise.all([
-    page.waitForURL(/\/sign-in\?registered=1&inviteAccepted=1/),
+    page.waitForURL(/\/sign-in(?:\?|$)/),
     page.getByRole("button", { name: "Create Account" }).click(),
   ]);
+  await expect(page).toHaveURL(/\/sign-in$/);
   await expect(
     page.getByText("Invitation accepted. Please sign in."),
   ).toBeVisible();
@@ -199,7 +205,8 @@ async function createProjectFromProjectsPage(page: Page, projectName: string) {
   await page.getByLabel("Project Name").fill(projectName);
   await page.getByRole("button", { name: "Create Project" }).click();
 
-  await expect(page).toHaveURL(/\/projects\/\d+\?created=1/);
+  await expect(page).toHaveURL(/\/projects\/\d+$/);
+  await expect(page.getByText("Project created.")).toBeVisible();
   const projectIdMatch = page.url().match(/\/projects\/(\d+)/);
   expect(projectIdMatch).not.toBeNull();
   return Number(projectIdMatch?.[1]);
@@ -466,31 +473,32 @@ async function uploadAndProcessTextDocument(
     })
     .toBe("queued");
 
-  const processResponse = await page.request.post("/api/upload/process-next", {
-    headers: { Authorization: `Bearer ${cronSecret}` },
-  });
-  expect(processResponse.status()).toBe(200);
-  const processResult = (await processResponse.json()) as {
-    failed: number;
-    processed: number;
-  };
-  expect(processResult.processed).toBeGreaterThanOrEqual(1);
-
   await expect
-    .poll(async () => {
-      const [uploadedDocument] = await getProjectSourceDocuments(
-        input.projectId,
-        1,
-      );
-      return uploadedDocument?.title === input.documentName
-        ? {
-            chunkCount: Number(uploadedDocument.chunkCount),
-            status: uploadedDocument.processingStatus,
-          }
-        : null;
-    })
+    .poll(
+      async () => {
+        const processResponse = await page.request.post(
+          "/api/upload/process-next",
+          {
+            headers: { Authorization: `Bearer ${cronSecret}` },
+          },
+        );
+        expect(processResponse.status()).toBe(200);
+
+        const [uploadedDocument] = await getProjectSourceDocuments(
+          input.projectId,
+          1,
+        );
+        return uploadedDocument?.title === input.documentName
+          ? {
+              hasChunks: Number(uploadedDocument.chunkCount) > 0,
+              status: uploadedDocument.processingStatus,
+            }
+          : null;
+      },
+      { timeout: 30_000 },
+    )
     .toEqual({
-      chunkCount: expect.any(Number),
+      hasChunks: true,
       status: "done",
     });
 
@@ -644,7 +652,7 @@ test("step creation keeps technical fields progressive and input-aware", async (
     .locator(".react-flow__node")
     .filter({ hasText: "Contact Email" });
   await expect(emailNode).toBeVisible();
-  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toBeHidden();
   await emailNode.getByText("Contact Email", { exact: true }).click();
   const editDialog = page.getByRole("dialog", { name: "Edit Step" });
   await expect(
@@ -720,12 +728,16 @@ test("action steps use friendly compact editors and preserve integration setting
   await page.goto(`/projects/actions/${action.id}/canvas`);
   const palette = page.locator("aside").filter({ hasText: "Blocks" });
   await expect(
-    palette.getByText("AI and Knowledge", { exact: true }),
-  ).toBeVisible();
-  await expect(palette.getByText("Wait", { exact: true })).toBeVisible();
+    palette.getByRole("button", {
+      name: /Knowledge Answer questions from approved project knowledge/,
+    }),
+  ).toBeEnabled();
   await expect(
-    palette.getByText(/prompt, grounding, output, and failure contracts/),
-  ).toBeVisible();
+    palette.getByRole("button", {
+      name: /Business Task Complete a published business task through conversation/,
+    }),
+  ).toBeEnabled();
+  await expect(palette.getByText("Wait", { exact: true })).toBeVisible();
   await expect(
     palette.getByRole("button", {
       name: /Wait Pause the conversation and resume it after a set duration/,
@@ -1046,9 +1058,10 @@ test("universal Add Content menu explains availability in both canvas editors", 
     contentMenu.getByRole("button", { name: /List message/i }),
   ).toBeDisabled();
   await expect(
-    contentMenu.getByText("This step already has a choice or list block.", {
-      exact: true,
-    }),
+    contentMenu.getByText(
+      "This step already has a response collector (buttons or list).",
+      { exact: true },
+    ),
   ).toHaveCount(2);
   await expect(
     contentMenu.getByRole("button", { name: /Template/i }),
@@ -1145,8 +1158,15 @@ test("disabled tenant owner is blocked at sign in", async ({ browser }) => {
 
   const tenantRow = adminPage.locator("tr").filter({ hasText: tenantName });
   await expect(tenantRow).toBeVisible();
+  const tenantStatusResponse = adminPage.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname === "/platform",
+  );
   await tenantRow.getByRole("button", { name: "Disable" }).click();
-  await expect(adminPage).toHaveURL(/\/platform\?updated=1/);
+  await tenantStatusResponse;
+  await adminPage.goto("/platform");
+  await expect(adminPage).toHaveURL(/\/platform$/);
   await expect(
     adminPage
       .locator("tr")
@@ -1158,7 +1178,7 @@ test("disabled tenant owner is blocked at sign in", async ({ browser }) => {
   const disabledContext = await browser.newContext();
   const disabledPage = await disabledContext.newPage();
   await signInWithEmail(disabledPage, tenantEmail);
-  await expect(disabledPage).toHaveURL(/\/sign-in\?accountDisabled=1/);
+  await expect(disabledPage).toHaveURL(/\/sign-in$/);
   await expect(
     disabledPage
       .getByText(
@@ -1652,12 +1672,6 @@ test("widget token access respects tenant and allowed domains", async ({
 test("upload queue endpoint rejects missing and invalid worker secrets", async ({
   page,
 }) => {
-  const cronSecret = process.env.CRON_SECRET;
-  expect(
-    cronSecret,
-    "CRON_SECRET must be set for worker authorization.",
-  ).toMatch(/.+/);
-
   const missingSecretResponse = await page.request.post(
     "/api/upload/process-next",
   );
@@ -1687,24 +1701,11 @@ test("upload queue endpoint rejects missing and invalid worker secrets", async (
   await expect(invalidHeaderResponse.json()).resolves.toEqual({
     error: "Unauthorized",
   });
-
-  const cronSecretResponse = await page.request.post(
-    "/api/upload/process-next",
-    {
-      headers: { Authorization: `Bearer ${cronSecret}` },
-    },
-  );
-  expect(cronSecretResponse.status()).toBe(200);
-  await expect(cronSecretResponse.json()).resolves.toEqual(
-    expect.objectContaining({
-      failed: expect.any(Number),
-      idle: expect.any(Boolean),
-      processed: expect.any(Number),
-    }),
-  );
 });
 
-test("company owner can upload and process a document", async ({ page }) => {
+test("@live-openai company owner can upload and process a document", async ({
+  page,
+}) => {
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const email = `e2e-document-${runId}@example.test`;
   const projectName = `E2E Document Project ${runId}`;
@@ -1740,7 +1741,7 @@ test("company owner can upload and process a document", async ({ page }) => {
   await expect(page.getByText(/Total chunks indexed: [1-9]/)).toBeVisible();
 });
 
-test("project chat answers a RAG question from uploaded documents", async ({
+test("@live-openai project chat answers a RAG question from uploaded documents", async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -1809,7 +1810,7 @@ test("company owner can create a media asset", async ({ page }) => {
   });
   await page.getByRole("button", { name: "Upload Asset" }).click();
 
-  await expect(page).toHaveURL(/\/projects\/media\?uploaded=1/);
+  await expect(page).toHaveURL(/\/projects\/media$/);
   await expect(page.getByText("Media asset uploaded.")).toBeVisible();
   await expect(page.getByText(fileName)).toBeVisible();
   await expect(page.getByText("image", { exact: true })).toBeVisible();
@@ -1859,7 +1860,7 @@ test("company owner can manage a product catalog and product lifecycle", async (
   await page.getByLabel("WhatsApp Catalog ID").fill(`meta-${runId}`);
   await page.getByRole("button", { name: "Create Catalog" }).click();
 
-  await expect(page).toHaveURL(/\/projects\/catalog\?catalogCreated=1/);
+  await expect(page).toHaveURL(/\/projects\/catalog$/);
   await expect(page.getByText("Catalog created.")).toBeVisible();
   await expect(
     page.locator("p").filter({ hasText: catalogName }).first(),
@@ -1878,7 +1879,7 @@ test("company owner can manage a product catalog and product lifecycle", async (
   await page.getByLabel("Product URL").fill("https://example.com/product");
   await page.getByRole("button", { name: "Add Product" }).click();
 
-  await expect(page).toHaveURL(/\/projects\/catalog\?productCreated=1/);
+  await expect(page).toHaveURL(/\/projects\/catalog$/);
   await expect(page.getByText("Product created.")).toBeVisible();
   await expect(page.getByText(productName).first()).toBeVisible();
   await expect(page.getByText(sku).first()).toBeVisible();
@@ -1965,7 +1966,7 @@ test("company owner can manage a product catalog and product lifecycle", async (
 
   await page.getByRole("button", { name: "Archive" }).click();
   await page.getByRole("button", { name: "Delete Permanently" }).click();
-  await expect(page).toHaveURL(/\/projects\/catalog\?catalogDeleted=1/);
+  await expect(page).toHaveURL(/\/projects\/catalog$/);
   await expect(page.getByText("Catalog permanently deleted.")).toBeVisible();
 });
 
