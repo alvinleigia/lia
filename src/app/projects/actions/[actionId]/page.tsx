@@ -395,10 +395,10 @@ export default async function ActionDetailPage({
                   </Button>
                 ) : null}
                 <Button asChild variant="outline">
-                  <Link href={`/projects/actions/${action.id}/export`}>
+                  <a download href={`/projects/actions/${action.id}/export`}>
                     <Download className="h-4 w-4" />
                     Export
-                  </Link>
+                  </a>
                 </Button>
                 <Button asChild variant="outline">
                   <Link href={`/projects/actions/${action.id}/settings`}>

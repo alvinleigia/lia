@@ -262,10 +262,10 @@ export function CanvasToolbar({
             </Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href={`/projects/actions/${actionId}/export`}>
+            <a download href={`/projects/actions/${actionId}/export`}>
               <FileDown className="h-4 w-4" />
               Export
-            </Link>
+            </a>
           </Button>
         </div>
       </div>

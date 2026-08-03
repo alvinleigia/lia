@@ -343,8 +343,10 @@ Expected result:
 1. After recording the Step 5 submission result, click `Automation` >
    `Actions`, then open
    `Phase 9 Composed Content UAT`.
-2. On its overview, click `Export`. Confirm the browser downloads one `.json`
-   file. Do not open or edit the JSON.
+2. On its overview, click `Export` once. Confirm the browser downloads one
+   `.json` file while the action overview remains open. The page must not
+   navigate, remain in a `Rendering...` state, or require another click. Do not
+   open or edit the JSON.
 3. Click `Automation` > `Actions` to return to `Actions: Ewissen Infra`, then
    click `Import`.
 4. On `Import Action Flow: Ewissen Infra`, complete both fields:
