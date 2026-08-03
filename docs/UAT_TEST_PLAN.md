@@ -307,9 +307,15 @@ or edit the earlier steps.
    `Classic Facial`, section `Massages`, row `Deep Tissue Massage`, both row
    descriptions, and footer `Choose one service` are visible.
 14. Click the visible `Deep Tissue Massage` row. Do not type or submit the
-    stored value manually. Wait for the flow to continue
-   and confirm the assistant displays
-   `Thanks. Your Phase 9 selection was saved.` exactly once.
+    stored value manually. Wait for the flow to continue, then confirm all of
+    the following:
+    - The visitor message on the right reads `Deep Tissue Massage`; it must not
+      display `service_deep_tissue`.
+    - The assistant displays `Thanks. Your Phase 9 selection was saved.`
+      exactly once.
+    - A separate standard saved-request summary may follow. If present, it
+      displays `phase9Service: Deep Tissue Massage`; it must not display the
+      stored value `service_deep_tissue` in Project Chat.
 15. Click `Automation` in the header, then click `Submissions`.
 16. On `Submissions: Ewissen Infra`, open the newest row named
     `Phase 9 Composed Content UAT` with source

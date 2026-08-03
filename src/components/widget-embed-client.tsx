@@ -194,6 +194,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
 
   const runCanonicalFlow = async (input: {
     actionId?: number;
+    displayText?: string;
     displayUserText?: boolean;
     editSection?: FlowEditSection;
     text?: string;
@@ -204,7 +205,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
 
     const optimisticUserMessage =
       input.displayUserText && input.text
-        ? makeFlowMessage("user", input.text)
+        ? makeFlowMessage("user", input.displayText ?? input.text)
         : null;
 
     if (optimisticUserMessage) {
@@ -400,13 +401,17 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
     sendMessage({ text });
   };
 
-  const submitActiveStep = async (value: string) => {
+  const submitActiveStep = async (value: string, displayText = value) => {
     if (!activeFlow) {
       return;
     }
 
     setInput("");
-    await runCanonicalFlow({ displayUserText: true, text: value });
+    await runCanonicalFlow({
+      displayText,
+      displayUserText: true,
+      text: value,
+    });
   };
 
   const uploadActiveStepFile = async (file: File) => {

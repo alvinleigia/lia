@@ -32,7 +32,7 @@ type ActionFlowStepOptionsProps = {
   step: RuntimeActionStep;
   fields?: Record<string, unknown>;
   disabled?: boolean;
-  onSelect: (value: string) => void | Promise<void>;
+  onSelect: (value: string, displayText: string) => void | Promise<void>;
 };
 
 type AddressFormState = {
@@ -571,7 +571,7 @@ export function ActionFlowStepOptions({
                     <button
                       className="rounded-md bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
                       disabled={disabled}
-                      onClick={() => onSelect(selectValue)}
+                      onClick={() => onSelect(selectValue, option.label)}
                       type="button"
                     >
                       Select
@@ -587,7 +587,13 @@ export function ActionFlowStepOptions({
             className="w-full rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
             disabled={disabled || selectedCartItems.length === 0}
             onClick={() =>
-              onSelect(buildProductSelectionCartAnswerValue(selectedCartItems))
+              onSelect(
+                buildProductSelectionCartAnswerValue(selectedCartItems),
+                options
+                  .filter((option) => selectedProducts[String(option.value)])
+                  .map((option) => option.label)
+                  .join(", "),
+              )
             }
             type="button"
           >
@@ -619,7 +625,7 @@ export function ActionFlowStepOptions({
                 key={option.id ?? String(option.value)}
                 type="button"
                 className="flex w-full items-start gap-3 rounded-md border bg-white px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50"
-                onClick={() => onSelect(String(option.value))}
+                onClick={() => onSelect(String(option.value), option.label)}
                 disabled={disabled}
               >
                 <span className="min-w-0">
@@ -650,7 +656,7 @@ export function ActionFlowStepOptions({
           key={String(option.value)}
           type="button"
           className="rounded-full border bg-white px-3 py-1.5 text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50"
-          onClick={() => onSelect(String(option.value))}
+          onClick={() => onSelect(String(option.value), option.label)}
           disabled={disabled}
         >
           {option.label}

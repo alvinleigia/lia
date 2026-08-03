@@ -199,6 +199,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
 
   const runCanonicalFlow = async (input: {
     actionId?: number;
+    displayText?: string;
     displayUserText?: boolean;
     editSection?: FlowEditSection;
     text?: string;
@@ -209,7 +210,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
 
     const optimisticUserMessage =
       input.displayUserText && input.text
-        ? makeFlowMessage("user", input.text)
+        ? makeFlowMessage("user", input.displayText ?? input.text)
         : null;
 
     if (optimisticUserMessage) {
@@ -396,13 +397,17 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     });
   };
 
-  const submitActiveStep = async (value: string) => {
+  const submitActiveStep = async (value: string, displayText = value) => {
     if (!activeFlow) {
       return;
     }
 
     setInput("");
-    await runCanonicalFlow({ displayUserText: true, text: value });
+    await runCanonicalFlow({
+      displayText,
+      displayUserText: true,
+      text: value,
+    });
   };
 
   const uploadActiveStepFile = async (file: File) => {

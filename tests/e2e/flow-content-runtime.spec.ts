@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
+  buildActionReviewSummary,
+  buildStepAnswerResult,
   getActionStepChoicePresentation,
   getActionStepOptions,
   groupActionStepOptionsBySection,
@@ -195,4 +197,21 @@ test("preserves list chrome and groups stable options for browser controls", () 
       title: "Massages",
     },
   ]);
+
+  const answer = buildStepAnswerResult(
+    step,
+    "phase9Service",
+    "service_deep_tissue",
+  );
+
+  expect(answer).toEqual({
+    fields: {
+      phase9Service: "service_deep_tissue",
+      phase9ServiceName: "Deep Tissue Massage",
+    },
+    label: "Deep Tissue Massage",
+  });
+  expect(buildActionReviewSummary(answer.fields)).toBe(
+    "- phase9Service: Deep Tissue Massage",
+  );
 });

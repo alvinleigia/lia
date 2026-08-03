@@ -1874,15 +1874,27 @@ export function buildActionReviewSummary(fields: Record<string, unknown>) {
     "serviceCategoryId",
     "serviceItemId",
   ]);
+  const companionNameKeys = new Set(
+    Object.keys(fields).filter((key) => {
+      if (!key.endsWith("Name")) {
+        return false;
+      }
+
+      const prefix = key.slice(0, -4);
+      return prefix in fields || `${prefix}Id` in fields;
+    }),
+  );
   const extraLines = Object.entries(fields)
-    .filter(([key]) => !knownKeys.has(key))
-    .map(
-      ([key, value]) =>
-        `- ${REVIEW_FIELD_LABELS[key] ?? key}: ${formatReviewValue(
-          key,
-          value,
-        )}`,
-    );
+    .filter(([key]) => !knownKeys.has(key) && !companionNameKeys.has(key))
+    .map(([key, value]) => {
+      const prefix = key.endsWith("Id") ? key.slice(0, -2) : key;
+      const companionName = fields[`${prefix}Name`];
+
+      return `- ${REVIEW_FIELD_LABELS[key] ?? key}: ${formatReviewValue(
+        key,
+        companionName ?? value,
+      )}`;
+    });
   const lines = [...knownLines, ...extraLines];
 
   if (lines.length === 0) {
