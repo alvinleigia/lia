@@ -237,9 +237,11 @@ export default async function OperationsPage({
               </p>
             )}
             {params.operationCreated && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Operation created.
-              </p>
+              <FlashToast
+                clearParams="operationCreated"
+                id="operation-created"
+                message="Operation created."
+              />
             )}
             {params.operationUpdated && (
               <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
