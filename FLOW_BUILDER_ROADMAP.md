@@ -773,7 +773,7 @@ new task-first model.
 - [x] Existing choice values can route through branch rules.
 - [x] Ask Question supports common text, contact, date, time, and number formats.
 - [x] Ask Address, Ask Location, and Ask Media store structured values.
-- [ ] Give every button, list row, product, and selectable result a stable option ID and output port.
+- [x] Give every button, list row, product, and selectable result a stable option ID and output port.
 - [ ] Add route, URL, and phone button behavior where supported.
 - [ ] Connect each routable option through a canvas handle or `Go to` selector.
 - [ ] Make both routing controls write the same graph edge.
@@ -788,6 +788,15 @@ new task-first model.
 - [ ] Keep retry, no-reply, cancellation, and collection state durable.
 - [ ] Keep deterministic response policies pinned to the active published version.
 - [ ] Confirm every deterministic input example in `docs/Flow Builder v2.pdf` has complete success and failure behavior.
+
+Phase 10 Checkpoint 1 status: Complete on 2026-08-03. One shared option
+identity contract now gives composed buttons and list rows, manual and dynamic
+choices, and selectable products a stable ID with a deterministic
+`option:<id>` output port. Manual option edits preserve existing identities and
+stored values when labels change or options are reordered, while legacy values
+remain readable and receive persistent IDs on their next save. No database
+migration was required. Nine focused option/runtime checks, TypeScript, lint,
+tenant-scope analysis, cron validation, and all 139 channel contracts passed.
 
 Phase 10 exit gate: businesses can choose either flexible task collection or
 fully scripted collection with stable per-option routes.

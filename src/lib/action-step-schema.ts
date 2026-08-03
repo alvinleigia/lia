@@ -113,10 +113,71 @@ export function parseActionStepLines(value?: string) {
 }
 
 export function parseActionStepOptions(value?: string) {
-  return parseActionStepLines(value).map((label) => ({
-    label,
-    value: label,
-  }));
+  return mergeActionStepOptions(value);
+}
+
+export function mergeActionStepOptions(
+  value?: string,
+  existingOptions: unknown[] = [],
+  createId: () => string = () => crypto.randomUUID(),
+) {
+  const existing = existingOptions
+    .map((option, index) => {
+      if (typeof option === "string" && option.trim()) {
+        return {
+          id: null,
+          index,
+          label: option.trim(),
+          value: option.trim(),
+        };
+      }
+
+      if (!option || typeof option !== "object" || Array.isArray(option)) {
+        return null;
+      }
+
+      const record = option as Record<string, unknown>;
+      const label =
+        typeof record.label === "string"
+          ? record.label
+          : typeof record.value === "string"
+            ? record.value
+            : "";
+
+      return label
+        ? {
+            id:
+              typeof record.id === "string" && record.id.trim()
+                ? record.id.trim()
+                : null,
+            index,
+            label,
+            value: record.value ?? label,
+          }
+        : null;
+    })
+    .filter((option): option is NonNullable<typeof option> => Boolean(option));
+  const usedIndexes = new Set<number>();
+
+  return parseActionStepLines(value).map((label, index) => {
+    const matchingLabel = existing.find(
+      (option) => !usedIndexes.has(option.index) && option.label === label,
+    );
+    const matchingIndex = existing.find(
+      (option) => !usedIndexes.has(option.index) && option.index === index,
+    );
+    const matched = matchingLabel ?? matchingIndex ?? null;
+
+    if (matched) {
+      usedIndexes.add(matched.index);
+    }
+
+    return {
+      id: matched?.id ?? createId(),
+      label,
+      value: matched?.value ?? label,
+    };
+  });
 }
 
 function refineActionStep(

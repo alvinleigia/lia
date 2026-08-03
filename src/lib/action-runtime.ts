@@ -7,6 +7,7 @@ import {
   compileActionFlowGraph,
   evaluateCompiledActionFlowConditionGroup,
 } from "@/lib/action-flow-compiler";
+import { getActionOptionIdentity } from "@/lib/action-option-routing";
 import {
   formatFlowContentBlockText,
   formatFlowInteractiveContentBlockText,
@@ -35,9 +36,10 @@ export type ProductDisplayLayout = "featured" | "grid" | "list";
 
 export type RuntimeActionOption = {
   description?: string;
-  id?: string;
+  id: string;
   label: string;
   metadata?: Record<string, unknown>;
+  outputPort: string;
   section?: string;
   value: unknown;
 };
@@ -481,14 +483,23 @@ export function getActionStepOptions(
   );
 
   if (dataSourceOptions.length > 0) {
-    return dataSourceOptions;
+    return dataSourceOptions.map((option, index) => ({
+      ...option,
+      ...getActionOptionIdentity({
+        fallbackId: `source-option-${index + 1}`,
+        id: option.value,
+      }),
+    }));
   }
 
   const contentChoice = getFlowChoiceContentBlock(step.settings);
   if (contentChoice) {
     return contentChoice.options.map((option) => ({
       description: option.description || undefined,
-      id: option.id,
+      ...getActionOptionIdentity({
+        fallbackId: `content-option-${option.value}`,
+        id: option.id,
+      }),
       label: option.label,
       section: option.section || undefined,
       value: option.value,
@@ -500,9 +511,15 @@ export function getActionStepOptions(
   }
 
   return step.options
-    .map((option) => {
+    .map((option, index) => {
       if (typeof option === "string") {
-        return { label: option, value: option };
+        return {
+          ...getActionOptionIdentity({
+            fallbackId: `legacy-option-${index + 1}`,
+          }),
+          label: option,
+          value: option,
+        };
       }
 
       if (option && typeof option === "object") {
@@ -519,7 +536,14 @@ export function getActionStepOptions(
             : label;
 
         if (label && value !== null) {
-          return { label, value };
+          return {
+            ...getActionOptionIdentity({
+              fallbackId: `legacy-option-${index + 1}`,
+              id: "id" in option ? option.id : undefined,
+            }),
+            label,
+            value,
+          };
         }
       }
 
@@ -532,6 +556,10 @@ function getProductSelectionOptions(
   step: RuntimeActionStep,
 ): RuntimeActionOption[] {
   return getActionStepProducts(step).map((product) => ({
+    ...getActionOptionIdentity({
+      fallbackId: `product-${product.id}`,
+      id: `product-${product.id}`,
+    }),
     label: product.name,
     value: String(product.id),
     description: product.description ?? undefined,

@@ -41,6 +41,7 @@ import type { ActionFormState } from "@/lib/action-form-state";
 import {
   actionStepDynamicChoiceSchemaShape,
   createActionStepSchema,
+  mergeActionStepOptions,
   parseActionStepLines,
   parseActionStepOptions,
 } from "@/lib/action-step-schema";
@@ -1321,7 +1322,9 @@ export async function updateActionFlowStepAction(
       nextStepId: parsed.data.nextStepId ?? null,
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled,
-      options: isInputStep ? parseActionStepOptions(parsed.data.options) : [],
+      options: isInputStep
+        ? mergeActionStepOptions(parsed.data.options, existingStep.options)
+        : [],
       settings: buildActionStepSettings({
         ...parsed.data,
         connectedAction,

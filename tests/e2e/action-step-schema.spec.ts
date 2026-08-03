@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   actionStepDynamicChoiceSchemaShape,
   createActionStepSchema,
+  mergeActionStepOptions,
   parseActionStepLines,
   parseActionStepOptions,
 } from "../../src/lib/action-step-schema";
@@ -96,7 +97,51 @@ test("shared option parsing trims commas, lines, and empty values", () => {
     parseActionStepLines(" Massage,\n\nFacials, Body Treatments "),
   ).toEqual(["Massage", "Facials", "Body Treatments"]);
   expect(parseActionStepOptions("Massage\nFacials")).toEqual([
-    { label: "Massage", value: "Massage" },
-    { label: "Facials", value: "Facials" },
+    { id: expect.any(String), label: "Massage", value: "Massage" },
+    { id: expect.any(String), label: "Facials", value: "Facials" },
+  ]);
+});
+
+test("manual option edits preserve stable identities and stored values", () => {
+  const existing = [
+    { id: "massage", label: "Massage", value: "service_massage" },
+    { id: "facial", label: "Facials", value: "service_facial" },
+  ];
+
+  expect(
+    mergeActionStepOptions(
+      "Therapeutic Massage\nFacials\nBody Treatments",
+      existing,
+      () => "body",
+    ),
+  ).toEqual([
+    {
+      id: "massage",
+      label: "Therapeutic Massage",
+      value: "service_massage",
+    },
+    { id: "facial", label: "Facials", value: "service_facial" },
+    { id: "body", label: "Body Treatments", value: "Body Treatments" },
+  ]);
+
+  expect(
+    mergeActionStepOptions("Facials\nMassage", existing, () => "unused"),
+  ).toEqual([
+    { id: "facial", label: "Facials", value: "service_facial" },
+    { id: "massage", label: "Massage", value: "service_massage" },
+  ]);
+
+  expect(
+    mergeActionStepOptions(
+      "Renamed legacy option",
+      ["Legacy option"],
+      () => "legacy-id",
+    ),
+  ).toEqual([
+    {
+      id: "legacy-id",
+      label: "Renamed legacy option",
+      value: "Legacy option",
+    },
   ]);
 });

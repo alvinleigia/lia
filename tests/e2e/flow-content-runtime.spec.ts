@@ -176,11 +176,13 @@ test("preserves list chrome and groups stable options for browser controls", () 
         expect.objectContaining({
           id: "classic",
           label: "Classic Facial",
+          outputPort: "option:classic",
           value: "service_classic_facial",
         }),
         expect.objectContaining({
           id: "express",
           label: "Express Facial",
+          outputPort: "option:express",
           value: "service_express_facial",
         }),
       ],
@@ -191,6 +193,7 @@ test("preserves list chrome and groups stable options for browser controls", () 
         expect.objectContaining({
           id: "deep",
           label: "Deep Tissue Massage",
+          outputPort: "option:deep",
           value: "service_deep_tissue",
         }),
       ],
@@ -214,4 +217,78 @@ test("preserves list chrome and groups stable options for browser controls", () 
   expect(buildActionReviewSummary(answer.fields)).toBe(
     "- phase9Service: Deep Tissue Massage",
   );
+});
+
+test("assigns output ports to legacy, dynamic, and product options", () => {
+  const baseStep: RuntimeActionStep = {
+    fieldKey: "selection",
+    id: 44,
+    inputType: "text",
+    isEnabled: true,
+    isRequired: true,
+    label: "Selection",
+    nextStepId: null,
+    operationId: null,
+    options: [],
+    prompt: "Choose",
+    settings: {},
+    sortOrder: 1,
+    stepType: "choice",
+  };
+  const legacyOptions = getActionStepOptions({
+    ...baseStep,
+    options: [
+      { id: "yes", label: "Yes", value: "accepted" },
+      { label: "No", value: "declined" },
+    ],
+  });
+
+  expect(legacyOptions).toEqual([
+    expect.objectContaining({ id: "yes", outputPort: "option:yes" }),
+    expect.objectContaining({
+      id: "legacy-option-2",
+      outputPort: "option:legacy-option-2",
+    }),
+  ]);
+
+  const dynamicOptions = getActionStepOptions({
+    ...baseStep,
+    options: [],
+    settings: {
+      sourceConfig: { catalogId: "cat_spa_services" },
+      sourceType: "catalog_categories",
+    },
+  });
+  expect(dynamicOptions.length).toBeGreaterThan(0);
+  expect(
+    dynamicOptions.every(
+      (option) => option.outputPort === `option:${option.id}`,
+    ),
+  ).toBe(true);
+
+  const productOptions = getActionStepOptions({
+    ...baseStep,
+    settings: {
+      products: [
+        {
+          currency: "INR",
+          description: "Deep pressure massage",
+          id: 91,
+          imageUrl: null,
+          name: "Deep Tissue Massage",
+          priceAmount: 9500,
+          productUrl: null,
+          sku: "DEEP",
+        },
+      ],
+    },
+    stepType: "product_selection",
+  });
+  expect(productOptions).toEqual([
+    expect.objectContaining({
+      id: "product-91",
+      outputPort: "option:product-91",
+      value: "91",
+    }),
+  ]);
 });

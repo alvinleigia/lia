@@ -26,6 +26,7 @@ import {
 } from "@/lib/action-flows";
 import {
   createActionStepSchema,
+  mergeActionStepOptions,
   parseActionStepOptions,
 } from "@/lib/action-step-schema";
 import { buildActionStepSettings } from "@/lib/action-step-settings";
@@ -1191,7 +1192,9 @@ export async function updateCanvasStepAction(
       nextStepId: existingStep.nextStepId,
       isRequired: isInputStep ? parsed.data.isRequired : false,
       isEnabled: parsed.data.isEnabled ?? true,
-      options: isInputStep ? parseActionStepOptions(parsed.data.options) : [],
+      options: isInputStep
+        ? mergeActionStepOptions(parsed.data.options, existingStep.options)
+        : [],
       settings: buildActionStepSettings({
         stepType: parsed.data.stepType,
         choiceDisplayMode: parsed.data.choiceDisplayMode,
@@ -1420,6 +1423,7 @@ export async function updateCanvasStepBasicsAction(
 
   if (choiceContent && parsed.data.contentBlocksChanged) {
     options = choiceContent.options.map((option) => ({
+      id: option.id,
       label: option.label,
       value: option.value,
     }));
@@ -1430,7 +1434,7 @@ export async function updateCanvasStepBasicsAction(
   ) {
     options = [];
   } else if (isInputStep && parsed.data.optionsChanged && !hasDynamicOptions) {
-    options = parseActionStepOptions(parsed.data.options);
+    options = mergeActionStepOptions(parsed.data.options, existingStep.options);
   }
 
   if (isInputStep && !parsed.data.label) {
