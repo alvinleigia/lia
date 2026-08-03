@@ -245,42 +245,84 @@ Expected result:
 
 ## Step 5 of 6 - Verify Runtime Presentation And Collection
 
+UAT progress: Steps 1 through 4 passed. Continue from this step; do not repeat
+or edit the earlier steps.
+
+### Part A - Verify The Published Graph
+
 1. On the `Phase 9 Composed Content UAT` overview, click `Test Flow`.
-2. On `Published Flow Test`, set `Start From` to `Normal conversation`.
-   Confirm `Entry Rule` displays `Published normal route`, then click
+2. Confirm the `Published Flow Test` summary shows:
+
+   | Summary label | Expected value |
+   | --- | --- |
+   | `Version` | `v1`, or the version published in Step 4 |
+   | `Nodes` | `2` |
+   | `Routes` | `1` |
+   | `Status` | `Idle` before starting, or `Active` if a test is already open |
+
+3. If an earlier test is already active and the main button says
+   `Start Again`, click the circular reset button to its right. This clears
+   only the simulator trail; it does not alter the published action.
+4. Set `Start From` to `Normal conversation`. Confirm the read-only
+   `Entry Rule` field displays `Published normal route`, then click
    `Start Test`.
-3. Under `Current Node`, confirm the first node is `Choose a service`. Under
-   `Simulate This Node`, click the available route button leading to
-   `Complete Phase 9 test`. Continue through the available finish route until
-   the page displays `Flow completed`.
-4. Click `Projects` in the header, then click `Chat`.
-5. At the top of `Project Chat`, click the action button named
+5. Under `Current Node`, confirm the simulator displays:
+
+   | Screen text | Expected value |
+   | --- | --- |
+   | Node type | `DETERMINISTIC` |
+   | Node label | `Step 1` |
+   | Description | `Run the published collect input step.` |
+   | Response owner | `Flow step` |
+   | Available action | `Continue` |
+
+   The simulator intentionally uses generic published labels such as `Step 1`
+   and `Step 2`; it does not display the canvas names `Choose a service` and
+   `Complete Phase 9 test` on this screen.
+6. In `Test Trail`, confirm the first entry is `Normal conversation` with
+   `Entered at Step 1.`
+7. Under `Simulate This Node`, click `Continue` once.
+8. Confirm `Current Node` changes to deterministic `Step 2` and its description
+   identifies the published submit step. Confirm `Test Trail` adds `Continue`
+   with `Moved to Step 2.`
+9. `Step 2` is the terminal Submit node. If the simulator displays
+   `This node has no published outgoing route.`, treat that as expected. This
+   graph-only screen does not create a live submission and is not required to
+   display `Flow completed` for this two-node action.
+
+### Part B - Verify The Live Project-Chat Presentation
+
+10. Click `Projects` in the header, then click `Chat`.
+11. At the top of `Project Chat`, click the action button named
    `Phase 9 Composed Content UAT`. Do not type the trigger phrase; using the
    action button keeps this deterministic UAT from spending an unnecessary
    model call.
-6. Read the assistant output from top to bottom and confirm this exact order:
+12. Read the assistant output from top to bottom and confirm this exact order:
    1. `What would you like to book?`
    2. `Our available spa experiences are shown below.`
    3. `A preview of our spa experience.` with the recorded media asset
    4. `Browse the full spa catalogue.` with the `Facial` product cards
    5. `Select the service you want to book.` followed by the structured list
-7. In the list control, confirm header `Spa services`, section `Facials`, row
+13. In the list control, confirm header `Spa services`, section `Facials`, row
    `Classic Facial`, section `Massages`, row `Deep Tissue Massage`, both row
    descriptions, and footer `Choose one service` are visible.
-8. Click the visible `Deep Tissue Massage` row. Wait for the flow to continue
+14. Click the visible `Deep Tissue Massage` row. Do not type or submit the
+    stored value manually. Wait for the flow to continue
    and confirm the assistant displays
    `Thanks. Your Phase 9 selection was saved.` exactly once.
-9. Click `Automation` > `Submissions`.
-10. Open the newest row named `Phase 9 Composed Content UAT` with source
+15. Click `Automation` in the header, then click `Submissions`.
+16. On `Submissions: Ewissen Infra`, open the newest row named
+    `Phase 9 Composed Content UAT` with source
     `project_chat`.
-11. In the `Fields` card, confirm key `phase9Service` has value
+17. In the submission's `Fields` card, confirm key `phase9Service` has value
     `service_deep_tissue`. The visible label must not be stored in place of the
     stable value.
 
 Expected result:
 
-- The published graph test reaches its completion target, and project chat
-  preserves the authored content order.
+- The graph simulator starts at deterministic `Step 1`, follows `Continue` to
+  terminal `Step 2`, and records both events without changing live data.
+- Project chat preserves the authored content order.
 - The list shows its header, footer, two sections, descriptions, and visible
   labels without exposing internal IDs.
 - Choosing the visible label is accepted as the stable
@@ -292,7 +334,8 @@ Expected result:
 
 ## Step 6 of 6 - Verify Export And Import Preservation
 
-1. Click `Automation` > `Actions`, then open
+1. After recording the Step 5 submission result, click `Automation` >
+   `Actions`, then open
    `Phase 9 Composed Content UAT`.
 2. On its overview, click `Export`. Confirm the browser downloads one `.json`
    file. Do not open or edit the JSON.
@@ -343,10 +386,11 @@ Expected result:
 
 ## Phase 9 Sign-Off
 
+- [x] Steps 1 through 4 passed before this UAT-plan correction.
 - [ ] All six focused steps pass.
-- [ ] Universal Add Content visibility and disabled reasons are correct.
-- [ ] Ordered content and structured choices survive save and refresh.
-- [ ] Incomplete or conflicting content blocks publication.
+- [x] Universal Add Content visibility and disabled reasons are correct.
+- [x] Ordered content and structured choices survive save and refresh.
+- [x] Incomplete or conflicting content blocks publication.
 - [ ] Published preview and project chat preserve order and stable selection.
 - [ ] Export/import preserves the universal content contract without raw JSON.
 - [ ] No unresolved Critical or High Phase 9 defect remains.
