@@ -344,6 +344,22 @@ test("WhatsApp adapter uses native delivery within provider limits", async () =>
       text: "Choose a button",
     }),
   });
+  const callToActionButton = await adapter.adaptReply({
+    context,
+    reply: createChoiceReply({
+      displayMode: "buttons",
+      options: [
+        {
+          actionType: "url",
+          actionValue: "https://example.com/services",
+          id: "website",
+          label: "Website",
+          value: "website",
+        },
+      ],
+      text: "Open our website",
+    }),
+  });
   const nativeList = await adapter.adaptReply({
     context,
     reply: createChoiceReply({
@@ -371,6 +387,11 @@ test("WhatsApp adapter uses native delivery within provider limits", async () =>
   expect(nativeButton.delivery.body.type).toBe("interactive");
   expect(fallbackButton.mode).toBe("fallback");
   expect(fallbackButton.delivery.body.type).toBe("text");
+  expect(callToActionButton.mode).toBe("fallback");
+  expect(callToActionButton.delivery.body.type).toBe("text");
+  expect(JSON.stringify(callToActionButton.delivery.body)).toContain(
+    "https://example.com/services",
+  );
   expect(nativeList.mode).toBe("native");
   expect(nativeList.delivery.body.type).toBe("interactive");
   expect(nativeList.delivery.body).toMatchObject({

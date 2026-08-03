@@ -526,6 +526,55 @@ export function FlowMessageContentEditor({
                       className="h-9 min-w-0 rounded-md border px-2 text-sm outline-none"
                     />
                   </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <select
+                      aria-label={`Button behavior ${optionIndex + 1}`}
+                      value={option.actionType ?? "reply"}
+                      onChange={(event) => {
+                        const options = [...block.options];
+                        options[optionIndex] = {
+                          ...option,
+                          actionType: event.target.value as
+                            | "phone"
+                            | "reply"
+                            | "url",
+                          actionValue:
+                            event.target.value === "reply"
+                              ? ""
+                              : option.actionValue,
+                        };
+                        onChange({ ...block, options });
+                      }}
+                      className="h-9 min-w-0 rounded-md border bg-white px-2 text-sm outline-none"
+                    >
+                      <option value="reply">Reply and continue</option>
+                      <option value="url">Open website</option>
+                      <option value="phone">Call phone number</option>
+                    </select>
+                    {(option.actionType === "url" ||
+                      option.actionType === "phone") && (
+                      <input
+                        aria-label={`Button destination ${optionIndex + 1}`}
+                        value={option.actionValue ?? ""}
+                        maxLength={2000}
+                        placeholder={
+                          option.actionType === "url"
+                            ? "https://example.com"
+                            : "+1 555 010 0200"
+                        }
+                        type={option.actionType === "url" ? "url" : "tel"}
+                        onChange={(event) => {
+                          const options = [...block.options];
+                          options[optionIndex] = {
+                            ...option,
+                            actionValue: event.target.value,
+                          };
+                          onChange({ ...block, options });
+                        }}
+                        className="h-9 min-w-0 rounded-md border px-2 text-sm outline-none"
+                      />
+                    )}
+                  </div>
                   {block.displayMode === "list" && (
                     <div className="grid gap-2 sm:grid-cols-2">
                       <input

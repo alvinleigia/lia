@@ -12,6 +12,7 @@ export const ACTION_STEP_TYPES = [
   "message",
   "collect_input",
   "choice",
+  "boolean",
   "date",
   "date_range",
   "address",

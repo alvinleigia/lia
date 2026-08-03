@@ -21,6 +21,7 @@ test("every input step maps to one friendly family", () => {
 });
 
 test("fixed input blocks derive their runtime answer type", () => {
+  expect(getFlowInputType("boolean", "text")).toBe("text");
   expect(getFlowInputType("email", "text")).toBe("email");
   expect(getFlowInputType("phone", "text")).toBe("phone");
   expect(getFlowInputType("date", "text")).toBe("date");
@@ -31,6 +32,16 @@ test("fixed input blocks derive their runtime answer type", () => {
   expect(getFlowInputType("collect_input", "int")).toBe("int");
   expect(allowsFlowAnswerFormatSelection("collect_input")).toBe(true);
   expect(allowsFlowAnswerFormatSelection("email")).toBe(false);
+});
+
+test("boolean input is a fixed Yes or No family", () => {
+  const boolean = getFlowInputFamilyDefinition("boolean", null);
+
+  expect(boolean).toMatchObject({
+    family: "boolean",
+    title: "Yes / No",
+  });
+  expect(allowsFlowAnswerFormatSelection("boolean")).toBe(false);
 });
 
 test("validation capabilities stay relevant to each family", () => {

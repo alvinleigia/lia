@@ -1,3 +1,8 @@
+import {
+  type ActionOptionBehavior,
+  getActionOptionBehavior,
+  getActionOptionHref,
+} from "@/lib/action-option-routing";
 import type {
   RuntimeReplyMedia,
   RuntimeReplyProduct,
@@ -19,6 +24,8 @@ type FlowTextContentBlock = {
 };
 
 export type FlowChoiceOption = {
+  actionType?: ActionOptionBehavior;
+  actionValue?: string;
   description: string;
   id: string;
   label: string;
@@ -74,7 +81,10 @@ export type FlowResponseCollectorBlock = Extract<
 >;
 
 export type FlowContentCompositionIssue = {
-  code: "multiple_response_collectors";
+  code:
+    | "choice_action_invalid"
+    | "choice_reply_missing"
+    | "multiple_response_collectors";
   message: string;
 };
 
@@ -149,8 +159,20 @@ function parseChoiceOption(
   if (!label) {
     return null;
   }
+  const actionType =
+    option.actionType === "reply" ||
+    option.actionType === "url" ||
+    option.actionType === "phone"
+      ? option.actionType
+      : undefined;
+  const actionValue =
+    typeof option.actionValue === "string"
+      ? getText(option.actionValue, 2000)
+      : undefined;
 
   return {
+    ...(actionType ? { actionType } : {}),
+    ...(actionValue !== undefined ? { actionValue } : {}),
     description: getText(option.description, 240),
     id: getText(option.id, 80) || `${blockId}-option-${index + 1}`,
     label,
@@ -409,14 +431,45 @@ export function getFlowResponseCollectorBlocks(
 export function getFlowContentCompositionIssues(
   blocks: FlowContentBlock[],
 ): FlowContentCompositionIssue[] {
-  return getFlowResponseCollectorBlocks(blocks).length > 1
-    ? [
-        {
-          code: "multiple_response_collectors",
-          message: "A step can contain one response collector.",
-        },
-      ]
-    : [];
+  const issues: FlowContentCompositionIssue[] = [];
+  if (getFlowResponseCollectorBlocks(blocks).length > 1) {
+    issues.push({
+      code: "multiple_response_collectors",
+      message: "A step can contain one response collector.",
+    });
+  }
+
+  for (const block of blocks) {
+    if (block.type !== "choice") {
+      continue;
+    }
+
+    if (
+      !block.options.some(
+        (option) => getActionOptionBehavior(option.actionType) === "reply",
+      )
+    ) {
+      issues.push({
+        code: "choice_reply_missing",
+        message: "A choice collector needs at least one reply option.",
+      });
+    }
+
+    if (
+      block.options.some(
+        (option) =>
+          getActionOptionBehavior(option.actionType) !== "reply" &&
+          !getActionOptionHref(option),
+      )
+    ) {
+      issues.push({
+        code: "choice_action_invalid",
+        message: "Website and phone buttons need a valid destination.",
+      });
+    }
+  }
+
+  return issues;
 }
 
 export function getFlowResponseCollectorCompatibilityIssue(

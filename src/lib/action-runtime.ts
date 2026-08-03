@@ -7,7 +7,12 @@ import {
   compileActionFlowGraph,
   evaluateCompiledActionFlowConditionGroup,
 } from "@/lib/action-flow-compiler";
-import { getActionOptionIdentity } from "@/lib/action-option-routing";
+import {
+  type ActionOptionBehavior,
+  getActionOptionBehavior,
+  getActionOptionHref,
+  getActionOptionIdentity,
+} from "@/lib/action-option-routing";
 import {
   formatFlowContentBlockText,
   formatFlowInteractiveContentBlockText,
@@ -35,6 +40,8 @@ import type {
 export type ProductDisplayLayout = "featured" | "grid" | "list";
 
 export type RuntimeActionOption = {
+  actionType?: ActionOptionBehavior;
+  actionValue?: string;
   description?: string;
   id: string;
   label: string;
@@ -270,6 +277,7 @@ export function getActionStepHandoffConfig(
 
 export function isActionInputStep(step: RuntimeActionStep) {
   return [
+    "boolean",
     "collect_input",
     "choice",
     "date",
@@ -449,6 +457,8 @@ export function getNextActionStepDecision(
 
 export function getActionStepInputType(step: RuntimeActionStep) {
   switch (step.stepType) {
+    case "boolean":
+      return "text";
     case "date":
       return "date";
     case "email":
@@ -473,6 +483,27 @@ export function getActionStepOptions(
   step: RuntimeActionStep,
   fields: Record<string, unknown> = {},
 ): RuntimeActionOption[] {
+  if (step.stepType === "boolean") {
+    return [
+      {
+        ...getActionOptionIdentity({
+          fallbackId: "boolean-true",
+          id: "boolean-true",
+        }),
+        label: "Yes",
+        value: true,
+      },
+      {
+        ...getActionOptionIdentity({
+          fallbackId: "boolean-false",
+          id: "boolean-false",
+        }),
+        label: "No",
+        value: false,
+      },
+    ];
+  }
+
   if (step.stepType === "product_selection") {
     return getProductSelectionOptions(step);
   }
@@ -495,6 +526,8 @@ export function getActionStepOptions(
   const contentChoice = getFlowChoiceContentBlock(step.settings);
   if (contentChoice) {
     return contentChoice.options.map((option) => ({
+      actionType: getActionOptionBehavior(option.actionType),
+      actionValue: option.actionValue,
       description: option.description || undefined,
       ...getActionOptionIdentity({
         fallbackId: `content-option-${option.value}`,
@@ -550,6 +583,20 @@ export function getActionStepOptions(
       return null;
     })
     .filter((option): option is RuntimeActionOption => Boolean(option));
+}
+
+export function isActionReplyOption(option: RuntimeActionOption) {
+  return getActionOptionBehavior(option.actionType) === "reply";
+}
+
+function formatActionOptionFallback(
+  option: RuntimeActionOption,
+  index: number,
+) {
+  const href = getActionOptionHref(option);
+  return href
+    ? `${index + 1}. ${option.label} - ${href}`
+    : `${index + 1}. ${option.label}`;
 }
 
 function getProductSelectionOptions(
@@ -847,11 +894,7 @@ export function buildActionStepTextFallbackMessage(
     return withRichContent(prompt);
   }
 
-  const lines = [
-    prompt,
-    "",
-    ...options.map((option, index) => `${index + 1}. ${option.label}`),
-  ];
+  const lines = [prompt, "", ...options.map(formatActionOptionFallback)];
 
   if (
     step.stepType === "product_selection" &&
@@ -952,7 +995,9 @@ export function normalizeStepAnswer(
   fields: Record<string, unknown> = {},
 ) {
   const trimmed = answer.trim();
-  const options = getActionStepOptions(step, fields);
+  const options = getActionStepOptions(step, fields).filter(
+    isActionReplyOption,
+  );
 
   if (options.length === 0) {
     return trimmed;
@@ -1453,7 +1498,9 @@ export function validateStepAnswer(
     return { isValid: false, value: trimmed };
   }
 
-  const options = getActionStepOptions(step, fields);
+  const options = getActionStepOptions(step, fields).filter(
+    isActionReplyOption,
+  );
 
   if (options.length === 0) {
     if (step.stepType === "address") {
@@ -1575,7 +1622,9 @@ export function buildStepAnswerResult(
     }
   }
 
-  const options = getActionStepOptions(step, fields);
+  const options = getActionStepOptions(step, fields).filter(
+    isActionReplyOption,
+  );
   const productSelectionCartValue =
     step.stepType === "product_selection"
       ? normalizeProductSelectionCartAnswerValue(value)
@@ -1769,7 +1818,9 @@ export function buildInvalidStepAnswerMessage(
     return step.settings.validationMessage;
   }
 
-  const options = getActionStepOptions(step, fields);
+  const options = getActionStepOptions(step, fields).filter(
+    isActionReplyOption,
+  );
 
   if (options.length > 0) {
     if (

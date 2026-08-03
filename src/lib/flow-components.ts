@@ -65,6 +65,16 @@ const CURRENT_STEP_COMPONENTS: readonly FlowComponentDefinition[] = [
   },
   {
     channels: ["project_chat", "widget", "whatsapp", "future"],
+    color: "#16a34a",
+    description: "Ask a yes or no question and store a boolean value.",
+    group: "action",
+    key: "ask_boolean",
+    label: "Ask Yes / No",
+    status: "enabled",
+    stepType: "boolean",
+  },
+  {
+    channels: ["project_chat", "widget", "whatsapp", "future"],
     color: "#0891b2",
     description: "Ask for a calendar date.",
     group: "action",

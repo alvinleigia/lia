@@ -695,6 +695,15 @@ function getRuntimeReplyOptions(reply: RuntimeReply) {
       }
 
       return {
+        actionType:
+          optionRecord.actionType === "phone" ||
+          optionRecord.actionType === "url"
+            ? optionRecord.actionType
+            : "reply",
+        actionValue:
+          typeof optionRecord.actionValue === "string"
+            ? optionRecord.actionValue
+            : undefined,
         description:
           typeof optionRecord.description === "string"
             ? optionRecord.description
@@ -929,7 +938,11 @@ function buildWhatsAppButtonBody(input: {
   text: string;
   to: string;
 }): WhatsAppMessageRequestBody | null {
-  if (input.options.length === 0 || input.options.length > 3) {
+  if (
+    input.options.length === 0 ||
+    input.options.length > 3 ||
+    input.options.some((option) => option.actionType !== "reply")
+  ) {
     return null;
   }
 
@@ -963,7 +976,11 @@ function buildWhatsAppListBody(input: {
   text: string;
   to: string;
 }): WhatsAppMessageRequestBody | null {
-  if (input.options.length === 0 || input.options.length > 10) {
+  if (
+    input.options.length === 0 ||
+    input.options.length > 10 ||
+    input.options.some((option) => option.actionType !== "reply")
+  ) {
     return null;
   }
 

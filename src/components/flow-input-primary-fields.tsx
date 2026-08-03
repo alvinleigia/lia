@@ -27,6 +27,8 @@ function getFamilyIcon(family: FlowInputFamily) {
   switch (family) {
     case "address":
       return MapPin;
+    case "boolean":
+      return CheckSquare2;
     case "choice":
       return ListChecks;
     case "date":

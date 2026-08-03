@@ -16,6 +16,7 @@ import type { ActionFlowRouteValidationIssue } from "@/lib/action-flows";
 import { getStoredActionOptionRoute } from "@/lib/action-option-routing";
 import {
   getActionStepOptions,
+  isActionReplyOption,
   type RuntimeActionStep,
 } from "@/lib/action-runtime";
 import {
@@ -396,7 +397,9 @@ export function buildEdges(input: {
     const sourceOption =
       optionRoute && sourceStep
         ? getActionStepOptions(sourceStep as RuntimeActionStep).find(
-            (option) => option.id === optionRoute.sourceOptionId,
+            (option) =>
+              option.id === optionRoute.sourceOptionId &&
+              isActionReplyOption(option),
           )
         : null;
     const label = sourceOption

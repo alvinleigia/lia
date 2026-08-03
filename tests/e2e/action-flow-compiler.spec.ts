@@ -325,6 +325,42 @@ test("compiler keeps an option route valid when its label changes", () => {
   );
 });
 
+test("compiler routes first-class boolean outputs as typed values", () => {
+  const graph = compileActionFlowGraph({
+    branchRules: [
+      createRule(41, 1, 3, {
+        comparisonValue: "true",
+        settings: {
+          optionRoute: buildStoredActionOptionRoute("boolean-true"),
+        },
+        sourceFieldKey: "acceptedTerms",
+      }),
+    ],
+    steps: [
+      createStep(1, 1, {
+        fieldKey: "acceptedTerms",
+        stepType: "boolean",
+      }),
+      createStep(2, 2, { stepType: "submit" }),
+      createStep(3, 3, { stepType: "submit" }),
+    ],
+  });
+
+  expect(graph.issues).toEqual([]);
+  expect(graph.branchConditions[41]?.conditions[0]).toMatchObject({
+    comparisonValue: true,
+    fieldKey: "acceptedTerms",
+  });
+  expect(graph.edges).toContainEqual(
+    expect.objectContaining({
+      ruleId: 41,
+      sourceStepId: 1,
+      targetStepId: 3,
+      type: "branch",
+    }),
+  );
+});
+
 test("compiler blocks missing and stale option route identities", () => {
   const graph = compileActionFlowGraph({
     branchRules: [

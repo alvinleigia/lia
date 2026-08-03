@@ -269,3 +269,55 @@ test("accepts complete structured content resources", () => {
     }),
   ).toEqual([]);
 });
+
+test("validates reply, website, and phone button behavior", () => {
+  const choice = orderedBlocks.find((block) => block.type === "choice");
+  expect(choice).toBeTruthy();
+  if (!choice) {
+    return;
+  }
+
+  const actionChoice: FlowContentBlock = {
+    ...choice,
+    options: [
+      { ...choice.options[0], actionType: "reply" },
+      {
+        ...choice.options[1],
+        actionType: "url",
+        actionValue: "https://example.com/book",
+      },
+      {
+        ...choice.options[1],
+        actionType: "phone",
+        actionValue: "+91 98765 43210",
+        id: "call",
+        label: "Call",
+        value: "call",
+      },
+    ],
+  };
+
+  expect(getFlowContentCompositionIssues([actionChoice])).toEqual([]);
+  expect(
+    getFlowContentReadinessIssues({
+      contentDocument: buildFlowContentDocument([actionChoice]),
+    }),
+  ).toEqual([]);
+  expect(
+    getFlowContentCompositionIssues([
+      {
+        ...actionChoice,
+        options: actionChoice.options.map((option) => ({
+          ...option,
+          actionType: "url",
+          actionValue: "javascript:alert(1)",
+        })),
+      },
+    ]),
+  ).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ code: "choice_action_invalid" }),
+      expect.objectContaining({ code: "choice_reply_missing" }),
+    ]),
+  );
+});

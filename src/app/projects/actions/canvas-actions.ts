@@ -33,6 +33,7 @@ import {
 } from "@/lib/action-option-routing";
 import {
   getActionStepOptions,
+  isActionReplyOption,
   type RuntimeActionStep,
 } from "@/lib/action-runtime";
 import {
@@ -1500,6 +1501,8 @@ export async function updateCanvasStepBasicsAction(
 
   if (choiceContent && parsed.data.contentBlocksChanged) {
     options = choiceContent.options.map((option) => ({
+      actionType: option.actionType,
+      actionValue: option.actionValue,
       id: option.id,
       label: option.label,
       value: option.value,
@@ -1882,7 +1885,9 @@ export async function setCanvasOptionRouteAction(
   }
 
   const option = getActionStepOptions(sourceStep as RuntimeActionStep).find(
-    (candidate) => candidate.id === parsed.data.sourceOptionId,
+    (candidate) =>
+      candidate.id === parsed.data.sourceOptionId &&
+      isActionReplyOption(candidate),
   );
   if (!option) {
     return {

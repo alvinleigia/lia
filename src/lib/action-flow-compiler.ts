@@ -5,10 +5,12 @@ import {
 } from "@/lib/action-flow-constants";
 import {
   ACTION_OPTION_ROUTE_SETTINGS_KEY,
+  getActionOptionBehavior,
   getActionOptionIdentity,
   getStoredActionOptionRoute,
   getStoredActionOptions,
 } from "@/lib/action-option-routing";
+import { getFlowChoiceContentBlock } from "@/lib/flow-content-blocks";
 
 export const ACTION_FLOW_CONDITION_VALUE_TYPES = [
   "string",
@@ -193,6 +195,43 @@ function isRunnableStep(step: ActionFlowCompilerStep) {
 }
 
 function getCompilerStepOptions(step: ActionFlowCompilerStep) {
+  if (step.stepType === "boolean") {
+    return [
+      {
+        ...getActionOptionIdentity({
+          fallbackId: "boolean-true",
+          id: "boolean-true",
+        }),
+        label: "Yes",
+        value: true,
+      },
+      {
+        ...getActionOptionIdentity({
+          fallbackId: "boolean-false",
+          id: "boolean-false",
+        }),
+        label: "No",
+        value: false,
+      },
+    ];
+  }
+
+  const contentChoice = getFlowChoiceContentBlock(step.settings);
+  if (contentChoice) {
+    return contentChoice.options
+      .filter(
+        (option) => getActionOptionBehavior(option.actionType) === "reply",
+      )
+      .map((option) => ({
+        ...getActionOptionIdentity({
+          fallbackId: `content-option-${option.value}`,
+          id: option.id,
+        }),
+        label: option.label,
+        value: option.value,
+      }));
+  }
+
   const storedOptions = getStoredActionOptions(step.options);
   if (storedOptions.length > 0) {
     return storedOptions;
@@ -245,6 +284,10 @@ function getCompilerStepOptions(step: ActionFlowCompilerStep) {
 function inferStepFieldType(
   step: ActionFlowCompilerStep,
 ): ActionFlowConditionValueType | null {
+  if (step.stepType === "boolean") {
+    return "boolean";
+  }
+
   if (
     step.stepType === "product_selection" &&
     step.settings.productSelectionAllowMultiple !== true &&

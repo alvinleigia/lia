@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { getActionOptionHref } from "@/lib/action-option-routing";
 import {
   buildActionReviewSummary,
   buildStepAnswerResult,
@@ -6,6 +7,7 @@ import {
   getActionStepOptions,
   groupActionStepOptionsBySection,
   type RuntimeActionStep,
+  validateStepAnswer,
 } from "@/lib/action-runtime";
 import { buildRuntimeRepliesForStep } from "@/lib/channel-flow-runtime";
 import { buildFlowContentDocument } from "@/lib/flow-content-blocks";
@@ -291,4 +293,134 @@ test("assigns output ports to legacy, dynamic, and product options", () => {
       value: "91",
     }),
   ]);
+});
+
+test("preserves website and phone buttons without accepting them as replies", () => {
+  const step: RuntimeActionStep = {
+    fieldKey: "nextAction",
+    id: 45,
+    inputType: "text",
+    isEnabled: true,
+    isRequired: true,
+    label: "Next action",
+    nextStepId: null,
+    operationId: null,
+    options: [],
+    prompt: "Choose",
+    settings: {
+      contentDocument: buildFlowContentDocument([
+        {
+          displayMode: "buttons",
+          footer: "",
+          header: "",
+          id: "actions",
+          options: [
+            {
+              actionType: "reply",
+              description: "",
+              id: "book",
+              label: "Book",
+              section: "",
+              value: "book",
+            },
+            {
+              actionType: "url",
+              actionValue: "https://example.com/services",
+              description: "",
+              id: "website",
+              label: "Website",
+              section: "",
+              value: "website",
+            },
+            {
+              actionType: "phone",
+              actionValue: "+91 98765 43210",
+              description: "",
+              id: "call",
+              label: "Call",
+              section: "",
+              value: "call",
+            },
+          ],
+          text: "Choose",
+          type: "choice",
+        },
+      ]),
+    },
+    sortOrder: 1,
+    stepType: "choice",
+  };
+  const options = getActionStepOptions(step);
+  const replies = buildRuntimeRepliesForStep(step, {});
+
+  expect(options.map((option) => getActionOptionHref(option))).toEqual([
+    null,
+    "https://example.com/services",
+    "tel:+919876543210",
+  ]);
+  expect(validateStepAnswer(step, "Book")).toMatchObject({ isValid: true });
+  expect(validateStepAnswer(step, "Website")).toMatchObject({
+    isValid: false,
+  });
+  expect(replies.at(-1)?.payload?.options).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        actionType: "url",
+        actionValue: "https://example.com/services",
+      }),
+      expect.objectContaining({
+        actionType: "phone",
+        actionValue: "+91 98765 43210",
+      }),
+    ]),
+  );
+  expect(replies.at(-1)?.fallbackText).toContain(
+    "https://example.com/services",
+  );
+  expect(replies.at(-1)?.fallbackText).toContain("tel:+919876543210");
+});
+
+test("boolean input exposes stable Yes and No outputs", () => {
+  const step: RuntimeActionStep = {
+    fieldKey: "acceptedTerms",
+    id: 46,
+    inputType: "text",
+    isEnabled: true,
+    isRequired: true,
+    label: "Accepted terms",
+    nextStepId: null,
+    operationId: null,
+    options: [],
+    prompt: "Do you accept?",
+    settings: {},
+    sortOrder: 1,
+    stepType: "boolean",
+  };
+
+  expect(getActionStepOptions(step)).toEqual([
+    expect.objectContaining({
+      id: "boolean-true",
+      label: "Yes",
+      outputPort: "option:boolean-true",
+      value: true,
+    }),
+    expect.objectContaining({
+      id: "boolean-false",
+      label: "No",
+      outputPort: "option:boolean-false",
+      value: false,
+    }),
+  ]);
+  expect(validateStepAnswer(step, "Yes")).toEqual({
+    isValid: true,
+    value: true,
+  });
+  expect(validateStepAnswer(step, "No")).toEqual({
+    isValid: true,
+    value: false,
+  });
+  expect(validateStepAnswer(step, "Maybe")).toEqual({
+    isValid: false,
+    value: "Maybe",
+  });
 });

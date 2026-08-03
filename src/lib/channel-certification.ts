@@ -33,6 +33,7 @@ export type FlowCertificationFamily =
 export const FLOW_STEP_CERTIFICATION_FAMILIES = {
   add_tag: "state_mutation",
   address: "input",
+  boolean: "choice_reply",
   catalog_message: "catalog_reply",
   choice: "choice_reply",
   collect_input: "input",

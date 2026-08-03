@@ -56,6 +56,7 @@ import type { ActionFlowRouteValidationIssue } from "@/lib/action-flows";
 import { getStoredActionOptionRoute } from "@/lib/action-option-routing";
 import {
   getActionStepOptions,
+  isActionReplyOption,
   type RuntimeActionStep,
 } from "@/lib/action-runtime";
 import {
@@ -320,7 +321,9 @@ function CanvasStepNodeContent({
     (step.settings.productSelectionAllowMultiple !== true &&
       step.settings.productSelectionAllowQuantity !== true);
   const routeOptions = supportsOptionRoutes
-    ? getActionStepOptions(step as RuntimeActionStep)
+    ? getActionStepOptions(step as RuntimeActionStep).filter(
+        isActionReplyOption,
+      )
     : [];
   const optionRouteTargets = new Map(
     branchRules.flatMap((rule) => {

@@ -6,6 +6,7 @@ import type {
 export const FLOW_INPUT_STEP_TYPES = [
   "collect_input",
   "choice",
+  "boolean",
   "date",
   "date_range",
   "address",
@@ -35,6 +36,7 @@ export type FlowInputStepType = (typeof FLOW_INPUT_STEP_TYPES)[number];
 
 export type FlowInputFamily =
   | "address"
+  | "boolean"
   | "choice"
   | "date"
   | "date_range"
@@ -87,6 +89,17 @@ const FAMILY_DEFINITIONS: Record<
     questionLabel: "Address question",
     questionPlaceholder: "What address should we use?",
     title: "Address",
+    validation: NO_SPECIAL_VALIDATION,
+  },
+  boolean: {
+    answerLabel: "Yes or no",
+    answerPlaceholder: "The visitor chooses Yes or No",
+    description:
+      "Collect a true or false answer with explicit Yes and No choices.",
+    fixedInputType: "text",
+    questionLabel: "Yes or no question",
+    questionPlaceholder: "Would you like to continue?",
+    title: "Yes / No",
     validation: NO_SPECIAL_VALIDATION,
   },
   choice: {
@@ -226,6 +239,7 @@ const FAMILY_DEFINITIONS: Record<
 
 const FIXED_STEP_FAMILIES: Partial<Record<ActionStepType, FlowInputFamily>> = {
   address: "address",
+  boolean: "boolean",
   choice: "choice",
   date: "date",
   date_range: "date_range",

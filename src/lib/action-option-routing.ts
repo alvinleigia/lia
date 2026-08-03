@@ -14,6 +14,8 @@ export type StoredActionOption = {
   value: boolean | number | string;
 };
 
+export type ActionOptionBehavior = "phone" | "reply" | "url";
+
 export function buildActionOptionOutputPort(optionId: string) {
   return `${ACTION_OPTION_OUTPUT_PORT_PREFIX}${optionId}`;
 }
@@ -25,6 +27,40 @@ export function getActionOptionIdFromOutputPort(outputPort: string | null) {
 
   const optionId = outputPort.slice(ACTION_OPTION_OUTPUT_PORT_PREFIX.length);
   return optionId || null;
+}
+
+export function getActionOptionBehavior(value: unknown): ActionOptionBehavior {
+  return value === "phone" || value === "url" ? value : "reply";
+}
+
+export function getActionOptionHref(input: {
+  actionType?: unknown;
+  actionValue?: unknown;
+}) {
+  const actionType = getActionOptionBehavior(input.actionType);
+  const actionValue =
+    typeof input.actionValue === "string" ? input.actionValue.trim() : "";
+
+  if (actionType === "url") {
+    try {
+      const url = new URL(actionValue);
+      return url.protocol === "http:" || url.protocol === "https:"
+        ? url.toString()
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (actionType === "phone") {
+    const normalized = actionValue
+      .replace(/[^\d+]/g, "")
+      .replace(/(?!^)\+/g, "");
+    const digitCount = normalized.replace(/\D/g, "").length;
+    return digitCount >= 7 && digitCount <= 15 ? `tel:${normalized}` : null;
+  }
+
+  return null;
 }
 
 export function getActionOptionIdentity(input: {

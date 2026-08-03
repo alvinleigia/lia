@@ -279,6 +279,8 @@ function buildRuntimeReplyForStep(
   }
 
   const replyOptions: RuntimeReplyOption[] = options.map((option, index) => ({
+    actionType: option.actionType,
+    actionValue: option.actionValue,
     description: option.description,
     id: option.id ?? `${step.id}-${index + 1}`,
     label: option.label,
@@ -309,6 +311,8 @@ function buildRuntimeReplyForContentBlock(
       footer: block.footer,
       header: block.header,
       options: block.options.map((option) => ({
+        actionType: option.actionType,
+        actionValue: option.actionValue,
         description: option.description || undefined,
         id: option.id,
         label: option.label,

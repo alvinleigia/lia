@@ -1,3 +1,7 @@
+import {
+  type ActionOptionBehavior,
+  getActionOptionHref,
+} from "@/lib/action-option-routing";
 import { renderWhatsAppTemplateBodyPreview } from "@/lib/whatsapp-template-metadata";
 
 export type RuntimeReplyType =
@@ -10,6 +14,8 @@ export type RuntimeReplyType =
   | "text";
 
 export type RuntimeReplyOption = {
+  actionType?: ActionOptionBehavior;
+  actionValue?: string;
   description?: string;
   id: string;
   label: string;
@@ -76,7 +82,12 @@ function buildChoiceFallbackText(input: {
   return [
     input.text,
     "",
-    ...input.options.map((option, index) => `${index + 1}. ${option.label}`),
+    ...input.options.map((option, index) => {
+      const href = getActionOptionHref(option);
+      return href
+        ? `${index + 1}. ${option.label} - ${href}`
+        : `${index + 1}. ${option.label}`;
+    }),
   ].join("\n");
 }
 

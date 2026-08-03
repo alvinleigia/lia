@@ -774,14 +774,14 @@ new task-first model.
 - [x] Ask Question supports common text, contact, date, time, and number formats.
 - [x] Ask Address, Ask Location, and Ask Media store structured values.
 - [x] Give every button, list row, product, and selectable result a stable option ID and output port.
-- [ ] Add route, URL, and phone button behavior where supported.
+- [x] Add route, URL, and phone button behavior where supported.
 - [x] Connect each routable option through a canvas handle or `Go to` selector.
 - [x] Make both routing controls write the same graph edge.
 - [x] Preserve routing when labels change or are translated.
 - [x] Add documented default and no-match outputs.
 - [x] Warn before deleting a connected option.
 - [x] Block duplicate, conflicting, missing, or invalid option routes.
-- [ ] Add a first-class boolean input.
+- [x] Add a first-class boolean input.
 - [ ] Add retry count, retry message, and retry-exhausted output.
 - [ ] Add no-reply reminder, timeout, and output.
 - [ ] Add cancellation and validation-failure outputs.
@@ -807,6 +807,17 @@ resolved from the current option label, the fallback edge is explicitly shown
 as `default / no match`, and connected options must have their route cleared
 before removal. No database migration was required. TypeScript and 21 focused
 compiler/canvas checks passed.
+
+Phase 10 Checkpoint 3 status: Complete on 2026-08-03. Composed choice rows now
+support deterministic reply, website, and phone behavior. Browser channels
+render safe website and telephone links without advancing the flow, while
+channels that cannot express those calls to action receive a readable fallback
+containing the destination. Only reply options expose routes or satisfy answer
+validation. A first-class Yes / No input now stores typed booleans and exposes
+stable `boolean-true` and `boolean-false` output ports. Legacy composed-content
+JSON continues to round-trip without acquiring new default fields. No database
+migration was required. TypeScript, lint, and 55 focused content, runtime,
+compiler, adapter, input-family, and channel-certification checks passed.
 
 Phase 10 exit gate: businesses can choose either flexible task collection or
 fully scripted collection with stable per-option routes.

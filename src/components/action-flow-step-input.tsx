@@ -3,6 +3,10 @@
 import { Send } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import {
+  getActionOptionBehavior,
+  getActionOptionHref,
+} from "@/lib/action-option-routing";
+import {
   buildProductSelectionAnswerValue,
   buildProductSelectionCartAnswerValue,
   getActionStepChoiceDisplayMode,
@@ -620,24 +624,54 @@ export function ActionFlowStepOptions({
                 {section.title}
               </p>
             )}
-            {section.options.map((option) => (
-              <button
-                key={option.id ?? String(option.value)}
-                type="button"
-                className="flex w-full items-start gap-3 rounded-md border bg-white px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50"
-                onClick={() => onSelect(String(option.value), option.label)}
-                disabled={disabled}
-              >
-                <span className="min-w-0">
-                  <span className="block font-medium">{option.label}</span>
-                  {option.description && (
-                    <span className="block text-xs text-muted-foreground">
-                      {option.description}
-                    </span>
-                  )}
-                </span>
-              </button>
-            ))}
+            {section.options.map((option) =>
+              (() => {
+                const href = getActionOptionHref(option);
+                const content = (
+                  <span className="min-w-0">
+                    <span className="block font-medium">{option.label}</span>
+                    {option.description && (
+                      <span className="block text-xs text-muted-foreground">
+                        {option.description}
+                      </span>
+                    )}
+                  </span>
+                );
+                const className =
+                  "flex w-full items-start gap-3 rounded-md border bg-white px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50";
+
+                return href ? (
+                  <a
+                    key={option.id}
+                    aria-disabled={disabled}
+                    className={className}
+                    href={disabled ? undefined : href}
+                    rel={
+                      getActionOptionBehavior(option.actionType) === "url"
+                        ? "noopener noreferrer"
+                        : undefined
+                    }
+                    target={
+                      getActionOptionBehavior(option.actionType) === "url"
+                        ? "_blank"
+                        : undefined
+                    }
+                  >
+                    {content}
+                  </a>
+                ) : (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={className}
+                    onClick={() => onSelect(String(option.value), option.label)}
+                    disabled={disabled}
+                  >
+                    {content}
+                  </button>
+                );
+              })(),
+            )}
           </div>
         ))}
         {choicePresentation.footer && (
@@ -651,17 +685,44 @@ export function ActionFlowStepOptions({
 
   return (
     <div className="flex flex-wrap gap-2 pt-2">
-      {options.map((option) => (
-        <button
-          key={String(option.value)}
-          type="button"
-          className="rounded-full border bg-white px-3 py-1.5 text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50"
-          onClick={() => onSelect(String(option.value), option.label)}
-          disabled={disabled}
-        >
-          {option.label}
-        </button>
-      ))}
+      {options.map((option) =>
+        (() => {
+          const href = getActionOptionHref(option);
+          const className =
+            "rounded-full border bg-white px-3 py-1.5 text-sm text-gray-900 hover:bg-gray-100 disabled:opacity-50";
+
+          return href ? (
+            <a
+              key={option.id}
+              aria-disabled={disabled}
+              className={className}
+              href={disabled ? undefined : href}
+              rel={
+                getActionOptionBehavior(option.actionType) === "url"
+                  ? "noopener noreferrer"
+                  : undefined
+              }
+              target={
+                getActionOptionBehavior(option.actionType) === "url"
+                  ? "_blank"
+                  : undefined
+              }
+            >
+              {option.label}
+            </a>
+          ) : (
+            <button
+              key={option.id}
+              type="button"
+              className={className}
+              onClick={() => onSelect(String(option.value), option.label)}
+              disabled={disabled}
+            >
+              {option.label}
+            </button>
+          );
+        })(),
+      )}
     </div>
   );
 }
