@@ -85,11 +85,11 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 2, Phase 10 of 18. Phases 8 and 9 completed
+Current phase: Priority 2, Phase 11 of 18. Phases 8 through 10 completed
 implementation, automated verification, and manual UAT by 2026-08-03.
 
-Current target: give every deterministic selectable response a stable identity
-and explicit output-port contract without changing existing stored values.
+Current target: complete the deterministic action baseline and expose every
+operational result as a named route.
 
 ## Product Direction
 
@@ -844,14 +844,16 @@ retry, exhausted, cancellation, reminder, and timeout behavior. The reference's
 previously unclear media "attempts" concept is represented explicitly as the
 bounded retry count rather than an implicit channel-specific counter.
 
-Phase 10 Checkpoint 6 automated status: Complete on 2026-08-03. The production
-build, 142 channel and universal-content contracts, all 244 offline browser and
-database scenarios, and tenant-isolation checks passed. The only initial
-browser failure exposed an accessible-label collision between an option input
-and its route selector; the route selector now has an unambiguous label and its
-focused browser regression passes. The exact six-step manual UAT is prepared
-in `docs/UAT_TEST_PLAN.md`; manual sign-off remains the Phase 10 exit
-requirement. No database migration is required.
+Phase 10 Checkpoint 6 status: Complete on 2026-08-03. The production build, 142
+channel and universal-content contracts, all 244 offline browser and database
+scenarios, and tenant-isolation checks passed before UAT. All six focused
+manual scenarios then passed. UAT findings were corrected with focused
+regressions for unambiguous option labels, durable-worker batch defaults,
+completed-chat hydration after refresh, and first-publication draft/runtime
+comparison. Lint and TypeScript passed after the final fix, and the isolated
+first-publication regression confirmed that an action becomes `Active` without
+a false unpublished-settings warning. No database migration was required, and
+no unresolved Critical or High Phase 10 defect remains.
 
 Phase 10 exit gate: businesses can choose either flexible task collection or
 fully scripted collection with stable per-option routes.

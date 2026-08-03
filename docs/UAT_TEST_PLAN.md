@@ -4,7 +4,7 @@
 
 Phase 10 of 18: per-option routing and deterministic response policies.
 
-Status: Ready for focused manual UAT on 2026-08-03. No database migration is
+Status: Passed focused manual UAT on 2026-08-03. No database migration was
 required.
 
 Automated evidence:
@@ -17,6 +17,9 @@ Automated evidence:
   retries, cancellation, durable reminders and timeouts, version pinning,
   canvas persistence, and the existing project-chat and widget journeys.
 - Tenant-isolation database checks passed.
+- Post-UAT regressions passed for durable-worker batch defaults, completed-chat
+  hydration after refresh, and a first publication whose editable draft must
+  immediately match its active runtime snapshot.
 
 Use the exact project, action name, labels, and values below. The action is
 disposable. Do not modify an existing customer flow. Keep the terminal running
@@ -316,14 +319,24 @@ Expected result:
 
 ## Phase 10 Sign-Off
 
-- [ ] All six focused steps pass.
-- [ ] Stable option routes survive label changes and store stable values.
-- [ ] URL and phone controls do not advance the flow.
-- [ ] Retry-exhausted, cancellation, validation-failure, reminder, and timeout
+- [x] All six focused steps pass.
+- [x] Stable option routes survive label changes and store stable values.
+- [x] URL and phone controls do not advance the flow.
+- [x] Retry-exhausted, cancellation, validation-failure, reminder, and timeout
   behavior match the published policy.
-- [ ] Reminder and timeout state survives idle time and stays pinned to the
+- [x] Reminder and timeout state survives idle time and stays pinned to the
   version that started the run.
-- [ ] No unresolved Critical or High Phase 10 defect remains.
+- [x] No unresolved Critical or High Phase 10 defect remains.
+
+Phase 10 passed manual UAT on 2026-08-03. The six scenarios confirmed stable
+option identity, non-reply calls to action, bounded retry and cancellation,
+durable reminder and timeout delivery, direct validation-failure routing, and
+published-version pinning. UAT findings were corrected with focused
+regressions: visible option labels are preserved in chat, omitted durable-worker
+limits use the configured batch defaults, completed conversations hydrate
+after refresh, and the first published snapshot records the post-publication
+`Active` status so `Draft matches runtime` is reported immediately. No
+unresolved Critical or High Phase 10 defect remains.
 
 ## Previous Sign-Off - Phase 9
 
