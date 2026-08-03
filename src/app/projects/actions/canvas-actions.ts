@@ -39,6 +39,7 @@ import {
   getFlowContentBlocks,
   getFlowContentCompositionIssues,
   getFlowResponseCollectorBlocks,
+  getFlowResponseCollectorCompatibilityIssue,
   parseFlowContentBlocks,
 } from "@/lib/flow-content-blocks";
 import { getFlowInputType, isFlowInputStepType } from "@/lib/flow-input-editor";
@@ -1403,10 +1404,17 @@ export async function updateCanvasStepBasicsAction(
     ["display_result", "handoff", "message"].includes(existingStep.stepType);
   let options = existingStep.options;
 
-  if (choiceContent && (!isInputStep || hasDynamicOptions)) {
+  const collectorCompatibilityIssue =
+    getFlowResponseCollectorCompatibilityIssue({
+      hasDynamicOptions,
+      hasManualOptions: existingStep.options.length > 0,
+      hasStoredResponseCollector: Boolean(existingChoiceContent),
+      isInputStep,
+    });
+  if (choiceContent && collectorCompatibilityIssue) {
     return {
       ok: false,
-      message: "Choice content can only be added to a manual answer step.",
+      message: collectorCompatibilityIssue,
     };
   }
 

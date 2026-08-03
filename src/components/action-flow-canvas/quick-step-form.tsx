@@ -51,6 +51,7 @@ import { isFlowActionStepType } from "@/lib/flow-action-editor";
 import {
   type FlowContentBlock,
   getFlowContentBlocks,
+  getFlowResponseCollectorCompatibilityIssue,
 } from "@/lib/flow-content-blocks";
 import type { FlowContentComponentKey } from "@/lib/flow-content-components";
 import {
@@ -59,14 +60,14 @@ import {
 } from "@/lib/flow-input-editor";
 
 function FlowContentBlocksEditor({
-  allowsAnswerCollection,
+  answerCollectionDisabledReason,
   blocks,
   catalogProducts,
   mediaAssets,
   onChange,
   productCatalogs,
 }: {
-  allowsAnswerCollection: boolean;
+  answerCollectionDisabledReason: string | null;
   blocks: FlowContentBlock[];
   catalogProducts: CatalogProductOption[];
   mediaAssets: MediaAssetOption[];
@@ -265,7 +266,7 @@ function FlowContentBlocksEditor({
         >
           <FlowAddContentMenuItems
             context={{
-              allowsAnswerCollection,
+              answerCollectionDisabledReason,
               blockCount: blocks.length,
               catalogProductCount: catalogProducts.length,
               hasResponseCollector,
@@ -315,11 +316,15 @@ function ContentStepBasicsForm({
   const showsChoiceDisplay = hasDynamicOptions || showsManualOptions;
   const allowsAnswerFormat =
     step.stepType === "collect_input" && !hasDynamicOptions;
-  const allowsAnswerCollection =
-    collectsAnswer &&
-    !hasDynamicOptions &&
-    step.stepType !== "choice" &&
-    storedOptions.length === 0;
+  const answerCollectionDisabledReason =
+    getFlowResponseCollectorCompatibilityIssue({
+      hasDynamicOptions,
+      hasManualOptions: storedOptions.length > 0,
+      hasStoredResponseCollector: storedContentBlocks.some(
+        (block) => block.type === "choice",
+      ),
+      isInputStep: collectsAnswer,
+    });
   const inputDefinition = getFlowInputFamilyDefinition(
     step.stepType,
     step.inputType,
@@ -416,7 +421,7 @@ function ContentStepBasicsForm({
       </div>
 
       <FlowContentBlocksEditor
-        allowsAnswerCollection={allowsAnswerCollection}
+        answerCollectionDisabledReason={answerCollectionDisabledReason}
         blocks={contentBlocks}
         catalogProducts={catalogProducts}
         mediaAssets={mediaAssets}

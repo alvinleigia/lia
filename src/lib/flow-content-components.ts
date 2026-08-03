@@ -44,7 +44,7 @@ export type FlowContentComponentDefinition = {
 };
 
 export type FlowContentEligibilityContext = {
-  allowsAnswerCollection: boolean;
+  answerCollectionDisabledReason: string | null;
   blockCount: number;
   catalogProductCount: number;
   hasResponseCollector: boolean;
@@ -165,9 +165,7 @@ function getRequirementReason(
 ) {
   switch (requirement) {
     case "answer_collection":
-      return context.allowsAnswerCollection
-        ? null
-        : "Available on steps that collect a compatible visitor answer.";
+      return context.answerCollectionDisabledReason;
     case "single_response_collector":
       return context.hasResponseCollector
         ? "This step already has a response collector (buttons or list)."

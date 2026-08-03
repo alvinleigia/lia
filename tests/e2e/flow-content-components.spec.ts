@@ -5,7 +5,7 @@ import {
 } from "../../src/lib/flow-content-components";
 
 const readyContext = {
-  allowsAnswerCollection: true,
+  answerCollectionDisabledReason: null,
   blockCount: 0,
   catalogProductCount: 2,
   hasResponseCollector: false,
@@ -16,7 +16,8 @@ const readyContext = {
 test("universal content menu always returns every registered option", () => {
   const menu = resolveFlowContentMenu({
     ...readyContext,
-    allowsAnswerCollection: false,
+    answerCollectionDisabledReason:
+      "Response collectors can only be added to steps that collect a visitor answer.",
     catalogProductCount: 0,
     mediaAssetCount: 0,
     productCatalogCount: 0,
@@ -31,7 +32,7 @@ test("universal content menu always returns every registered option", () => {
   expect(
     menu.find((item) => item.component.key === "choice_buttons")
       ?.disabledReason,
-  ).toContain("collect a compatible visitor answer");
+  ).toContain("collect a visitor answer");
   expect(
     menu.find((item) => item.component.key === "media")?.disabledReason,
   ).toContain("Media Library");

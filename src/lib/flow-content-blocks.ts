@@ -68,6 +68,13 @@ export type FlowContentCompositionIssue = {
   message: string;
 };
 
+export type FlowResponseCollectorCompatibilityContext = {
+  hasDynamicOptions: boolean;
+  hasManualOptions: boolean;
+  hasStoredResponseCollector: boolean;
+  isInputStep: boolean;
+};
+
 export const FLOW_CONTENT_SCHEMA_VERSION = 1 as const;
 
 export type FlowContentDocumentV1 = {
@@ -358,6 +365,24 @@ export function getFlowContentCompositionIssues(
         },
       ]
     : [];
+}
+
+export function getFlowResponseCollectorCompatibilityIssue(
+  context: FlowResponseCollectorCompatibilityContext,
+) {
+  if (!context.isInputStep) {
+    return "Response collectors can only be added to steps that collect a visitor answer.";
+  }
+
+  if (context.hasDynamicOptions) {
+    return "This step already collects an answer from a dynamic choice source.";
+  }
+
+  if (context.hasManualOptions && !context.hasStoredResponseCollector) {
+    return "This step already collects an answer from its configured choices.";
+  }
+
+  return null;
 }
 
 export function getFlowChoiceContentBlock(settings: Record<string, unknown>) {

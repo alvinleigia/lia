@@ -54,6 +54,7 @@ import type { ActionFlowRouteValidationIssue } from "@/lib/action-flows";
 import {
   type FlowContentBlock,
   getFlowContentBlocks,
+  getFlowResponseCollectorCompatibilityIssue,
 } from "@/lib/flow-content-blocks";
 import type { FlowContentComponentKey } from "@/lib/flow-content-components";
 import { getFlowMessageFamilyDefinition } from "@/lib/flow-message-editor";
@@ -413,11 +414,13 @@ function CanvasStepNodeContent({
     });
   };
 
-  const allowsAnswerCollection =
-    step.inputType !== null &&
-    !hasDynamicChoices &&
-    step.stepType !== "choice" &&
-    storedManualChoices.length === 0;
+  const answerCollectionDisabledReason =
+    getFlowResponseCollectorCompatibilityIssue({
+      hasDynamicOptions: hasDynamicChoices,
+      hasManualOptions: storedManualChoices.length > 0,
+      hasStoredResponseCollector: Boolean(choiceBlock),
+      isInputStep: step.inputType !== null,
+    });
 
   if (isHybridStepType(step.stepType)) {
     return (
@@ -801,7 +804,7 @@ function CanvasStepNodeContent({
         >
           <FlowAddContentMenuItems
             context={{
-              allowsAnswerCollection,
+              answerCollectionDisabledReason,
               blockCount: contentBlocks.length,
               catalogProductCount: catalogProducts.length,
               hasResponseCollector: Boolean(choiceBlock),

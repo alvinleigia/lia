@@ -88,8 +88,8 @@ database, backup, and provider readiness work.
 Current phase: Priority 2, Phase 9 of 18. Phase 8 and Priority 1 completed
 implementation, automated verification, and manual UAT by 2026-08-03.
 
-Current target: prevent incompatible or ambiguous response collectors across
-content blocks, typed step inputs, and manual or dynamic choice sources.
+Current target: complete structured choice rows, stable stored values, and the
+remaining rich-message authoring controls from the Flow Builder v2 examples.
 
 ## Product Direction
 
@@ -702,9 +702,9 @@ structured interactions.
 - [x] Existing content can be reordered, duplicated, edited, and removed.
 - [x] Finalize the versioned universal node and ordered-content contracts.
 - [x] Allow several compatible presentation blocks and one response collector in a node.
-- [ ] Prevent incompatible or ambiguous response collectors.
-- [ ] Show every universal Add Content option in one menu.
-- [ ] Keep inapplicable content visible with a plain-language disabled reason.
+- [x] Prevent incompatible or ambiguous response collectors.
+- [x] Show every universal Add Content option in one menu.
+- [x] Keep inapplicable content visible with a plain-language disabled reason.
 - [ ] Complete Text and Buttons.
 - [ ] Complete Media and Buttons.
 - [ ] Complete structured lists with sections and rows.
@@ -731,6 +731,14 @@ one response-collector role. The authoritative composition contract accepts
 several presentations plus one collector and rejects a second collector; both
 editor menus and the server save boundary use the same rule. Thirteen focused
 content/menu checks, the canvas save/reload scenario, and the 126-test fast
+release certification passed.
+
+Phase 9 Checkpoint 3 status: Complete on 2026-08-03. One shared compatibility
+rule now rejects response collectors on presentation-only nodes and nodes that
+already collect from manual or dynamic choices, while preserving edits to
+stored legacy collectors. Both editor menus continue to show every registered
+option and now expose the specific incompatibility reason. Fifteen focused
+content/menu checks, the canvas save/reload scenario, and the 128-test fast
 release certification passed.
 
 Phase 9 exit gate: explicit nodes provide complete composed-content control

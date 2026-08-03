@@ -1001,7 +1001,7 @@ test("universal Add Content menu explains availability in both canvas editors", 
   ).toBeDisabled();
   await expect(
     contentMenu.getByText(
-      "Available on steps that collect a compatible visitor answer.",
+      "Response collectors can only be added to steps that collect a visitor answer.",
       { exact: true },
     ),
   ).toHaveCount(2);

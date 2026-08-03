@@ -8,6 +8,7 @@ import {
   getFlowContentCompositionIssues,
   getFlowContentDocument,
   getFlowResponseCollectorBlocks,
+  getFlowResponseCollectorCompatibilityIssue,
   parseFlowContentDocument,
 } from "@/lib/flow-content-blocks";
 
@@ -138,4 +139,42 @@ test("rejects a second response collector", () => {
       message: "A step can contain one response collector.",
     },
   ]);
+});
+
+test("rejects collectors on presentation-only and dynamic-choice steps", () => {
+  expect(
+    getFlowResponseCollectorCompatibilityIssue({
+      hasDynamicOptions: false,
+      hasManualOptions: false,
+      hasStoredResponseCollector: false,
+      isInputStep: false,
+    }),
+  ).toContain("collect a visitor answer");
+  expect(
+    getFlowResponseCollectorCompatibilityIssue({
+      hasDynamicOptions: true,
+      hasManualOptions: false,
+      hasStoredResponseCollector: false,
+      isInputStep: true,
+    }),
+  ).toContain("dynamic choice source");
+});
+
+test("rejects a collector beside manual choices but permits editing a stored collector", () => {
+  expect(
+    getFlowResponseCollectorCompatibilityIssue({
+      hasDynamicOptions: false,
+      hasManualOptions: true,
+      hasStoredResponseCollector: false,
+      isInputStep: true,
+    }),
+  ).toContain("configured choices");
+  expect(
+    getFlowResponseCollectorCompatibilityIssue({
+      hasDynamicOptions: false,
+      hasManualOptions: true,
+      hasStoredResponseCollector: true,
+      isInputStep: true,
+    }),
+  ).toBeNull();
 });
