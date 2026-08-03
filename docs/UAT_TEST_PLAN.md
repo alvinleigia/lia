@@ -396,16 +396,17 @@ Expected result:
 ## Phase 9 Sign-Off
 
 - [x] Steps 1 through 4 passed before this UAT-plan correction.
-- [ ] All six focused steps pass.
+- [x] All six focused steps pass.
 - [x] Universal Add Content visibility and disabled reasons are correct.
 - [x] Ordered content and structured choices survive save and refresh.
 - [x] Incomplete or conflicting content blocks publication.
-- [ ] Published preview and project chat preserve order and stable selection.
-- [ ] Export/import preserves the universal content contract without raw JSON.
-- [ ] No unresolved Critical or High Phase 9 defect remains.
+- [x] Published preview and project chat preserve order and stable selection.
+- [x] Export/import preserves the universal content contract without raw JSON.
+- [x] No unresolved Critical or High Phase 9 defect remains.
 
-Record screenshots or concise defect notes under the failed step. Phase 9 is
-not closed until these checks are signed off.
+Phase 9 passed manual UAT on 2026-08-03. The visitor-label, export-navigation,
+and React file-import form defects found during Steps 5 and 6 were corrected,
+covered by focused browser regressions, and committed before sign-off.
 
 ## Previous Sign-Off - Phase 8, Checkpoint 6
 

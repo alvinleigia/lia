@@ -85,11 +85,11 @@ database, backup, and provider readiness work.
 - [ ] Direct button, list-row, product, and result-to-node mapping is not complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 2, Phase 9 of 18. Phase 8 and Priority 1 completed
+Current phase: Priority 2, Phase 10 of 18. Phases 8 and 9 completed
 implementation, automated verification, and manual UAT by 2026-08-03.
 
-Current target: complete focused manual UAT for Phase 9 composed-content
-authoring, persistence, and runtime presentation.
+Current target: give every deterministic selectable response a stable identity
+and explicit output-port contract without changing existing stored values.
 
 ## Product Direction
 
@@ -752,8 +752,15 @@ canvas save/reload scenario and the 137-test fast release certification passed.
 Phase 9 Checkpoint 5 automated status: Complete on 2026-08-03. The production
 build, 138 contract tests, 225 offline browser and database tests, tenant
 isolation checks, and both serialized live OpenAI smoke scenarios passed. The
-focused six-step manual plan is ready in `docs/UAT_TEST_PLAN.md`; its sign-off
-is the only remaining Phase 9 exit requirement.
+focused six-step manual plan was prepared in `docs/UAT_TEST_PLAN.md`; its
+sign-off was the remaining Phase 9 exit requirement at this checkpoint.
+
+Phase 9 Checkpoint 6 status: Complete on 2026-08-03. All six focused manual
+UAT steps passed. Defects found during UAT were corrected so structured choices
+show visitor labels while retaining stable stored values, export downloads do
+not enter client navigation, and React owns file-import form encoding. Focused
+browser regressions cover those fixes, and no unresolved Critical or High
+Phase 9 defect remains.
 
 Phase 9 exit gate: explicit nodes provide complete composed-content control
 when a business needs exact interaction wording or presentation.
