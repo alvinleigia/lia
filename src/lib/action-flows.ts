@@ -1124,8 +1124,11 @@ export async function createPublishedActionFlowVersion(input: {
   ) {
     throw new Error("Action flow must pass validation before publishing.");
   }
+  const statusAfterPublish = getProjectActionStatusAfterPublish(
+    action.status as ProjectActionStatus,
+  );
   const snapshot = buildActionFlowVersionSnapshot({
-    action,
+    action: { ...action, status: statusAfterPublish },
     branchRules,
     hybridGraph: hybrid.graph,
     publishedAt,
@@ -1148,9 +1151,7 @@ export async function createPublishedActionFlowVersion(input: {
     projectId: input.projectId,
     actionId: input.actionId,
     publishedVersionId: version.id,
-    status: getProjectActionStatusAfterPublish(
-      action.status as ProjectActionStatus,
-    ),
+    status: statusAfterPublish,
   });
 
   return version;

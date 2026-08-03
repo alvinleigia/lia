@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
+import { getDraftRuntimeChangeSummary } from "../../src/lib/action-flow-version-diff";
 import {
   countBlockingActionFlowIssues,
   createActionFlowBranchRule,
@@ -8,7 +9,9 @@ import {
   createPublishedActionFlowVersion,
   getActionSubmission,
   getActiveActionSubmissionForConversation,
+  getProjectAction,
   listActionFlowBranchRules,
+  listActionFlowSteps,
   listActionSubmissionEvents,
   listActionSubmissions,
   updateActionFlowStep,
@@ -822,6 +825,68 @@ test("action steps use friendly compact editors and preserve integration setting
   await expect(
     dialog.getByText("Advanced settings", { exact: true }),
   ).toHaveCount(0);
+});
+
+test("first publication keeps the draft aligned with runtime", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-first-publish-${runId}@example.test`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E First Publish User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(
+    page,
+    `E2E First Publish Project ${runId}`,
+  );
+  const action = await createChatbotAction({
+    description: "Checks first-publication draft comparison.",
+    name: `E2E First Publish ${runId}`,
+    projectId,
+    status: "draft",
+    triggerPhrases: [],
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Finish request",
+    projectId,
+    prompt: "Your request is saved.",
+    sortOrder: 1,
+    stepType: "submit",
+  });
+
+  const user = await getUserByEmail(email);
+  if (!user) {
+    throw new Error("Expected the first-publish test user to exist.");
+  }
+  const publishedVersion = await createPublishedActionFlowVersion({
+    actionId: action.id,
+    projectId,
+    publishedByUserId: user.id,
+  });
+  const publishedAction = await getProjectAction(projectId, action.id);
+  if (!publishedVersion || !publishedAction) {
+    throw new Error("Expected the draft action to publish.");
+  }
+  const [publishedSteps, publishedBranches] = await Promise.all([
+    listActionFlowSteps(projectId, action.id),
+    listActionFlowBranchRules(projectId, action.id),
+  ]);
+
+  expect(publishedAction.status).toBe("active");
+  expect(
+    getDraftRuntimeChangeSummary({
+      action: publishedAction,
+      branchRules: publishedBranches,
+      publishedSnapshot: publishedVersion.snapshot,
+      steps: publishedSteps,
+    }),
+  ).toMatchObject({ actionChanged: false, hasChanges: false });
 });
 
 test("canvas saves and restores friendly grouped route conditions", async ({
