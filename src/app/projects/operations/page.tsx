@@ -232,9 +232,11 @@ export default async function OperationsPage({
               </p>
             )}
             {params.providerUpdated && (
-              <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                Provider updated.
-              </p>
+              <FlashToast
+                clearParams="providerUpdated"
+                id="provider-updated"
+                message="Provider updated."
+              />
             )}
             {params.operationCreated && (
               <FlashToast
@@ -846,6 +848,7 @@ export default async function OperationsPage({
                         <form
                           action={updateIntegrationProviderStatusAction}
                           className="flex items-center gap-2"
+                          data-preserve-scroll
                         >
                           <input
                             type="hidden"
