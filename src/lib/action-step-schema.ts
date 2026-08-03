@@ -49,7 +49,9 @@ const actionStepSchemaShape = {
   contactAttributeFieldKey: z.string().trim().max(120).optional(),
   contactAttributeValue: z.string().trim().max(1000).optional(),
   contactAttributeValueSource: z.enum(["field", "static"]).optional(),
+  contactAgentEmail: z.string().trim().email().max(320).optional(),
   contactTagNames: z.string().trim().max(1000).optional(),
+  contactTeamName: z.string().trim().max(120).optional(),
   connectedActionId: optionalNumber(z.coerce.number().int().positive()),
   connectFlowMode: z.enum(["jump", "return"]).optional(),
   handoffNotifyTeam: z.coerce.boolean().optional(),
@@ -312,11 +314,30 @@ function refineActionStep(
     });
   }
 
-  if (data.stepType === "add_tag" && !data.contactTagNames?.trim()) {
+  if (
+    (data.stepType === "add_tag" || data.stepType === "remove_tag") &&
+    !data.contactTagNames?.trim()
+  ) {
     ctx.addIssue({
       code: "custom",
       message: "At least one tag is required.",
       path: ["contactTagNames"],
+    });
+  }
+
+  if (data.stepType === "assign_agent" && !data.contactAgentEmail?.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      message: "An active company member email is required.",
+      path: ["contactAgentEmail"],
+    });
+  }
+
+  if (data.stepType === "assign_team" && !data.contactTeamName?.trim()) {
+    ctx.addIssue({
+      code: "custom",
+      message: "A team or queue name is required.",
+      path: ["contactTeamName"],
     });
   }
 

@@ -248,6 +248,26 @@ export function getActionStepPrompt(step: RuntimeActionStep) {
     return step.prompt || step.label || "Updating contact tags.";
   }
 
+  if (step.stepType === "remove_tag") {
+    return step.prompt || step.label || "Removing contact tags.";
+  }
+
+  if (step.stepType === "subscribe") {
+    return step.prompt || step.label || "Updating subscription preferences.";
+  }
+
+  if (step.stepType === "unsubscribe") {
+    return step.prompt || step.label || "Updating subscription preferences.";
+  }
+
+  if (step.stepType === "assign_agent") {
+    return step.prompt || step.label || "Assigning a contact owner.";
+  }
+
+  if (step.stepType === "assign_team") {
+    return step.prompt || step.label || "Assigning a contact team.";
+  }
+
   if (step.stepType === "wait") {
     return step.prompt || step.label || "I will continue shortly.";
   }
@@ -320,7 +340,15 @@ export function isActionSubmitStep(step: RuntimeActionStep) {
 }
 
 export function isActionMutationStep(step: RuntimeActionStep) {
-  return step.stepType === "set_attribute" || step.stepType === "add_tag";
+  return [
+    "set_attribute",
+    "add_tag",
+    "remove_tag",
+    "subscribe",
+    "unsubscribe",
+    "assign_agent",
+    "assign_team",
+  ].includes(step.stepType);
 }
 
 export function isActionConnectFlowStep(step: RuntimeActionStep) {

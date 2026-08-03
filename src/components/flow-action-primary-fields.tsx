@@ -40,11 +40,16 @@ type FlowActionPrimaryFieldsProps = {
 
 const ACTION_ICONS = {
   add_tag: Tags,
+  assign_agent: ContactRound,
+  assign_team: UsersRound,
   connect_flow: Workflow,
   handoff: UsersRound,
   operation: GitBranch,
+  remove_tag: Tags,
   set_attribute: ContactRound,
   submit: CheckCircle2,
+  subscribe: CheckCircle2,
+  unsubscribe: ContactRound,
   wait: Clock3,
 } as const;
 
@@ -623,10 +628,10 @@ export function FlowActionPrimaryFields({
         </div>
       )}
 
-      {stepType === "add_tag" && (
+      {(stepType === "add_tag" || stepType === "remove_tag") && (
         <div className="space-y-2 rounded-md border p-4">
           <label className="text-sm font-medium" htmlFor={`${idPrefix}-tags`}>
-            Tags to add
+            Tags to {stepType === "add_tag" ? "add" : "remove"}
           </label>
           <textarea
             id={`${idPrefix}-tags`}
@@ -638,8 +643,51 @@ export function FlowActionPrimaryFields({
             className="flex min-h-24 w-full resize-y rounded-md border border-input bg-transparent px-3 py-3 text-sm leading-6 shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           />
           <p className="text-xs text-muted-foreground">
-            Add one tag per line or separate tags with commas.
+            Enter one tag per line or separate tags with commas.
           </p>
+        </div>
+      )}
+
+      {stepType === "assign_agent" && (
+        <div className="space-y-2 rounded-md border p-4">
+          <label
+            className="text-sm font-medium"
+            htmlFor={`${idPrefix}-agent-email`}
+          >
+            Agent email
+          </label>
+          <input
+            id={`${idPrefix}-agent-email`}
+            name="contactAgentEmail"
+            type="email"
+            required
+            defaultValue={getSettingText(settings, "contactAgentEmail")}
+            placeholder="agent@example.com"
+            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          />
+          <p className="text-xs text-muted-foreground">
+            The address must belong to an active member of this project&apos;s
+            company when the flow runs.
+          </p>
+        </div>
+      )}
+
+      {stepType === "assign_team" && (
+        <div className="space-y-2 rounded-md border p-4">
+          <label
+            className="text-sm font-medium"
+            htmlFor={`${idPrefix}-team-name`}
+          >
+            Team or queue name
+          </label>
+          <input
+            id={`${idPrefix}-team-name`}
+            name="contactTeamName"
+            required
+            defaultValue={getSettingText(settings, "contactTeamName")}
+            placeholder="Sales"
+            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          />
         </div>
       )}
 

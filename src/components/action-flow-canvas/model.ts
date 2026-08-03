@@ -580,7 +580,9 @@ export function readStepForm(form: HTMLFormElement): CanvasStepInput {
     contactAttributeValueSource: String(
       formData.get("contactAttributeValueSource") ?? "field",
     ),
+    contactAgentEmail: String(formData.get("contactAgentEmail") ?? ""),
     contactTagNames: String(formData.get("contactTagNames") ?? ""),
+    contactTeamName: String(formData.get("contactTeamName") ?? ""),
     connectedActionId: String(formData.get("connectedActionId") ?? ""),
     connectFlowMode: String(formData.get("connectFlowMode") ?? "jump"),
     fieldKey: String(formData.get("fieldKey") ?? ""),
@@ -676,7 +678,9 @@ export function readStepBasicsForm(
     contactAttributeValueSource: String(
       formData.get("contactAttributeValueSource") ?? "field",
     ),
+    contactAgentEmail: String(formData.get("contactAgentEmail") ?? ""),
     contactTagNames: String(formData.get("contactTagNames") ?? ""),
+    contactTeamName: String(formData.get("contactTeamName") ?? ""),
     connectedActionId: String(formData.get("connectedActionId") ?? ""),
     connectFlowMode: String(formData.get("connectFlowMode") ?? "jump"),
     contentBlocks: String(formData.get("contentBlocks") ?? "[]"),

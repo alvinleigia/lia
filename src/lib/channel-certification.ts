@@ -32,6 +32,8 @@ export type FlowCertificationFamily =
 
 export const FLOW_STEP_CERTIFICATION_FAMILIES = {
   add_tag: "state_mutation",
+  assign_agent: "state_mutation",
+  assign_team: "state_mutation",
   address: "input",
   boolean: "choice_reply",
   catalog_message: "catalog_reply",
@@ -55,11 +57,14 @@ export const FLOW_STEP_CERTIFICATION_FAMILIES = {
   operation: "side_effect",
   phone: "input",
   product_selection: "choice_reply",
+  remove_tag: "state_mutation",
   set_attribute: "state_mutation",
   single_product: "product_reply",
   submit: "terminal",
+  subscribe: "state_mutation",
   template_message: "template_reply",
   time: "input",
+  unsubscribe: "state_mutation",
   wait: "durable_pause",
 } as const satisfies Record<ActionStepType, FlowCertificationFamily>;
 

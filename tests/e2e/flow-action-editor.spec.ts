@@ -28,6 +28,9 @@ test("action fields stay relevant to their runtime family", () => {
   expect(isFlowActionFieldRelevant("handoff", "handoffQueue")).toBe(true);
   expect(isFlowActionFieldRelevant("connect_flow", "connectedFlow")).toBe(true);
   expect(isFlowActionFieldRelevant("add_tag", "tags")).toBe(true);
+  expect(isFlowActionFieldRelevant("remove_tag", "tags")).toBe(true);
+  expect(isFlowActionFieldRelevant("assign_agent", "agentEmail")).toBe(true);
+  expect(isFlowActionFieldRelevant("assign_team", "teamName")).toBe(true);
   expect(isFlowActionFieldRelevant("submit", "completionMessage")).toBe(true);
   expect(isFlowActionFieldRelevant("wait", "waitDuration")).toBe(true);
   expect(isFlowActionFieldRelevant("wait", "waitMessage")).toBe(true);

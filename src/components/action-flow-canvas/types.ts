@@ -138,7 +138,9 @@ export type CanvasStepInput = {
   contactAttributeKey: string;
   contactAttributeValue: string;
   contactAttributeValueSource: string;
+  contactAgentEmail: string;
   contactTagNames: string;
+  contactTeamName: string;
   connectedActionId: string;
   connectFlowMode: string;
   fieldKey: string;
@@ -198,7 +200,9 @@ export type CanvasStepBasicsInput = {
   contactAttributeKey?: string;
   contactAttributeValue?: string;
   contactAttributeValueSource?: string;
+  contactAgentEmail?: string;
   contactTagNames?: string;
+  contactTeamName?: string;
   connectedActionId?: string;
   connectFlowMode?: string;
   contentBlocks: string;

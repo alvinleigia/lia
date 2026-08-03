@@ -5,6 +5,11 @@ export const FLOW_ACTION_STEP_TYPES = [
   "connect_flow",
   "set_attribute",
   "add_tag",
+  "remove_tag",
+  "subscribe",
+  "unsubscribe",
+  "assign_agent",
+  "assign_team",
   "wait",
 ] as const;
 
@@ -17,6 +22,11 @@ export const FLOW_ACTION_FAMILY_KEYS = [
   "subflow",
   "contact_attribute",
   "contact_tag",
+  "contact_tag_removal",
+  "contact_subscription",
+  "contact_unsubscription",
+  "agent_assignment",
+  "team_assignment",
   "condition",
   "ai_knowledge",
   "wait",
@@ -30,6 +40,7 @@ export type FlowActionField =
   | "attributeName"
   | "attributeValue"
   | "attributeValueSource"
+  | "agentEmail"
   | "completionMessage"
   | "connectedFlow"
   | "connectedFlowMode"
@@ -41,6 +52,7 @@ export type FlowActionField =
   | "operationRoutes"
   | "operationTiming"
   | "tags"
+  | "teamName"
   | "waitDuration"
   | "waitMessage";
 
@@ -117,6 +129,48 @@ export const FLOW_ACTION_FAMILY_DEFINITIONS: Record<
     key: "contact_tag",
     stepType: "add_tag",
     title: "Tag contact",
+  },
+  contact_tag_removal: {
+    availability: "supported",
+    description: "Remove one or more existing labels from the current contact.",
+    fields: ["tags"],
+    key: "contact_tag_removal",
+    stepType: "remove_tag",
+    title: "Remove contact tag",
+  },
+  contact_subscription: {
+    availability: "supported",
+    description:
+      "Record whether the current contact is subscribed or unsubscribed.",
+    fields: [],
+    key: "contact_subscription",
+    stepType: "subscribe",
+    title: "Subscribe contact",
+  },
+  contact_unsubscription: {
+    availability: "supported",
+    description: "Record that the current contact is unsubscribed.",
+    fields: [],
+    key: "contact_unsubscription",
+    stepType: "unsubscribe",
+    title: "Unsubscribe contact",
+  },
+  agent_assignment: {
+    availability: "supported",
+    description:
+      "Assign the contact to an active member of this project company.",
+    fields: ["agentEmail"],
+    key: "agent_assignment",
+    stepType: "assign_agent",
+    title: "Assign agent",
+  },
+  team_assignment: {
+    availability: "supported",
+    description: "Assign the contact to a named team or queue.",
+    fields: ["teamName"],
+    key: "team_assignment",
+    stepType: "assign_team",
+    title: "Assign team",
   },
   condition: {
     availability: "route",

@@ -126,7 +126,16 @@ function getExperimentSummary(settings: Record<string, unknown>) {
 }
 
 function isSilentActionStep(stepType: string) {
-  return ["operation", "set_attribute", "add_tag"].includes(stepType);
+  return [
+    "operation",
+    "set_attribute",
+    "add_tag",
+    "remove_tag",
+    "subscribe",
+    "unsubscribe",
+    "assign_agent",
+    "assign_team",
+  ].includes(stepType);
 }
 
 function isProductMessageStep(stepType: string) {
@@ -251,10 +260,26 @@ function getPublishReadinessIssues(input: {
     }
 
     if (
-      step.stepType === "add_tag" &&
+      (step.stepType === "add_tag" || step.stepType === "remove_tag") &&
       !getSettingText(step.settings, "contactTagNames")
     ) {
       issues.push(`Step ${step.sortOrder} needs at least one contact tag.`);
+    }
+
+    if (
+      step.stepType === "assign_agent" &&
+      !getSettingText(step.settings, "contactAgentEmail")
+    ) {
+      issues.push(
+        `Step ${step.sortOrder} needs an active company member email.`,
+      );
+    }
+
+    if (
+      step.stepType === "assign_team" &&
+      !getSettingText(step.settings, "contactTeamName")
+    ) {
+      issues.push(`Step ${step.sortOrder} needs a team or queue name.`);
     }
   }
 

@@ -4,12 +4,16 @@ import {
   actionSubmissions,
   channelConversations,
   channelMessages,
+  companyMemberships,
   contactAttributes,
   contacts,
   contactTagAssignments,
   contactTags,
   projectActions,
+  projects,
   type SelectContact,
+  users,
+  workspaces,
 } from "@/lib/db-schema";
 
 type ContactIdentityInput = {
@@ -40,6 +44,16 @@ export type AddContactTagInput = {
   name: string;
   projectId: number;
   source?: string;
+};
+
+export type ContactWorkflowState = {
+  assignedAgent?: {
+    email: string;
+    name: string | null;
+    userId: number;
+  };
+  assignedTeam?: string;
+  subscriptionStatus?: "subscribed" | "unsubscribed";
 };
 
 function normalizeContactAttributeKey(key: string) {
@@ -354,6 +368,116 @@ export async function addContactTag(input: AddContactTagInput) {
     .returning();
 
   return { assignment, tag };
+}
+
+export async function removeContactTag(input: {
+  contactId: number;
+  name: string;
+  projectId: number;
+}) {
+  const name = normalizeTagName(input.name);
+  if (!name) {
+    throw new Error("Contact tag name is required.");
+  }
+
+  const contact = await getContact(input.projectId, input.contactId);
+  if (!contact) {
+    return null;
+  }
+
+  const [tag] = await db
+    .select()
+    .from(contactTags)
+    .where(
+      and(
+        eq(contactTags.projectId, input.projectId),
+        eq(contactTags.name, name),
+      ),
+    )
+    .limit(1);
+
+  if (!tag) {
+    return null;
+  }
+
+  const [assignment] = await db
+    .delete(contactTagAssignments)
+    .where(
+      and(
+        eq(contactTagAssignments.projectId, input.projectId),
+        eq(contactTagAssignments.contactId, contact.id),
+        eq(contactTagAssignments.tagId, tag.id),
+      ),
+    )
+    .returning();
+
+  return assignment ? { assignment, tag } : null;
+}
+
+export async function getActiveProjectAgentByEmail(
+  projectId: number,
+  email: string,
+) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const [agent] = await db
+    .select({ email: users.email, name: users.name, userId: users.id })
+    .from(projects)
+    .innerJoin(workspaces, eq(workspaces.id, projects.workspaceId))
+    .innerJoin(
+      companyMemberships,
+      and(
+        eq(companyMemberships.companyId, workspaces.companyId),
+        eq(companyMemberships.status, "active"),
+      ),
+    )
+    .innerJoin(
+      users,
+      and(
+        eq(users.id, companyMemberships.userId),
+        eq(users.email, normalizedEmail),
+      ),
+    )
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  return agent ?? null;
+}
+
+export async function updateContactWorkflowState(input: {
+  contactId: number;
+  patch: ContactWorkflowState;
+  projectId: number;
+}) {
+  const contact = await getContact(input.projectId, input.contactId);
+  if (!contact) {
+    return null;
+  }
+
+  const currentState =
+    contact.metadata.workflowState &&
+    typeof contact.metadata.workflowState === "object" &&
+    !Array.isArray(contact.metadata.workflowState)
+      ? (contact.metadata.workflowState as ContactWorkflowState)
+      : {};
+  const [updated] = await db
+    .update(contacts)
+    .set({
+      metadata: {
+        ...contact.metadata,
+        workflowState: { ...currentState, ...input.patch },
+      },
+      updatedAt: new Date(),
+    })
+    .where(
+      and(eq(contacts.projectId, input.projectId), eq(contacts.id, contact.id)),
+    )
+    .returning();
+
+  return updated ?? null;
 }
 
 export function getContactLabel(contact: SelectContact) {

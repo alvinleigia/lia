@@ -1,6 +1,12 @@
 import { addActionSubmissionEvent } from "@/lib/action-flows";
 import type { RuntimeActionStep } from "@/lib/action-runtime";
-import { addContactTag, setContactAttribute } from "@/lib/contacts";
+import {
+  addContactTag,
+  getActiveProjectAgentByEmail,
+  removeContactTag,
+  setContactAttribute,
+  updateContactWorkflowState,
+} from "@/lib/contacts";
 
 type MutationResult = {
   ok: boolean;
@@ -49,7 +55,15 @@ function resolveAttributeValue(input: {
 }
 
 export function isContactMutationStep(step: RuntimeActionStep) {
-  return step.stepType === "set_attribute" || step.stepType === "add_tag";
+  return [
+    "set_attribute",
+    "add_tag",
+    "remove_tag",
+    "subscribe",
+    "unsubscribe",
+    "assign_agent",
+    "assign_team",
+  ].includes(step.stepType);
 }
 
 export async function executeContactMutationStep(
@@ -134,53 +148,167 @@ export async function executeContactMutationStep(
     };
   }
 
-  const tags = getTagNames(input.step.settings);
-  if (tags.length === 0) {
+  if (input.step.stepType === "add_tag") {
+    const tags = getTagNames(input.step.settings);
+    if (tags.length === 0) {
+      await addActionSubmissionEvent({
+        projectId: input.projectId,
+        submissionId: input.submissionId,
+        eventType: "contact.tags_skipped",
+        message: "Contact tag step has no tags configured.",
+        payload: { stepId: input.step.id },
+      });
+
+      return {
+        ok: false,
+        message: "Contact tag step has no tags configured.",
+      };
+    }
+
+    const results = await Promise.all(
+      tags.map((name) =>
+        addContactTag({
+          contactId,
+          name,
+          projectId: input.projectId,
+          source: input.source ?? "flow",
+        }),
+      ),
+    );
+    const appliedTags = results
+      .filter((result): result is NonNullable<typeof result> => Boolean(result))
+      .map((result) => result.tag.name);
+
     await addActionSubmissionEvent({
       projectId: input.projectId,
       submissionId: input.submissionId,
-      eventType: "contact.tags_skipped",
-      message: "Contact tag step has no tags configured.",
+      eventType: "contact.tags_added",
+      message: `Added ${appliedTags.length} contact tag(s).`,
       payload: {
+        contactId,
+        requestedTags: tags,
         stepId: input.step.id,
+        tags: appliedTags,
       },
     });
 
     return {
-      ok: false,
-      message: "Contact tag step has no tags configured.",
+      ok: appliedTags.length > 0,
+      message: `Added ${appliedTags.length} contact tag(s).`,
     };
   }
 
-  const results = await Promise.all(
-    tags.map((name) =>
-      addContactTag({
-        contactId,
-        name,
-        projectId: input.projectId,
-        source: input.source ?? "flow",
-      }),
-    ),
-  );
-  const appliedTags = results
-    .filter((result): result is NonNullable<typeof result> => Boolean(result))
-    .map((result) => result.tag.name);
+  if (input.step.stepType === "remove_tag") {
+    const tags = getTagNames(input.step.settings);
+    const results = await Promise.all(
+      tags.map((name) =>
+        removeContactTag({ contactId, name, projectId: input.projectId }),
+      ),
+    );
+    const removedTags = results
+      .filter((result): result is NonNullable<typeof result> => Boolean(result))
+      .map((result) => result.tag.name);
 
+    await addActionSubmissionEvent({
+      projectId: input.projectId,
+      submissionId: input.submissionId,
+      eventType: "contact.tags_removed",
+      message: `Removed ${removedTags.length} contact tag(s).`,
+      payload: {
+        contactId,
+        requestedTags: tags,
+        stepId: input.step.id,
+        tags: removedTags,
+      },
+    });
+
+    return {
+      ok: removedTags.length > 0,
+      message: `Removed ${removedTags.length} contact tag(s).`,
+    };
+  }
+
+  if (
+    input.step.stepType === "subscribe" ||
+    input.step.stepType === "unsubscribe"
+  ) {
+    const subscriptionStatus =
+      input.step.stepType === "subscribe" ? "subscribed" : "unsubscribed";
+    const updated = await updateContactWorkflowState({
+      contactId,
+      patch: { subscriptionStatus },
+      projectId: input.projectId,
+    });
+
+    await addActionSubmissionEvent({
+      projectId: input.projectId,
+      submissionId: input.submissionId,
+      eventType: `contact.${subscriptionStatus}`,
+      message: `Contact marked ${subscriptionStatus}.`,
+      payload: { contactId, stepId: input.step.id },
+    });
+
+    return {
+      ok: Boolean(updated),
+      message: `Contact marked ${subscriptionStatus}.`,
+    };
+  }
+
+  if (input.step.stepType === "assign_agent") {
+    const email = getSettingText(input.step.settings, "contactAgentEmail");
+    const agent = await getActiveProjectAgentByEmail(input.projectId, email);
+    if (!agent) {
+      await addActionSubmissionEvent({
+        projectId: input.projectId,
+        submissionId: input.submissionId,
+        eventType: "contact.agent_assignment_skipped",
+        message: "Configured agent is not an active company member.",
+        payload: { stepId: input.step.id },
+      });
+      return {
+        ok: false,
+        message: "Configured agent is not an active company member.",
+      };
+    }
+
+    const updated = await updateContactWorkflowState({
+      contactId,
+      patch: { assignedAgent: agent },
+      projectId: input.projectId,
+    });
+    await addActionSubmissionEvent({
+      projectId: input.projectId,
+      submissionId: input.submissionId,
+      eventType: "contact.agent_assigned",
+      message: "Contact assigned to an agent.",
+      payload: { contactId, stepId: input.step.id, userId: agent.userId },
+    });
+    return { ok: Boolean(updated), message: "Contact assigned to an agent." };
+  }
+
+  const teamName = getSettingText(input.step.settings, "contactTeamName");
+  const updated = teamName
+    ? await updateContactWorkflowState({
+        contactId,
+        patch: { assignedTeam: teamName },
+        projectId: input.projectId,
+      })
+    : null;
   await addActionSubmissionEvent({
     projectId: input.projectId,
     submissionId: input.submissionId,
-    eventType: "contact.tags_added",
-    message: `Added ${appliedTags.length} contact tag(s).`,
-    payload: {
-      contactId,
-      requestedTags: tags,
-      stepId: input.step.id,
-      tags: appliedTags,
-    },
+    eventType: updated
+      ? "contact.team_assigned"
+      : "contact.team_assignment_skipped",
+    message: updated
+      ? "Contact assigned to a team."
+      : "Contact team name is missing.",
+    payload: { contactId, stepId: input.step.id, teamName: teamName || null },
   });
-
   return {
-    ok: appliedTags.length > 0,
-    message: `Added ${appliedTags.length} contact tag(s).`,
+    ok: Boolean(updated),
+    message: updated
+      ? "Contact assigned to a team."
+      : "Contact team name is missing.",
   };
 }

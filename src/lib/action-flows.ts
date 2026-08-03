@@ -1491,13 +1491,35 @@ export async function validateActionFlowRoutes(
     }
 
     if (
-      step.stepType === "add_tag" &&
+      (step.stepType === "add_tag" || step.stepType === "remove_tag") &&
       !getStepSettingText(step.settings, "contactTagNames")
     ) {
       issues.push({
         source: "default_next_step",
         stepId: step.id,
         message: `Step ${step.sortOrder} needs at least one contact tag.`,
+      });
+    }
+
+    if (
+      step.stepType === "assign_agent" &&
+      !getStepSettingText(step.settings, "contactAgentEmail")
+    ) {
+      issues.push({
+        source: "default_next_step",
+        stepId: step.id,
+        message: `Step ${step.sortOrder} needs an active company member email.`,
+      });
+    }
+
+    if (
+      step.stepType === "assign_team" &&
+      !getStepSettingText(step.settings, "contactTeamName")
+    ) {
+      issues.push({
+        source: "default_next_step",
+        stepId: step.id,
+        message: `Step ${step.sortOrder} needs a team or queue name.`,
       });
     }
 

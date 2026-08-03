@@ -24,7 +24,9 @@ export type ActionStepSettingsInput = {
   contactAttributeKey?: string;
   contactAttributeValue?: string;
   contactAttributeValueSource?: "field" | "static";
+  contactAgentEmail?: string;
   contactTagNames?: string;
+  contactTeamName?: string;
   existingSettings?: unknown;
   filterByField?: string;
   handoffNotifyTeam?: boolean;
@@ -412,6 +414,22 @@ export function buildActionStepSettings(input: ActionStepSettingsInput) {
 
   if (hasOwn(input, "contactTagNames")) {
     updateStringSetting(settings, "contactTagNames", input.contactTagNames);
+  }
+
+  if (hasOwn(input, "contactAgentEmail")) {
+    updateStringSetting(
+      settings,
+      "contactAgentEmail",
+      input.stepType === "assign_agent" ? input.contactAgentEmail : undefined,
+    );
+  }
+
+  if (hasOwn(input, "contactTeamName")) {
+    updateStringSetting(
+      settings,
+      "contactTeamName",
+      input.stepType === "assign_team" ? input.contactTeamName : undefined,
+    );
   }
 
   if (hasAnyOwn(input, ["connectedAction", "connectFlowMode"])) {

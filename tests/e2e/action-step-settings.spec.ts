@@ -50,6 +50,21 @@ test("managed blank settings are removed without deleting unknown settings", () 
   expect(settings).toHaveProperty("contentBlocks");
 });
 
+test("contact assignment settings remain friendly persisted values", () => {
+  expect(
+    buildActionStepSettings({
+      contactAgentEmail: "agent@example.com",
+      stepType: "assign_agent",
+    }),
+  ).toMatchObject({ contactAgentEmail: "agent@example.com" });
+  expect(
+    buildActionStepSettings({
+      contactTeamName: "Sales",
+      stepType: "assign_team",
+    }),
+  ).toMatchObject({ contactTeamName: "Sales" });
+});
+
 test("changing step families removes managed incompatible settings", () => {
   const settings = buildActionStepSettings({
     existingSettings: {

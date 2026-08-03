@@ -794,8 +794,27 @@ export function ActionStepForm({
             placeholder={"Interested Lead\nHigh Intent"}
           />
           <p className="text-xs text-muted-foreground">
-            Used by Set Attribute and Add Tag action blocks.
+            Used by Add Tag and Remove Tag action blocks.
           </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="contactAgentEmail">Agent Email</Label>
+          <Input
+            id="contactAgentEmail"
+            name="contactAgentEmail"
+            type="email"
+            defaultValue={getSettingText(settings, "contactAgentEmail")}
+            placeholder="agent@example.com"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="contactTeamName">Team or Queue Name</Label>
+          <Input
+            id="contactTeamName"
+            name="contactTeamName"
+            defaultValue={getSettingText(settings, "contactTeamName")}
+            placeholder="Sales"
+          />
         </div>
       </div>
 

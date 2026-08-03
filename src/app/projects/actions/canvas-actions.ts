@@ -168,7 +168,9 @@ const canvasStepBasicsSchema = z.object({
   contactAttributeKey: z.string().trim().max(120).optional(),
   contactAttributeValue: z.string().trim().max(1000).optional(),
   contactAttributeValueSource: z.enum(["field", "static"]).optional(),
+  contactAgentEmail: z.string().trim().email().max(320).optional(),
   contactTagNames: z.string().trim().max(1000).optional(),
+  contactTeamName: z.string().trim().max(120).optional(),
   connectedActionId: z.preprocess(
     (value) =>
       typeof value === "string" && value.trim() === "" ? undefined : value,
@@ -1096,7 +1098,9 @@ export async function createCanvasStepAction(
         contactAttributeKey: parsed.data.contactAttributeKey,
         contactAttributeValue: parsed.data.contactAttributeValue,
         contactAttributeValueSource: parsed.data.contactAttributeValueSource,
+        contactAgentEmail: parsed.data.contactAgentEmail,
         contactTagNames: parsed.data.contactTagNames,
+        contactTeamName: parsed.data.contactTeamName,
         connectedAction,
         connectFlowMode: parsed.data.connectFlowMode,
         handoffNotifyTeam: parsed.data.handoffNotifyTeam,
@@ -1313,7 +1317,9 @@ export async function updateCanvasStepAction(
         contactAttributeKey: parsed.data.contactAttributeKey,
         contactAttributeValue: parsed.data.contactAttributeValue,
         contactAttributeValueSource: parsed.data.contactAttributeValueSource,
+        contactAgentEmail: parsed.data.contactAgentEmail,
         contactTagNames: parsed.data.contactTagNames,
+        contactTeamName: parsed.data.contactTeamName,
         connectedAction,
         connectFlowMode: parsed.data.connectFlowMode,
         existingSettings: existingStep.settings,
@@ -1420,11 +1426,16 @@ export async function updateCanvasStepBasicsAction(
   const isInputStep = isFlowInputStepType(existingStep.stepType);
   const isActionStep = [
     "add_tag",
+    "assign_agent",
+    "assign_team",
     "connect_flow",
     "handoff",
     "operation",
+    "remove_tag",
     "set_attribute",
     "submit",
+    "subscribe",
+    "unsubscribe",
     "wait",
   ].includes(existingStep.stepType);
   const operation = isActionStep
@@ -1470,10 +1481,25 @@ export async function updateCanvasStepBasicsAction(
   }
 
   if (
-    existingStep.stepType === "add_tag" &&
+    (existingStep.stepType === "add_tag" ||
+      existingStep.stepType === "remove_tag") &&
     !parsed.data.contactTagNames?.trim()
   ) {
     return { ok: false, message: "Add at least one contact tag." };
+  }
+
+  if (
+    existingStep.stepType === "assign_agent" &&
+    !parsed.data.contactAgentEmail?.trim()
+  ) {
+    return { ok: false, message: "Enter an active company member email." };
+  }
+
+  if (
+    existingStep.stepType === "assign_team" &&
+    !parsed.data.contactTeamName?.trim()
+  ) {
+    return { ok: false, message: "Enter a team or queue name." };
   }
   const existingContentBlocks = getFlowContentBlocks(existingStep.settings);
   let contentBlocks = existingContentBlocks;
@@ -1620,7 +1646,9 @@ export async function updateCanvasStepBasicsAction(
       contactAttributeKey: parsed.data.contactAttributeKey,
       contactAttributeValue: parsed.data.contactAttributeValue,
       contactAttributeValueSource: parsed.data.contactAttributeValueSource,
+      contactAgentEmail: parsed.data.contactAgentEmail,
       contactTagNames: parsed.data.contactTagNames,
+      contactTeamName: parsed.data.contactTeamName,
       connectedAction,
       connectFlowMode: parsed.data.connectFlowMode,
       existingSettings: settings,

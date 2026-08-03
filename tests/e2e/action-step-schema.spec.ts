@@ -112,6 +112,24 @@ test("step-specific resources remain required", () => {
       stepType: "media",
     }).success,
   ).toBe(false);
+  expect(
+    canvasStepSchema.safeParse({
+      actionId: 1,
+      stepType: "remove_tag",
+    }).success,
+  ).toBe(false);
+  expect(
+    canvasStepSchema.safeParse({
+      actionId: 1,
+      stepType: "assign_agent",
+    }).success,
+  ).toBe(false);
+  expect(
+    canvasStepSchema.safeParse({
+      actionId: 1,
+      stepType: "assign_team",
+    }).success,
+  ).toBe(false);
 });
 
 test("shared option parsing trims commas, lines, and empty values", () => {
