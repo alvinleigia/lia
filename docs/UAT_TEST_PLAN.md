@@ -142,23 +142,27 @@ Do not continue that older run with the date picker.
    older sequential action and does not exercise the conversational task.
 3. When asked for `Service Category`, click `Facial`.
 4. When asked for `Service`, click `Classic Facial`.
-5. In `What would you like to know?`, enter this exact multi-field reply and
-   click the send-arrow button:
+5. The task now asks for the preferred date and may display a date-picker card
+   with its own `Send` button. This is expected. For this multi-field test, do
+   not select a date in that card and do not click the card's `Send` button.
+6. Use the separate conversation composer fixed at the bottom of Project Chat,
+   labelled `What would you like to know?`. Enter this exact multi-field reply
+   there and click the send-arrow button at the right of that bottom composer:
 
 ```text
 2026-08-15 at 15:30 for Phase 13 Parity Guest. Email phase13.invalid and phone +919876543210.
 ```
 
-6. Confirm the invalid email is not accepted as a valid completed field and the
+7. Confirm the invalid email is not accepted as a valid completed field and the
    assistant asks for a usable email or clarification.
-7. Enter `Correct my email to phase13.parity@example.com.` and click the
+8. Enter `Correct my email to phase13.parity@example.com.` and click the
    send-arrow button.
-8. Review the confirmation summary. It must show `Facial`, `Classic Facial`,
+9. Review the confirmation summary. It must show `Facial`, `Classic Facial`,
    `2026-08-15`, `15:30`, `Phase 13 Parity Guest`,
    `phase13.parity@example.com`, and `+919876543210`.
-9. Click the visible confirmation control labelled `Confirm`, or enter
+10. Click the visible confirmation control labelled `Confirm`, or enter
    `confirm` if the reply is presented as text.
-10. Wait for the `Manual Review` result and the task's successful completion
+11. Wait for the `Manual Review` result and the task's successful completion
     reply. Do not click the task button again while it is processing.
 
 Expected result:
@@ -187,7 +191,7 @@ Expected result:
    Preview` again.
 7. Confirm the same active task and collected values resume instead of starting
    a new run.
-8. Confirm the summary shows the same seven values listed in Step 2 point 8.
+8. Confirm the summary shows the same seven values listed in Step 2 point 9.
 9. Click `Confirm`, or enter `confirm` if a text reply is shown.
 10. Wait for the Manual Review result and the successful completion reply.
 11. Click `Open Widget Preview` again. Use browser responsive mode or resize the
@@ -222,7 +226,7 @@ Expected result:
 6. Wait at least 10 seconds after the reply arrives, then confirm no second copy
    of the same prompt or acknowledgement appears.
 7. Review the confirmation summary. It must contain the same seven values from
-   Step 2 point 8; provider wording and line wrapping may differ.
+   Step 2 point 9; provider wording and line wrapping may differ.
 8. Select or send `Confirm` once.
 9. Wait for the Manual Review result and successful completion reply. If the
    reply is delayed, run the documented durable worker command once, then wait
