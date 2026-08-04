@@ -81,6 +81,28 @@ function canRequestTaskField(proposal: TurnResultV1) {
   );
 }
 
+export function bindRequestedTaskSelection(input: {
+  proposal: TurnResultV1;
+  requestedFieldKey: string | null;
+  selectionValue: string | null;
+}): TurnResultV1 {
+  if (!input.requestedFieldKey || !input.selectionValue) {
+    return input.proposal;
+  }
+
+  return {
+    ...input.proposal,
+    fieldCandidates: [
+      {
+        confidence: 1,
+        fieldKey: input.requestedFieldKey,
+        naturalValue: input.selectionValue,
+        source: "visitor",
+      },
+    ],
+  };
+}
+
 function findUnresolvedTaskField(input: TaskRuntimeReconciliationInput) {
   if (!canRequestTaskField(input.proposal)) {
     return null;

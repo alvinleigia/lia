@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
 import { resumeChannelFlowAtStep } from "@/lib/channel-flow-runtime";
+import type { ChannelInboundSelectionV1 } from "@/lib/channel-inbound-contract";
 import { type ChannelType, listRecentChannelMessages } from "@/lib/channels";
 import {
   type ConversationalTaskSnapshotV1,
@@ -40,6 +41,7 @@ import type {
   HybridFlowNodeV1,
 } from "@/lib/hybrid-flow-contracts";
 import {
+  bindRequestedTaskSelection,
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   dispatchHybridFlowBoundary,
@@ -469,6 +471,7 @@ type HybridChannelRuntimeInput = {
   externalUserId?: string | null;
   inboundMessageId: number;
   projectId: number;
+  selection?: ChannelInboundSelectionV1 | null;
   submission: SelectActionSubmission;
   text: string;
 };
@@ -603,7 +606,15 @@ async function executeTaskBoundary(input: {
     stage: "extraction",
     visitorMessage: input.runtimeInput.text,
   });
-  const proposal = execution.proposal;
+  const requestedField = session.snapshot.task.definition.fields.find(
+    (field) => field.key === session.runtime?.run.lastRequestedFieldKey,
+  );
+  const proposal = bindRequestedTaskSelection({
+    proposal: execution.proposal,
+    requestedFieldKey:
+      requestedField?.type === "project_resource" ? requestedField.key : null,
+    selectionValue: input.runtimeInput.selection?.value ?? null,
+  });
   let revision = session.execution.revision;
 
   if (proposal.turnKind === "side_question") {

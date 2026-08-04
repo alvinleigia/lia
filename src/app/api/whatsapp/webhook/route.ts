@@ -169,6 +169,7 @@ export async function POST(req: Request) {
             externalUserId: change.message.from,
             inboundMessageId: inboundRecord.message.id,
             projectId: channel.projectId,
+            selection: normalizedInbound.selection,
             source: WHATSAPP_FLOW_SOURCE,
             text: runtimeText,
           })

@@ -26,6 +26,7 @@ import {
   taskSuspensionReturnTargetV1Schema,
 } from "../../src/lib/hybrid-flow-contracts";
 import {
+  bindRequestedTaskSelection,
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   dispatchHybridFlowBoundary,
@@ -500,6 +501,46 @@ test("task turns cannot claim progress past invalid canonical fields", () => {
     toolRequest: null,
     turnKind: "field_correction",
   });
+});
+
+test("explicit task selections override model-rewritten resource IDs", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor selected a service.",
+    fieldCandidates: [
+      {
+        confidence: 0.99,
+        fieldKey: "serviceId",
+        naturalValue: "catalog:71",
+        source: "visitor" as const,
+      },
+    ],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "ask" as const,
+    outcomeRecommendation: null,
+    reply: "Please provide Service.",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_answer" as const,
+  };
+
+  expect(
+    bindRequestedTaskSelection({
+      proposal,
+      requestedFieldKey: "serviceId",
+      selectionValue: "product:71",
+    }).fieldCandidates,
+  ).toEqual([
+    {
+      confidence: 1,
+      fieldKey: "serviceId",
+      naturalValue: "product:71",
+      source: "visitor",
+    },
+  ]);
 });
 
 test("task turns ask for the next unresolved field before confirmation", () => {

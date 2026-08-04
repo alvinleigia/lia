@@ -355,6 +355,7 @@ async function executeBrowserFlowText(
       externalUserId: input.externalUserId,
       inboundMessageId: inboundRecord.message.id,
       projectId: input.projectId,
+      selection: normalizedInbound.selection,
       source: input.source,
       text,
     });
