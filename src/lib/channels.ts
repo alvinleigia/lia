@@ -27,6 +27,7 @@ export type NormalizedChannelInboundMessage = {
   projectId: number;
   channelType: ChannelType;
   externalConversationId: string;
+  externalMessageId?: string | null;
   externalUserId?: string | null;
   text?: string | null;
   messageType?: string;
@@ -38,6 +39,7 @@ export type NormalizedChannelOutboundMessage = {
   projectId: number;
   channelType: ChannelType;
   externalConversationId: string;
+  externalMessageId?: string | null;
   text?: string | null;
   messageType?: string;
   payload?: Record<string, unknown>;
@@ -115,6 +117,7 @@ export async function recordChannelMessage(input: {
   projectId: number;
   channelType: ChannelType;
   externalConversationId: string;
+  externalMessageId?: string | null;
   externalUserId?: string | null;
   direction: ChannelMessageDirection;
   text?: string | null;
@@ -137,19 +140,54 @@ export async function recordChannelMessage(input: {
     metadata,
   });
 
-  const [message] = await db
+  const externalMessageId = input.externalMessageId?.trim() || null;
+  const [insertedMessage] = await db
     .insert(channelMessages)
     .values({
       projectId: input.projectId,
       conversationId: conversation.id,
       direction: input.direction,
+      externalMessageId,
       messageType: input.messageType ?? "text",
       text: input.text ?? null,
       payload: input.payload ?? {},
     })
+    .onConflictDoNothing({
+      target: [
+        channelMessages.projectId,
+        channelMessages.conversationId,
+        channelMessages.direction,
+        channelMessages.externalMessageId,
+      ],
+    })
     .returning();
 
-  return { conversation, message };
+  if (insertedMessage) {
+    return { conversation, duplicate: false, message: insertedMessage };
+  }
+
+  if (!externalMessageId) {
+    throw new Error("Channel message could not be recorded.");
+  }
+
+  const [existingMessage] = await db
+    .select()
+    .from(channelMessages)
+    .where(
+      and(
+        eq(channelMessages.projectId, input.projectId),
+        eq(channelMessages.conversationId, conversation.id),
+        eq(channelMessages.direction, input.direction),
+        eq(channelMessages.externalMessageId, externalMessageId),
+      ),
+    )
+    .limit(1);
+
+  if (!existingMessage) {
+    throw new Error("Channel message could not be recorded.");
+  }
+
+  return { conversation, duplicate: true, message: existingMessage };
 }
 
 export function recordChannelInboundMessage(

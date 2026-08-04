@@ -4,7 +4,10 @@ import {
   getNormalizedChannelInboundRuntimeValue,
   normalizeChannelInboundV1,
 } from "../../src/lib/channel-inbound-contract";
-import type { ChannelType } from "../../src/lib/channels";
+import {
+  type ChannelType,
+  recordChannelInboundMessage,
+} from "../../src/lib/channels";
 import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
@@ -31,6 +34,7 @@ import {
   channelConversations,
   channelMessages,
   companies,
+  contacts,
   conversationalTaskRuns,
   conversationalTasks,
   conversationalTaskVersions,
@@ -86,6 +90,7 @@ let activeRunId: number;
 let activeRevision: number;
 let providerSequence = 0;
 const certificationConversationIds: number[] = [];
+const certificationContactIds: number[] = [];
 
 function timestamp(offsetMinutes: number) {
   return new Date(
@@ -349,6 +354,16 @@ test.afterAll(async () => {
         ),
       );
   }
+  for (const contactId of certificationContactIds) {
+    await db
+      .delete(contacts)
+      .where(
+        and(
+          eq(contacts.id, contactId),
+          eq(contacts.projectId, fixture.projectId),
+        ),
+      );
+  }
   await deleteConversationRuntimeData({
     conversationId: fixture.conversationId,
     includeMessages: true,
@@ -593,6 +608,46 @@ test("certifies identical booking fields and outcomes across live channel types"
   });
   expect(results[1]).toEqual(results[0]);
   expect(results[2]).toEqual(results[0]);
+});
+
+test("deduplicates replayed WhatsApp provider messages before runtime effects", async () => {
+  const externalConversationId = `phase13-whatsapp-replay-${suffix}`;
+  const externalMessageId = `wamid.phase13.${suffix}`;
+  const input = {
+    channelType: "whatsapp" as const,
+    externalConversationId,
+    externalMessageId,
+    externalUserId: externalConversationId,
+    messageType: "text",
+    payload: { whatsappMessageId: externalMessageId },
+    projectId: fixture?.projectId as number,
+    text: "Book a massage",
+  };
+
+  const first = await recordChannelInboundMessage(input);
+  certificationConversationIds.push(first.conversation.id);
+  if (first.conversation.contactId) {
+    certificationContactIds.push(first.conversation.contactId);
+  }
+  const replay = await recordChannelInboundMessage(input);
+
+  expect(first.duplicate).toBe(false);
+  expect(replay).toMatchObject({
+    duplicate: true,
+    message: { id: first.message.id },
+  });
+  await expect(
+    db
+      .select({ id: channelMessages.id })
+      .from(channelMessages)
+      .where(
+        and(
+          eq(channelMessages.projectId, fixture?.projectId as number),
+          eq(channelMessages.conversationId, first.conversation.id),
+          eq(channelMessages.externalMessageId, externalMessageId),
+        ),
+      ),
+  ).resolves.toHaveLength(1);
 });
 
 test("starts a version-pinned run and replays the same event once", async () => {

@@ -779,6 +779,7 @@ export const channelMessages = pgTable(
       .notNull()
       .references(() => channelConversations.id),
     direction: text("direction").notNull(),
+    externalMessageId: text("external_message_id"),
     messageType: text("message_type").notNull().default("text"),
     text: text("text"),
     payload: jsonb("payload")
@@ -792,6 +793,12 @@ export const channelMessages = pgTable(
     index("channel_messages_conversation_idx").on(table.conversationId),
     index("channel_messages_direction_idx").on(table.direction),
     index("channel_messages_created_at_idx").on(table.createdAt),
+    uniqueIndex("channel_messages_provider_message_unique").on(
+      table.projectId,
+      table.conversationId,
+      table.direction,
+      table.externalMessageId,
+    ),
   ],
 );
 

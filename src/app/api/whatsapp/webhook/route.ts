@@ -103,6 +103,7 @@ export async function POST(req: Request) {
       projectId: channel.projectId,
       channelType: "whatsapp",
       externalConversationId: change.message.from,
+      externalMessageId: change.message.id,
       externalUserId: change.message.from,
       text:
         normalizedInbound.selection?.label ??
@@ -124,6 +125,10 @@ export async function POST(req: Request) {
         channelId: channel.id,
       },
     });
+
+    if (inboundRecord.duplicate) {
+      continue;
+    }
 
     if (!text?.trim() && !media && !location) {
       continue;
