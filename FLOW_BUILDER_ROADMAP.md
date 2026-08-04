@@ -953,11 +953,21 @@ channels.
 - [ ] Confirm service-window and approved-template requirements on WhatsApp.
 - [ ] Confirm content beyond provider limits uses documented readable fallbacks.
 - [ ] Confirm page refresh and delayed replies resume the correct version-pinned task.
-- [ ] Confirm duplicate events and stale clients do not duplicate operations.
+- [x] Confirm duplicate events and stale clients do not duplicate operations.
 - [ ] Confirm project chat and widget visual acceptance.
 - [ ] Confirm widget responsive, origin, token, and accessibility acceptance.
 - [ ] Confirm WhatsApp webhook, media, template, retry, and outbox behavior.
-- [ ] Record every provider limitation as an adapter rule.
+- [x] Record every provider limitation as an adapter rule.
+
+Phase 13 implementation status on 2026-08-04: automated certification is
+complete and focused live UAT is prepared. The gate includes 144 passing channel
+contracts, 21 passing serialized task-runtime scenarios, explicit provider-rule
+coverage, scoped WhatsApp provider-message idempotency, and responsive,
+keyboard-accessible widget launcher and preview checks. Migration
+`0037_channel_message_idempotency.sql` is applied locally. Project 194 retains
+the published `Book a Spa Service` v4 reference task, but live sign-off is
+pending creation of its widget token and configuration of a UAT WhatsApp
+Business channel with a public HTTPS Meta callback.
 
 Phase 13 exit gate: every production channel reaches equivalent validated task
 outcomes without introducing channel-specific task or graph persistence.

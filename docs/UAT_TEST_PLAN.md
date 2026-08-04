@@ -2,6 +2,278 @@
 
 ## Current Test
 
+Phase 13 of 18: cross-channel conversational certification.
+
+Status: Ready for focused manual UAT on 2026-08-04. Migration
+`0037_channel_message_idempotency.sql` has been applied to the local database.
+
+Automated evidence:
+
+- All 144 shared channel, task, hybrid-flow, and delivery contracts pass.
+- All 21 serialized database runtime scenarios pass, including identical
+  canonical booking fields and outcomes across Project Chat, Widget, and
+  WhatsApp.
+- Replayed WhatsApp provider message IDs are persisted once and do not re-enter
+  the task or repeat an operation.
+- Focused browser checks pass for widget token/origin enforcement, the built-in
+  conversation preview, small-screen sizing, launcher state, keyboard close,
+  and focus return.
+- Lint, TypeScript, and tenant-scope analysis pass. Lint reports only the three
+  established image and sidebar-cookie warnings.
+- Provider rules explicitly record the 24-hour WhatsApp service window,
+  approved-template requirement, native limits of 3 buttons, 10 list rows, and
+  30 products, the 16 MiB inbound-media limit, public outbound-media URLs, and
+  the 5-attempt durable outbox.
+
+Use:
+
+- Project: `Ewissen Infra (#194)`
+- Task: `Book a Spa Service`, published version `v4`
+- Catalog and service: `Facial` > `Classic Facial`
+- Date and time: `2026-08-15` at `15:30`
+- Guest: `Phase 13 Parity Guest`
+- Correct email: `phase13.parity@example.com`
+- Phone: `+919876543210`
+
+The task's required write operation is the project-scoped `Manual Review`
+operation, not a live booking provider. Keep the terminal running `npm run dev`
+open throughout the test. Do not paste access tokens, app secrets, or webhook
+verify tokens into screenshots or the UAT notes.
+
+## Step 1 of 6 - Prepare The Three Live Channels
+
+1. Open [the local application](http://localhost:3000) and sign in with the UAT
+   account.
+2. Click the header pill beginning with `Selected Project:`. In `Select a
+   Project`, search for `Ewissen Infra`, then select the row with ID `194`.
+3. Confirm the header says `Selected Project: Ewissen Infra`.
+4. Click `Automation` > `Tasks`, click `Book a Spa Service`, then click
+   `Configure Conversation` > `Versions`.
+5. Confirm `v4` is the latest published version. Do not edit or publish the
+   task.
+6. Click `Projects` > `Product Catalog`. Confirm catalog `Facial` and product
+   `Classic Facial` both show `Active`.
+7. Click `Projects` > `Widget`.
+8. Click `Generate Widget Token`. If the button instead says `Rotate Widget
+   Token` and no plaintext token is visible, click it once to create a new
+   disposable UAT token.
+9. Copy `Widget Token (shown once)` to a temporary private note. Do not place it
+   in the UAT report.
+10. Leave `Allowed Domains` empty for the built-in local preview and click
+    `Save Allowed Domains`.
+11. Confirm `Allowed domains saved.` appears and the button `Open Widget
+    Preview` is visible. Do not refresh this page because the plaintext token is
+    intentionally shown only once.
+12. Click `Projects` > `WhatsApp`.
+13. In `Channel Settings`, enter the values from the Meta UAT application:
+    `Channel Name`, `Business Name`, `Display Phone Number`, `WhatsApp Business
+    Account ID`, `Phone Number ID`, `Webhook Verify Token`, `Meta App Secret`,
+    and `Cloud API Access Token`. Set `Status` to `active`.
+14. Click `Save WhatsApp Settings` and confirm the Sonner toast says `WhatsApp
+    settings saved.` The status badge must show `active`, and the summary cards
+    must show a Phone Number ID, Business Account, and `Credentials: Stored`.
+15. In Meta's WhatsApp configuration, subscribe the UAT app to message events
+    using the exact `Callback URL` displayed under `Meta Webhook` and the same
+    private verify token saved in Step 13.
+16. If the displayed callback starts with `http://localhost`, stop here. Meta
+    cannot deliver to localhost; configure an HTTPS staging/tunnel URL in the
+    application environment, restart the development server, and repeat Steps
+    12 through 15.
+17. Under `Send Test Message`, enter the tester's WhatsApp number in
+    country-code format without `+` (example: `919876543210`). Keep the exact
+    message `This is a Lia AI WhatsApp channel test.` and click `Send Test`.
+18. Confirm the Sonner toast says `Test message sent through WhatsApp Cloud
+    API.` and the phone receives exactly one test message.
+
+Expected result:
+
+- Version `v4`, `Facial`, and `Classic Facial` are ready without editing the
+  reference task.
+- The disposable widget token opens a local preview and remains private.
+- The active WhatsApp channel has stored credentials, a verified public HTTPS
+  callback, and one successful device delivery.
+- If Meta credentials or a public callback are unavailable, record `Environment
+  blocker` and do not continue to Steps 2 through 6.
+
+## Step 2 of 6 - Complete The Reference Booking In Project Chat
+
+1. Open a new browser tab so the Widget token page remains open, then navigate
+   to [Project Chat](http://localhost:3000/projects/chat).
+2. Under `Project Chat`, click the action button `Book a Spa Service` once.
+3. When asked for `Service Category`, click `Facial`.
+4. When asked for `Service`, click `Classic Facial`.
+5. In `What would you like to know?`, enter this exact multi-field reply and
+   click the send-arrow button:
+
+```text
+2026-08-15 at 15:30 for Phase 13 Parity Guest. Email phase13.invalid and phone +919876543210.
+```
+
+6. Confirm the invalid email is not accepted as a valid completed field and the
+   assistant asks for a usable email or clarification.
+7. Enter `Correct my email to phase13.parity@example.com.` and click the
+   send-arrow button.
+8. Review the confirmation summary. It must show `Facial`, `Classic Facial`,
+   `2026-08-15`, `15:30`, `Phase 13 Parity Guest`,
+   `phase13.parity@example.com`, and `+919876543210`.
+9. Click the visible confirmation control labelled `Confirm`, or enter
+   `confirm` if the reply is presented as text.
+10. Wait for the `Manual Review` result and the task's successful completion
+    reply. Do not click the task button again while it is processing.
+
+Expected result:
+
+- One message supplies several fields, validation rejects the malformed email,
+  and the correction changes only `Guest Email`.
+- The task remains pinned to `v4`, creates one Manual Review attempt, and ends
+  through outcome `Completed`.
+- No raw catalog ID, product ID, provider payload, secret, or duplicate success
+  reply is shown.
+
+## Step 3 of 6 - Complete The Same Booking In The Widget Preview
+
+1. Return to the still-open `Widget: Ewissen Infra` tab.
+2. Click `Open Widget Preview`.
+3. Inside `Widget conversation preview`, click `Book a Spa Service` once.
+4. Click `Facial`, then click `Classic Facial` when each choice is requested.
+5. Enter this exact reply in the widget input and click its send-arrow button:
+
+```text
+2026-08-15 at 15:30 for Phase 13 Parity Guest, phase13.parity@example.com, +919876543210.
+```
+
+6. Before confirming, click `Close Widget Preview`, then click `Open Widget
+   Preview` again.
+7. Confirm the same active task and collected values resume instead of starting
+   a new run.
+8. Confirm the summary shows the same seven values listed in Step 2 point 8.
+9. Click `Confirm`, or enter `confirm` if a text reply is shown.
+10. Wait for the Manual Review result and the successful completion reply.
+11. Click `Open Widget Preview` again. Use browser responsive mode or resize the
+    window to approximately `320 x 568`. Press `Tab` inside the preview until
+    `Close chat` is focused, then press `Escape`.
+12. Confirm the preview closes, `Open Widget Preview` is visible again, and no
+    content extends beyond the narrow viewport.
+
+Expected result:
+
+- Widget labels may be laid out differently, but its canonical seven fields,
+  validation, pinned `v4`, Manual Review operation, and `Completed` outcome are
+  identical to Project Chat.
+- Closing and reopening resumes one run without duplicate values or operations.
+- The preview and public launcher remain usable on a narrow screen and by
+  keyboard.
+
+## Step 4 of 6 - Complete The Same Booking Through WhatsApp
+
+1. On the tester's phone, open the conversation with the configured UAT
+   WhatsApp Business number.
+2. Send exactly `Book a Spa Service`.
+3. Select or reply `Facial` when asked for `Service Category`.
+4. Select or reply `Classic Facial` when asked for `Service`.
+5. Send this exact multi-field message:
+
+```text
+2026-08-15 at 15:30 for Phase 13 Parity Guest, phase13.parity@example.com, +919876543210.
+```
+
+6. Wait at least 10 seconds after the reply arrives, then confirm no second copy
+   of the same prompt or acknowledgement appears.
+7. Review the confirmation summary. It must contain the same seven values from
+   Step 2 point 8; provider wording and line wrapping may differ.
+8. Select or send `Confirm` once.
+9. Wait for the Manual Review result and successful completion reply. If the
+   reply is delayed, run the documented durable worker command once, then wait
+   and recheck the phone; do not resend `Confirm`.
+
+Expected result:
+
+- WhatsApp button, list, or readable text presentation normalizes to the same
+  stable `Facial` and `Classic Facial` selections.
+- The inbound message opens the 24-hour service window, the run stays pinned to
+  `v4`, and one Manual Review operation reaches `Completed`.
+- A provider retry or delayed delivery does not duplicate a field, prompt,
+  confirmation, operation, or completion reply.
+
+## Step 5 of 6 - Verify Cancellation, Handoff, And Provider Boundaries
+
+1. In Project Chat, click `Book a Spa Service` to start a new clean run.
+2. At the first task prompt, enter `cancel` and click the send-arrow button.
+3. Confirm the assistant acknowledges cancellation and does not ask for the
+   next booking field or create a Manual Review attempt.
+4. In the Widget preview, start a new `Book a Spa Service` run.
+5. Enter `I need a person to help me with this booking.` and click the widget
+   send-arrow button.
+6. Confirm the automated task stops replying as owner and gives a readable
+   human-help or handoff response.
+7. Open `Automation` > `Handoff Queue`. Confirm one new row belongs to the
+   Widget conversation; do not resolve it yet.
+8. Open `Automation` > `Tasks` > `Book a Spa Service` > `Configure
+   Conversation` > `Test` and inspect `Channel Preview` > `WhatsApp`.
+9. Confirm two choices use native buttons, while missing media and handoff
+   requirements display readable fallback warnings without changing their
+   original intent.
+10. Review [Channel Provider Limitations](./CHANNEL_PROVIDER_LIMITATIONS.md).
+    Confirm the UAT result records the 24-hour service window, approved-template
+    requirement outside that window, native limits, media rules, and 5-attempt
+    outbox as accepted provider constraints rather than task differences.
+
+Expected result:
+
+- Explicit cancellation reaches `Cancelled` without a write operation.
+- Human-help intent reaches `Needs Team Help` and appears once in the Handoff
+  Queue with no dual automated reply.
+- WhatsApp provider limits degrade to readable presentation; canonical task
+  keys, routes, and outcomes remain channel-neutral.
+
+## Step 6 of 6 - Compare Evidence And Complete Sign-Off
+
+1. Click `Automation` > `Contacts`.
+2. Open each newest contact/conversation created by Steps 2 through 4. Use the
+   channel label or transcript to distinguish `project_chat`, `widget`, and
+   `whatsapp`.
+3. In each `Channel Transcript`, confirm one start, one set of seven canonical
+   values, one confirmation, and one completion. WhatsApp must show only one row
+   for each provider message ID.
+4. Compare the three completed runs and confirm these exact business values are
+   equivalent: `Facial`, `Classic Facial`, `2026-08-15`, `15:30`, `Phase 13
+   Parity Guest`, `phase13.parity@example.com`, and `+919876543210`.
+5. Click `Automation` > `Submissions`. Confirm each completed channel run is
+   pinned to task version `v4`, has outcome `Completed`, and references only one
+   Manual Review attempt.
+6. Click `Admin` > `Audit Logs`. Confirm the run, correction, cancellation,
+   handoff, and operation lifecycle are explainable without exposing guest
+   values, access tokens, app secrets, verify tokens, raw provider payloads, or
+   private reasoning.
+7. Return to `Automation` > `Handoff Queue` and resolve the disposable Phase 13
+   handoff if the screen provides the normal resolve action.
+8. Record each live channel as `Pass`, `Pass with accepted provider
+   limitations`, or `Fail`. Attach screenshots only after checking that no
+   credential or private token is visible.
+
+Expected result:
+
+- All production channels reach equivalent validated fields, pinned version,
+  Manual Review behavior, and business outcome without channel-specific task or
+  graph persistence.
+- Refresh, delayed delivery, duplicate delivery, cancellation, and handoff do
+  not cause duplicate effects or dual ownership.
+- No unresolved Critical or High Phase 13 defect remains.
+
+## Phase 13 Sign-Off
+
+- [ ] All six focused steps pass.
+- [ ] Project Chat, Widget, and WhatsApp complete the same published `v4` task.
+- [ ] All three completed runs contain equivalent seven canonical values.
+- [ ] Validation, correction, cancellation, and handoff behave consistently.
+- [ ] Widget token, origin, preview, responsiveness, and keyboard checks pass.
+- [ ] WhatsApp webhook, device delivery, service window, fallback, and outbox checks pass.
+- [ ] Provider limitations are accepted and do not change task semantics.
+- [ ] Duplicate or delayed events create no duplicate operation or reply.
+- [ ] No unresolved Critical or High Phase 13 defect remains.
+
+## Previous Sign-Off - Phase 12
+
 Phase 12 of 18: universal channel adapter upgrade.
 
 Status: Passed focused manual UAT on 2026-08-04. No database migration was
