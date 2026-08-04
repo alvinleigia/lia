@@ -961,7 +961,7 @@ channels.
 
 Phase 13 implementation status on 2026-08-04: automated certification is
 complete and focused live UAT is prepared. The gate includes 145 passing channel
-contracts, 21 passing serialized task-runtime scenarios, explicit provider-rule
+contracts, 22 passing serialized task-runtime scenarios, explicit provider-rule
 coverage, scoped WhatsApp provider-message idempotency, and responsive,
 keyboard-accessible widget launcher and preview checks. Migration
 `0037_channel_message_idempotency.sql` is applied locally. Project 194 retains

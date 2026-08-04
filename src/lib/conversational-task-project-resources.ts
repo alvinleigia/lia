@@ -19,6 +19,45 @@ type ResourceOption = {
   label: string;
 };
 
+export async function listProjectTaskResourceOptions(input: {
+  field: TaskFieldDefinition;
+  fieldValues: ReadonlyMap<string, unknown>;
+  projectId: number;
+}): Promise<ResourceOption[]> {
+  if (input.field.optionSource?.kind !== "project_resource") return [];
+
+  const resourceType = input.field.optionSource.resourceType.toLowerCase();
+  if (
+    ["catalog", "category", "servicecategory", "productcategory"].includes(
+      resourceType,
+    )
+  ) {
+    return (await listProjectCatalogs(input.projectId)).map((catalog) => ({
+      id: `catalog:${catalog.id}`,
+      label: catalog.name,
+    }));
+  }
+  if (["product", "service", "catalogproduct"].includes(resourceType)) {
+    const catalogId = readCatalogDependency(input.field, input.fieldValues);
+    const rows = catalogId
+      ? (
+          await listProjectCatalogProductsForCatalog(input.projectId, catalogId)
+        ).map((product) => ({ product }))
+      : await listProjectCatalogProducts(input.projectId);
+    return rows.map(({ product }) => ({
+      id: `product:${product.id}`,
+      label: product.name,
+    }));
+  }
+  if (["media", "mediaasset", "asset"].includes(resourceType)) {
+    return (await listProjectMediaAssets(input.projectId)).map((asset) => ({
+      id: `media:${asset.id}`,
+      label: asset.originalName,
+    }));
+  }
+  return [];
+}
+
 function parseScopedId(value: string, prefix: string) {
   const match = value.match(new RegExp(`^${prefix}:(\\d+)$`, "i"));
   return match ? Number(match[1]) : null;

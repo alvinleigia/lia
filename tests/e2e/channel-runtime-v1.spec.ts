@@ -10,6 +10,8 @@ import {
   getNormalizedChannelInboundRuntimeValue,
   normalizeChannelInboundV1,
 } from "../../src/lib/channel-inbound-contract";
+import { REFERENCE_BOOKING_TASK_DEFINITION } from "../../src/lib/conversation-contract-fixtures";
+import { createTaskRuntimeInputRequest } from "../../src/lib/runtime-input-request";
 import {
   createTaskRuntimeReply,
   normalizeRuntimeReply,
@@ -104,6 +106,16 @@ test("task replies use one versioned channel-neutral contract", () => {
     options: expect.arrayContaining([
       { label: "Classic Facial", value: "product:71" },
     ]),
+  });
+});
+
+test("project-resource fields request selectable channel choices", () => {
+  expect(
+    createTaskRuntimeInputRequest(REFERENCE_BOOKING_TASK_DEFINITION.fields[0]),
+  ).toMatchObject({
+    fieldKey: "serviceCategoryId",
+    inputKind: "choice",
+    label: "Service Category",
   });
 });
 

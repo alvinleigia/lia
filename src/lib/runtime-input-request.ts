@@ -22,7 +22,11 @@ export type RuntimeInputRequest = {
 };
 
 function getInputKind(field: TaskFieldDefinition): RuntimeInputKind {
-  if (field.optionSource?.kind === "static" || field.type === "boolean") {
+  if (
+    field.optionSource?.kind === "static" ||
+    field.type === "project_resource" ||
+    field.type === "boolean"
+  ) {
     return "choice";
   }
   if (

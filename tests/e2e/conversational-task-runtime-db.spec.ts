@@ -16,7 +16,10 @@ import {
   conversationalTaskSnapshotV1Schema,
   type ToolDefinitionV1,
 } from "../../src/lib/conversation-contracts";
-import { resolveProjectTaskResource } from "../../src/lib/conversational-task-project-resources";
+import {
+  listProjectTaskResourceOptions,
+  resolveProjectTaskResource,
+} from "../../src/lib/conversational-task-project-resources";
 import {
   applyConversationalTaskEvent,
   cleanupExpiredConversationRuntime,
@@ -442,6 +445,34 @@ test("resolves legacy generic resource fields inside the selected project", asyn
     label: "Deep Tissue",
     status: "resolved",
   });
+});
+
+test("lists scoped catalog choices for channel input controls", async () => {
+  const [categoryField, serviceField] =
+    REFERENCE_BOOKING_TASK_DEFINITION.fields;
+  const categories = await listProjectTaskResourceOptions({
+    field: categoryField,
+    fieldValues: new Map(),
+    projectId: fixture?.projectId as number,
+  });
+  const services = await listProjectTaskResourceOptions({
+    field: serviceField,
+    fieldValues: new Map([
+      ["serviceCategoryId", `catalog:${fixture?.catalogId}`],
+    ]),
+    projectId: fixture?.projectId as number,
+  });
+
+  expect(categories).toEqual([
+    { id: `catalog:${fixture?.facialCatalogId}`, label: "Facial" },
+    { id: `catalog:${fixture?.catalogId}`, label: "Massage" },
+  ]);
+  expect(services).toEqual([
+    { id: `product:${fixture?.serviceProductId}`, label: "Deep Tissue" },
+  ]);
+  expect([...categories, ...services].map((option) => option.id)).not.toContain(
+    `product:${fixture?.otherProductId}`,
+  );
 });
 
 test("certifies identical booking fields and outcomes across live channel types", async () => {

@@ -19,6 +19,7 @@ import {
   getBoundAvailabilityDefinition,
   readCanonicalAvailability,
 } from "@/lib/conversational-task-availability";
+import { listProjectTaskResourceOptions } from "@/lib/conversational-task-project-resources";
 import {
   applyConversationalTaskEvent,
   ConversationalTaskRuntimeConflictError,
@@ -209,6 +210,49 @@ function toRuntimeContext(
         ]
       : [];
   });
+}
+
+async function hydrateProjectResourceInputRequest(input: {
+  fields: NonNullable<
+    Awaited<ReturnType<typeof getConversationTaskRuntimeSession>>["runtime"]
+  >["fields"];
+  inputRequest: RuntimeInputRequest | null;
+  projectId: number;
+  snapshot: ConversationalTaskSnapshotV1;
+}) {
+  if (!input.inputRequest) return null;
+
+  const field = input.snapshot.task.definition.fields.find(
+    (candidate) => candidate.key === input.inputRequest?.fieldKey,
+  );
+  if (field?.optionSource?.kind !== "project_resource") {
+    return input.inputRequest;
+  }
+
+  const fieldValues = new Map<string, unknown>();
+  for (const runtimeField of input.fields) {
+    if (runtimeField.state !== "valid" && runtimeField.state !== "confirmed") {
+      continue;
+    }
+    const value = runtimeField.canonicalValue ?? runtimeField.naturalValue;
+    if (value !== null && value !== undefined) {
+      fieldValues.set(runtimeField.fieldKey, value);
+    }
+  }
+  const options = await listProjectTaskResourceOptions({
+    field,
+    fieldValues,
+    projectId: input.projectId,
+  });
+
+  return {
+    ...input.inputRequest,
+    inputKind: "choice" as const,
+    options: options.map((option) => ({
+      label: option.label,
+      value: option.id,
+    })),
+  };
 }
 
 async function refreshTaskAvailability(input: {
@@ -629,9 +673,14 @@ async function executeTaskBoundary(input: {
       requestedFieldKey: resumedSession.runtime.run.lastRequestedFieldKey,
       snapshot: resumedSession.snapshot,
     });
-    const inputRequest = getResumedTaskRuntimeInputRequest({
+    const inputRequest = await hydrateProjectResourceInputRequest({
       fields: resumedSession.runtime.fields,
-      requestedFieldKey: resumedSession.runtime.run.lastRequestedFieldKey,
+      inputRequest: getResumedTaskRuntimeInputRequest({
+        fields: resumedSession.runtime.fields,
+        requestedFieldKey: resumedSession.runtime.run.lastRequestedFieldKey,
+        snapshot: resumedSession.snapshot,
+      }),
+      projectId: input.runtimeInput.projectId,
       snapshot: resumedSession.snapshot,
     });
     await recordTaskFieldRequest({
@@ -751,11 +800,20 @@ async function executeTaskBoundary(input: {
           ))
         : null;
   if (!outcome) {
-    const inputRequest =
+    const baseInputRequest =
       canonicalSession.runtime && canonicalSession.snapshot
         ? getTaskRuntimeInputRequest({
             fields: canonicalSession.runtime.fields,
             proposal: reconciledProposal,
+            snapshot: canonicalSession.snapshot,
+          })
+        : null;
+    const inputRequest =
+      canonicalSession.runtime && canonicalSession.snapshot
+        ? await hydrateProjectResourceInputRequest({
+            fields: canonicalSession.runtime.fields,
+            inputRequest: baseInputRequest,
+            projectId: input.runtimeInput.projectId,
             snapshot: canonicalSession.snapshot,
           })
         : null;
@@ -970,9 +1028,14 @@ export async function runHybridChannelBoundary(
         proposal,
         snapshot: taskSession.snapshot,
       });
-      inputRequest = getTaskRuntimeInputRequest({
+      inputRequest = await hydrateProjectResourceInputRequest({
         fields: taskSession.runtime.fields,
-        proposal: replyProposal,
+        inputRequest: getTaskRuntimeInputRequest({
+          fields: taskSession.runtime.fields,
+          proposal: replyProposal,
+          snapshot: taskSession.snapshot,
+        }),
+        projectId: input.projectId,
         snapshot: taskSession.snapshot,
       });
       await recordTaskFieldRequest({

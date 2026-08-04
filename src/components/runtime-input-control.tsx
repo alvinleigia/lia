@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 type RuntimeInputControlProps = {
   compact?: boolean;
   disabled?: boolean;
-  onSubmit: (value: string) => void | Promise<void>;
+  onSubmit: (value: string, displayText?: string) => void | Promise<void>;
   request: RuntimeInputRequest;
 };
 
@@ -58,7 +58,7 @@ export function RuntimeInputControl({
             size={compact ? "sm" : "default"}
             variant="outline"
             disabled={disabled}
-            onClick={() => onSubmit(option.value)}
+            onClick={() => onSubmit(option.value, option.label)}
           >
             {option.label}
           </Button>
@@ -91,9 +91,12 @@ export function RuntimeInputControl({
           className="block text-xs font-medium text-foreground"
           htmlFor={inputId}
         >
-          {request.label}
+          Quick answer: {request.label}
           {request.required ? " (required)" : ""}
         </label>
+        <p className="text-xs text-muted-foreground">
+          Or reply naturally in the main message box below.
+        </p>
         <Input
           aria-label={request.label}
           autoComplete={

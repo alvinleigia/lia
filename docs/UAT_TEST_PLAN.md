@@ -10,7 +10,8 @@ Status: Ready for focused manual UAT on 2026-08-04. Migration
 Automated evidence:
 
 - All 145 shared channel, task, hybrid-flow, and delivery contracts pass.
-- All 21 serialized database runtime scenarios pass, including identical
+- All 22 serialized database runtime scenarios pass, including project-scoped
+  catalog choices for browser controls plus identical
   canonical booking fields and outcomes after each channel enters the same
   pinned conversational task. Live channel entry remains part of this UAT.
 - Replayed WhatsApp provider message IDs are persisted once and do not re-enter
