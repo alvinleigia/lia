@@ -960,14 +960,15 @@ channels.
 - [x] Record every provider limitation as an adapter rule.
 
 Phase 13 implementation status on 2026-08-04: automated certification is
-complete and focused live UAT is prepared. The gate includes 144 passing channel
+complete and focused live UAT is prepared. The gate includes 145 passing channel
 contracts, 21 passing serialized task-runtime scenarios, explicit provider-rule
 coverage, scoped WhatsApp provider-message idempotency, and responsive,
 keyboard-accessible widget launcher and preview checks. Migration
 `0037_channel_message_idempotency.sql` is applied locally. Project 194 retains
-the published `Book a Spa Service` v4 reference task, but live sign-off is
-pending creation of its widget token and configuration of a UAT WhatsApp
-Business channel with a public HTTPS Meta callback.
+the published `Book a Spa Service` v4 reference task. Live entry uses a
+disposable single-node `Business Task` action pinned to v4 so Project Chat,
+Widget, and WhatsApp enter the conversational runtime instead of the older
+sequential booking action. Live sign-off remains pending.
 
 Phase 13 exit gate: every production channel reaches equivalent validated task
 outcomes without introducing channel-specific task or graph persistence.

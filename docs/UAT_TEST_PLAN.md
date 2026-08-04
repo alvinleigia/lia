@@ -9,10 +9,10 @@ Status: Ready for focused manual UAT on 2026-08-04. Migration
 
 Automated evidence:
 
-- All 144 shared channel, task, hybrid-flow, and delivery contracts pass.
+- All 145 shared channel, task, hybrid-flow, and delivery contracts pass.
 - All 21 serialized database runtime scenarios pass, including identical
-  canonical booking fields and outcomes across Project Chat, Widget, and
-  WhatsApp.
+  canonical booking fields and outcomes after each channel enters the same
+  pinned conversational task. Live channel entry remains part of this UAT.
 - Replayed WhatsApp provider message IDs are persisted once and do not re-enter
   the task or repeat an operation.
 - Focused browser checks pass for widget token/origin enforcement, the built-in
@@ -53,42 +53,75 @@ verify tokens into screenshots or the UAT notes.
    task.
 6. Click `Projects` > `Product Catalog`. Confirm catalog `Facial` and product
    `Classic Facial` both show `Active`.
-7. Click `Projects` > `Widget`.
-8. Click `Generate Widget Token`. If the button instead says `Rotate Widget
+7. Create a disposable channel wrapper for the published task:
+   1. Click `Automation` > `Actions`, then click `New Action`.
+   2. Scroll to `Blank Action` and enter all three fields exactly:
+
+      | Field label | Value |
+      | --- | --- |
+      | `Action Name` | `Phase 13 Booking Parity UAT` |
+      | `Description` | `Runs the published booking task through Project Chat, Widget, and WhatsApp.` |
+      | `Trigger Phrases` | `phase thirteen booking parity` |
+
+   3. Click `Create Action`. On the new action overview, confirm the heading is
+      `Phase 13 Booking Parity UAT`, then click `Canvas`.
+   4. In the left `Blocks` panel, scroll to `Actions` and click `Business Task`.
+   5. In `Create Step`, enter `Run Phase 13 booking` in `Step Name`.
+   6. In `Published Business Task`, select `Book a Spa Service - version 4`.
+   7. Under `After the Task`, set each visible outcome exactly as follows:
+
+      | Outcome label | Destination |
+      | --- | --- |
+      | `Completed` | `End flow` |
+      | `Cancelled` | `End flow` |
+      | `Needs Team Help` | `End flow` |
+      | `Booking Failed` | `End flow` |
+
+   8. Leave `Values Shared With This Task` with no values selected. Keep
+      `Enabled` on and click `Create Business Task Step`.
+   9. Confirm the canvas contains exactly one node named `Run Phase 13
+      booking`, the toolbar shows `Nodes 1`, and `Blockers 0`. No connector or
+      separate terminal node is required because every task outcome ends the
+      wrapper flow.
+   10. Click `Overview`, then click `Publish` once. Confirm `Action published.`,
+       `Status Active`, and `Published Version v1`. Do not publish again.
+8. Click `Projects` > `Widget`.
+9. Click `Generate Widget Token`. If the button instead says `Rotate Widget
    Token` and no plaintext token is visible, click it once to create a new
    disposable UAT token.
-9. Copy `Widget Token (shown once)` to a temporary private note. Do not place it
+10. Copy `Widget Token (shown once)` to a temporary private note. Do not place it
    in the UAT report.
-10. Leave `Allowed Domains` empty for the built-in local preview and click
+11. Leave `Allowed Domains` empty for the built-in local preview and click
     `Save Allowed Domains`.
-11. Confirm `Allowed domains saved.` appears and the button `Open Widget
+12. Confirm `Allowed domains saved.` appears and the button `Open Widget
     Preview` is visible. Do not refresh this page because the plaintext token is
     intentionally shown only once.
-12. Click `Projects` > `WhatsApp`.
-13. In `Channel Settings`, enter the values from the Meta UAT application:
+13. Click `Projects` > `WhatsApp`.
+14. In `Channel Settings`, enter the values from the Meta UAT application:
     `Channel Name`, `Business Name`, `Display Phone Number`, `WhatsApp Business
     Account ID`, `Phone Number ID`, `Webhook Verify Token`, `Meta App Secret`,
     and `Cloud API Access Token`. Set `Status` to `active`.
-14. Click `Save WhatsApp Settings` and confirm the Sonner toast says `WhatsApp
+15. Click `Save WhatsApp Settings` and confirm the Sonner toast says `WhatsApp
     settings saved.` The status badge must show `active`, and the summary cards
     must show a Phone Number ID, Business Account, and `Credentials: Stored`.
-15. In Meta's WhatsApp configuration, subscribe the UAT app to message events
+16. In Meta's WhatsApp configuration, subscribe the UAT app to message events
     using the exact `Callback URL` displayed under `Meta Webhook` and the same
-    private verify token saved in Step 13.
-16. If the displayed callback starts with `http://localhost`, stop here. Meta
+    private verify token saved in Step 14.
+17. If the displayed callback starts with `http://localhost`, stop here. Meta
     cannot deliver to localhost; configure an HTTPS staging/tunnel URL in the
     application environment, restart the development server, and repeat Steps
-    12 through 15.
-17. Under `Send Test Message`, enter the tester's WhatsApp number in
+    13 through 16.
+18. Under `Send Test Message`, enter the tester's WhatsApp number in
     country-code format without `+` (example: `919876543210`). Keep the exact
     message `This is a Lia AI WhatsApp channel test.` and click `Send Test`.
-18. Confirm the Sonner toast says `Test message sent through WhatsApp Cloud
+19. Confirm the Sonner toast says `Test message sent through WhatsApp Cloud
     API.` and the phone receives exactly one test message.
 
 Expected result:
 
 - Version `v4`, `Facial`, and `Classic Facial` are ready without editing the
-  reference task.
+  reference task. The active `Phase 13 Booking Parity UAT` wrapper contains one
+  `Business Task` node pinned to `v4` and no route blockers.
 - The disposable widget token opens a local preview and remains private.
 - The active WhatsApp channel has stored credentials, a verified public HTTPS
   callback, and one successful device delivery.
@@ -97,9 +130,16 @@ Expected result:
 
 ## Step 2 of 6 - Complete The Reference Booking In Project Chat
 
+Interrupted-attempt recovery: if Project Chat is already showing prompts from
+the older `Book Spa Service` action, enter `cancel`, click the send-arrow, wait
+for the cancellation acknowledgement, and refresh Project Chat before point 1.
+Do not continue that older run with the date picker.
+
 1. Open a new browser tab so the Widget token page remains open, then navigate
    to [Project Chat](http://localhost:3000/projects/chat).
-2. Under `Project Chat`, click the action button `Book a Spa Service` once.
+2. Under `Project Chat`, click the action button `Phase 13 Booking Parity UAT`
+   once. Do not click the similarly named `Book Spa Service` button; that is an
+   older sequential action and does not exercise the conversational task.
 3. When asked for `Service Category`, click `Facial`.
 4. When asked for `Service`, click `Classic Facial`.
 5. In `What would you like to know?`, enter this exact multi-field reply and
@@ -134,7 +174,8 @@ Expected result:
 
 1. Return to the still-open `Widget: Ewissen Infra` tab.
 2. Click `Open Widget Preview`.
-3. Inside `Widget conversation preview`, click `Book a Spa Service` once.
+3. Inside `Widget conversation preview`, click `Phase 13 Booking Parity UAT`
+   once.
 4. Click `Facial`, then click `Classic Facial` when each choice is requested.
 5. Enter this exact reply in the widget input and click its send-arrow button:
 
@@ -168,7 +209,8 @@ Expected result:
 
 1. On the tester's phone, open the conversation with the configured UAT
    WhatsApp Business number.
-2. Send exactly `Book a Spa Service`.
+2. Send exactly `phase thirteen booking parity`. This unique trigger starts the
+   disposable wrapper and avoids the older sequential booking action.
 3. Select or reply `Facial` when asked for `Service Category`.
 4. Select or reply `Classic Facial` when asked for `Service`.
 5. Send this exact multi-field message:
@@ -197,11 +239,12 @@ Expected result:
 
 ## Step 5 of 6 - Verify Cancellation, Handoff, And Provider Boundaries
 
-1. In Project Chat, click `Book a Spa Service` to start a new clean run.
+1. In Project Chat, click `Phase 13 Booking Parity UAT` to start a new clean
+   run.
 2. At the first task prompt, enter `cancel` and click the send-arrow button.
 3. Confirm the assistant acknowledges cancellation and does not ask for the
    next booking field or create a Manual Review attempt.
-4. In the Widget preview, start a new `Book a Spa Service` run.
+4. In the Widget preview, start a new `Phase 13 Booking Parity UAT` run.
 5. Enter `I need a person to help me with this booking.` and click the widget
    send-arrow button.
 6. Confirm the automated task stops replying as owner and gives a readable
@@ -247,7 +290,10 @@ Expected result:
    private reasoning.
 7. Return to `Automation` > `Handoff Queue` and resolve the disposable Phase 13
    handoff if the screen provides the normal resolve action.
-8. Record each live channel as `Pass`, `Pass with accepted provider
+8. Return to `Automation` > `Actions`, open `Phase 13 Booking Parity UAT`,
+   click `Settings`, set `Status` to `Archived`, and save. Confirm the Sonner
+   toast reports the status change and the action shows `Archived`.
+9. Record each live channel as `Pass`, `Pass with accepted provider
    limitations`, or `Fail`. Attach screenshots only after checking that no
    credential or private token is visible.
 

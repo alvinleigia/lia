@@ -293,6 +293,56 @@ test("compiler publishes a reachable knowledge-task-deterministic graph", () => 
   );
 });
 
+test("compiler accepts a terminal business-task channel wrapper", () => {
+  const taskStep = createStep(1, 1, {
+    settings: {
+      conversationalTask: {
+        outcomeRoutes: Object.fromEntries(
+          outcomes.map((outcome) => [outcome.outputPort, "end"]),
+        ),
+        schemaVersion: 1,
+        task: {
+          name: "Book a service",
+          outcomes,
+          schemaVersion: 1,
+          taskId: 40,
+          taskVersionId: 80,
+          versionNumber: 2,
+        },
+        transferContextKeys: [],
+        transferFieldKeys: [],
+      },
+      nodeLabel: "Run channel booking",
+    },
+    stepType: "conversational_task",
+  });
+
+  const result = compileHybridFlowGraph({
+    actionSettings: {},
+    branchRules: [],
+    steps: [taskStep],
+  });
+
+  expect(result.baseIssues).toEqual([]);
+  expect(result.issues).toEqual([]);
+  expect(result.graph.nodes).toEqual([
+    expect.objectContaining({
+      id: "step:1",
+      kind: "conversational_task",
+    }),
+  ]);
+  expect(result.graph.transitions).toEqual(
+    outcomes.map((outcome) =>
+      expect.objectContaining({
+        kind: "task_outcome",
+        sourceNodeId: "step:1",
+        targetNodeId: null,
+        triggerKey: outcome.outputPort,
+      }),
+    ),
+  );
+});
+
 test("resuming a hybrid boundary does not expose its internal prompt", () => {
   const graph = compileHybridFlowGraph({
     actionSettings: {},
