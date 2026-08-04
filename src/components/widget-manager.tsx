@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Save,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,21 @@ export function WidgetManager({
     initialAllowedDomains.join("\n"),
   );
   const [savedDomains, setSavedDomains] = useState(initialAllowedDomains);
+  const previewRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    const closePreview = (event: MessageEvent) => {
+      if (
+        event.source === previewRef.current?.contentWindow &&
+        event.data?.type === "RAG_WIDGET_CLOSE"
+      ) {
+        setIsPreviewOpen(false);
+      }
+    };
+
+    window.addEventListener("message", closePreview);
+    return () => window.removeEventListener("message", closePreview);
+  }, []);
 
   const embedSnippet = useMemo(() => {
     if (!token) {
@@ -247,6 +262,7 @@ export function WidgetManager({
           </Button>
           {isPreviewOpen && (
             <iframe
+              ref={previewRef}
               className="h-[560px] max-h-[70vh] w-full rounded-lg border bg-background"
               src={`${appBaseUrl}/widget/embed?token=${encodeURIComponent(token)}`}
               title="Widget conversation preview"

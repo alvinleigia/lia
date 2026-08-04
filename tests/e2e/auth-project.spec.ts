@@ -1631,7 +1631,10 @@ test("widget token access respects tenant and allowed domains", async ({
   await expect(
     ownerPage.getByTitle("Widget conversation preview"),
   ).toBeVisible();
-  await ownerPage.getByRole("button", { name: "Close Widget Preview" }).click();
+  await ownerPage
+    .frameLocator('iframe[title="Widget conversation preview"]')
+    .getByRole("button", { name: "Close chat" })
+    .press("Escape");
   await expect(ownerPage.getByTitle("Widget conversation preview")).toHaveCount(
     0,
   );
