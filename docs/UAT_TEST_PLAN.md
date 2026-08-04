@@ -72,10 +72,10 @@ verify tokens into screenshots or the UAT notes.
 
       | Outcome label | Destination |
       | --- | --- |
-      | `Completed` | `End flow` |
-      | `Cancelled` | `End flow` |
-      | `Needs Team Help` | `End flow` |
-      | `Booking Failed` | `End flow` |
+      | `Completed` | `End Conversation` |
+      | `Cancelled` | `End Conversation` |
+      | `Needs Team Help` | `End Conversation` |
+      | `Booking Failed` | `End Conversation` |
 
    8. Leave `Values Shared With This Task` with no values selected. Keep
       `Enabled` on and click `Create Business Task Step`.
