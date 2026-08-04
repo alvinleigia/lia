@@ -88,9 +88,9 @@ database, backup, and provider readiness work.
 Current phase: Priority 2, Phase 12 of 18. Phases 8 through 11 completed
 implementation, automated verification, and manual UAT by 2026-08-04.
 
-Current target: upgrade the universal channel adapter contract for task replies,
-rich deterministic content, normalized inbound replies, channel limits, and
-per-channel preview.
+Current target: complete focused Phase 12 manual UAT for the versioned universal
+reply contract, normalized inbound replies, stable values, channel fallbacks,
+and per-channel preview.
 
 ## Product Direction
 
@@ -912,17 +912,27 @@ existing channel adapter boundary.
 - [x] Project chat and widget already use the shared browser adapter.
 - [x] WhatsApp already uses native and fallback delivery from the shared runtime.
 - [x] The reference future adapter already consumes the channel-neutral reply envelope.
-- [ ] Version the runtime reply envelope for task prompts, structured choices, content, and outcomes.
-- [ ] Normalize free text and native interactive replies into one inbound contract.
-- [ ] Preserve stable option and project-resource IDs across adapters.
-- [ ] Let a task request a question, choices, confirmation, media, or handoff without naming a channel.
-- [ ] Let adapters select a native interaction or readable fallback.
-- [ ] Map composed content, lists, products, media, and templates.
-- [ ] Enforce channel limits without changing the saved task or graph.
-- [ ] Keep model instructions and task state free of provider-specific payloads.
-- [ ] Add per-channel preview without changing the universal definition.
-- [ ] Prevent adapter delivery failure from changing task semantics.
-- [ ] Extend the certification matrix for every task reply and V2 content capability.
+- [x] Version the runtime reply envelope for task prompts, structured choices, content, and outcomes.
+- [x] Normalize free text and native interactive replies into one inbound contract.
+- [x] Preserve stable option and project-resource IDs across adapters.
+- [x] Let a task request a question, choices, confirmation, media, or handoff without naming a channel.
+- [x] Let adapters select a native interaction or readable fallback.
+- [x] Map composed content, lists, products, media, and templates.
+- [x] Enforce channel limits without changing the saved task or graph.
+- [x] Keep model instructions and task state free of provider-specific payloads.
+- [x] Add per-channel preview without changing the universal definition.
+- [x] Prevent adapter delivery failure from changing task semantics.
+- [x] Extend the certification matrix for every task reply and V2 content capability.
+
+Phase 12 engineering status: implementation and automated verification completed
+on 2026-08-04; focused manual UAT is pending. The version-one reply and inbound
+contracts cover seven task reply intents and five inbound kinds across project
+chat, widget, WhatsApp, and the reference future adapter. Automated evidence
+includes 22 focused Phase 12 and adapter tests, all 143 channel certification
+tests, lint, TypeScript, tenant-scope analysis, and 50 relevant serial browser
+and database scenarios. Four unrelated platform-admin and invitation scenarios
+require Playwright's isolated test-server environment and are not part of the
+focused Phase 12 gate.
 
 Phase 12 exit gate: the same task and deterministic graph have declared
 delivery behavior in project chat, widget, WhatsApp, and a future adapter.

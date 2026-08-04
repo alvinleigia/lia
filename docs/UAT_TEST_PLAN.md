@@ -2,6 +2,202 @@
 
 ## Current Test
 
+Phase 12 of 18: universal channel adapter upgrade.
+
+Status: Ready for focused manual UAT on 2026-08-04. No database migration is
+required.
+
+Automated evidence:
+
+- Twenty-two focused versioned-reply, normalized-inbound, adapter, delivery,
+  and certification scenarios pass.
+- All 143 shared channel and runtime contract scenarios pass.
+- Lint, TypeScript, and tenant-scope analysis pass; lint reports only the three
+  established image and sidebar-cookie warnings.
+- Fifty relevant serial browser and database scenarios pass against the
+  restarted development server, including browser and widget runtime,
+  version-pinned flows, durable policies, contacts, media, catalogue, and
+  operation routing.
+- The reply matrix covers seven task intents and the inbound matrix covers text,
+  interactive selection, media, location, and product selection across Project
+  Chat, Widget, WhatsApp, and the reference Future adapter.
+
+This UAT is read-only. Use the existing `Book a Spa Service` task in project
+`Ewissen Infra` (`#194`); do not edit or publish the task. The preview does not
+send a WhatsApp message, call OpenAI, create a submission, or change live task
+state. Keep the terminal running `npm run dev` open throughout the test.
+
+## Step 1 of 6 - Open The Existing Task Channel Preview
+
+1. Open [the local application](http://localhost:3000) and sign in with the UAT
+   account.
+2. In the header, click the pill beginning with `Selected Project:`. In the
+   `Select a Project` dialog, search for `Ewissen Infra`, then select the row
+   whose ID is `194`.
+3. Confirm the header says `Selected Project: Ewissen Infra`.
+4. Click `Automation` in the header, then click `Tasks`.
+5. On `Tasks: Ewissen Infra`, click the task named `Book a Spa Service`.
+6. On the task overview, click `Configure Conversation`.
+7. In the task-configuration navigation, click `Test`.
+8. Confirm the page contains the heading `Channel Preview` and exactly four tab
+   labels: `Project Chat`, `Widget`, `WhatsApp`, and `Future`.
+9. At the bottom of the selected preview panel, confirm the summary says
+   `Universal definition: 7 fields / 4 outcomes`.
+
+Expected result:
+
+- The existing task opens without an edit, version, or publication action.
+- `Project Chat` is selected by default and all four channels preview the same
+  seven-scenario universal definition.
+
+## Step 2 of 6 - Verify Project Chat Reply Semantics
+
+1. Keep the `Project Chat` tab selected.
+2. Confirm its note says
+   `Full browser controls use the universal reply contract.`
+3. Confirm these seven cards appear once each and show the exact contract
+   metadata below:
+
+   | Card | Message | Intent | Capability | Delivery |
+   | --- | --- | --- | --- | --- |
+   | `Question` | `Service Category` | `question` | `text` | `native` |
+   | `Choices` | `Choose one Phase 12 option.` | `choices` | `buttons` | `native` |
+   | `Confirmation` | `Confirm the current task details?` | `confirmation` | `buttons` | `native` |
+   | `Media request` | `Upload the requested Phase 12 media.` | `media` | `media` | `fallback` |
+   | `Handoff` | `A team member will continue this conversation.` | `handoff` | `handoff` | `fallback` |
+   | `Outcome` | `The task completed successfully.` | `outcome` | `text` | `native` |
+   | `Content` | `Channel-neutral content remains readable on every adapter.` | `content` | `text` | `native` |
+
+4. On every card, confirm the first metadata item is `Contract v1`.
+5. On `Media request`, confirm the warning is
+   `Media payload is unavailable; text fallback was used.`
+6. On `Handoff`, confirm the warning is
+   `handoff is rendered using its text fallback.`
+7. Confirm none of the five native cards displays an amber fallback warning.
+
+Expected result:
+
+- Browser-native text and button replies remain native.
+- Missing media and unsupported browser handoff presentation degrade to readable
+  text without changing the `media` or `handoff` intent.
+
+## Step 3 of 6 - Verify Widget Parity
+
+1. Click the `Widget` tab.
+2. Confirm its note says
+   `The visitor widget uses the same stable values and task state.`
+3. Compare all seven Widget cards with the Project Chat table in Step 2.
+4. Confirm every message, `Contract v1`, intent, capability, and delivery value
+   is identical to Project Chat.
+5. Confirm `Media request` has only the missing-media warning and `Handoff` has
+   only the text-fallback warning.
+6. Confirm the summary still says `Universal definition: 7 fields / 4 outcomes`.
+
+Expected result:
+
+- Widget and Project Chat expose the same semantic reply contract and stable
+  browser behavior.
+- No widget-specific task definition, option value, or outcome is introduced.
+
+## Step 4 of 6 - Verify WhatsApp Native And Fallback Selection
+
+1. Click the `WhatsApp` tab.
+2. Confirm its note says
+   `Native interactions are selected within provider limits; otherwise a readable fallback is used.`
+3. Confirm `Question`, `Outcome`, and `Content` show capability `text` and
+   delivery `native`.
+4. Confirm `Choices` and `Confirmation` show capability `buttons` and delivery
+   `native`. These previews contain two buttons, which is within the declared
+   WhatsApp limit of three.
+5. Confirm `Media request` retains intent and capability `media`, uses delivery
+   `fallback`, and displays
+   `media requirements were not met; text fallback was used.`
+6. Confirm `Handoff` retains intent and capability `handoff`, uses delivery
+   `fallback`, and displays
+   `handoff requirements were not met; text fallback was used.`
+7. Confirm every card still says `Contract v1` and the visible messages are the
+   same as Project Chat and Widget.
+
+Expected result:
+
+- Supported text and two-button replies select native WhatsApp delivery.
+- Missing media and handoff provider requirements select readable text fallback
+  while preserving the original task semantics.
+- No real WhatsApp message is sent and no WhatsApp credential is requested.
+
+## Step 5 of 6 - Verify Stable Values And Provider Independence
+
+1. While still on `WhatsApp`, inspect the `Choices` card and confirm the two
+   visible options are exactly:
+
+   | Visible label | Stable value in parentheses |
+   | --- | --- |
+   | `Option Alpha` | `phase12_alpha` |
+   | `Option Beta` | `phase12_beta` |
+
+2. Inspect the `Confirmation` card and confirm its two options are exactly:
+
+   | Visible label | Stable value in parentheses |
+   | --- | --- |
+   | `Confirm` | `confirm` |
+   | `Cancel` | `cancel` |
+
+3. Click `Project Chat`, then `Widget`, and confirm the same four label/value
+   pairs remain unchanged on both browser adapters.
+4. Click `Future` and confirm its note says
+   `The reference adapter proves the definition is not tied to a current provider.`
+5. On `Future`, confirm all seven cards use delivery `native`, including
+   `Media request` and `Handoff`, and no card displays a warning.
+6. Confirm the same choice and confirmation label/value pairs remain unchanged
+   on `Future`.
+7. Confirm the cards do not expose provider request fields such as access
+   tokens, phone-number IDs, recipient payloads, or raw provider JSON.
+
+Expected result:
+
+- Human-readable labels may be rendered differently by an adapter, but their
+  stable values remain identical across all four channels.
+- The Future adapter consumes the same version-one envelope without a
+  provider-specific task or graph definition.
+
+## Step 6 of 6 - Verify Read-Only Persistence And Complete Sign-Off
+
+1. With the `Future` tab selected, refresh the browser once.
+2. Confirm the page reloads successfully, `Project Chat` returns as the default
+   selected tab, and all four tab labels remain present.
+3. Recheck the `Choices` card and confirm `Option Alpha (phase12_alpha)` and
+   `Option Beta (phase12_beta)` are unchanged after refresh.
+4. Recheck the footer and confirm it still says
+   `Universal definition: 7 fields / 4 outcomes`.
+5. Use the browser keyboard once: press `Tab` until the channel tab list is
+   focused, then use the left or right arrow key. Confirm focus and the selected
+   preview move to an adjacent channel without a mouse.
+6. Click `Back to task`.
+7. Confirm the task heading is still `Book a Spa Service` and no success,
+   warning, or error message says the task was edited or published.
+8. Click `Test` again and confirm the Channel Preview still opens with the same
+   values. No cleanup action is required because this UAT creates no data.
+
+Expected result:
+
+- Refresh and keyboard navigation preserve a usable, accessible preview.
+- The task, published versions, conversations, submissions, and provider state
+  remain unchanged.
+- No unresolved Critical or High Phase 12 defect remains.
+
+## Phase 12 Sign-Off
+
+- [ ] All six focused steps pass.
+- [ ] Project Chat and Widget expose the same version-one semantics.
+- [ ] WhatsApp selects native delivery within limits and readable fallback when required.
+- [ ] Stable choice and confirmation values remain identical across adapters.
+- [ ] Media and handoff fallbacks preserve their original intents.
+- [ ] The Future adapter remains provider-neutral and fully native.
+- [ ] Preview refresh and keyboard navigation pass without changing task data.
+- [ ] No unresolved Critical or High Phase 12 defect remains.
+
+## Previous Sign-Off - Phase 11
+
 Phase 11 of 18: actions, API operations, and deterministic outcomes.
 
 Status: Passed focused manual UAT on 2026-08-04. No database migration was

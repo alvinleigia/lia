@@ -807,18 +807,19 @@ test("action steps use friendly compact editors and preserve integration setting
   await dialog.getByLabel("During the conversation").check();
   await dialog.getByText("Result and routing", { exact: true }).click();
   await dialog
-    .getByLabel("On success", { exact: true })
+    .getByLabel("On Success", { exact: true })
     .selectOption(String(submitStep.id));
   await dialog.getByRole("button", { name: "Save action" }).click();
   await expect(dialog).toBeHidden();
   await expect(
     page.getByText("Step updated.", { exact: true }).first(),
   ).toBeVisible();
+  await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCount(0);
 
   await operationNode.getByText("Create booking", { exact: true }).click();
   await expect(dialog.getByLabel("During the conversation")).toBeChecked();
   await dialog.getByText("Result and routing", { exact: true }).click();
-  await expect(dialog.getByLabel("On success", { exact: true })).toHaveValue(
+  await expect(dialog.getByLabel("On Success", { exact: true })).toHaveValue(
     String(submitStep.id),
   );
   await expect(dialog.getByLabel("Integration to run")).toHaveCount(1);
