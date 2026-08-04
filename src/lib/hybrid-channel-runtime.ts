@@ -46,11 +46,11 @@ import {
   getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
   type HybridBoundaryExecution,
-  type HybridRuntimeResponseOwner,
   reconcileTaskSideQuestionWithRuntime,
   reconcileTaskTurnWithAvailability,
   reconcileTaskTurnWithRuntime,
   resolveHybridBoundaryNode,
+  resolveHybridRuntimeResponseOwner,
   shouldCheckTaskAvailability,
 } from "@/lib/hybrid-flow-runtime";
 import { startHybridTaskEntry } from "@/lib/hybrid-task-entry";
@@ -318,18 +318,6 @@ async function refreshTaskAvailability(input: {
       : null,
     session,
   };
-}
-
-function getResponseOwner(
-  value: string | null | undefined,
-  fallback: HybridRuntimeResponseOwner,
-): HybridRuntimeResponseOwner {
-  return value === "deterministic" ||
-    value === "human" ||
-    value === "knowledge" ||
-    value === "task"
-    ? value
-    : fallback;
 }
 
 async function getProjectTurnContext(
@@ -987,10 +975,11 @@ export async function runHybridChannelBoundary(
             runtimeInput: input,
           }),
     graph,
-    responseOwner: getResponseOwner(
-      session.execution?.responseOwner,
-      sourceNode.responseOwner,
-    ),
+    responseOwner: resolveHybridRuntimeResponseOwner({
+      executionStatus: session.execution?.status,
+      fallback: sourceNode.responseOwner,
+      responseOwner: session.execution?.responseOwner,
+    }),
     sourceNodeId: sourceNode.id,
   });
   const proposal = dispatch.execution?.output;

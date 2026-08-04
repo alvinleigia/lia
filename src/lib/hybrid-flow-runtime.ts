@@ -311,6 +311,23 @@ export type HybridRuntimeResponseOwner =
   | HybridFlowNodeV1["responseOwner"]
   | "human";
 
+export function resolveHybridRuntimeResponseOwner(input: {
+  executionStatus?: string | null;
+  fallback: HybridRuntimeResponseOwner;
+  responseOwner?: string | null;
+}): HybridRuntimeResponseOwner {
+  if (input.executionStatus !== "active") {
+    return input.fallback;
+  }
+
+  return input.responseOwner === "deterministic" ||
+    input.responseOwner === "human" ||
+    input.responseOwner === "knowledge" ||
+    input.responseOwner === "task"
+    ? input.responseOwner
+    : input.fallback;
+}
+
 export type HybridBoundaryExecution<TOutput> = {
   inputRequest?: RuntimeInputRequest | null;
   output: TOutput;

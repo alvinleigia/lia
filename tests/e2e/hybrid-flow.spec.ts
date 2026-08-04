@@ -37,6 +37,7 @@ import {
   reconcileTaskTurnWithAvailability,
   reconcileTaskTurnWithRuntime,
   resolveHybridBoundaryNode,
+  resolveHybridRuntimeResponseOwner,
   resolveHybridTaskOutcomeResume,
   resolveHybridTaskOutcomeRoute,
   selectHybridFlowEntryNode,
@@ -84,6 +85,23 @@ test("active hybrid execution owns the next channel boundary", () => {
       requestedNodeId: "step:1",
     }),
   ).toBeNull();
+});
+
+test("closed hybrid execution does not own a restarted task boundary", () => {
+  expect(
+    resolveHybridRuntimeResponseOwner({
+      executionStatus: "active",
+      fallback: "task",
+      responseOwner: "knowledge",
+    }),
+  ).toBe("knowledge");
+  expect(
+    resolveHybridRuntimeResponseOwner({
+      executionStatus: "closed",
+      fallback: "task",
+      responseOwner: "knowledge",
+    }),
+  ).toBe("task");
 });
 
 test("hybrid graphs use compiled terminal validation for publish readiness", () => {
