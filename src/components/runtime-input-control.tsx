@@ -1,14 +1,7 @@
 "use client";
 
-import { Send } from "lucide-react";
-import { type FormEvent, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import type {
-  RuntimeInputKind,
-  RuntimeInputRequest,
-} from "@/lib/runtime-input-request";
-import { cn } from "@/lib/utils";
+import type { RuntimeInputRequest } from "@/lib/runtime-input-request";
 
 type RuntimeInputControlProps = {
   compact?: boolean;
@@ -17,37 +10,12 @@ type RuntimeInputControlProps = {
   request: RuntimeInputRequest;
 };
 
-const INPUT_TYPES: Record<
-  Exclude<RuntimeInputKind, "choice" | "media">,
-  "date" | "email" | "number" | "tel" | "text" | "time"
-> = {
-  date: "date",
-  email: "email",
-  number: "number",
-  phone: "tel",
-  text: "text",
-  time: "time",
-};
-
 export function RuntimeInputControl({
   compact = false,
   disabled = false,
   onSubmit,
   request,
 }: RuntimeInputControlProps) {
-  const inputId = useId();
-  const [value, setValue] = useState("");
-
-  const submitValue = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const nextValue = value.trim();
-    if (!nextValue || disabled) {
-      return;
-    }
-
-    await onSubmit(nextValue);
-  };
-
   if (request.inputKind === "choice" && request.options.length > 0) {
     return (
       <div className="flex flex-wrap gap-2 pt-2">
@@ -75,59 +43,5 @@ export function RuntimeInputControl({
     );
   }
 
-  const inputType =
-    request.inputKind === "choice" ? "text" : INPUT_TYPES[request.inputKind];
-
-  return (
-    <form
-      className={cn(
-        "mt-2 flex items-end gap-2 rounded-md border bg-background p-3",
-        compact && "p-2",
-      )}
-      onSubmit={submitValue}
-    >
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <label
-          className="block text-xs font-medium text-foreground"
-          htmlFor={inputId}
-        >
-          Quick answer: {request.label}
-          {request.required ? " (required)" : ""}
-        </label>
-        <p className="text-xs text-muted-foreground">
-          Or reply naturally in the main message box below.
-        </p>
-        <Input
-          aria-label={request.label}
-          autoComplete={
-            request.inputKind === "email"
-              ? "email"
-              : request.inputKind === "phone"
-                ? "tel"
-                : undefined
-          }
-          disabled={disabled}
-          inputMode={
-            request.inputKind === "number"
-              ? "decimal"
-              : request.inputKind === "phone"
-                ? "tel"
-                : undefined
-          }
-          id={inputId}
-          onChange={(event) => setValue(event.target.value)}
-          type={inputType}
-          value={value}
-        />
-      </div>
-      <Button
-        aria-label={`Send ${request.label}`}
-        disabled={disabled || !value.trim()}
-        size={compact ? "sm" : "icon"}
-        type="submit"
-      >
-        <Send />
-      </Button>
-    </form>
-  );
+  return null;
 }

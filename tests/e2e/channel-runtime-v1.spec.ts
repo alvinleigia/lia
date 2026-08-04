@@ -3,6 +3,11 @@ import {
   createBrowserChannelAdapter,
   mergeBrowserFlowResumeMessages,
 } from "../../src/lib/browser-channel-adapter";
+import {
+  getBrowserComposerPlaceholder,
+  shouldRenderActionStepInlineControl,
+  shouldRenderRuntimeInputControl,
+} from "../../src/lib/browser-input-presentation";
 import type { ChannelDeliveryError } from "../../src/lib/channel-adapter-contract";
 import {
   buildInboundCertificationMatrix,
@@ -120,6 +125,67 @@ test("project-resource fields request selectable channel choices", () => {
     inputKind: "choice",
     label: "Service Category",
   });
+});
+
+test("browser chat renders only dedicated runtime controls inline", () => {
+  const request = {
+    fieldKey: "guestEmail",
+    inputKind: "email" as const,
+    label: "Guest Email",
+    options: [],
+    required: true,
+  };
+
+  expect(shouldRenderRuntimeInputControl(request)).toBe(false);
+  expect(
+    shouldRenderRuntimeInputControl({
+      ...request,
+      fieldKey: "preferredDate",
+      inputKind: "date",
+      label: "Preferred Date",
+    }),
+  ).toBe(false);
+  expect(
+    shouldRenderRuntimeInputControl({
+      ...request,
+      fieldKey: "serviceId",
+      inputKind: "choice",
+      label: "Service",
+      options: [{ label: "Classic Facial", value: "product:71" }],
+    }),
+  ).toBe(true);
+  expect(
+    shouldRenderRuntimeInputControl({
+      ...request,
+      fieldKey: "referencePhoto",
+      inputKind: "media",
+      label: "Reference Photo",
+    }),
+  ).toBe(true);
+  expect(
+    shouldRenderActionStepInlineControl({
+      hasOptions: false,
+      stepType: "collect_input",
+    }),
+  ).toBe(false);
+  expect(
+    shouldRenderActionStepInlineControl({
+      hasOptions: true,
+      stepType: "collect_input",
+    }),
+  ).toBe(true);
+  expect(
+    shouldRenderActionStepInlineControl({
+      hasOptions: false,
+      stepType: "file_upload",
+    }),
+  ).toBe(true);
+  expect(
+    getBrowserComposerPlaceholder({
+      fallback: "What would you like to know?",
+      request,
+    }),
+  ).toBe("Enter Guest Email (required)...");
 });
 
 test("browser resume replaces a stale active prompt with hydrated choices", () => {

@@ -33,7 +33,6 @@ import {
   type FlowChatMessage,
   type FlowEditSection,
   getActionStepChoiceDisplayMode,
-  getActionStepInputType,
   getActionStepOptions,
   getRunnableActionSteps,
   isActionInputStep,
@@ -52,6 +51,11 @@ import {
   recoverBrowserFlowState,
 } from "@/lib/browser-conversation";
 import type { BrowserFlowRuntimeResult } from "@/lib/browser-flow-contract";
+import {
+  getBrowserComposerPlaceholder,
+  shouldRenderActionStepInlineControl,
+  shouldRenderRuntimeInputControl,
+} from "@/lib/browser-input-presentation";
 
 type ChatPageClientProps = {
   actions: RuntimeAction[];
@@ -74,10 +78,6 @@ function makeFlowMessage(
     role,
     text,
   };
-}
-
-function shouldRenderStepControl(inputType: string | null) {
-  return ["date", "time", "int", "float"].includes(inputType ?? "");
 }
 
 export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
@@ -172,15 +172,19 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     : false;
   const activeStepHasInlineControl = activeStep
     ? isActionInputStep(activeStep) &&
-      (activeStepHasOptions ||
-        activeStep.stepType === "file_upload" ||
-        shouldRenderStepControl(getActionStepInputType(activeStep)))
+      shouldRenderActionStepInlineControl({
+        hasOptions: activeStepHasOptions,
+        stepType: activeStep.stepType,
+      })
     : false;
   const latestFlowMessage = flowMessages[flowMessages.length - 1];
   const runtimeInputRequest =
     latestFlowMessage?.role === "assistant"
       ? latestFlowMessage.inputRequest
       : null;
+  const runtimeInputHasInlineControl = runtimeInputRequest
+    ? shouldRenderRuntimeInputControl(runtimeInputRequest)
+    : false;
 
   const recoverFlow = async (expectedRevision?: number) => {
     if (!conversationId) {
@@ -557,18 +561,20 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
                 </MessageContent>
               </Message>
             )}
-            {runtimeInputRequest && !activeStepHasInlineControl && (
-              <Message from="assistant">
-                <MessageContent>
-                  <RuntimeInputControl
-                    disabled={isSavingSubmission}
-                    key={`${latestFlowMessage?.id ?? "runtime"}-${runtimeInputRequest.fieldKey}`}
-                    onSubmit={submitActiveStep}
-                    request={runtimeInputRequest}
-                  />
-                </MessageContent>
-              </Message>
-            )}
+            {runtimeInputRequest &&
+              runtimeInputHasInlineControl &&
+              !activeStepHasInlineControl && (
+                <Message from="assistant">
+                  <MessageContent>
+                    <RuntimeInputControl
+                      disabled={isSavingSubmission}
+                      key={`${latestFlowMessage?.id ?? "runtime"}-${runtimeInputRequest.fieldKey}`}
+                      onSubmit={submitActiveStep}
+                      request={runtimeInputRequest}
+                    />
+                  </MessageContent>
+                </Message>
+              )}
             {isConfirmingFlow && (
               <Message from="assistant">
                 <MessageContent>
@@ -655,6 +661,10 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
                 !conversationId ||
                 isSavingSubmission
               }
+              placeholder={getBrowserComposerPlaceholder({
+                fallback: "What would you like to know?",
+                request: runtimeInputRequest,
+              })}
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />

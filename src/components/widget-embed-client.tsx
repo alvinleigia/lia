@@ -16,7 +16,6 @@ import {
   type FlowChatMessage,
   type FlowEditSection,
   getActionStepChoiceDisplayMode,
-  getActionStepInputType,
   getActionStepOptions,
   getRunnableActionSteps,
   isActionInputStep,
@@ -32,6 +31,11 @@ import {
   recoverBrowserFlowState,
 } from "@/lib/browser-conversation";
 import type { BrowserFlowRuntimeResult } from "@/lib/browser-flow-contract";
+import {
+  getBrowserComposerPlaceholder,
+  shouldRenderActionStepInlineControl,
+  shouldRenderRuntimeInputControl,
+} from "@/lib/browser-input-presentation";
 
 type WidgetEmbedClientProps = {
   actions: RuntimeAction[];
@@ -54,10 +58,6 @@ function makeFlowMessage(
     role,
     text,
   };
-}
-
-function shouldRenderStepControl(inputType: string | null) {
-  return ["date", "time", "int", "float"].includes(inputType ?? "");
 }
 
 export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
@@ -103,15 +103,19 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
     : false;
   const activeStepHasInlineControl = activeStep
     ? isActionInputStep(activeStep) &&
-      (activeStepHasOptions ||
-        activeStep.stepType === "file_upload" ||
-        shouldRenderStepControl(getActionStepInputType(activeStep)))
+      shouldRenderActionStepInlineControl({
+        hasOptions: activeStepHasOptions,
+        stepType: activeStep.stepType,
+      })
     : false;
   const latestFlowMessage = flowMessages[flowMessages.length - 1];
   const runtimeInputRequest =
     latestFlowMessage?.role === "assistant"
       ? latestFlowMessage.inputRequest
       : null;
+  const runtimeInputHasInlineControl = runtimeInputRequest
+    ? shouldRenderRuntimeInputControl(runtimeInputRequest)
+    : false;
 
   const recoverFlow = async (expectedRevision?: number) => {
     if (!conversationId) {
@@ -576,17 +580,19 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
             )}
           </div>
         )}
-        {runtimeInputRequest && !activeStepHasInlineControl && (
-          <div className="mr-8">
-            <RuntimeInputControl
-              compact
-              disabled={Boolean(error) || isBusy}
-              key={`${latestFlowMessage?.id ?? "runtime"}-${runtimeInputRequest.fieldKey}`}
-              onSubmit={submitActiveStep}
-              request={runtimeInputRequest}
-            />
-          </div>
-        )}
+        {runtimeInputRequest &&
+          runtimeInputHasInlineControl &&
+          !activeStepHasInlineControl && (
+            <div className="mr-8">
+              <RuntimeInputControl
+                compact
+                disabled={Boolean(error) || isBusy}
+                key={`${latestFlowMessage?.id ?? "runtime"}-${runtimeInputRequest.fieldKey}`}
+                onSubmit={submitActiveStep}
+                request={runtimeInputRequest}
+              />
+            </div>
+          )}
         {isConfirmingFlow && (
           <div className="mr-8 rounded-lg bg-gray-100 text-gray-900 p-2 text-sm">
             <div className="flex flex-wrap gap-2 pt-2">
@@ -660,7 +666,10 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
       <form onSubmit={onSubmit} className="border-t bg-white p-3 flex gap-2">
         <input
           className="flex-1 rounded-md border px-3 py-2 text-sm"
-          placeholder="Ask a question..."
+          placeholder={getBrowserComposerPlaceholder({
+            fallback: "Ask a question...",
+            request: runtimeInputRequest,
+          })}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={Boolean(error) || isBusy}

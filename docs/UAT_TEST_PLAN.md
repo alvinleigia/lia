@@ -150,12 +150,12 @@ Do not continue that older run with the date picker.
    `Facial` once.
 6. Wait for the `Service` question and its choices, then click `Classic Facial`
    once.
-7. The task now asks for the preferred date and may display a date-picker card
-   with its own `Send` button. This is expected. For this multi-field test, do
-   not select a date in that card and do not click the card's `Send` button.
-8. Use the separate conversation composer fixed at the bottom of Project Chat,
-   labelled `What would you like to know?`. Enter this exact multi-field reply
-   there and click the send-arrow button at the right of that bottom composer:
+7. Wait for the task to ask for `Preferred Date`. Confirm no second text or
+   date input card appears inside the transcript. The persistent composer at
+   the bottom is the only text-entry control and its placeholder identifies
+   `Preferred Date` as required.
+8. In that persistent composer, enter this exact multi-field reply and click
+   the send-arrow button at its right:
 
 ```text
 2026-08-15 at 15:30 for Phase 13 Parity Guest. Email phase13.invalid and phone +919876543210.
@@ -193,9 +193,9 @@ Expected result:
    send-arrow button once.
 6. Wait for each question, then click `Facial` for `Service Category` and
    `Classic Facial` for `Service`.
-7. When the preferred-date question and date-picker card appear, leave that
-   card unused. Enter this exact reply in the persistent widget composer and
-   click its send-arrow button:
+7. When the preferred-date question appears, confirm there is no second text
+   or date input card inside the transcript. Enter this exact reply in the
+   single persistent widget composer and click its send-arrow button:
 
 ```text
 2026-08-15 at 15:30 for Phase 13 Parity Guest, phase13.parity@example.com, +919876543210.
@@ -219,6 +219,8 @@ Expected result:
 - Widget labels may be laid out differently, but its canonical seven fields,
   validation, pinned `v4`, Manual Review operation, and `Completed` outcome are
   identical to Project Chat.
+- Project Chat and Widget display one persistent text-entry control for typed
+  task fields; choice buttons and genuine media controls may remain inline.
 - Closing and reopening resumes one run without duplicate values or operations.
 - The preview and public launcher remain usable on a narrow screen and by
   keyboard.
