@@ -39,7 +39,10 @@ import {
   isActionInputStep,
   type RuntimeAction,
 } from "@/lib/action-runtime";
-import { browserRuntimeRepliesToFlowMessages } from "@/lib/browser-channel-adapter";
+import {
+  browserRuntimeRepliesToFlowMessages,
+  mergeBrowserFlowResumeMessages,
+} from "@/lib/browser-channel-adapter";
 import {
   createBrowserCommandId,
   getOrCreateSessionConversationId,
@@ -119,13 +122,18 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
         }
 
         setFlowMessages(
-          result.history ??
-            (result.handled
+          result.history
+            ? mergeBrowserFlowResumeMessages(
+                "project_chat",
+                result.history,
+                result.replies,
+              )
+            : result.handled
               ? browserRuntimeRepliesToFlowMessages(
                   "project_chat",
                   result.replies,
                 )
-              : []),
+              : [],
         );
         setActiveFlow(result.activeFlow);
         setServerActiveAction(result.activeFlow ? result.action : null);

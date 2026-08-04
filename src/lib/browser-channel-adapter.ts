@@ -153,6 +153,21 @@ export function browserRuntimeRepliesToFlowMessages(
   );
 }
 
+export function mergeBrowserFlowResumeMessages(
+  channelType: BrowserChannelType,
+  history: FlowChatMessage[],
+  replies: RuntimeReply[],
+) {
+  const resumed = browserRuntimeRepliesToFlowMessages(channelType, replies);
+  if (resumed.length === 0) return history;
+
+  const lastHistoryMessage = history[history.length - 1];
+  return lastHistoryMessage?.role === "assistant" &&
+    lastHistoryMessage.text === resumed[0]?.text
+    ? [...history.slice(0, -1), ...resumed]
+    : [...history, ...resumed];
+}
+
 function getStoredBrowserReplyText(message: StoredBrowserChannelMessage) {
   const text = message.text ?? "";
 

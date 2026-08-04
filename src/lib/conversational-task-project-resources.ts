@@ -24,9 +24,17 @@ export async function listProjectTaskResourceOptions(input: {
   fieldValues: ReadonlyMap<string, unknown>;
   projectId: number;
 }): Promise<ResourceOption[]> {
-  if (input.field.optionSource?.kind !== "project_resource") return [];
+  if (
+    input.field.type !== "project_resource" &&
+    input.field.optionSource?.kind !== "project_resource"
+  ) {
+    return [];
+  }
 
-  const resourceType = input.field.optionSource.resourceType.toLowerCase();
+  const resourceType = getResourceTypeForOptions(
+    input.field,
+    input.fieldValues,
+  );
   if (
     ["catalog", "category", "servicecategory", "productcategory"].includes(
       resourceType,
@@ -96,17 +104,44 @@ function readCatalogDependency(
   field: TaskFieldDefinition,
   fieldValues: ReadonlyMap<string, unknown>,
 ) {
-  if (field.optionSource?.kind !== "project_resource") return null;
-  const filterKey = field.optionSource.filterByField;
-  if (filterKey) {
-    const value = fieldValues.get(filterKey);
+  const dependencyKeys = [
+    field.optionSource?.kind === "project_resource"
+      ? field.optionSource.filterByField
+      : null,
+    ...field.dependsOn,
+  ].filter((key): key is string => Boolean(key));
+  for (const key of dependencyKeys) {
+    const value = fieldValues.get(key);
     const catalogId =
       typeof value === "string" ? parseScopedId(value, "catalog") : null;
     if (catalogId) return catalogId;
   }
-  return field.optionSource.collectionKey
+  return field.optionSource?.kind === "project_resource" &&
+    field.optionSource.collectionKey
     ? parseScopedId(field.optionSource.collectionKey, "catalog")
     : null;
+}
+
+function getResourceTypeForOptions(
+  field: TaskFieldDefinition,
+  fieldValues: ReadonlyMap<string, unknown>,
+) {
+  if (field.optionSource?.kind === "project_resource") {
+    return field.optionSource.resourceType.toLowerCase();
+  }
+  if (readCatalogDependency(field, fieldValues)) return "product";
+
+  const hint = `${field.key} ${field.label}`.toLowerCase();
+  if (hint.includes("category") || hint.includes("catalog")) return "catalog";
+  if (hint.includes("service") || hint.includes("product")) return "product";
+  if (
+    hint.includes("media") ||
+    hint.includes("asset") ||
+    hint.includes("file")
+  ) {
+    return "media";
+  }
+  return "";
 }
 
 async function resolveCatalog(

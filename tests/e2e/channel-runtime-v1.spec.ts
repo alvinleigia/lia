@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { createBrowserChannelAdapter } from "../../src/lib/browser-channel-adapter";
+import {
+  createBrowserChannelAdapter,
+  mergeBrowserFlowResumeMessages,
+} from "../../src/lib/browser-channel-adapter";
 import type { ChannelDeliveryError } from "../../src/lib/channel-adapter-contract";
 import {
   buildInboundCertificationMatrix,
@@ -117,6 +120,48 @@ test("project-resource fields request selectable channel choices", () => {
     inputKind: "choice",
     label: "Service Category",
   });
+});
+
+test("browser resume replaces a stale active prompt with hydrated choices", () => {
+  const history = [
+    {
+      id: "channel-1",
+      inputRequest: {
+        fieldKey: "serviceCategoryId",
+        inputKind: "choice" as const,
+        label: "Service Category",
+        options: [],
+        required: true,
+      },
+      role: "assistant" as const,
+      text: "Please provide Service Category.",
+    },
+  ];
+  const replies = [
+    createTaskRuntimeReply({
+      inputRequest: {
+        fieldKey: "serviceCategoryId",
+        inputKind: "choice",
+        label: "Service Category",
+        options: [{ label: "Facial", value: "catalog:76" }],
+        required: true,
+      },
+      nextAction: "ask",
+      text: "Please provide Service Category.",
+    }),
+  ];
+
+  expect(
+    mergeBrowserFlowResumeMessages("project_chat", history, replies),
+  ).toEqual([
+    expect.objectContaining({
+      inputRequest: expect.objectContaining({
+        options: [{ label: "Facial", value: "catalog:76" }],
+      }),
+      role: "assistant",
+      text: "Please provide Service Category.",
+    }),
+  ]);
 });
 
 test("legacy stored replies normalize to version one without changing text", () => {

@@ -39,7 +39,10 @@ import {
   completeFlowRuntimeCommand,
   failFlowRuntimeCommand,
 } from "@/lib/flow-runtime-commands";
-import { runHybridChannelFlowBoundary } from "@/lib/hybrid-channel-runtime";
+import {
+  buildHybridChannelResumeReplies,
+  runHybridChannelFlowBoundary,
+} from "@/lib/hybrid-channel-runtime";
 import {
   getRuntimeProjectAction,
   getRuntimeProjectActionForSubmission,
@@ -198,6 +201,20 @@ async function executeBrowserFlowText(
       return { action: null, activeFlow: null, handled: false, replies: [] };
     }
 
+    const channelResumeReplies = input.resumeExecution
+      ? []
+      : buildChannelFlowResumeReplies({
+          action,
+          submission: activeSubmission,
+        });
+    const hybridResumeReplies =
+      input.resumeExecution || channelResumeReplies.length > 0
+        ? []
+        : await buildHybridChannelResumeReplies({
+            channelType: input.channelType,
+            externalConversationId: input.conversationId,
+            projectId: input.projectId,
+          });
     const resumeResult = input.resumeExecution
       ? await resumeChannelFlowExecution({
           action,
@@ -206,10 +223,10 @@ async function executeBrowserFlowText(
           submission: activeSubmission,
         })
       : {
-          replies: buildChannelFlowResumeReplies({
-            action,
-            submission: activeSubmission,
-          }),
+          replies:
+            hybridResumeReplies.length > 0
+              ? hybridResumeReplies
+              : channelResumeReplies,
         };
 
     if (input.resumeExecution && input.recordReplies !== false) {

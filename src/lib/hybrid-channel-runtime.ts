@@ -72,6 +72,45 @@ export type HybridChannelBoundaryResult = {
   replies: RuntimeReply[];
 };
 
+export async function buildHybridChannelResumeReplies(input: {
+  channelType: ChannelType;
+  externalConversationId: string;
+  projectId: number;
+}) {
+  const session = await getConversationTaskRuntimeSession(input);
+  if (
+    session.execution?.status !== "active" ||
+    !session.execution.activeTaskRunId ||
+    !session.runtime ||
+    !session.snapshot
+  ) {
+    return [];
+  }
+
+  const inputRequest = await hydrateProjectResourceInputRequest({
+    fields: session.runtime.fields,
+    inputRequest: getResumedTaskRuntimeInputRequest({
+      fields: session.runtime.fields,
+      requestedFieldKey: session.runtime.run.lastRequestedFieldKey,
+      snapshot: session.snapshot,
+    }),
+    projectId: input.projectId,
+    snapshot: session.snapshot,
+  });
+  if (!inputRequest) return [];
+
+  const field = session.snapshot.task.definition.fields.find(
+    (candidate) => candidate.key === inputRequest.fieldKey,
+  );
+  return [
+    createTaskRuntimeReply({
+      inputRequest,
+      nextAction: "ask",
+      text: field?.prompt ?? `Please provide ${inputRequest.label}.`,
+    }),
+  ];
+}
+
 async function persistReturnedKnowledgeBoundary(input: {
   actionVersionId: number;
   conversationId: number;
@@ -225,7 +264,10 @@ async function hydrateProjectResourceInputRequest(input: {
   const field = input.snapshot.task.definition.fields.find(
     (candidate) => candidate.key === input.inputRequest?.fieldKey,
   );
-  if (field?.optionSource?.kind !== "project_resource") {
+  if (
+    field?.type !== "project_resource" &&
+    field?.optionSource?.kind !== "project_resource"
+  ) {
     return input.inputRequest;
   }
 

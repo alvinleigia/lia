@@ -450,6 +450,8 @@ test("resolves legacy generic resource fields inside the selected project", asyn
 test("lists scoped catalog choices for channel input controls", async () => {
   const [categoryField, serviceField] =
     REFERENCE_BOOKING_TASK_DEFINITION.fields;
+  const legacyCategoryField = { ...categoryField, optionSource: null };
+  const legacyServiceField = { ...serviceField, optionSource: null };
   const categories = await listProjectTaskResourceOptions({
     field: categoryField,
     fieldValues: new Map(),
@@ -457,6 +459,18 @@ test("lists scoped catalog choices for channel input controls", async () => {
   });
   const services = await listProjectTaskResourceOptions({
     field: serviceField,
+    fieldValues: new Map([
+      ["serviceCategoryId", `catalog:${fixture?.catalogId}`],
+    ]),
+    projectId: fixture?.projectId as number,
+  });
+  const legacyCategories = await listProjectTaskResourceOptions({
+    field: legacyCategoryField,
+    fieldValues: new Map(),
+    projectId: fixture?.projectId as number,
+  });
+  const legacyServices = await listProjectTaskResourceOptions({
+    field: legacyServiceField,
     fieldValues: new Map([
       ["serviceCategoryId", `catalog:${fixture?.catalogId}`],
     ]),
@@ -470,6 +484,8 @@ test("lists scoped catalog choices for channel input controls", async () => {
   expect(services).toEqual([
     { id: `product:${fixture?.serviceProductId}`, label: "Deep Tissue" },
   ]);
+  expect(legacyCategories).toEqual(categories);
+  expect(legacyServices).toEqual(services);
   expect([...categories, ...services].map((option) => option.id)).not.toContain(
     `product:${fixture?.otherProductId}`,
   );
