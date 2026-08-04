@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Eye,
   KeyRound,
   PauseCircle,
   PlayCircle,
@@ -31,6 +32,7 @@ export function WidgetManager({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSavingDomains, setIsSavingDomains] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isTokenActive, setIsTokenActive] = useState(hasActiveToken);
@@ -63,6 +65,7 @@ export function WidgetManager({
 
       const data = (await res.json()) as { token: string };
       setToken(data.token);
+      setIsPreviewOpen(false);
       setIsTokenActive(true);
       setSuccess("Widget token ready. Copy and store it safely.");
     } catch {
@@ -234,6 +237,21 @@ export function WidgetManager({
             value={embedSnippet}
             readOnly
           />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsPreviewOpen((current) => !current)}
+          >
+            <Eye className="h-4 w-4" />
+            {isPreviewOpen ? "Close Widget Preview" : "Open Widget Preview"}
+          </Button>
+          {isPreviewOpen && (
+            <iframe
+              className="h-[560px] max-h-[70vh] w-full rounded-lg border bg-background"
+              src={`${appBaseUrl}/widget/embed?token=${encodeURIComponent(token)}`}
+              title="Widget conversation preview"
+            />
+          )}
         </div>
       )}
     </div>

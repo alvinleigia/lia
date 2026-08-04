@@ -1627,6 +1627,14 @@ test("widget token access respects tenant and allowed domains", async ({
   await expect(ownerPage.getByText("Widget token ready.")).toBeVisible();
   const widgetToken = await ownerPage.locator("input[readonly]").inputValue();
   expect(widgetToken).toContain("ws_");
+  await ownerPage.getByRole("button", { name: "Open Widget Preview" }).click();
+  await expect(
+    ownerPage.getByTitle("Widget conversation preview"),
+  ).toBeVisible();
+  await ownerPage.getByRole("button", { name: "Close Widget Preview" }).click();
+  await expect(ownerPage.getByTitle("Widget conversation preview")).toHaveCount(
+    0,
+  );
 
   await ownerPage
     .locator("textarea")
