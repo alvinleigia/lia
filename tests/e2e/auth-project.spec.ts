@@ -138,6 +138,38 @@ test("shared channel adapter contract describes capability parity", async () => 
   expect(listWarnings).toHaveLength(1);
   expect(listWarnings[0]?.message).toContain("10 native list rows");
 });
+
+test("widget launcher is responsive and keyboard accessible", async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 568, width: 320 });
+  await page.goto("/signin");
+  await page.evaluate(() => {
+    const script = document.createElement("script");
+    script.src = "/widget.js";
+    script.dataset.baseUrl = window.location.origin;
+    script.dataset.token = "phase13-accessibility-test";
+    document.body.appendChild(script);
+  });
+
+  const launcher = page.locator('button[aria-label="Open AI chat"]');
+  await expect(launcher).toHaveAttribute("aria-expanded", "false");
+  await launcher.click();
+
+  const widget = page.getByTitle("AI Chat Widget");
+  await expect(widget).toBeVisible();
+  await expect(launcher).toHaveAttribute("aria-expanded", "true");
+  const bounds = await widget.boundingBox();
+  expect(bounds?.width).toBeLessThanOrEqual(320);
+  expect(bounds?.height).toBeLessThanOrEqual(568);
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  });
+  await expect(widget).toBeHidden();
+  await expect(launcher).toBeFocused();
+  await expect(launcher).toHaveAttribute("aria-expanded", "false");
+});
 const platformAdminEmail =
   process.env.E2E_PLATFORM_ADMIN_EMAIL ?? "e2e-platform-admin@example.test";
 

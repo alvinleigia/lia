@@ -192,6 +192,17 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
     };
   }, [token]);
 
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && window.parent) {
+        window.parent.postMessage({ type: "RAG_WIDGET_CLOSE" }, "*");
+      }
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, []);
+
   const runCanonicalFlow = async (input: {
     actionId?: number;
     displayText?: string;
