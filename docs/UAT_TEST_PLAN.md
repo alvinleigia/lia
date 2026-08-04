@@ -4,7 +4,7 @@
 
 Phase 12 of 18: universal channel adapter upgrade.
 
-Status: Ready for focused manual UAT on 2026-08-04. No database migration is
+Status: Passed focused manual UAT on 2026-08-04. No database migration was
 required.
 
 Automated evidence:
@@ -187,14 +187,20 @@ Expected result:
 
 ## Phase 12 Sign-Off
 
-- [ ] All six focused steps pass.
-- [ ] Project Chat and Widget expose the same version-one semantics.
-- [ ] WhatsApp selects native delivery within limits and readable fallback when required.
-- [ ] Stable choice and confirmation values remain identical across adapters.
-- [ ] Media and handoff fallbacks preserve their original intents.
-- [ ] The Future adapter remains provider-neutral and fully native.
-- [ ] Preview refresh and keyboard navigation pass without changing task data.
-- [ ] No unresolved Critical or High Phase 12 defect remains.
+- [x] All six focused steps pass.
+- [x] Project Chat and Widget expose the same version-one semantics.
+- [x] WhatsApp selects native delivery within limits and readable fallback when required.
+- [x] Stable choice and confirmation values remain identical across adapters.
+- [x] Media and handoff fallbacks preserve their original intents.
+- [x] The Future adapter remains provider-neutral and fully native.
+- [x] Preview refresh and keyboard navigation pass without changing task data.
+- [x] No unresolved Critical or High Phase 12 defect remains.
+
+Phase 12 passed manual UAT on 2026-08-04. The read-only run verified the
+version-one reply envelope, identical Project Chat and Widget behavior,
+WhatsApp native and fallback selection, stable choice values, provider-neutral
+Future delivery, refresh persistence, and keyboard navigation without changing
+task, version, conversation, submission, or provider state.
 
 ## Previous Sign-Off - Phase 11
 

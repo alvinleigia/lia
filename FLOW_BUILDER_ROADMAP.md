@@ -85,12 +85,12 @@ database, backup, and provider readiness work.
 - [x] Direct button, list-row, product, and result-to-node mapping is complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 2, Phase 12 of 18. Phases 8 through 11 completed
+Current phase: Priority 2, Phase 13 of 18. Phases 8 through 12 completed
 implementation, automated verification, and manual UAT by 2026-08-04.
 
-Current target: complete focused Phase 12 manual UAT for the versioned universal
-reply contract, normalized inbound replies, stable values, channel fallbacks,
-and per-channel preview.
+Current target: certify equivalent validated task outcomes across project chat,
+the website widget, and WhatsApp without introducing channel-specific task or
+graph persistence.
 
 ## Product Direction
 
@@ -924,15 +924,16 @@ existing channel adapter boundary.
 - [x] Prevent adapter delivery failure from changing task semantics.
 - [x] Extend the certification matrix for every task reply and V2 content capability.
 
-Phase 12 engineering status: implementation and automated verification completed
-on 2026-08-04; focused manual UAT is pending. The version-one reply and inbound
+Phase 12 status: Complete on 2026-08-04. The version-one reply and inbound
 contracts cover seven task reply intents and five inbound kinds across project
 chat, widget, WhatsApp, and the reference future adapter. Automated evidence
 includes 22 focused Phase 12 and adapter tests, all 143 channel certification
 tests, lint, TypeScript, tenant-scope analysis, and 50 relevant serial browser
 and database scenarios. Four unrelated platform-admin and invitation scenarios
 require Playwright's isolated test-server environment and are not part of the
-focused Phase 12 gate.
+focused Phase 12 gate. Focused manual UAT passed all six read-only preview,
+stable-value, fallback, refresh, and keyboard-navigation steps with no unresolved
+Critical or High Phase 12 defect.
 
 Phase 12 exit gate: the same task and deterministic graph have declared
 delivery behavior in project chat, widget, WhatsApp, and a future adapter.
