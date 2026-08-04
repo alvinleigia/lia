@@ -140,12 +140,19 @@ Do not continue that older run with the date picker.
 2. Under `Project Chat`, click the action button `Phase 13 Booking Parity UAT`
    once. Do not click the similarly named `Book Spa Service` button; that is an
    older sequential action and does not exercise the conversational task.
-3. When asked for `Service Category`, click `Facial`.
-4. When asked for `Service`, click `Classic Facial`.
-5. The task now asks for the preferred date and may display a date-picker card
+3. Wait for the acknowledgement `Sure, I can help with Phase 13 Booking Parity
+   UAT.` This means the wrapper is active; the business task still needs its
+   first visitor message.
+4. In the bottom composer labelled `What would you like to know?`, enter
+   `I want to book a spa service.` and click the send-arrow button once.
+5. Wait for the `Service Category` question and its choices, then click
+   `Facial` once.
+6. Wait for the `Service` question and its choices, then click `Classic Facial`
+   once.
+7. The task now asks for the preferred date and may display a date-picker card
    with its own `Send` button. This is expected. For this multi-field test, do
    not select a date in that card and do not click the card's `Send` button.
-6. Use the separate conversation composer fixed at the bottom of Project Chat,
+8. Use the separate conversation composer fixed at the bottom of Project Chat,
    labelled `What would you like to know?`. Enter this exact multi-field reply
    there and click the send-arrow button at the right of that bottom composer:
 
@@ -153,16 +160,16 @@ Do not continue that older run with the date picker.
 2026-08-15 at 15:30 for Phase 13 Parity Guest. Email phase13.invalid and phone +919876543210.
 ```
 
-7. Confirm the invalid email is not accepted as a valid completed field and the
+9. Confirm the invalid email is not accepted as a valid completed field and the
    assistant asks for a usable email or clarification.
-8. Enter `Correct my email to phase13.parity@example.com.` and click the
-   send-arrow button.
-9. Review the confirmation summary. It must show `Facial`, `Classic Facial`,
+10. Enter `Correct my email to phase13.parity@example.com.` in the bottom
+    composer and click the send-arrow button.
+11. Review the confirmation summary. It must show `Facial`, `Classic Facial`,
    `2026-08-15`, `15:30`, `Phase 13 Parity Guest`,
    `phase13.parity@example.com`, and `+919876543210`.
-10. Click the visible confirmation control labelled `Confirm`, or enter
+12. Click the visible confirmation control labelled `Confirm`, or enter
    `confirm` if the reply is presented as text.
-11. Wait for the `Manual Review` result and the task's successful completion
+13. Wait for the `Manual Review` result and the task's successful completion
     reply. Do not click the task button again while it is processing.
 
 Expected result:
@@ -180,24 +187,30 @@ Expected result:
 2. Click `Open Widget Preview`.
 3. Inside `Widget conversation preview`, click `Phase 13 Booking Parity UAT`
    once.
-4. Click `Facial`, then click `Classic Facial` when each choice is requested.
-5. Enter this exact reply in the widget input and click its send-arrow button:
+4. Wait for `Sure, I can help with Phase 13 Booking Parity UAT.`
+5. In the widget composer, enter `I want to book a spa service.` and click its
+   send-arrow button once.
+6. Wait for each question, then click `Facial` for `Service Category` and
+   `Classic Facial` for `Service`.
+7. When the preferred-date question and date-picker card appear, leave that
+   card unused. Enter this exact reply in the persistent widget composer and
+   click its send-arrow button:
 
 ```text
 2026-08-15 at 15:30 for Phase 13 Parity Guest, phase13.parity@example.com, +919876543210.
 ```
 
-6. Before confirming, click `Close Widget Preview`, then click `Open Widget
+8. Before confirming, click `Close Widget Preview`, then click `Open Widget
    Preview` again.
-7. Confirm the same active task and collected values resume instead of starting
+9. Confirm the same active task and collected values resume instead of starting
    a new run.
-8. Confirm the summary shows the same seven values listed in Step 2 point 9.
-9. Click `Confirm`, or enter `confirm` if a text reply is shown.
-10. Wait for the Manual Review result and the successful completion reply.
-11. Click `Open Widget Preview` again. Use browser responsive mode or resize the
+10. Confirm the summary shows the same seven values listed in Step 2 point 11.
+11. Click `Confirm`, or enter `confirm` if a text reply is shown.
+12. Wait for the Manual Review result and the successful completion reply.
+13. Click `Open Widget Preview` again. Use browser responsive mode or resize the
     window to approximately `320 x 568`. Press `Tab` inside the preview until
     `Close chat` is focused, then press `Escape`.
-12. Confirm the preview closes, `Open Widget Preview` is visible again, and no
+14. Confirm the preview closes, `Open Widget Preview` is visible again, and no
     content extends beyond the narrow viewport.
 
 Expected result:
@@ -226,7 +239,7 @@ Expected result:
 6. Wait at least 10 seconds after the reply arrives, then confirm no second copy
    of the same prompt or acknowledgement appears.
 7. Review the confirmation summary. It must contain the same seven values from
-   Step 2 point 9; provider wording and line wrapping may differ.
+   Step 2 point 11; provider wording and line wrapping may differ.
 8. Select or send `Confirm` once.
 9. Wait for the Manual Review result and successful completion reply. If the
    reply is delayed, run the documented durable worker command once, then wait
