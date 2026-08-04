@@ -1,6 +1,6 @@
 # Lia Conversational Flow Roadmap
 
-Status date: 2026-08-03
+Status date: 2026-08-04
 
 ## Document Authority
 
@@ -85,11 +85,12 @@ database, backup, and provider readiness work.
 - [x] Direct button, list-row, product, and result-to-node mapping is complete.
 - [ ] Live cross-channel UAT and release approval are not complete.
 
-Current phase: Priority 2, Phase 11 of 18. Phases 8 through 10 completed
-implementation, automated verification, and manual UAT by 2026-08-03.
+Current phase: Priority 2, Phase 12 of 18. Phases 8 through 11 completed
+implementation, automated verification, and manual UAT by 2026-08-04.
 
-Current target: complete focused Phase 11 manual UAT for the implemented
-deterministic action baseline and named operation-result routes.
+Current target: upgrade the universal channel adapter contract for task replies,
+rich deterministic content, normalized inbound replies, channel limits, and
+per-channel preview.
 
 ## Product Direction
 
@@ -880,11 +881,10 @@ result as a named route.
 - [x] Connect every API output directly to a specific node.
 - [x] Keep credentials out of flow exports and diagnostics.
 - [x] Add publish blockers for invalid URL, method, mapping, secret, and output configuration.
-- [ ] Confirm every action in `docs/Flow Builder v2.pdf` can be configured and executed.
+- [x] Confirm every action in `docs/Flow Builder v2.pdf` can be configured and executed.
 - [x] Add focused runtime and tenant-isolation tests for every result path.
 
-Phase 11 engineering status: Complete on 2026-08-03; focused manual UAT is
-pending. The runtime now supports all five remaining contact mutations, five
+Phase 11 status: Complete on 2026-08-04. The runtime supports all five remaining contact mutations, five
 HTTP methods, friendly request and nested response mapping, isolated test
 requests, sanitized previews, five standard result outputs, custom HTTP status
 outputs, and direct named output-to-node routes. Credentials are encrypted at
@@ -894,9 +894,12 @@ routes. TypeScript and lint pass, 47 focused contract/editor/compiler checks
 pass, and the scoped contact and named-route database checks pass, including
 cross-project rejection. The five existing conversational-operation database
 regressions and all 143 shared channel/runtime contracts also pass. No
-migration was required. Complete the six detailed
-steps in `docs/UAT_TEST_PLAN.md` before checking the remaining reference-action
-confirmation and declaring the Phase 11 exit gate complete.
+migration was required. All six focused manual scenarios passed. UAT findings
+were corrected with focused changes for friendly validation, nested preview
+mapping, secured-header publication, operation and provider feedback, scroll
+restoration, and one-time Sonner status messages. Both disposable actions were
+archived, the test operation and provider were disabled, and no unresolved
+Critical or High Phase 11 defect remains.
 
 Phase 11 exit gate: explicit actions and conversational tasks use the same
 approved operation, security, durability, and routing boundaries.

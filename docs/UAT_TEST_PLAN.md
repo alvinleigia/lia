@@ -4,8 +4,8 @@
 
 Phase 11 of 18: actions, API operations, and deterministic outcomes.
 
-Status: Implementation and focused automated verification complete on
-2026-08-03. Focused manual UAT is pending. No database migration is required.
+Status: Passed focused manual UAT on 2026-08-04. No database migration was
+required.
 
 Automated evidence:
 
@@ -326,17 +326,22 @@ Expected result:
 
 ## Phase 11 Sign-Off
 
-- [ ] All six focused steps pass.
-- [ ] Friendly HTTP authoring and isolated previews work without raw JSON.
-- [ ] Sanitized response mapping and credential-safe export pass.
-- [ ] All seven standard/custom operation outputs retain their named routes.
-- [ ] Invalid operation configuration blocks publication.
-- [ ] Runtime success stores and follows the granular result exactly once.
-- [ ] Contact mutation actions execute in order and remain project scoped.
-- [ ] No unresolved Critical or High Phase 11 defect remains.
+- [x] All six focused steps pass.
+- [x] Friendly HTTP authoring and isolated previews work without raw JSON.
+- [x] Sanitized response mapping and credential-safe export pass.
+- [x] All seven standard/custom operation outputs retain their named routes.
+- [x] Invalid operation configuration blocks publication.
+- [x] Runtime success stores and follows the granular result exactly once.
+- [x] Contact mutation actions execute in order and remain project scoped.
+- [x] No unresolved Critical or High Phase 11 defect remains.
 
-Record the UAT date, findings, and any corrective commit here before marking
-Phase 11 complete and moving to Phase 12.
+Phase 11 passed manual UAT on 2026-08-04. The run verified friendly API
+authoring, isolated HTTPBin preview, credential redaction, seven named result
+routes, provider publication blockers, one successful live operation, all six
+contact mutation families, event ordering, and contact cleanup. Findings were
+corrected in commits `f6b0203`, `eb90bda`, `7777de6`, `4d09fa2`, `08e8d0b`,
+`7d93afe`, `9734692`, and `0c53614`. The two disposable actions were archived,
+and the Phase 11 operation and provider were disabled before sign-off.
 
 ## Previous Sign-Off - Phase 10
 
