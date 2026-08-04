@@ -17,6 +17,7 @@ import {
 import { sendWhatsAppRuntimeReply } from "@/lib/whatsapp";
 
 export const OUTBOX_TOPICS = ["whatsapp.runtime_reply"] as const;
+export const WHATSAPP_OUTBOX_MAX_ATTEMPTS = 5;
 export const OUTBOX_STATUSES = [
   "queued",
   "processing",
@@ -218,7 +219,7 @@ export async function enqueueWhatsAppRuntimeReplies(input: {
         .values({
           dedupeKey: `channel-message:${channelMessage.id}`,
           destination: input.to,
-          maxAttempts: 5,
+          maxAttempts: WHATSAPP_OUTBOX_MAX_ATTEMPTS,
           payload: {
             channelId: input.channelId,
             channelMessageId: channelMessage.id,

@@ -5,7 +5,14 @@ import {
   CERTIFICATION_CHANNELS,
   FLOW_STEP_CERTIFICATION_FAMILIES,
 } from "../../src/lib/channel-certification";
+import {
+  CHANNEL_PROVIDER_RULES,
+  listChannelProviderRules,
+} from "../../src/lib/channel-provider-rules";
 import { listEnabledStepFlowComponents } from "../../src/lib/flow-components";
+import { MAX_MEDIA_UPLOAD_BYTES } from "../../src/lib/media-assets";
+import { WHATSAPP_OUTBOX_MAX_ATTEMPTS } from "../../src/lib/outbox";
+import { WHATSAPP_SERVICE_WINDOW_MS } from "../../src/lib/whatsapp";
 
 test("every enabled step has one typed certification family", () => {
   const enabled = listEnabledStepFlowComponents();
@@ -86,4 +93,29 @@ test("hybrid knowledge and task nodes are certified for every channel", () => {
       true,
     );
   }
+});
+
+test("production provider limitations stay explicit and tied to runtime constants", () => {
+  expect(new Set(CHANNEL_PROVIDER_RULES.map((rule) => rule.key)).size).toBe(
+    CHANNEL_PROVIDER_RULES.length,
+  );
+
+  for (const channel of ["project_chat", "widget", "whatsapp"] as const) {
+    expect(listChannelProviderRules(channel).length).toBeGreaterThan(0);
+  }
+
+  const whatsappRules = Object.fromEntries(
+    listChannelProviderRules("whatsapp").map((rule) => [rule.key, rule.value]),
+  );
+
+  expect(whatsappRules).toMatchObject({
+    approved_template_outside_window: true,
+    inbound_media_bytes: MAX_MEDIA_UPLOAD_BYTES,
+    native_button_options: 3,
+    native_list_options: 10,
+    native_product_items: 30,
+    outbox_max_attempts: WHATSAPP_OUTBOX_MAX_ATTEMPTS,
+    outbound_media_public_url: true,
+    service_window_ms: WHATSAPP_SERVICE_WINDOW_MS,
+  });
 });
