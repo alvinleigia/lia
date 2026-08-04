@@ -4,6 +4,7 @@ import {
   BrowserFlowCommandError,
   runBrowserFlowText,
 } from "@/lib/browser-flow-runtime";
+import { channelInboundSelectionInputV1Schema } from "@/lib/channel-inbound-contract";
 import { resolveWidgetTokenAccessForRequest } from "@/lib/widget-keys";
 
 const requestSchema = z
@@ -16,6 +17,7 @@ const requestSchema = z
       .optional(),
     expectedRevision: z.number().int().nonnegative().optional(),
     resume: z.boolean().optional(),
+    selection: channelInboundSelectionInputV1Schema.optional(),
     text: z.string().max(4000).optional(),
     token: z.string().trim().min(1).max(256),
   })
@@ -76,6 +78,7 @@ export async function POST(req: Request) {
       expectedRevision: parsed.data.expectedRevision,
       projectId: accessResult.widgetAccess.projectId,
       resume: parsed.data.resume,
+      selection: parsed.data.selection,
       source: "widget_chat",
       text: parsed.data.text,
     });

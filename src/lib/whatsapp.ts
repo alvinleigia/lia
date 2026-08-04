@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import type { ChannelReplyAdapter } from "@/lib/channel-adapter-contract";
 import {
+  ChannelDeliveryError,
+  type ChannelReplyAdapter,
   getChannelAdapterProfile,
   getRuntimeReplyCapability,
 } from "@/lib/channel-adapter-contract";
@@ -387,48 +388,55 @@ export function getWhatsAppInboundText(message: WhatsAppWebhookMessage) {
     return message.text.body;
   }
 
-  if (message.order?.product_items?.length) {
-    const cartItems = message.order.product_items
-      .map((item) => {
-        const productRetailerId = item.product_retailer_id?.trim();
+  const products = getWhatsAppInboundProducts(message);
+  if (products.length > 0) {
+    return products
+      .map((product) => `${product.retailerId} x ${product.quantity}`)
+      .join(", ");
+  }
 
-        if (!productRetailerId) {
-          return null;
-        }
+  const selection = getWhatsAppInboundSelection(message);
+  if (selection) {
+    return selection.value;
+  }
 
-        const quantity =
+  return null;
+}
+
+export function getWhatsAppInboundSelection(message: WhatsAppWebhookMessage) {
+  const reply =
+    message.interactive?.button_reply ?? message.interactive?.list_reply;
+  const value = reply?.id || reply?.title;
+  if (!reply || !value) {
+    return null;
+  }
+
+  return {
+    id: reply.id || value,
+    label: reply.title || value,
+    value,
+  };
+}
+
+export function getWhatsAppInboundProducts(message: WhatsAppWebhookMessage) {
+  return (message.order?.product_items ?? []).flatMap((item) => {
+    const retailerId = item.product_retailer_id?.trim();
+    if (!retailerId) {
+      return [];
+    }
+
+    return [
+      {
+        quantity:
           typeof item.quantity === "number" &&
           Number.isInteger(item.quantity) &&
           item.quantity > 0
             ? item.quantity
-            : 1;
-
-        return `${productRetailerId} x ${quantity}`;
-      })
-      .filter((item): item is string => Boolean(item));
-
-    if (cartItems.length > 0) {
-      return cartItems.join(", ");
-    }
-  }
-
-  if (message.interactive?.button_reply) {
-    return (
-      message.interactive.button_reply.id ||
-      message.interactive.button_reply.title ||
-      null
-    );
-  }
-
-  if (message.interactive?.list_reply) {
-    return (
-      message.interactive.list_reply.id ||
-      message.interactive.list_reply.title ||
-      null
-    );
-  }
-
-  return null;
+            : 1,
+        retailerId,
+      },
+    ];
+  });
 }
 
 function getWhatsAppMediaPayload(message: WhatsAppWebhookMessage) {
@@ -1323,8 +1331,9 @@ export function createWhatsAppChannelAdapter(): ChannelReplyAdapter<
         };
       } else {
         if (!context.serviceWindowOpen) {
-          throw new Error(
+          throw new ChannelDeliveryError(
             "WhatsApp service window is closed. Send an approved template message before sending regular flow replies.",
+            false,
           );
         }
 
@@ -1355,7 +1364,8 @@ export function createWhatsAppChannelAdapter(): ChannelReplyAdapter<
         }
       }
 
-      const hasNativeDelivery = Boolean(delivery) || reply.type === "text";
+      const hasNativeDelivery =
+        Boolean(delivery) || (reply.type === "text" && capability === "text");
       const mode = hasNativeDelivery ? "native" : "fallback";
       if (!delivery) {
         delivery = {
@@ -1364,7 +1374,7 @@ export function createWhatsAppChannelAdapter(): ChannelReplyAdapter<
           messageType: "text",
           text: fallbackText,
         };
-        if (reply.type !== "text") {
+        if (capability !== "text") {
           warnings.push(
             `${capability} requirements were not met; text fallback was used.`,
           );

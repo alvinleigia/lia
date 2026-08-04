@@ -22,6 +22,11 @@ import {
   startChannelFlowEdit,
 } from "@/lib/channel-flow-runtime";
 import {
+  type ChannelInboundSelectionInputV1,
+  getNormalizedChannelInboundRuntimeValue,
+  normalizeChannelInboundV1,
+} from "@/lib/channel-inbound-contract";
+import {
   type ChannelType,
   getOrCreateChannelConversation,
   recordChannelInboundMessage,
@@ -53,6 +58,7 @@ type RunBrowserFlowTextInput = {
   recordReplies?: boolean;
   resume?: boolean;
   resumeExecution?: boolean;
+  selection?: ChannelInboundSelectionInputV1;
   source: string;
   text?: string;
   traceId?: string | null;
@@ -163,7 +169,12 @@ async function executeBrowserFlowText(
     projectId: input.projectId,
     source: input.source,
   });
-  const text = input.text?.trim() ?? "";
+  const normalizedInbound = normalizeChannelInboundV1({
+    channelType: input.channelType,
+    selection: input.selection,
+    text: input.text,
+  });
+  const text = getNormalizedChannelInboundRuntimeValue(normalizedInbound);
   let action: RuntimeAction | null = null;
 
   if (
@@ -284,8 +295,10 @@ async function executeBrowserFlowText(
         channelType: input.channelType,
         externalConversationId: input.conversationId,
         externalUserId: input.externalUserId,
+        messageType: normalizedInbound.kind,
+        payload: { normalizedInbound },
         projectId: input.projectId,
-        text,
+        text: normalizedInbound.selection?.label ?? text,
       })
     : {
         conversation: await getOrCreateChannelConversation({
@@ -358,6 +371,7 @@ function hashBrowserFlowCommand(input: RunBrowserFlowTextInput) {
         actionId: input.actionId ?? null,
         editSection: input.editSection ?? null,
         expectedRevision: input.expectedRevision ?? null,
+        selection: input.selection ?? null,
         text: input.text ?? null,
       }),
     )

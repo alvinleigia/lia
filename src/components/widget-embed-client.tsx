@@ -197,6 +197,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
     displayText?: string;
     displayUserText?: boolean;
     editSection?: FlowEditSection;
+    selection?: { id: string; label: string; value: string };
     text?: string;
   }) => {
     if (!conversationId) {
@@ -223,6 +224,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
           conversationId,
           editSection: input.editSection,
           expectedRevision: activeFlow?.revision,
+          selection: input.selection,
           text: input.text,
           token,
         },
@@ -410,6 +412,11 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
     await runCanonicalFlow({
       displayText,
       displayUserText: true,
+      selection:
+        (activeStepHasOptions || runtimeInputRequest?.inputKind === "choice") &&
+        value.length <= 240
+          ? { id: value, label: displayText, value }
+          : undefined,
       text: value,
     });
   };

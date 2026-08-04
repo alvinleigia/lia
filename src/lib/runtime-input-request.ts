@@ -4,6 +4,7 @@ export const RUNTIME_INPUT_KINDS = [
   "choice",
   "date",
   "email",
+  "media",
   "number",
   "phone",
   "text",
@@ -27,6 +28,7 @@ function getInputKind(field: TaskFieldDefinition): RuntimeInputKind {
   if (
     field.type === "date" ||
     field.type === "email" ||
+    field.type === "media" ||
     field.type === "time"
   ) {
     return field.type;

@@ -56,7 +56,10 @@ import { startHybridTaskEntry } from "@/lib/hybrid-task-entry";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 import { getRuntimeProjectActionForSubmission } from "@/lib/runtime-actions";
 import type { RuntimeInputRequest } from "@/lib/runtime-input-request";
-import { createTextReply, type RuntimeReply } from "@/lib/runtime-replies";
+import {
+  createTaskRuntimeReply,
+  type RuntimeReply,
+} from "@/lib/runtime-replies";
 
 type ProjectTurnContext = {
   companyName: string;
@@ -982,11 +985,12 @@ export async function runHybridChannelBoundary(
     }
   }
 
-  const replies = [
-    createTextReply(
-      replyProposal.reply,
-      inputRequest ? { inputRequest } : undefined,
-    ),
+  const replies: RuntimeReply[] = [
+    createTaskRuntimeReply({
+      inputRequest,
+      nextAction: replyProposal.nextAction,
+      text: replyProposal.reply,
+    }),
   ];
   if (
     dispatch.status === "ended" ||

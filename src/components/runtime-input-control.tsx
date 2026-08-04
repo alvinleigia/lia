@@ -18,7 +18,7 @@ type RuntimeInputControlProps = {
 };
 
 const INPUT_TYPES: Record<
-  Exclude<RuntimeInputKind, "choice">,
+  Exclude<RuntimeInputKind, "choice" | "media">,
   "date" | "email" | "number" | "tel" | "text" | "time"
 > = {
   date: "date",
@@ -64,6 +64,14 @@ export function RuntimeInputControl({
           </Button>
         ))}
       </div>
+    );
+  }
+
+  if (request.inputKind === "media") {
+    return (
+      <p className="mt-2 rounded-md border bg-background p-3 text-sm text-muted-foreground">
+        Upload the requested file using this channel&apos;s media control.
+      </p>
     );
   }
 

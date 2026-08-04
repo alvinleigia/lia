@@ -9,6 +9,7 @@ import {
   BrowserFlowCommandError,
   runBrowserFlowText,
 } from "@/lib/browser-flow-runtime";
+import { channelInboundSelectionInputV1Schema } from "@/lib/channel-inbound-contract";
 import {
   getChannelConversation,
   listRecentChannelMessages,
@@ -25,6 +26,7 @@ const requestSchema = z
     expectedRevision: z.number().int().nonnegative().optional(),
     projectId: z.number().int().positive().optional(),
     resume: z.boolean().optional(),
+    selection: channelInboundSelectionInputV1Schema.optional(),
     text: z.string().max(4000).optional(),
   })
   .strict();
@@ -96,6 +98,7 @@ export async function POST(req: Request) {
       expectedRevision: parsed.data.expectedRevision,
       projectId: project.id,
       resume: parsed.data.resume,
+      selection: parsed.data.selection,
       source: "project_chat",
       text: parsed.data.text,
     });

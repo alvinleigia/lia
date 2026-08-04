@@ -15,6 +15,7 @@ import type {
   RuntimeReplyMedia,
   RuntimeReplyProduct,
 } from "@/lib/runtime-replies";
+import { normalizeRuntimeReply } from "@/lib/runtime-replies";
 
 type BrowserChannelType = Extract<ChannelType, "project_chat" | "widget">;
 
@@ -186,12 +187,15 @@ export function browserChannelMessagesToFlowMessages(
     )
       ? (message.messageType as RuntimeReply["type"])
       : "text";
-    const reply: RuntimeReply = {
+    const reply = normalizeRuntimeReply({
       fallbackText: message.text,
       payload: message.payload,
       text: getStoredBrowserReplyText(message),
       type,
-    };
+    });
+    if (!reply) {
+      return [];
+    }
 
     return [
       adapter.adaptReply({

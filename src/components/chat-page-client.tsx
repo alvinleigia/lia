@@ -208,6 +208,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     displayText?: string;
     displayUserText?: boolean;
     editSection?: FlowEditSection;
+    selection?: { id: string; label: string; value: string };
     text?: string;
   }) => {
     if (!conversationId) {
@@ -233,6 +234,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
         editSection: input.editSection,
         expectedRevision: activeFlow?.revision,
         projectId,
+        selection: input.selection,
         text: input.text,
       });
 
@@ -412,6 +414,11 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     await runCanonicalFlow({
       displayText,
       displayUserText: true,
+      selection:
+        (activeStepHasOptions || runtimeInputRequest?.inputKind === "choice") &&
+        value.length <= 240
+          ? { id: value, label: displayText, value }
+          : undefined,
       text: value,
     });
   };

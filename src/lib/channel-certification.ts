@@ -1,6 +1,19 @@
 import type { ActionStepType } from "@/lib/action-flow-constants";
+import {
+  type ChannelCapabilitySupport,
+  type ChannelReplyCapability,
+  getChannelAdapterProfile,
+} from "@/lib/channel-adapter-contract";
+import {
+  CHANNEL_INBOUND_KINDS,
+  type ChannelInboundKind,
+} from "@/lib/channel-inbound-contract";
 import type { FlowComponentChannel } from "@/lib/flow-components";
 import { listEnabledStepFlowComponents } from "@/lib/flow-components";
+import {
+  RUNTIME_REPLY_INTENTS,
+  type RuntimeReplyIntent,
+} from "@/lib/runtime-replies";
 
 export const CERTIFICATION_CHANNELS = [
   "project_chat",
@@ -78,6 +91,68 @@ export type ChannelCertificationCell = {
   liveSignOffRequired: boolean;
   stepType: ActionStepType;
 };
+
+export type TaskReplyCertificationCell = {
+  channel: CertificationChannel;
+  capability: ChannelReplyCapability;
+  intent: RuntimeReplyIntent;
+  support: ChannelCapabilitySupport;
+};
+
+export type InboundCertificationCell = {
+  channel: CertificationChannel;
+  kind: ChannelInboundKind;
+  normalized: boolean;
+};
+
+const TASK_INTENT_CAPABILITIES = {
+  choices: "buttons",
+  confirmation: "buttons",
+  content: "text",
+  handoff: "handoff",
+  media: "media",
+  outcome: "text",
+  question: "text",
+} as const satisfies Record<RuntimeReplyIntent, ChannelReplyCapability>;
+
+function getCertificationProfile(channel: CertificationChannel) {
+  return channel === "reference_future"
+    ? null
+    : getChannelAdapterProfile(channel);
+}
+
+export function buildTaskReplyCertificationMatrix(): TaskReplyCertificationCell[] {
+  return RUNTIME_REPLY_INTENTS.flatMap((intent) =>
+    CERTIFICATION_CHANNELS.map((channel) => {
+      const capability = TASK_INTENT_CAPABILITIES[intent];
+      const profile = getCertificationProfile(channel);
+
+      return {
+        capability,
+        channel,
+        intent,
+        support: profile ? profile.replies[capability] : "native",
+      };
+    }),
+  );
+}
+
+export function buildInboundCertificationMatrix(): InboundCertificationCell[] {
+  return CHANNEL_INBOUND_KINDS.flatMap((kind) =>
+    CERTIFICATION_CHANNELS.map((channel) => {
+      const profile = getCertificationProfile(channel);
+      const normalized =
+        !profile ||
+        (kind === "text" && profile.inbound.text) ||
+        (kind === "selection" && profile.inbound.interactiveSelection) ||
+        (kind === "media" && profile.inbound.media) ||
+        (kind === "location" && profile.inbound.location) ||
+        (kind === "product_selection" && profile.inbound.productSelection);
+
+      return { channel, kind, normalized };
+    }),
+  );
+}
 
 function toComponentChannel(
   channel: CertificationChannel,

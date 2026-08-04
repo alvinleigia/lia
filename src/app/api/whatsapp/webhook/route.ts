@@ -4,6 +4,10 @@ import {
   processChannelFlowMedia,
   processChannelFlowText,
 } from "@/lib/channel-flow-runtime";
+import {
+  getNormalizedChannelInboundRuntimeValue,
+  normalizeChannelInboundV1,
+} from "@/lib/channel-inbound-contract";
 import { recordChannelInboundMessage } from "@/lib/channels";
 import { resolveTraceId } from "@/lib/execution-trace";
 import { runHybridChannelFlowBoundary } from "@/lib/hybrid-channel-runtime";
@@ -17,6 +21,8 @@ import {
   getActiveWhatsAppChannelByVerifyToken,
   getWhatsAppInboundLocationValue,
   getWhatsAppInboundMediaReference,
+  getWhatsAppInboundProducts,
+  getWhatsAppInboundSelection,
   getWhatsAppInboundText,
   normalizeWhatsAppConfig,
   verifyWhatsAppSignature,
@@ -85,17 +91,31 @@ export async function POST(req: Request) {
     const text = getWhatsAppInboundText(change.message);
     const media = getWhatsAppInboundMediaReference(change.message);
     const location = getWhatsAppInboundLocationValue(change.message);
+    const normalizedInbound = normalizeChannelInboundV1({
+      channelType: "whatsapp",
+      location: location ? { ...location } : null,
+      media: media ? { ...media } : null,
+      products: getWhatsAppInboundProducts(change.message),
+      selection: getWhatsAppInboundSelection(change.message),
+      text,
+    });
     const inboundRecord = await recordChannelInboundMessage({
       projectId: channel.projectId,
       channelType: "whatsapp",
       externalConversationId: change.message.from,
       externalUserId: change.message.from,
-      text: text ?? media?.originalName ?? location?.label ?? null,
+      text:
+        normalizedInbound.selection?.label ??
+        text ??
+        media?.originalName ??
+        location?.label ??
+        null,
       messageType: change.message.type ?? "text",
       payload: {
         location,
         mediaReference: media,
         message: change.message,
+        normalizedInbound,
         phoneNumberId: change.phoneNumberId,
         displayPhoneNumber: change.displayPhoneNumber,
         whatsappMessageId: change.message.id,
@@ -115,7 +135,9 @@ export async function POST(req: Request) {
       source: WHATSAPP_FLOW_SOURCE,
     });
     const traceId = resolveTraceId(activeSubmission?.traceId);
-    const runtimeText = text ?? (location ? JSON.stringify(location) : "");
+    const runtimeText = location
+      ? JSON.stringify(location)
+      : getNormalizedChannelInboundRuntimeValue(normalizedInbound);
     const result = media
       ? await processChannelFlowMedia({
           activeSubmission,

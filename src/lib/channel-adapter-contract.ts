@@ -22,6 +22,18 @@ export type ChannelCapabilitySupport =
   | "unsupported";
 export type ChannelDeliveryMode = "native" | "fallback";
 
+export class ChannelDeliveryError extends Error {
+  readonly semanticsPreserved = true;
+
+  constructor(
+    message: string,
+    readonly retryable: boolean,
+  ) {
+    super(message);
+    this.name = "ChannelDeliveryError";
+  }
+}
+
 export type ChannelAdapterLimits = {
   buttonOptions: number | null;
   listOptions: number | null;
@@ -32,7 +44,9 @@ export type ChannelAdapterProfile<TChannelType extends string = ChannelType> = {
   channelType: TChannelType;
   inbound: {
     interactiveSelection: boolean;
+    location: boolean;
     media: boolean;
+    productSelection: boolean;
     text: boolean;
   };
   limits: ChannelAdapterLimits;
@@ -74,19 +88,37 @@ const browserReplySupport = {
 export const CHANNEL_ADAPTER_PROFILES = {
   project_chat: {
     channelType: "project_chat",
-    inbound: { interactiveSelection: true, media: true, text: true },
+    inbound: {
+      interactiveSelection: true,
+      location: true,
+      media: true,
+      productSelection: true,
+      text: true,
+    },
     limits: { buttonOptions: null, listOptions: null, productItems: null },
     replies: browserReplySupport,
   },
   widget: {
     channelType: "widget",
-    inbound: { interactiveSelection: true, media: true, text: true },
+    inbound: {
+      interactiveSelection: true,
+      location: true,
+      media: true,
+      productSelection: true,
+      text: true,
+    },
     limits: { buttonOptions: null, listOptions: null, productItems: null },
     replies: browserReplySupport,
   },
   whatsapp: {
     channelType: "whatsapp",
-    inbound: { interactiveSelection: true, media: true, text: true },
+    inbound: {
+      interactiveSelection: true,
+      location: true,
+      media: true,
+      productSelection: true,
+      text: true,
+    },
     limits: { buttonOptions: 3, listOptions: 10, productItems: 30 },
     replies: {
       buttons: "conditional",
@@ -114,6 +146,10 @@ function readProductMode(reply: RuntimeReply) {
 export function getRuntimeReplyCapability(
   reply: RuntimeReply,
 ): ChannelReplyCapability {
+  if (reply.intent === "media" && reply.type === "text") {
+    return "media";
+  }
+
   if (reply.type === "catalog") {
     const mode = readProductMode(reply);
     return mode === "catalog" ? "catalog_message" : mode;

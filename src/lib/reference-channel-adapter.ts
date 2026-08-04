@@ -25,7 +25,13 @@ const referenceReplySupport = Object.fromEntries(
 
 export const REFERENCE_CHANNEL_PROFILE = {
   channelType: REFERENCE_CHANNEL_TYPE,
-  inbound: { interactiveSelection: true, media: true, text: true },
+  inbound: {
+    interactiveSelection: true,
+    location: true,
+    media: true,
+    productSelection: true,
+    text: true,
+  },
   limits: { buttonOptions: null, listOptions: null, productItems: null },
   replies: referenceReplySupport,
 } satisfies ChannelAdapterProfile<typeof REFERENCE_CHANNEL_TYPE>;

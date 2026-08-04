@@ -11,8 +11,8 @@ import { getDurableRetryDelayMs } from "@/lib/durable-jobs";
 import { resolveTraceId } from "@/lib/execution-trace";
 import {
   getRuntimeReplyText,
+  normalizeRuntimeReply,
   type RuntimeReply,
-  type RuntimeReplyType,
 } from "@/lib/runtime-replies";
 import { sendWhatsAppRuntimeReply } from "@/lib/whatsapp";
 
@@ -27,36 +27,8 @@ export const OUTBOX_STATUSES = [
 
 export type OutboxTopic = (typeof OUTBOX_TOPICS)[number];
 
-const RUNTIME_REPLY_TYPES = new Set<RuntimeReplyType>([
-  "buttons",
-  "catalog",
-  "handoff",
-  "list",
-  "media",
-  "template",
-  "text",
-]);
-
 function parseRuntimeReply(value: unknown): RuntimeReply | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  const reply = value as Record<string, unknown>;
-  if (
-    typeof reply.type !== "string" ||
-    !RUNTIME_REPLY_TYPES.has(reply.type as RuntimeReplyType) ||
-    typeof reply.text !== "string" ||
-    typeof reply.fallbackText !== "string" ||
-    (reply.payload !== undefined &&
-      (!reply.payload ||
-        typeof reply.payload !== "object" ||
-        Array.isArray(reply.payload)))
-  ) {
-    return null;
-  }
-
-  return reply as RuntimeReply;
+  return normalizeRuntimeReply(value);
 }
 
 function outboxClaimCondition(now: Date) {
