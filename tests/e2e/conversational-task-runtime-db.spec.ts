@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 import {
+  getNormalizedChannelInboundRuntimeValue,
+  normalizeChannelInboundV1,
+} from "../../src/lib/channel-inbound-contract";
+import type { ChannelType } from "../../src/lib/channels";
+import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
 } from "../../src/lib/conversation-contract-fixtures";
@@ -80,6 +85,7 @@ let fixture:
 let activeRunId: number;
 let activeRevision: number;
 let providerSequence = 0;
+const certificationConversationIds: number[] = [];
 
 function timestamp(offsetMinutes: number) {
   return new Date(
@@ -328,6 +334,21 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   if (!fixture) return;
+  for (const conversationId of certificationConversationIds) {
+    await deleteConversationRuntimeData({
+      conversationId,
+      includeMessages: true,
+      projectId: fixture.projectId,
+    });
+    await db
+      .delete(channelConversations)
+      .where(
+        and(
+          eq(channelConversations.id, conversationId),
+          eq(channelConversations.projectId, fixture.projectId),
+        ),
+      );
+  }
   await deleteConversationRuntimeData({
     conversationId: fixture.conversationId,
     includeMessages: true,
@@ -406,6 +427,172 @@ test("resolves legacy generic resource fields inside the selected project", asyn
     label: "Deep Tissue",
     status: "resolved",
   });
+});
+
+test("certifies identical booking fields and outcomes across live channel types", async () => {
+  const channels: ChannelType[] = ["project_chat", "widget", "whatsapp"];
+
+  const results = await Promise.all(
+    channels.map(async (channelType, channelIndex) => {
+      const externalConversationId = `phase13-${channelType}-${suffix}`;
+      const [conversation] = await db
+        .insert(channelConversations)
+        .values({
+          channelType,
+          externalConversationId,
+          projectId: fixture?.projectId as number,
+        })
+        .returning();
+      certificationConversationIds.push(conversation.id);
+
+      const channelIdentity = {
+        externalConversationId,
+        externalUserId: `phase13-visitor-${channelType}-${suffix}`,
+      };
+      const occurredAt = timestamp(30 + channelIndex);
+      const started = await startConversationalTaskRun({
+        anonymousVisitorId: channelIdentity.externalUserId,
+        authenticatedUserId: null,
+        channelIdentity,
+        channelType,
+        conversationId: conversation.id,
+        eventId: `phase13-start-${channelType}-${suffix}`,
+        identityKind: "anonymous",
+        initializationContext: { lia_timezone: "Asia/Kolkata" },
+        occurredAt,
+        projectId: fixture?.projectId as number,
+        providerSequence: null,
+        receivedAt: occurredAt,
+        sessionExpiresAt: timestamp(120),
+        sessionId: externalConversationId,
+        taskId: fixture?.taskId as number,
+        verifiedContactId: null,
+      });
+      expect(started.disposition).toBe("applied");
+
+      const categoryValue = getNormalizedChannelInboundRuntimeValue(
+        normalizeChannelInboundV1({
+          channelType,
+          selection: {
+            id: `task-field:serviceCategoryId:catalog:${fixture?.catalogId}`,
+            label: "Massage",
+            value: `catalog:${fixture?.catalogId}`,
+          },
+          text: "Massage",
+        }),
+      );
+      const serviceValue = getNormalizedChannelInboundRuntimeValue(
+        normalizeChannelInboundV1({
+          channelType,
+          selection: {
+            id: `task-field:serviceId:product:${fixture?.serviceProductId}`,
+            label: "Deep Tissue",
+            value: `product:${fixture?.serviceProductId}`,
+          },
+          text: "Deep Tissue",
+        }),
+      );
+      const textValue = (text: string) =>
+        getNormalizedChannelInboundRuntimeValue(
+          normalizeChannelInboundV1({ channelType, text }),
+        );
+      expect(categoryValue).toBe(`catalog:${fixture?.catalogId}`);
+      expect(serviceValue).toBe(`product:${fixture?.serviceProductId}`);
+
+      const fieldsApplied = await applyConversationalTaskEvent({
+        authentication: null,
+        candidates: [
+          {
+            canonicalValue: categoryValue,
+            fieldKey: "serviceCategoryId",
+            naturalValue: categoryValue,
+            provenance: { source: "visitor", sourceReference: null },
+            state: "valid",
+            validation: { code: null, message: null, valid: true },
+          },
+          {
+            canonicalValue: serviceValue,
+            fieldKey: "serviceId",
+            naturalValue: serviceValue,
+            provenance: { source: "visitor", sourceReference: null },
+            state: "valid",
+            validation: { code: null, message: null, valid: true },
+          },
+          ...[
+            ["preferredDate", "2026-08-10"],
+            ["preferredTime", "14:00"],
+            ["guestName", "Priya Sharma"],
+            ["guestEmail", "phase13@example.com"],
+            ["guestPhone", "+919988776655"],
+          ].map(([fieldKey, text]) => ({
+            canonicalValue: textValue(text),
+            fieldKey,
+            naturalValue: textValue(text),
+            provenance: { source: "visitor" as const, sourceReference: null },
+            state: "valid" as const,
+            validation: { code: null, message: null, valid: true },
+          })),
+        ],
+        channelIdentity,
+        channelType,
+        conversationId: conversation.id,
+        correction: false,
+        eventId: `phase13-fields-${channelType}-${suffix}`,
+        expectedRevision: started.revision as number,
+        occurredAt,
+        projectId: fixture?.projectId as number,
+        providerSequence: 1,
+        receivedAt: occurredAt,
+        schemaVersion: 1,
+        taskRunId: started.taskRunId as number,
+        type: "field.candidates",
+      });
+      expect(fieldsApplied.disposition).toBe("applied");
+
+      const completed = await applyConversationalTaskEvent({
+        authentication: null,
+        channelIdentity,
+        channelType,
+        conversationId: conversation.id,
+        eventId: `phase13-complete-${channelType}-${suffix}`,
+        expectedRevision: fieldsApplied.revision as number,
+        occurredAt,
+        outcomeKey: "completed",
+        projectId: fixture?.projectId as number,
+        providerSequence: 2,
+        receivedAt: occurredAt,
+        schemaVersion: 1,
+        taskRunId: started.taskRunId as number,
+        type: "task.complete",
+      });
+      expect(completed.disposition).toBe("applied");
+
+      const runtime = await getConversationalTaskRuntime({
+        projectId: fixture?.projectId as number,
+        taskRunId: started.taskRunId as number,
+      });
+      return {
+        fields: Object.fromEntries(
+          runtime?.fields.map((field) => [
+            field.fieldKey,
+            field.canonicalValue,
+          ]) ?? [],
+        ),
+        outcomeKey: runtime?.run.outcomeKey,
+        status: runtime?.run.status,
+        taskVersionId: runtime?.run.taskVersionId,
+      };
+    }),
+  );
+
+  expect(results).toHaveLength(3);
+  expect(results[0]).toMatchObject({
+    outcomeKey: "completed",
+    status: "completed",
+    taskVersionId: fixture?.taskVersionId,
+  });
+  expect(results[1]).toEqual(results[0]);
+  expect(results[2]).toEqual(results[0]);
 });
 
 test("starts a version-pinned run and replays the same event once", async () => {
