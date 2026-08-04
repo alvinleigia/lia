@@ -9,5 +9,20 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is required.");
 }
 
-const queryClient = postgres(databaseUrl, { prepare: false });
+const globalForDatabase = globalThis as unknown as {
+  liaQueryClient?: ReturnType<typeof postgres>;
+};
+const queryClient =
+  globalForDatabase.liaQueryClient ??
+  postgres(databaseUrl, {
+    connect_timeout: 10,
+    idle_timeout: 20,
+    max: 5,
+    prepare: false,
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForDatabase.liaQueryClient = queryClient;
+}
+
 export const db = drizzle(queryClient);
