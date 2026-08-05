@@ -143,6 +143,82 @@ test("invalid model identifiers are repaired before a proposal is accepted", asy
   expect(provider.calls[1]?.system).toContain("unknown_field");
 });
 
+test("zero-candidate compound task replies are repaired before acceptance", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      fieldCandidates: [],
+      reply: "What date would you prefer?",
+    }),
+    baseTurn({
+      fieldCandidates: [
+        {
+          fieldKey: "preferredDate",
+          naturalValue: "2026-08-15",
+          confidence: 0.99,
+          source: "visitor",
+        },
+        {
+          fieldKey: "preferredTime",
+          naturalValue: "15:30",
+          confidence: 0.99,
+          source: "visitor",
+        },
+        {
+          fieldKey: "guestName",
+          naturalValue: "Phase 13 Parity Guest",
+          confidence: 0.96,
+          source: "visitor",
+        },
+        {
+          fieldKey: "guestEmail",
+          naturalValue: "phase13.invalid",
+          confidence: 0.95,
+          source: "visitor",
+        },
+        {
+          fieldKey: "guestPhone",
+          naturalValue: "+919876543210",
+          confidence: 0.99,
+          source: "visitor",
+        },
+      ],
+    }),
+  ]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    visitorMessage:
+      "2026-08-15 at 15:30 for Phase 13 Parity Guest. Email phase13.invalid and phone +919876543210.",
+  });
+
+  expect(result.source).toBe("model");
+  expect(result.attempts).toBe(2);
+  expect(result.proposal.fieldCandidates).toHaveLength(5);
+  expect(provider.calls[1]?.system).toContain("missing_direct_field_candidate");
+});
+
+test("vague task replies without direct values do not trigger repair", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      fieldCandidates: [],
+      reply: "What date would you prefer?",
+      turnKind: "ordinary_question",
+    }),
+  ]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    visitorMessage: "I am not sure yet.",
+  });
+
+  expect(result.source).toBe("model");
+  expect(result.attempts).toBe(1);
+  expect(result.proposal.fieldCandidates).toEqual([]);
+  expect(provider.calls).toHaveLength(1);
+});
+
 test("prompt extraction requests are blocked before retrieval or model use", async () => {
   const provider = new QueueProvider([baseTurn()]);
   const retriever = new FixtureRetriever();

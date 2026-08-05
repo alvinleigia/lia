@@ -337,6 +337,34 @@ function directFieldRecoveryProposal(
   });
 }
 
+function hasDirectUnresolvedFieldEvidence(input: ExecuteStructuredTurnInput) {
+  if (!input.activeTask || input.stage !== "extraction") return false;
+
+  const fieldStates = new Map(
+    input.fieldState.map((field) => [field.fieldKey, field.state]),
+  );
+  const value = input.visitorMessage.trim();
+
+  return input.activeTask.task.definition.fields.some((field) => {
+    const state = fieldStates.get(field.key) ?? "missing";
+    if (!["cleared", "invalid", "missing"].includes(state)) return false;
+
+    if (field.type === "email") {
+      return /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/.test(value);
+    }
+    if (field.type === "phone") {
+      return /(?:\+|00)[1-9][\d\s().-]{5,20}/.test(value);
+    }
+    if (field.type === "date") {
+      return /\b\d{4}-\d{2}-\d{2}\b/.test(value);
+    }
+    if (field.type === "time") {
+      return /\b(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\b/.test(value);
+    }
+    return false;
+  });
+}
+
 function retrievalFailureProposal(input: ExecuteStructuredTurnInput) {
   const mode =
     input.activeTask?.task.definition.degradedMode.retrieval ?? "clarify";
@@ -569,6 +597,16 @@ export class StructuredTurnEngine {
           );
           if (hasUnsafeTurnOutput(proposal.reply)) {
             throw new TurnProposalValidationError(["unsafe_output"]);
+          }
+          if (
+            proposal.fieldCandidates.length === 0 &&
+            proposal.nextAction === "ask" &&
+            proposal.safety.decision === "allow" &&
+            hasDirectUnresolvedFieldEvidence(input)
+          ) {
+            throw new TurnProposalValidationError([
+              "missing_direct_field_candidate",
+            ]);
           }
 
           return {

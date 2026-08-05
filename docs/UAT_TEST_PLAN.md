@@ -9,7 +9,9 @@ Status: Ready for focused manual UAT on 2026-08-04. Migration
 
 Automated evidence:
 
-- All 145 shared channel, task, hybrid-flow, and delivery contracts pass.
+- All 151 shared channel, task, hybrid-flow, and delivery contracts pass,
+  including bounded repair when a compound extraction response unexpectedly
+  contains no field candidates.
 - All 22 serialized database runtime scenarios pass, including project-scoped
   catalog choices for browser controls plus identical
   canonical booking fields and outcomes after each channel enters the same
