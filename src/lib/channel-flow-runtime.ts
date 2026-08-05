@@ -670,7 +670,7 @@ async function resumeParentFlowAfterSubmit(input: {
   });
 }
 
-async function requestHumanHandoff(input: {
+export async function requestHumanHandoff(input: {
   action: RuntimeAction;
   projectId: number;
   step: RuntimeActionStep;

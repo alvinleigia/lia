@@ -271,6 +271,43 @@ test("sentences mentioning cancellation still use normal language handling", asy
   expect(provider.calls).toHaveLength(1);
 });
 
+test("explicit human help requests hand off without model use", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    visitorMessage: "I need a person to help me with this booking.",
+  });
+
+  expect(result.source).toBe("deterministic");
+  expect(result.proposal).toMatchObject({
+    fieldCandidates: [],
+    nextAction: "handoff",
+    safety: {
+      decision: "handoff",
+      reasonCode: "explicit_human_help_request",
+    },
+  });
+  expect(provider.calls).toHaveLength(0);
+  expect(retriever.calls).toBe(0);
+});
+
+test("negated human help requests still use normal language handling", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    visitorMessage: "I don't need a person to help me.",
+  });
+
+  expect(result.source).toBe("model");
+  expect(result.proposal.nextAction).toBe("ask");
+  expect(provider.calls).toHaveLength(1);
+});
+
 test("task field extraction skips knowledge retrieval", async () => {
   const provider = new QueueProvider([baseTurn()]);
   const retriever = new FixtureRetriever();

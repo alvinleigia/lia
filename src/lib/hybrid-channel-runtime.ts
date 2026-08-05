@@ -3,6 +3,7 @@ import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
 import {
   completeChannelFlowAfterHybridEnd,
+  requestHumanHandoff,
   resumeChannelFlowAtStep,
 } from "@/lib/channel-flow-runtime";
 import type { ChannelInboundSelectionV1 } from "@/lib/channel-inbound-contract";
@@ -1091,7 +1092,16 @@ async function executeTaskBoundary(input: {
           session.snapshot.task.definition.outcomes.find(
             (candidate) => candidate.type === "cancelled",
           ))
-        : null;
+        : reconciledProposal.nextAction === "handoff"
+          ? (session.snapshot.task.definition.outcomes.find(
+              (candidate) =>
+                candidate.key ===
+                reconciledProposal.outcomeRecommendation?.outcomeKey,
+            ) ??
+            session.snapshot.task.definition.outcomes.find(
+              (candidate) => candidate.type === "handoff",
+            ))
+          : null;
   if (!outcome) {
     if (
       reconciledProposal.nextAction === "confirm" &&
@@ -1151,8 +1161,7 @@ async function executeTaskBoundary(input: {
     };
   }
 
-  const outcomeResult = await applyConversationalTaskEvent({
-    authentication: null,
+  const outcomeEvent = {
     channelIdentity: {
       externalConversationId: input.runtimeInput.externalConversationId,
       externalUserId: input.runtimeInput.externalUserId ?? null,
@@ -1168,11 +1177,28 @@ async function executeTaskBoundary(input: {
     receivedAt: new Date().toISOString(),
     schemaVersion: 1,
     taskRunId: session.runtime.run.id,
-    type:
-      reconciledProposal.nextAction === "cancel"
-        ? "task.cancel"
-        : "task.complete",
-  });
+  } as const;
+  const outcomeResult = await applyConversationalTaskEvent(
+    reconciledProposal.nextAction === "handoff"
+      ? {
+          ...outcomeEvent,
+          authentication: {
+            ...channelTaskPrincipal(input.runtimeInput),
+            keyId: null,
+            verifiedAt: new Date().toISOString(),
+          },
+          reason: "visitor_requested_human_help",
+          type: "task.handoff",
+        }
+      : {
+          ...outcomeEvent,
+          authentication: null,
+          type:
+            reconciledProposal.nextAction === "cancel"
+              ? "task.cancel"
+              : "task.complete",
+        },
+  );
 
   return {
     output: reconciledProposal,
@@ -1418,7 +1444,23 @@ export async function runHybridChannelBoundary(
     }),
   ];
   const continuation = resolveHybridDeterministicContinuation(dispatch);
-  if (continuation?.kind === "complete") {
+  if (
+    replyProposal.nextAction === "handoff" &&
+    continuation?.kind === "complete"
+  ) {
+    const handoffStep = input.action.steps.find(
+      (step) => step.id === sourceNode.sourceStepId,
+    );
+    if (!handoffStep) {
+      throw new Error("The handoff source step is unavailable.");
+    }
+    await requestHumanHandoff({
+      action: input.action,
+      projectId: input.projectId,
+      step: handoffStep,
+      submission: input.submission,
+    });
+  } else if (continuation?.kind === "complete") {
     const completed = await completeChannelFlowAfterHybridEnd({
       contactId: null,
       projectId: input.projectId,

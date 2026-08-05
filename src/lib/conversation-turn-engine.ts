@@ -98,6 +98,12 @@ const EXPLICIT_TASK_CANCELLATION_PHRASES = new Set([
   "stop this request",
 ]);
 
+const EXPLICIT_TASK_HANDOFF_PATTERNS = [
+  /\b(?:i\s+)?(?:need|want|would like)\s+(?:a\s+|an\s+)?(?:person|human|agent|representative|team member)\s+to\s+help\b/i,
+  /\b(?:talk|speak|chat)\s+(?:to|with)\s+(?:a\s+|an\s+)?(?:person|human|agent|representative|team member)\b/i,
+  /\b(?:human|live agent|team member)\s+(?:help|support)\b/i,
+];
+
 const TASK_INTENT_FILLER_WORDS = new Set([
   "a",
   "an",
@@ -165,6 +171,19 @@ function isExplicitTaskCancellation(input: ExecuteStructuredTurnInput) {
     .replace(/\s+/g, " ");
 
   return EXPLICIT_TASK_CANCELLATION_PHRASES.has(normalized);
+}
+
+function isExplicitTaskHandoff(input: ExecuteStructuredTurnInput) {
+  if (!input.activeTask) return false;
+
+  const normalized = input.visitorMessage.trim().replace(/\s+/g, " ");
+  if (/\b(?:do not|don['’]?t|no need to)\b/i.test(normalized)) {
+    return false;
+  }
+
+  return EXPLICIT_TASK_HANDOFF_PATTERNS.some((pattern) =>
+    pattern.test(normalized),
+  );
 }
 
 function resolveModelIds(
@@ -456,6 +475,24 @@ export class StructuredTurnEngine {
             reply: "No problem. I cancelled this request.",
             groundingStatus: "not_needed",
             turnKind: "cancellation",
+          }),
+        ),
+        source: "deterministic",
+        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+      };
+    }
+
+    if (isExplicitTaskHandoff(input)) {
+      return {
+        attempts: 0,
+        proposal: asValidatedDeterministic(
+          deterministicProposal({
+            nextAction: "handoff",
+            reasonCode: "explicit_human_help_request",
+            reply:
+              input.activeTask?.task.definition.taskPolicy.handoffMessage ??
+              "A team member will continue this conversation.",
+            groundingStatus: "not_needed",
           }),
         ),
         source: "deterministic",
