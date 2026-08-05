@@ -40,6 +40,7 @@ export async function listConversationalTaskRunsForWindow(input: {
   return db
     .select({
       run: conversationalTaskRuns,
+      snapshot: conversationalTaskVersions.snapshot,
       taskName: conversationalTasks.name,
       versionNumber: conversationalTaskVersions.versionNumber,
     })

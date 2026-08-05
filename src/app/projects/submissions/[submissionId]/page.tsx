@@ -30,6 +30,8 @@ import {
   buildConnectFlowRelationship,
   getConnectFlowSubmissionSummary,
 } from "@/lib/connect-flow-reporting";
+import { conversationalTaskSnapshotV1Schema } from "@/lib/conversation-contracts";
+import { resolveProjectTaskResource } from "@/lib/conversational-task-project-resources";
 import {
   getConversationalTaskRuntime,
   listConversationalTaskRunsForWindow,
@@ -265,23 +267,66 @@ export default async function SubmissionDetailPage({
       })
     : [];
   const linkedTaskRuns = await Promise.all(
-    linkedTaskRunRows.map(async ({ run, taskName, versionNumber }) => {
-      const [runtime, attempts] = await Promise.all([
-        getConversationalTaskRuntime({
-          projectId: project.id,
-          taskRunId: run.id,
-        }),
-        listOperationAttemptsWithDetailsForTaskRun(project.id, run.id),
-      ]);
+    linkedTaskRunRows.map(
+      async ({ run, snapshot, taskName, versionNumber }) => {
+        const [runtime, attempts] = await Promise.all([
+          getConversationalTaskRuntime({
+            projectId: project.id,
+            taskRunId: run.id,
+          }),
+          listOperationAttemptsWithDetailsForTaskRun(project.id, run.id),
+        ]);
+        const fields = runtime?.fields ?? [];
+        const parsedSnapshot =
+          conversationalTaskSnapshotV1Schema.safeParse(snapshot);
+        const definitions = new Map(
+          parsedSnapshot.success
+            ? parsedSnapshot.data.task.definition.fields.map((field) => [
+                field.key,
+                field,
+              ])
+            : [],
+        );
+        const fieldValues = new Map(
+          fields.map((field) => [
+            field.fieldKey,
+            field.canonicalValue ?? field.naturalValue,
+          ]),
+        );
+        const displayFields = await Promise.all(
+          fields.map(async (field) => {
+            const definition = definitions.get(field.fieldKey);
+            const storedValue = field.canonicalValue ?? field.naturalValue;
+            const displayValue = field.naturalValue ?? field.canonicalValue;
+            if (!definition || definition.type !== "project_resource") {
+              return { ...field, displayValue, resourceId: null };
+            }
 
-      return {
-        attempts,
-        fields: runtime?.fields ?? [],
-        run,
-        taskName,
-        versionNumber,
-      };
-    }),
+            const resolution = await resolveProjectTaskResource({
+              field: definition,
+              fieldValues,
+              projectId: project.id,
+              value: storedValue,
+            });
+            return resolution.status === "resolved"
+              ? {
+                  ...field,
+                  displayValue: resolution.label,
+                  resourceId: resolution.id,
+                }
+              : { ...field, displayValue, resourceId: null };
+          }),
+        );
+
+        return {
+          attempts,
+          fields: displayFields,
+          run,
+          taskName,
+          versionNumber,
+        };
+      },
+    ),
   );
   const operationAttempts = Array.from(
     new Map(
@@ -630,9 +675,12 @@ export default async function SubmissionDetailPage({
                           {field.state}
                         </span>
                       </div>
-                      <ReadOnlyValue
-                        value={field.naturalValue ?? field.canonicalValue}
-                      />
+                      <ReadOnlyValue value={field.displayValue} />
+                      {field.resourceId ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Canonical ID: {field.resourceId}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                 </div>
