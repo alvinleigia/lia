@@ -30,6 +30,7 @@ import {
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   dispatchHybridFlowBoundary,
+  getRequiredCompletionOperationDefinition,
   getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
   matchesHybridGraphTaskReturnTarget,
@@ -266,6 +267,48 @@ const availabilityDefinition = {
   version: 1,
 } satisfies ToolDefinitionV1;
 
+const requiredOperationDefinition = {
+  access: "write",
+  description: "Queue the booking for manual review.",
+  execution: {
+    adapter: "operation",
+    cancellation: "unsupported",
+    handler: "operation.manual_review",
+    mode: "asynchronous",
+    retryAttempts: 0,
+    retryDelayMs: 0,
+    timeoutMs: 15_000,
+  },
+  id: "manual_review",
+  inputSchema: { fields: [] },
+  name: "Manual Review",
+  outputSchema: { fields: [] },
+  projectId: 1,
+  requiredForCompletion: true,
+  resultMappings: [],
+  schemaVersion: 1,
+  version: 1,
+} satisfies ToolDefinitionV1;
+
+const taskSnapshotWithRequiredOperation =
+  conversationalTaskSnapshotV1Schema.parse({
+    ...taskSnapshot,
+    toolDefinitions: [requiredOperationDefinition],
+    task: {
+      ...taskSnapshot.task,
+      definition: {
+        ...taskSnapshot.task.definition,
+        tools: [
+          {
+            access: "write",
+            allowedStages: ["operation"],
+            tool: { id: requiredOperationDefinition.id, version: 1 },
+          },
+        ],
+      },
+    },
+  });
+
 test("compiler publishes a reachable knowledge-task-deterministic graph", () => {
   const result = compileHybridFlowGraph({
     actionSettings: {
@@ -497,6 +540,50 @@ test("task turns cannot claim progress past invalid canonical fields", () => {
     nextAction: "ask",
     outcomeRecommendation: null,
     reply: "Enter a date such as 2026-08-15.",
+    routeRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_correction",
+  });
+});
+
+test("the server requires confirmation after the last field correction", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor corrected the email address.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "ask" as const,
+    outcomeRecommendation: null,
+    reply: "Your email has been corrected.",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_correction" as const,
+  };
+
+  expect(
+    getRequiredCompletionOperationDefinition(taskSnapshotWithRequiredOperation)
+      ?.id,
+  ).toBe("manual_review");
+  expect(
+    reconcileTaskTurnWithRuntime({
+      fields: taskSnapshotWithRequiredOperation.task.definition.fields.map(
+        (field) => ({
+          fieldKey: field.key,
+          isRequired: field.required,
+          state: "valid",
+          validation: {},
+        }),
+      ),
+      proposal,
+      snapshot: taskSnapshotWithRequiredOperation,
+    }),
+  ).toMatchObject({
+    fieldCandidates: [],
+    nextAction: "confirm",
+    outcomeRecommendation: null,
     routeRecommendation: null,
     toolRequest: null,
     turnKind: "field_correction",

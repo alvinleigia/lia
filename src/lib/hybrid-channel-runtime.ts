@@ -20,6 +20,14 @@ import {
   getBoundAvailabilityDefinition,
   readCanonicalAvailability,
 } from "@/lib/conversational-task-availability";
+import {
+  confirmTaskOperation,
+  executeConfirmedTaskOperation,
+  listTaskOperationConfirmations,
+  prepareTaskOperationConfirmation,
+  processAndReconcileTaskOperation,
+  type TaskOperationPrincipal,
+} from "@/lib/conversational-task-operations";
 import { listProjectTaskResourceOptions } from "@/lib/conversational-task-project-resources";
 import {
   applyConversationalTaskEvent,
@@ -45,6 +53,7 @@ import {
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   dispatchHybridFlowBoundary,
+  getRequiredCompletionOperationDefinition,
   getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
   type HybridBoundaryExecution,
@@ -99,7 +108,21 @@ export async function buildHybridChannelResumeReplies(input: {
     projectId: input.projectId,
     snapshot: session.snapshot,
   });
-  if (!inputRequest) return [];
+  if (!inputRequest) {
+    const confirmation = await prepareRequiredTaskConfirmation({
+      projectId: input.projectId,
+      runtime: session.runtime,
+      snapshot: session.snapshot,
+    });
+    return confirmation
+      ? [
+          createTaskRuntimeReply({
+            nextAction: "confirm",
+            text: confirmation.text,
+          }),
+        ]
+      : [];
+  }
 
   const field = session.snapshot.task.definition.fields.find(
     (candidate) => candidate.key === inputRequest.fieldKey,
@@ -111,6 +134,95 @@ export async function buildHybridChannelResumeReplies(input: {
       text: field?.prompt ?? `Please provide ${inputRequest.label}.`,
     }),
   ];
+}
+
+function formatConfirmationValue(value: unknown) {
+  if (Array.isArray(value)) return value.map(String).join(", ");
+  if (
+    typeof value === "boolean" ||
+    typeof value === "number" ||
+    typeof value === "string"
+  ) {
+    return String(value);
+  }
+  return value === null || value === undefined ? "" : JSON.stringify(value);
+}
+
+async function buildTaskConfirmationText(input: {
+  operationName: string;
+  projectId: number;
+  runtime: NonNullable<
+    Awaited<ReturnType<typeof getConversationTaskRuntimeSession>>["runtime"]
+  >;
+  snapshot: ConversationalTaskSnapshotV1;
+}) {
+  const fieldValues = new Map<string, unknown>();
+  for (const field of input.runtime.fields) {
+    if (field.state !== "valid" && field.state !== "confirmed") continue;
+    const value = field.canonicalValue ?? field.naturalValue;
+    if (value !== null && value !== undefined) {
+      fieldValues.set(field.fieldKey, value);
+    }
+  }
+
+  const lines: string[] = [];
+  for (const definition of input.snapshot.task.definition.fields) {
+    if (!fieldValues.has(definition.key)) continue;
+    const value = fieldValues.get(definition.key);
+    let displayValue = formatConfirmationValue(value);
+    if (
+      definition.type === "project_resource" ||
+      definition.optionSource?.kind === "project_resource"
+    ) {
+      const options = await listProjectTaskResourceOptions({
+        field: definition,
+        fieldValues,
+        projectId: input.projectId,
+      });
+      const selected = options.find(
+        (option) => option.id === String(value),
+      )?.label;
+      if (!selected) {
+        throw new Error(
+          `The selected ${definition.label} is no longer available.`,
+        );
+      }
+      displayValue = selected;
+    }
+    lines.push(`- ${definition.label}: ${displayValue}`);
+  }
+
+  return [
+    "Please review these details:",
+    ...lines,
+    "",
+    `Confirm to submit this request through ${input.operationName}, or Cancel to stop.`,
+  ].join("\n");
+}
+
+async function prepareRequiredTaskConfirmation(input: {
+  projectId: number;
+  runtime: NonNullable<
+    Awaited<ReturnType<typeof getConversationTaskRuntimeSession>>["runtime"]
+  >;
+  snapshot: ConversationalTaskSnapshotV1;
+}) {
+  const definition = getRequiredCompletionOperationDefinition(input.snapshot);
+  if (!definition) return null;
+
+  await prepareTaskOperationConfirmation({
+    projectId: input.projectId,
+    taskRunId: input.runtime.run.id,
+    toolId: definition.id,
+  });
+  return {
+    text: await buildTaskConfirmationText({
+      operationName: definition.name,
+      projectId: input.projectId,
+      runtime: input.runtime,
+      snapshot: input.snapshot,
+    }),
+  };
 }
 
 async function persistReturnedKnowledgeBoundary(input: {
@@ -483,6 +595,135 @@ type HybridChannelFlowBoundaryInput = Omit<
   source: string;
 };
 
+function channelTaskPrincipal(
+  input: HybridChannelRuntimeInput,
+): TaskOperationPrincipal {
+  return {
+    kind: "session",
+    principal: input.externalUserId ?? input.externalConversationId,
+  };
+}
+
+function operationTurn(input: {
+  nextAction: TurnResultV1["nextAction"];
+  outcomeKey?: string | null;
+  reply: string;
+}): TurnResultV1 {
+  return {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The server handled the confirmed task operation.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" },
+    nextAction: input.nextAction,
+    outcomeRecommendation: input.outcomeKey
+      ? { confidence: 1, outcomeKey: input.outcomeKey }
+      : null,
+    reply: input.reply,
+    routeRecommendation: null,
+    safety: { decision: "allow", reasonCode: null },
+    schemaVersion: 1,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_answer",
+  };
+}
+
+async function executeTaskConfirmation(input: {
+  runtimeInput: HybridChannelRuntimeInput;
+  session: Awaited<ReturnType<typeof getConversationTaskRuntimeSession>>;
+}): Promise<HybridBoundaryExecution<TurnResultV1> | null> {
+  if (!input.session.runtime || !input.session.snapshot) return null;
+  const answer = (
+    input.runtimeInput.selection?.value ?? input.runtimeInput.text
+  )
+    .trim()
+    .toLowerCase();
+  if (answer !== "confirm") return null;
+
+  const confirmations = await listTaskOperationConfirmations({
+    projectId: input.runtimeInput.projectId,
+    taskRunId: input.session.runtime.run.id,
+  });
+  const active = confirmations.find((confirmation) =>
+    ["pending", "confirmed", "executing", "outcome_unknown"].includes(
+      confirmation.status,
+    ),
+  );
+  if (!active) return null;
+
+  const principal = channelTaskPrincipal(input.runtimeInput);
+  if (active.status === "pending") {
+    await confirmTaskOperation({
+      confirmationId: active.id,
+      principal,
+      projectId: input.runtimeInput.projectId,
+      taskRunId: input.session.runtime.run.id,
+    });
+  }
+  await executeConfirmedTaskOperation({
+    confirmationId: active.id,
+    principal,
+    projectId: input.runtimeInput.projectId,
+    taskRunId: input.session.runtime.run.id,
+  });
+  const result = await processAndReconcileTaskOperation({
+    confirmationId: active.id,
+    principal,
+    projectId: input.runtimeInput.projectId,
+    workerId: `hybrid-channel-${input.runtimeInput.channelType}-${input.runtimeInput.inboundMessageId}`,
+  });
+  const definition = input.session.snapshot.toolDefinitions.find(
+    (candidate) => candidate.id === active.toolId,
+  );
+  const operationName = definition?.name ?? "The operation";
+
+  if (result.attempt.status === "completed") {
+    const outcome = input.session.snapshot.task.definition.outcomes.find(
+      (candidate) => candidate.type === "completed",
+    );
+    return {
+      output: operationTurn({
+        nextAction: "complete",
+        outcomeKey: outcome?.key,
+        reply: `${operationName} completed. Your request was submitted successfully.`,
+      }),
+      signals: outcome
+        ? [{ kind: "task_outcome", triggerKey: outcome.outputPort }]
+        : [],
+    };
+  }
+  if (result.attempt.status === "failed") {
+    const outcome =
+      input.session.snapshot.task.definition.outcomes.find(
+        (candidate) => candidate.type === "failed",
+      ) ??
+      input.session.snapshot.task.definition.outcomes.find(
+        (candidate) => candidate.type === "handoff",
+      );
+    return {
+      output: operationTurn({
+        nextAction: outcome?.type === "handoff" ? "handoff" : "fail",
+        outcomeKey: outcome?.key,
+        reply: `${operationName} could not be completed. The team needs to review this request.`,
+      }),
+      signals: outcome
+        ? [{ kind: "task_outcome", triggerKey: outcome.outputPort }]
+        : [],
+    };
+  }
+
+  return {
+    output: operationTurn({
+      nextAction: "lookup",
+      reply:
+        result.attempt.status === "outcome_unknown"
+          ? `${operationName} needs reconciliation before its result can be confirmed.`
+          : `${operationName} is being processed.`,
+    }),
+    signals: [],
+  };
+}
+
 async function recordTaskFieldRequest(input: {
   conversationId: number;
   inputRequest: RuntimeInputRequest | null;
@@ -582,6 +823,12 @@ async function executeTaskBoundary(input: {
   ) {
     throw new Error("The pinned conversational task runtime is unavailable.");
   }
+
+  const confirmationExecution = await executeTaskConfirmation({
+    runtimeInput: input.runtimeInput,
+    session,
+  });
+  if (confirmationExecution) return confirmationExecution;
 
   const execution = await executeConfiguredStructuredTurn({
     activeTask: session.snapshot,
@@ -841,6 +1088,27 @@ async function executeTaskBoundary(input: {
           ))
         : null;
   if (!outcome) {
+    if (
+      reconciledProposal.nextAction === "confirm" &&
+      canonicalSession.runtime &&
+      canonicalSession.snapshot
+    ) {
+      const prepared = await prepareRequiredTaskConfirmation({
+        projectId: input.runtimeInput.projectId,
+        runtime: canonicalSession.runtime,
+        snapshot: canonicalSession.snapshot,
+      });
+      if (prepared) {
+        return {
+          inputRequest: null,
+          output: {
+            ...reconciledProposal,
+            reply: prepared.text,
+          },
+          signals: [],
+        };
+      }
+    }
     const baseInputRequest =
       canonicalSession.runtime && canonicalSession.snapshot
         ? getTaskRuntimeInputRequest({

@@ -164,14 +164,30 @@ Do not continue that older run with the date picker.
 9. Confirm the invalid email is not accepted as a valid completed field and the
    assistant asks for a usable email or clarification.
 10. Enter `Correct my email to phase13.parity@example.com.` in the bottom
-    composer and click the send-arrow button.
-11. Review the confirmation summary. It must show `Facial`, `Classic Facial`,
-   `2026-08-15`, `15:30`, `Phase 13 Parity Guest`,
-   `phase13.parity@example.com`, and `+919876543210`.
-12. Click the visible confirmation control labelled `Confirm`, or enter
-   `confirm` if the reply is presented as text.
-13. Wait for the `Manual Review` result and the task's successful completion
-    reply. Do not click the task button again while it is processing.
+    composer and click the send-arrow button once. Do not send another booking
+    message after the correction.
+11. Wait for one server-generated message beginning `Please review these
+    details:`. The same message must list these exact labelled values:
+
+    - `Service Category: Facial`
+    - `Service: Classic Facial`
+    - `Preferred Date: 2026-08-15`
+    - `Preferred Time: 15:30`
+    - `Guest Name: Phase 13 Parity Guest`
+    - `Guest Email: phase13.parity@example.com`
+    - `Guest Phone: +919876543210`
+
+    The message must end with instructions to confirm submission through
+    `Manual Review`, and visible `Confirm` and `Cancel` controls must appear.
+    A correction acknowledgement followed only by the ordinary composer is
+    not sufficient; stop and record a runtime defect if the confirmation does
+    not appear.
+12. Click the visible control labelled `Confirm` exactly once. Use the text
+    composer to enter `confirm` only on a provider that presents the same
+    confirmation as readable text instead of buttons.
+13. Wait for a reply stating that `Manual Review` completed and that the
+    request was submitted successfully. Do not click the task button or send
+    `Confirm` again while the operation is processing.
 
 Expected result:
 

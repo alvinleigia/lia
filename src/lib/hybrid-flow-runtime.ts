@@ -71,6 +71,30 @@ type TaskRuntimeReconciliationInput = {
   snapshot: ConversationalTaskSnapshotV1;
 };
 
+export function getRequiredCompletionOperationDefinition(
+  snapshot: ConversationalTaskSnapshotV1,
+) {
+  const definitions = snapshot.task.definition.tools.flatMap((binding) => {
+    if (
+      binding.access !== "write" ||
+      !binding.allowedStages.includes("operation")
+    ) {
+      return [];
+    }
+    const definition = snapshot.toolDefinitions.find(
+      (candidate) =>
+        candidate.id === binding.tool.id &&
+        candidate.version === binding.tool.version &&
+        candidate.access === "write" &&
+        candidate.execution.adapter === "operation" &&
+        candidate.requiredForCompletion,
+    );
+    return definition ? [definition] : [];
+  });
+
+  return definitions.length === 1 ? definitions[0] : null;
+}
+
 function canRequestTaskField(proposal: TurnResultV1) {
   return !(
     proposal.turnKind === "cancellation" ||
@@ -226,6 +250,30 @@ export function reconcileTaskTurnWithRuntime(
 ): TurnResultV1 {
   const unresolved = findUnresolvedTaskField(input);
   if (!unresolved) {
+    const requiredOperation = getRequiredCompletionOperationDefinition(
+      input.snapshot,
+    );
+    if (
+      requiredOperation &&
+      (input.proposal.turnKind === "field_answer" ||
+        input.proposal.turnKind === "field_correction") &&
+      input.proposal.safety.decision === "allow"
+    ) {
+      return {
+        ...input.proposal,
+        ambiguity: { question: null, requiresClarification: false },
+        decisionSummary: `The server prepared confirmation for required operation ${requiredOperation.id}.`,
+        fieldCandidates: [],
+        grounding: { excerptIds: [], status: "not_needed" },
+        nextAction: "confirm",
+        outcomeRecommendation: null,
+        reply: "Please review the current details before submitting.",
+        routeRecommendation: null,
+        safety: { decision: "allow", reasonCode: null },
+        taskRecommendation: null,
+        toolRequest: null,
+      };
+    }
     return input.proposal;
   }
   const { definition, runtimeField: unresolvedField } = unresolved;
