@@ -5,7 +5,9 @@ import {
   normalizeChannelInboundV1,
 } from "../../src/lib/channel-inbound-contract";
 import {
+  CHANNEL_METADATA_LAST_INBOUND_AT,
   type ChannelType,
+  getOrCreateChannelConversation,
   recordChannelInboundMessage,
 } from "../../src/lib/channels";
 import {
@@ -695,6 +697,37 @@ test("deduplicates replayed WhatsApp provider messages before runtime effects", 
         ),
       ),
   ).resolves.toHaveLength(1);
+});
+
+test("preserves the inbound timestamp when conversation metadata is extended", async () => {
+  const externalConversationId = `phase13-whatsapp-metadata-${suffix}`;
+  const inbound = await recordChannelInboundMessage({
+    channelType: "whatsapp",
+    externalConversationId,
+    externalUserId: externalConversationId,
+    metadata: { channelId: 1 },
+    projectId: fixture?.projectId as number,
+    text: "Book a facial",
+  });
+  certificationConversationIds.push(inbound.conversation.id);
+  if (inbound.conversation.contactId) {
+    certificationContactIds.push(inbound.conversation.contactId);
+  }
+  const lastInboundMessageAt =
+    inbound.conversation.metadata[CHANNEL_METADATA_LAST_INBOUND_AT];
+
+  const updated = await getOrCreateChannelConversation({
+    channelType: "whatsapp",
+    externalConversationId,
+    externalUserId: externalConversationId,
+    metadata: { channelId: 2 },
+    projectId: fixture?.projectId as number,
+  });
+
+  expect(updated.metadata).toMatchObject({
+    channelId: 2,
+    [CHANNEL_METADATA_LAST_INBOUND_AT]: lastInboundMessageAt,
+  });
 });
 
 test("starts a version-pinned run and replays the same event once", async () => {

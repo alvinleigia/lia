@@ -104,7 +104,9 @@ export async function getOrCreateChannelConversation(input: {
         externalUserId:
           input.externalUserId ?? sql`${channelConversations.externalUserId}`,
         lastMessageAt: now,
-        metadata: input.metadata ?? sql`${channelConversations.metadata}`,
+        metadata: input.metadata
+          ? sql`${channelConversations.metadata} || ${JSON.stringify(input.metadata)}::jsonb`
+          : sql`${channelConversations.metadata}`,
         updatedAt: now,
       },
     })
