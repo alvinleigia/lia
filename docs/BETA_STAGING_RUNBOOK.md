@@ -15,6 +15,8 @@ intended for a pre-beta dry run before real customers or production-like traffic
 - `PLATFORM_ADMIN_EMAILS` contains only intended SaaS owner emails.
 - `CRON_SECRET`, `UPLOAD_QUEUE_SECRET`, and `DURABLE_QUEUE_SECRET` are set.
 - `PROVIDER_SECRETS_ENCRYPTION_KEY` is set and its key version is recorded.
+- Historical `PROVIDER_SECRETS_ENCRYPTION_KEY_V<n>` values remain configured
+  while any stored provider credential uses those versions.
 - Staging uses separate OpenAI, SMTP2GO and WhatsApp credentials where possible.
 
 ## Migration Dry Run

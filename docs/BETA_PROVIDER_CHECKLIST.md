@@ -47,6 +47,8 @@ Required environment values:
 - `DURABLE_QUEUE_SECRET`
 - `PROVIDER_SECRETS_ENCRYPTION_KEY`
 - `PROVIDER_SECRETS_KEY_VERSION`
+- Historical `PROVIDER_SECRETS_ENCRYPTION_KEY_V<n>` values while encrypted
+  provider records still use those versions
 - `SMTP2GO_API_KEY`
 - `MAIL_FROM`
 

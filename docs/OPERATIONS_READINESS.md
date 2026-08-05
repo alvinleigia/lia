@@ -42,6 +42,22 @@ PROVIDER_SECRETS_ENCRYPTION_KEY="long-random-secret"
 PROVIDER_SECRETS_KEY_VERSION="1"
 ```
 
+If provider credentials were already saved before a dedicated encryption key
+was configured, those version-1 records were encrypted with `AUTH_SECRET` as
+the compatibility key. Do not assign a different key to version 1. Preserve
+the old material explicitly and start the dedicated key at version 2:
+
+```env
+PROVIDER_SECRETS_ENCRYPTION_KEY_V1="the-existing-AUTH_SECRET-value"
+PROVIDER_SECRETS_ENCRYPTION_KEY="new-long-random-secret"
+PROVIDER_SECRETS_KEY_VERSION="2"
+```
+
+Keep every historical `PROVIDER_SECRETS_ENCRYPTION_KEY_V<n>` value while
+records with that key version still exist. After changing key settings, verify
+an existing stored provider credential through its test operation before
+retiring any historical key.
+
 Optional integrations:
 
 ```env
