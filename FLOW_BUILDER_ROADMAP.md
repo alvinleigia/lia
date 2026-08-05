@@ -980,6 +980,13 @@ outcomes without introducing channel-specific task or graph persistence.
 Goal: approve the hybrid conversational platform for production-like beta
 traffic.
 
+Local release evidence recorded on 2026-08-05: environment preflight and the
+production build passed; `npm run certify:release:offline` passed lint over 436
+files, TypeScript, tenant-scope, cron, 154 channel contracts, 285 offline
+browser/database scenarios, and tenant isolation. The 24 task-runtime database
+scenarios also passed independently. Staging, restore, paid live-model, and
+intended-deployment channel gates remain open.
+
 - [x] `npm run certify:release:fast` exists.
 - [x] `npm run certify:release` exists.
 - [ ] Create or confirm a staging app and staging database.
@@ -987,21 +994,22 @@ traffic.
 - [ ] Confirm rollback, restore, and abandoned-task cleanup procedures.
 - [ ] Configure HTTPS, media delivery, cron recovery, encrypted secrets, model provider, and UAT channel credentials.
 - [ ] Set project and platform model rate, token, cost, timeout, and retention limits.
-- [ ] Confirm anonymous-session expiry, verified contact association, cross-channel linking, export, and deletion policies.
-- [ ] Confirm the reconciliation queue and operator procedure for uncertain external-operation outcomes.
-- [ ] Run deterministic task fixtures without a live model.
+- [x] Confirm anonymous-session expiry, verified contact association, cross-channel linking, export, and deletion policies.
+- [x] Confirm the reconciliation queue and operator procedure for uncertain external-operation outcomes.
+- [x] Run deterministic task fixtures without a live model.
 - [ ] Run approved live-model evaluation fixtures.
-- [ ] Run prompt-injection, tool-abuse, PII-redaction, and cross-tenant security checks.
-- [ ] Run duplicate, delayed, out-of-order, and concurrent inbound-event tests.
-- [ ] Run human-takeover and authorized automation-resume tests with no dual replies.
-- [ ] Run the degraded-mode matrix for model, retrieval, business tools, and outbound delivery.
-- [ ] Run `npm run lint`.
-- [ ] Run `npm run typecheck`.
-- [ ] Run `npm run check:tenant-scope`.
-- [ ] Run `npm run test:tenant-isolation`.
-- [ ] Run `npm run test:channel-certification`.
+- [x] Run prompt-injection, tool-abuse, PII-redaction, and cross-tenant security checks.
+- [x] Run duplicate, delayed, out-of-order, and concurrent inbound-event tests.
+- [x] Run human-takeover and authorized automation-resume tests with no dual replies.
+- [x] Run the degraded-mode matrix for model, retrieval, business tools, and outbound delivery.
+- [x] Run `npm run lint`.
+- [x] Run `npm run typecheck`.
+- [x] Run `npm run check:tenant-scope`.
+- [x] Run `npm run test:tenant-isolation`.
+- [x] Run `npm run test:channel-certification`.
 - [ ] Run `npm run test:e2e`.
-- [ ] Run `npm run build`.
+- [x] Run `npm run build`.
+- [x] Run `npm run certify:release:offline`.
 - [ ] Run `npm run certify:release`.
 - [ ] Record Project Chat as Pass, Pass with accepted limitations, or Fail.
 - [ ] Record Website Widget as Pass, Pass with accepted limitations, or Fail.

@@ -25,8 +25,9 @@ beta only when its own gates and the referenced roadmap exit gates pass.
 
 ## Current Position
 
-Overall beta status: Local release verification is in progress. Staging and
-provider approval are still required before production-like beta traffic.
+Overall beta status: Local offline release verification is complete. Staging,
+paid live-model, provider, restore, and release-owner approval are still
+required before production-like beta traffic.
 
 Authoritative product implementation status:
 
@@ -40,8 +41,8 @@ Authoritative product implementation status:
 - Priority 1, Phase 7 implementation and focused manual UAT are complete.
 - Priority 1, Phase 8 implementation and focused manual UAT are complete.
 - Priority 2, Phases 9-13 implementation and focused manual UAT are complete.
-- Priority 2, Phase 14 local, staging, provider, and release approval gates
-  remain in progress.
+- Priority 2, Phase 14 local offline gates are complete; staging, provider, and
+  release approval gates remain in progress.
 - Priority 3, Phases 15-18 are advanced post-beta work unless an earlier beta
   requirement explicitly depends on them.
 
@@ -74,9 +75,9 @@ Subdomain and custom-domain setup:
   - [x] `PLATFORM_ADMIN_EMAILS`
   - [x] `CRON_SECRET`
   - [x] `UPLOAD_QUEUE_SECRET`
-  - [ ] `DURABLE_QUEUE_SECRET`
-  - [ ] `PROVIDER_SECRETS_ENCRYPTION_KEY`
-  - [ ] `PROVIDER_SECRETS_KEY_VERSION`
+  - [x] `DURABLE_QUEUE_SECRET`
+  - [x] `PROVIDER_SECRETS_ENCRYPTION_KEY`
+  - [x] `PROVIDER_SECRETS_KEY_VERSION`
 - [ ] Create a staging environment separate from local development.
 - [ ] Create a staging Postgres database separate from production.
 - [ ] Confirm staging has pgvector enabled.
@@ -118,6 +119,13 @@ npm run test:e2e
 npm run build
 npm run certify:release
 ```
+
+Local evidence on 2026-08-05: `npm run certify:release:offline` passed the
+environment preflight, lint, TypeScript, tenant scope, cron, 154 channel
+contracts, production build, 285 offline browser/database scenarios, and tenant
+isolation. The unchecked online commands above remain release gates because
+the paid live-model fixtures and intended staging deployment were not exercised
+by the offline command.
 
 ## Gate 3: Database And Migration Safety
 
@@ -205,17 +213,17 @@ Subdomain note:
   deletion, and no automatic cascading changes.
 - [x] Conversational-task publication rejects unresolved trusted-context
   references.
-- [ ] Pass a cross-cutting form UX regression against the release candidate.
+- [x] Pass a cross-cutting form UX regression against the local release candidate.
 - [ ] Complete Priority 1, Phases 1-8 in `FLOW_BUILDER_ROADMAP.md`.
 - [ ] Complete Priority 2, Phases 9-14 in `FLOW_BUILDER_ROADMAP.md`.
 - [ ] Create and pass the phase-specific `docs/UAT_TEST_PLAN.md` after every
   completed roadmap phase.
-- [ ] Verify anonymous sessions, verified contact association, and cross-channel identity linking cannot expose another visitor's state.
-- [ ] Verify configured retention, export, and deletion behavior for messages, task fields, model traces, and operation records.
-- [ ] Verify duplicate, delayed, out-of-order, and concurrent events cannot repeat operations or overwrite newer state.
-- [ ] Verify model, retrieval, business-tool, and outbound-channel outages use the approved degraded behavior.
-- [ ] Verify human takeover stops automated replies and authorized release resumes the correct published target.
-- [ ] Verify uncertain external-operation results enter reconciliation and never produce a false success response.
+- [x] Verify anonymous sessions, verified contact association, and cross-channel identity linking cannot expose another visitor's state locally.
+- [x] Verify configured retention, export, and deletion behavior for messages, task fields, model traces, and operation records locally.
+- [x] Verify duplicate, delayed, out-of-order, and concurrent events cannot repeat operations or overwrite newer state locally.
+- [x] Verify model, retrieval, business-tool, and outbound-channel outages use the approved degraded behavior locally.
+- [x] Verify human takeover stops automated replies and authorized release resumes the correct published target locally.
+- [x] Verify uncertain external-operation results enter reconciliation and never produce a false success response locally.
 - [ ] Execute the complete UAT plan against the intended beta deployment and
   record its commit.
 - [ ] Pass project chat, website widget, and WhatsApp live channel
