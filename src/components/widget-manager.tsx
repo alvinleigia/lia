@@ -264,7 +264,7 @@ export function WidgetManager({
             <iframe
               ref={previewRef}
               className="h-[560px] max-h-[70vh] w-full rounded-lg border bg-background"
-              src={`${appBaseUrl}/widget/embed?token=${encodeURIComponent(token)}`}
+              src={`/widget/embed?token=${encodeURIComponent(token)}`}
               title="Widget conversation preview"
             />
           )}

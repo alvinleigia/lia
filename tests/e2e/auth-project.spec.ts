@@ -1631,6 +1631,9 @@ test("widget token access respects tenant and allowed domains", async ({
   await expect(
     ownerPage.getByTitle("Widget conversation preview"),
   ).toBeVisible();
+  await expect(
+    ownerPage.getByTitle("Widget conversation preview"),
+  ).toHaveAttribute("src", /^\/widget\/embed\?token=/);
   await ownerPage
     .frameLocator('iframe[title="Widget conversation preview"]')
     .getByRole("button", { name: "Close chat" })
