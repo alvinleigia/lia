@@ -30,6 +30,7 @@ export const Navigation = async () => {
   let canViewAudit = false;
   let signedInUserName = session?.user?.name ?? null;
   let signedInUserEmail = session?.user?.email ?? null;
+  const signedInUserImage = session?.user?.image ?? null;
 
   if (isSignedIn) {
     isPlatformAdmin = await isCurrentUserPlatformAdmin();
@@ -84,29 +85,33 @@ export const Navigation = async () => {
 
   return (
     <nav className="border-b border-[var(--foreground)]/10">
-      <div className="flex container h-16 items-center justify-between px-4  mx-auto">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-xl font-semibold">
+      <div className="container mx-auto flex h-16 min-w-0 items-center justify-between gap-3 px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link href="/" className="shrink-0 text-xl font-semibold">
             Lia AI
           </Link>
-          {selectedCompanyLabel &&
-            selectedCompanyId &&
-            selectableCompanies.length > 1 && (
-              <CompanySelectorModal
-                selectedCompanyId={selectedCompanyId}
-                selectedCompanyLabel={selectedCompanyLabel}
-                companies={selectableCompanies}
-              />
-            )}
-          {selectedProjectLabel &&
-            selectedProjectId &&
-            selectableProjects.length > 0 && (
-              <ProjectSelectorModal
-                selectedProjectId={selectedProjectId}
-                selectedProjectLabel={selectedProjectLabel}
-                projects={selectableProjects}
-              />
-            )}
+          <div className="hidden min-w-0 items-center gap-3 lg:flex">
+            {selectedCompanyLabel &&
+              selectedCompanyId &&
+              selectableCompanies.length > 1 && (
+                <CompanySelectorModal
+                  selectedCompanyId={selectedCompanyId}
+                  selectedCompanyLabel={selectedCompanyLabel}
+                  companies={selectableCompanies}
+                  triggerClassName="max-w-64 truncate"
+                />
+              )}
+            {selectedProjectLabel &&
+              selectedProjectId &&
+              selectableProjects.length > 0 && (
+                <ProjectSelectorModal
+                  selectedProjectId={selectedProjectId}
+                  selectedProjectLabel={selectedProjectLabel}
+                  projects={selectableProjects}
+                  triggerClassName="max-w-64 truncate"
+                />
+              )}
+          </div>
         </div>
 
         <NavigationActions
@@ -114,7 +119,32 @@ export const Navigation = async () => {
           canViewAudit={canViewAudit}
           isPlatformAdmin={isPlatformAdmin}
           isSignedIn={isSignedIn}
+          mobileSelectors={
+            <>
+              {selectedCompanyLabel &&
+                selectedCompanyId &&
+                selectableCompanies.length > 1 && (
+                  <CompanySelectorModal
+                    selectedCompanyId={selectedCompanyId}
+                    selectedCompanyLabel={selectedCompanyLabel}
+                    companies={selectableCompanies}
+                    triggerClassName="w-full justify-start whitespace-normal text-left"
+                  />
+                )}
+              {selectedProjectLabel &&
+                selectedProjectId &&
+                selectableProjects.length > 0 && (
+                  <ProjectSelectorModal
+                    selectedProjectId={selectedProjectId}
+                    selectedProjectLabel={selectedProjectLabel}
+                    projects={selectableProjects}
+                    triggerClassName="w-full justify-start whitespace-normal text-left"
+                  />
+                )}
+            </>
+          }
           signedInUserEmail={signedInUserEmail}
+          signedInUserImage={signedInUserImage}
           signedInUserName={signedInUserName}
         />
       </div>

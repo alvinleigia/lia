@@ -16,6 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type ProjectOption = {
   id: number;
@@ -26,12 +27,14 @@ type ProjectSelectorModalProps = {
   selectedProjectId: number;
   selectedProjectLabel: string;
   projects: ProjectOption[];
+  triggerClassName?: string;
 };
 
 export function ProjectSelectorModal({
   selectedProjectId,
   selectedProjectLabel,
   projects,
+  triggerClassName,
 }: ProjectSelectorModalProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -107,7 +110,10 @@ export function ProjectSelectorModal({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-200"
+          className={cn(
+            "inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-200",
+            triggerClassName,
+          )}
         >
           Selected Project: {selectedProjectLabel}
         </button>

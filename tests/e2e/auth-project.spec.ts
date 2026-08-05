@@ -568,6 +568,67 @@ test("user can sign up, sign in, and create a project", async ({ page }) => {
   await expect(page.getByText("Project created.")).toBeVisible();
 });
 
+test("signed-in navigation remains usable on a narrow screen", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-mobile-navigation-${runId}@example.test`;
+  const projectName = `Mobile Navigation ${runId}`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `Mobile User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  await createProjectFromProjectsPage(page, projectName);
+  await page.setViewportSize({ width: 320, height: 568 });
+
+  await expect(page.getByRole("link", { name: "Lia AI" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open navigation menu" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Open account menu for Mobile User/ }),
+  ).toBeVisible();
+
+  const headerWidth = await page.locator("nav").evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(headerWidth.scrollWidth).toBeLessThanOrEqual(headerWidth.clientWidth);
+
+  await page.getByRole("button", { name: "Open navigation menu" }).click();
+  const mobileMenu = page.getByRole("dialog", { name: "Navigation" });
+  await expect(mobileMenu).toBeVisible();
+  await expect(
+    mobileMenu.getByRole("button", {
+      name: `Selected Project: ${projectName}`,
+    }),
+  ).toBeVisible();
+  await expect(mobileMenu.getByRole("link", { name: "Widget" })).toBeVisible();
+
+  await mobileMenu
+    .getByRole("button", { name: `Selected Project: ${projectName}` })
+    .click();
+  const projectSelector = page.getByRole("dialog", {
+    name: "Select a Project",
+  });
+  await expect(projectSelector).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(projectSelector).toBeHidden();
+  await expect(mobileMenu).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(mobileMenu).toBeHidden();
+  await page
+    .getByRole("button", { name: /Open account menu for Mobile User/ })
+    .click();
+  await expect(
+    page.getByRole("menuitem", { name: "Manage Profile" }),
+  ).toBeVisible();
+});
+
 test("company owner can apply a bundled action template", async ({ page }) => {
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const email = `e2e-template-${runId}@example.test`;

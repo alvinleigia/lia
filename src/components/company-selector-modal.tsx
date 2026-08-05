@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { formatCompanyRole } from "@/lib/company-roles";
+import { cn } from "@/lib/utils";
 
 type CompanyOption = {
   id: number;
@@ -24,12 +25,14 @@ type CompanySelectorModalProps = {
   selectedCompanyId: number;
   selectedCompanyLabel: string;
   companies: CompanyOption[];
+  triggerClassName?: string;
 };
 
 export function CompanySelectorModal({
   selectedCompanyId,
   selectedCompanyLabel,
   companies,
+  triggerClassName,
 }: CompanySelectorModalProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -68,7 +71,10 @@ export function CompanySelectorModal({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800 hover:bg-sky-200"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800 hover:bg-sky-200",
+            triggerClassName,
+          )}
         >
           <Building2 className="h-3.5 w-3.5" />
           Account: {selectedCompanyLabel}
