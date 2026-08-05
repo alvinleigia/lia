@@ -6,6 +6,9 @@ const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const npmCliPath = process.env.npm_execpath;
 const includeDatabaseGates = full || offline;
 const gates = [
+  ...(includeDatabaseGates
+    ? [{ label: "Environment preflight", script: "check:local-env" }]
+    : []),
   { label: "Lint", script: "lint" },
   { label: "TypeScript", script: "typecheck" },
   { label: "Tenant-scope static analysis", script: "check:tenant-scope" },

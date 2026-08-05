@@ -25,11 +25,12 @@ beta only when its own gates and the referenced roadmap exit gates pass.
 
 ## Current Position
 
-Overall beta status: Not ready for production-like beta traffic.
+Overall beta status: Local release verification is in progress. Staging and
+provider approval are still required before production-like beta traffic.
 
 Authoritative product implementation status:
 
-- Flow roadmap target: Priority 1, Phase 8 implementation.
+- Flow roadmap target: Priority 2, Phase 14 release gate.
 - Priority 1, Phase 1 implementation and manual UAT are complete.
 - Priority 1, Phase 2 implementation and manual UAT are complete.
 - Priority 1, Phase 3 implementation and manual UAT are complete.
@@ -37,11 +38,10 @@ Authoritative product implementation status:
 - Priority 1, Phase 5 implementation and manual UAT are complete.
 - Priority 1, Phase 6 implementation and manual UAT are complete.
 - Priority 1, Phase 7 implementation and focused manual UAT are complete.
-- Priority 1, Phase 8 checkpoint 1 of 6 is implemented and its focused manual
-  UAT is pending; checkpoints 2-6 remain required for the goal-driven
-  conversational core.
-- Priority 2, Phases 9-14 remain required for declared non-voice beta
-  capability parity, live channel certification, and release approval.
+- Priority 1, Phase 8 implementation and focused manual UAT are complete.
+- Priority 2, Phases 9-13 implementation and focused manual UAT are complete.
+- Priority 2, Phase 14 local, staging, provider, and release approval gates
+  remain in progress.
 - Priority 3, Phases 15-18 are advanced post-beta work unless an earlier beta
   requirement explicitly depends on them.
 
@@ -60,19 +60,23 @@ Subdomain and custom-domain setup:
 
 ## Gate 1: Local And Staging Basics
 
-- [ ] Confirm Node.js 20.9+ is used locally and in deployment.
+- [x] Confirm Node.js 20.9+ is used locally.
+- [ ] Confirm Node.js 20.9+ is used in deployment.
 - [ ] Confirm a clean `npm ci` succeeds without `--force` or
   `--legacy-peer-deps`.
-- [ ] Confirm `.env.local` is not committed.
-- [ ] Confirm local `.env.local` has:
-  - [ ] `DATABASE_URL`
-  - [ ] `OPENAI_API_KEY`
-  - [ ] `AUTH_SECRET`
-  - [ ] `NEXTAUTH_URL`
-  - [ ] `NEXT_PUBLIC_APP_URL`
-  - [ ] `PLATFORM_ADMIN_EMAILS`
-  - [ ] `CRON_SECRET`
-  - [ ] `UPLOAD_QUEUE_SECRET`
+- [x] Confirm `.env.local` is not committed.
+- [ ] Confirm local `.env.local` has non-empty values for:
+  - [x] `DATABASE_URL`
+  - [x] `OPENAI_API_KEY`
+  - [x] `AUTH_SECRET`
+  - [x] `NEXTAUTH_URL`
+  - [x] `NEXT_PUBLIC_APP_URL`
+  - [x] `PLATFORM_ADMIN_EMAILS`
+  - [x] `CRON_SECRET`
+  - [x] `UPLOAD_QUEUE_SECRET`
+  - [ ] `DURABLE_QUEUE_SECRET`
+  - [ ] `PROVIDER_SECRETS_ENCRYPTION_KEY`
+  - [ ] `PROVIDER_SECRETS_KEY_VERSION`
 - [ ] Create a staging environment separate from local development.
 - [ ] Create a staging Postgres database separate from production.
 - [ ] Confirm staging has pgvector enabled.
@@ -283,10 +287,7 @@ These are not blockers for internal beta, but they must be explicitly accepted:
 
 ## Recommended Next Implementation Order
 
-1. Continue Priority 1, Phase 8 in `FLOW_BUILDER_ROADMAP.md`, updating
-   implementation status only there.
-2. Complete Priority 2, Phases 9-14 and the non-voice cross-channel release
-   gate.
+1. Complete Priority 2, Phase 14 and the non-voice cross-channel release gate.
 3. Keep local environment, tenant-safety, migration, and operations checks
    passing while product implementation proceeds.
 4. Create or refresh staging app and database environments before live channel

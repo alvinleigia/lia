@@ -44,6 +44,9 @@ Required environment values:
 - `PLATFORM_ADMIN_EMAILS`
 - `CRON_SECRET`
 - `UPLOAD_QUEUE_SECRET`
+- `DURABLE_QUEUE_SECRET`
+- `PROVIDER_SECRETS_ENCRYPTION_KEY`
+- `PROVIDER_SECRETS_KEY_VERSION`
 - `SMTP2GO_API_KEY`
 - `MAIL_FROM`
 
@@ -96,4 +99,3 @@ Before beta:
 - Confirm `PLATFORM_ADMIN_EMAILS` contains only intended SaaS owner emails.
 - Keep `.env.local` local and untracked.
 - Store staging/production secrets only in the deployment provider.
-
