@@ -361,15 +361,49 @@ Expected result:
 
 ## Phase 13 Sign-Off
 
-- [ ] All six focused steps pass.
-- [ ] Project Chat, Widget, and WhatsApp complete the same published `v4` task.
-- [ ] All three completed runs contain equivalent seven canonical values.
-- [ ] Validation, correction, cancellation, and handoff behave consistently.
-- [ ] Widget token, origin, preview, responsiveness, and keyboard checks pass.
-- [ ] WhatsApp webhook, device delivery, service window, fallback, and outbox checks pass.
-- [ ] Provider limitations are accepted and do not change task semantics.
-- [ ] Duplicate or delayed events create no duplicate operation or reply.
-- [ ] No unresolved Critical or High Phase 13 defect remains.
+Status: Passed focused live UAT on 2026-08-05. No additional database migration
+was required during final sign-off.
+
+Live evidence:
+
+- Project Chat passed with submission `#516` and linked task run `#312`.
+- Widget passed with submission `#520` and linked task run `#315`.
+- WhatsApp passed with accepted provider limitations using submission `#523`
+  and linked task run `#318`.
+- All three linked runs completed `Book a Spa Service` `v4` with the same seven
+  confirmed canonical values and exactly one completed Manual Review attempt.
+- Disposable handoff `#527` was completed, the queue returned to zero open
+  handoffs, and its status update produced the expected Sonner toast.
+- Audit metadata renders stored recipient values as `[REDACTED]`.
+- The disposable `Phase 13 Booking Parity UAT` wrapper action was archived after
+  sign-off. Its published `v1` remains immutable, so the resulting unpublished
+  action-settings difference is expected and must not be republished.
+
+Accepted provider limitations:
+
+- WhatsApp certification used Meta's UAT test account and number, a temporary
+  Cloud API access token, a Cloudflare quick tunnel, and Meta's unpublished-app
+  test-webhook constraints. These constraints did not change canonical fields,
+  validation, routing, or the completed business outcome.
+
+Automated evidence:
+
+- Lint checked 436 files with only the three established image and
+  sidebar-cookie warnings; TypeScript, tenant-scope, and cron checks passed.
+- All 154 shared channel contract scenarios passed.
+- All 24 serialized database-backed task-runtime scenarios passed.
+
+Sign-off checklist:
+
+- [x] All six focused steps pass.
+- [x] Project Chat, Widget, and WhatsApp complete the same published `v4` task.
+- [x] All three completed runs contain equivalent seven canonical values.
+- [x] Validation, correction, cancellation, and handoff behave consistently.
+- [x] Widget token, origin, preview, responsiveness, and keyboard checks pass.
+- [x] WhatsApp webhook, device delivery, service window, fallback, and outbox checks pass.
+- [x] Provider limitations are accepted and do not change task semantics.
+- [x] Duplicate or delayed events create no duplicate operation or reply.
+- [x] No unresolved Critical or High Phase 13 defect remains.
 
 ## Previous Sign-Off - Phase 12
 

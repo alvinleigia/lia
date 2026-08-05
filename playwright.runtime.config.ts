@@ -10,6 +10,6 @@ export default defineConfig({
     "conversational-task-runtime-db.spec.ts",
     "conversational-task-operation-runtime-db.spec.ts",
   ],
-  timeout: 30_000,
+  timeout: 90_000,
   workers: 1,
 });

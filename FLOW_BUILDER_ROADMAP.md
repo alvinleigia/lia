@@ -83,14 +83,14 @@ database, backup, and provider readiness work.
 - [x] Grounded Q&A can enter a bounded task and return to Q&A within one version-pinned conversation.
 - [ ] Full rich-content parity with `docs/Flow Builder v2.pdf` is not complete.
 - [x] Direct button, list-row, product, and result-to-node mapping is complete.
-- [ ] Live cross-channel UAT and release approval are not complete.
+- [x] Live cross-channel UAT is complete.
+- [ ] Priority 2 release approval is not complete.
 
-Current phase: Priority 2, Phase 13 of 18. Phases 8 through 12 completed
-implementation, automated verification, and manual UAT by 2026-08-04.
+Current phase: Priority 2, Phase 14 of 18. Phases 8 through 13 completed
+implementation, automated verification, and manual UAT by 2026-08-05.
 
-Current target: certify equivalent validated task outcomes across project chat,
-the website widget, and WhatsApp without introducing channel-specific task or
-graph persistence.
+Current target: approve the hybrid conversational platform for production-like
+beta traffic through the Priority 2 release gate.
 
 ## Product Direction
 
@@ -943,32 +943,34 @@ delivery behavior in project chat, widget, WhatsApp, and a future adapter.
 Goal: prove semantic task parity and deterministic outcome parity across live
 channels.
 
-- [ ] Execute the reference booking task in project chat.
-- [ ] Execute the same published task in the website widget.
-- [ ] Execute the same published task through a UAT WhatsApp Business number.
-- [ ] Confirm all channels produce the same canonical fields and business outcomes.
-- [ ] Confirm response wording may vary without changing validation or routes.
-- [ ] Confirm multi-field extraction, clarification, correction, cancellation, and handoff.
-- [ ] Confirm button, list, product, location, media, and free-text replies normalize correctly.
-- [ ] Confirm service-window and approved-template requirements on WhatsApp.
-- [ ] Confirm content beyond provider limits uses documented readable fallbacks.
-- [ ] Confirm page refresh and delayed replies resume the correct version-pinned task.
+- [x] Execute the reference booking task in project chat.
+- [x] Execute the same published task in the website widget.
+- [x] Execute the same published task through a UAT WhatsApp Business number.
+- [x] Confirm all channels produce the same canonical fields and business outcomes.
+- [x] Confirm response wording may vary without changing validation or routes.
+- [x] Confirm multi-field extraction, clarification, correction, cancellation, and handoff.
+- [x] Confirm button, list, product, location, media, and free-text replies normalize correctly.
+- [x] Confirm service-window and approved-template requirements on WhatsApp.
+- [x] Confirm content beyond provider limits uses documented readable fallbacks.
+- [x] Confirm page refresh and delayed replies resume the correct version-pinned task.
 - [x] Confirm duplicate events and stale clients do not duplicate operations.
-- [ ] Confirm project chat and widget visual acceptance.
-- [ ] Confirm widget responsive, origin, token, and accessibility acceptance.
-- [ ] Confirm WhatsApp webhook, media, template, retry, and outbox behavior.
+- [x] Confirm project chat and widget visual acceptance.
+- [x] Confirm widget responsive, origin, token, and accessibility acceptance.
+- [x] Confirm WhatsApp webhook, media, template, retry, and outbox behavior.
 - [x] Record every provider limitation as an adapter rule.
 
-Phase 13 implementation status on 2026-08-04: automated certification is
-complete and focused live UAT is prepared. The gate includes 151 passing channel
-contracts, 22 passing serialized task-runtime scenarios, explicit provider-rule
-coverage, scoped WhatsApp provider-message idempotency, and responsive,
-keyboard-accessible widget launcher and preview checks. Migration
-`0037_channel_message_idempotency.sql` is applied locally. Project 194 retains
-the published `Book a Spa Service` v4 reference task. Live entry uses a
-disposable single-node `Business Task` action pinned to v4 so Project Chat,
-Widget, and WhatsApp enter the conversational runtime instead of the older
-sequential booking action. Live sign-off remains pending.
+Phase 13 completed on 2026-08-05. All 154 channel contracts and all 24
+serialized database-backed task-runtime scenarios pass. Focused live UAT
+completed the same published `Book a Spa Service` v4 task through Project Chat,
+Widget, and WhatsApp with equivalent seven confirmed canonical values and one
+completed Manual Review attempt per channel. Submissions `#516`, `#520`, and
+`#523` retain the linked task-run evidence. Widget origin, token,
+responsiveness, and keyboard behavior passed; WhatsApp webhook, device
+delivery, service-window, fallback, retry, idempotency, and outbox behavior
+passed with documented Meta UAT limitations. Audit recipient metadata is
+redacted, disposable handoff `#527` is closed, and the disposable wrapper action
+is archived. Migration `0037_channel_message_idempotency.sql` remains applied
+locally.
 
 Phase 13 exit gate: every production channel reaches equivalent validated task
 outcomes without introducing channel-specific task or graph persistence.
