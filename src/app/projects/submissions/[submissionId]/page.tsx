@@ -23,14 +23,25 @@ import {
   listActionSubmissionsWithActions,
 } from "@/lib/action-flows";
 import {
+  getChannelConversation,
+  getChannelTypeForFlowSource,
+} from "@/lib/channels";
+import {
   buildConnectFlowRelationship,
   getConnectFlowSubmissionSummary,
 } from "@/lib/connect-flow-reporting";
 import {
+  getConversationalTaskRuntime,
+  listConversationalTaskRunsForWindow,
+} from "@/lib/conversational-task-runtime-data";
+import {
   type FlowMediaUploadValue,
   isFlowMediaUploadValue,
 } from "@/lib/flow-media-values";
-import { listOperationAttemptsWithDetailsForSubmission } from "@/lib/operations";
+import {
+  listOperationAttemptsWithDetailsForSubmission,
+  listOperationAttemptsWithDetailsForTaskRun,
+} from "@/lib/operations";
 import {
   getActiveProjectIdCookie,
   resolvePageUserAndProject,
@@ -190,6 +201,22 @@ function PayloadView({ payload }: { payload: unknown }) {
   );
 }
 
+function ReadOnlyValue({ value }: { value: unknown }) {
+  if (value === null || value === undefined) {
+    return <span className="text-muted-foreground">Not recorded</span>;
+  }
+
+  if (typeof value === "object") {
+    return (
+      <pre className="overflow-auto rounded-md bg-gray-50 p-3 text-xs">
+        {formatJson(value)}
+      </pre>
+    );
+  }
+
+  return <span className="break-words">{String(value)}</span>;
+}
+
 export default async function SubmissionDetailPage({
   params,
   searchParams,
@@ -210,7 +237,7 @@ export default async function SubmissionDetailPage({
     notFound();
   }
 
-  const [action, events, operationAttempts, projectSubmissions] =
+  const [action, events, submissionOperationAttempts, projectSubmissions] =
     await Promise.all([
       getProjectAction(project.id, submission.actionId),
       listActionSubmissionEvents(project.id, submission.id),
@@ -221,6 +248,49 @@ export default async function SubmissionDetailPage({
   if (!action) {
     notFound();
   }
+
+  const channelConversation = submission.conversationId
+    ? await getChannelConversation({
+        projectId: project.id,
+        channelType: getChannelTypeForFlowSource(submission.source),
+        externalConversationId: submission.conversationId,
+      })
+    : null;
+  const linkedTaskRunRows = channelConversation
+    ? await listConversationalTaskRunsForWindow({
+        conversationId: channelConversation.id,
+        endedAt: submission.submittedAt ?? submission.updatedAt,
+        projectId: project.id,
+        startedAt: submission.createdAt,
+      })
+    : [];
+  const linkedTaskRuns = await Promise.all(
+    linkedTaskRunRows.map(async ({ run, taskName, versionNumber }) => {
+      const [runtime, attempts] = await Promise.all([
+        getConversationalTaskRuntime({
+          projectId: project.id,
+          taskRunId: run.id,
+        }),
+        listOperationAttemptsWithDetailsForTaskRun(project.id, run.id),
+      ]);
+
+      return {
+        attempts,
+        fields: runtime?.fields ?? [],
+        run,
+        taskName,
+        versionNumber,
+      };
+    }),
+  );
+  const operationAttempts = Array.from(
+    new Map(
+      [
+        ...submissionOperationAttempts,
+        ...linkedTaskRuns.flatMap(({ attempts }) => attempts),
+      ].map((details) => [details.attempt.id, details]),
+    ).values(),
+  );
 
   const handoff = getHandoffDetails(submission.metadata);
   const connectFlowRelationship = buildConnectFlowRelationship(
@@ -506,11 +576,85 @@ export default async function SubmissionDetailPage({
           </Card>
         )}
 
+        {linkedTaskRuns.map(({ fields, run, taskName, versionNumber }) => (
+          <Card key={run.id}>
+            <CardHeader>
+              <CardTitle className="text-xl">Linked Task Run</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-md border bg-white p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Task
+                  </p>
+                  <p className="font-medium">{taskName}</p>
+                  <p className="text-sm text-muted-foreground">Run #{run.id}</p>
+                </div>
+                <div className="rounded-md border bg-white p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Pinned Version
+                  </p>
+                  <p className="font-medium">v{versionNumber}</p>
+                </div>
+                <div className="rounded-md border bg-white p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Status
+                  </p>
+                  <p className="font-medium capitalize">{run.status}</p>
+                </div>
+                <div className="rounded-md border bg-white p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Outcome
+                  </p>
+                  <p className="font-medium capitalize">
+                    {run.outcomeKey ?? "Not reached"}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
+                  Canonical Fields ({fields.length})
+                </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {fields.map((field) => (
+                    <div
+                      key={field.id}
+                      className="rounded-md border bg-white p-4"
+                    >
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          {field.fieldKey}
+                        </p>
+                        <span className="rounded-md border px-2 py-1 text-xs capitalize">
+                          {field.state}
+                        </span>
+                      </div>
+                      <ReadOnlyValue
+                        value={field.naturalValue ?? field.canonicalValue}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl">Fields</CardTitle>
+            <CardTitle className="text-xl">
+              {linkedTaskRuns.length > 0 ? "Action Wrapper Fields" : "Fields"}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {linkedTaskRuns.length > 0 &&
+              Object.keys(submission.fields).length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  This action delegates collection to the linked task run shown
+                  above and does not collect separate wrapper fields.
+                </p>
+              )}
             <FieldsView
               fields={submission.fields}
               submissionId={submission.id}

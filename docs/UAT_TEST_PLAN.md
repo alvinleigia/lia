@@ -322,9 +322,21 @@ Expected result:
 4. Compare the three completed runs and confirm these exact business values are
    equivalent: `Facial`, `Classic Facial`, `2026-08-15`, `15:30`, `Phase 13
    Parity Guest`, `phase13.parity@example.com`, and `+919876543210`.
-5. Click `Automation` > `Submissions`. Confirm each completed channel run is
-   pinned to task version `v4`, has outcome `Completed`, and references only one
-   Manual Review attempt.
+5. Click `Automation` > `Submissions`, then inspect the three submitted
+   `Phase 13 Booking Parity UAT` rows whose `Source` and creation time match the
+   completed `project_chat`, `widget_chat`, and `whatsapp_chat` transcripts:
+   1. Open the matching `project_chat` row.
+   2. In `Linked Task Run`, confirm `Task` is `Book a Spa Service`, `Pinned
+      Version` is `v4`, `Status` is `Completed`, and `Outcome` is `Completed`.
+   3. Confirm `Canonical Fields (7)` shows the same seven business values
+      checked in point 4 and every field badge says `Confirmed`.
+   4. In `Operation Attempts`, confirm there is exactly one `Manual Review`
+      attempt and its status is `Completed`.
+   5. `Action Wrapper Fields` may show no separate values because this action
+      delegates collection to the linked task run; do not treat that as a
+      failure.
+   6. Click `Back to submissions` and repeat points 2 through 5 for the matching
+      `widget_chat` and `whatsapp_chat` rows.
 6. Click `Admin` > `Audit Logs`. Confirm the run, correction, cancellation,
    handoff, and operation lifecycle are explainable without exposing guest
    values, access tokens, app secrets, verify tokens, raw provider payloads, or

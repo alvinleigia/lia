@@ -1,4 +1,15 @@
-import { and, asc, desc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 import { normalizeConversationProjectPolicy } from "@/lib/conversation-contracts";
 import { db } from "@/lib/db-config";
 import {
@@ -8,7 +19,9 @@ import {
   conversationalTaskContextValues,
   conversationalTaskFieldValues,
   conversationalTaskRuns,
+  conversationalTasks,
   conversationalTaskToolRequests,
+  conversationalTaskVersions,
   conversationExecutionStates,
   conversationInboundEvents,
   conversationProjectPolicies,
@@ -16,6 +29,40 @@ import {
 
 function addDays(date: Date, days: number) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+export async function listConversationalTaskRunsForWindow(input: {
+  conversationId: number;
+  endedAt: Date;
+  projectId: number;
+  startedAt: Date;
+}) {
+  return db
+    .select({
+      run: conversationalTaskRuns,
+      taskName: conversationalTasks.name,
+      versionNumber: conversationalTaskVersions.versionNumber,
+    })
+    .from(conversationalTaskRuns)
+    .innerJoin(
+      conversationalTasks,
+      eq(conversationalTasks.id, conversationalTaskRuns.taskId),
+    )
+    .innerJoin(
+      conversationalTaskVersions,
+      eq(conversationalTaskVersions.id, conversationalTaskRuns.taskVersionId),
+    )
+    .where(
+      and(
+        eq(conversationalTaskRuns.projectId, input.projectId),
+        eq(conversationalTaskRuns.conversationId, input.conversationId),
+        eq(conversationalTasks.projectId, input.projectId),
+        eq(conversationalTaskVersions.projectId, input.projectId),
+        gte(conversationalTaskRuns.startedAt, input.startedAt),
+        lte(conversationalTaskRuns.startedAt, input.endedAt),
+      ),
+    )
+    .orderBy(asc(conversationalTaskRuns.startedAt));
 }
 
 export async function getConversationalTaskRuntime(input: {

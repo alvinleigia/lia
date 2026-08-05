@@ -697,6 +697,33 @@ export async function listOperationAttemptsWithDetailsForSubmission(
     .orderBy(asc(operationAttempts.createdAt), asc(operationAttempts.id));
 }
 
+export async function listOperationAttemptsWithDetailsForTaskRun(
+  projectId: number,
+  taskRunId: number,
+) {
+  return db
+    .select({
+      attempt: operationAttempts,
+      operation: operations,
+      provider: integrationProviders,
+    })
+    .from(operationAttempts)
+    .innerJoin(operations, eq(operations.id, operationAttempts.operationId))
+    .innerJoin(
+      integrationProviders,
+      eq(integrationProviders.id, operationAttempts.providerId),
+    )
+    .where(
+      and(
+        eq(operationAttempts.projectId, projectId),
+        eq(operationAttempts.taskRunId, taskRunId),
+        eq(operations.projectId, projectId),
+        eq(integrationProviders.projectId, projectId),
+      ),
+    )
+    .orderBy(asc(operationAttempts.createdAt), asc(operationAttempts.id));
+}
+
 export async function listRecentProjectOperationAttempts(
   projectId: number,
   limit = 10,
