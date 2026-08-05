@@ -187,7 +187,10 @@ Do not continue that older run with the date picker.
     confirmation as readable text instead of buttons.
 13. Wait for a reply stating that `Manual Review` completed and that the
     request was submitted successfully. Do not click the task button or send
-    `Confirm` again while the operation is processing.
+    `Confirm` again while the operation is processing. This is the terminal
+    reply for this wrapper. Confirm it is not followed by `Please review your
+    request before I save it`, `No details collected`, another confirmation,
+    or `Thanks. I saved this request.`
 
 Expected result:
 

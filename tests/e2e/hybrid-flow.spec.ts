@@ -39,6 +39,7 @@ import {
   reconcileTaskTurnWithAvailability,
   reconcileTaskTurnWithRuntime,
   resolveHybridBoundaryNode,
+  resolveHybridDeterministicContinuation,
   resolveHybridRuntimeResponseOwner,
   resolveHybridTaskOutcomeResume,
   resolveHybridTaskOutcomeRoute,
@@ -1154,6 +1155,37 @@ test("boundary dispatcher invokes one owner and stops at the selected target", a
       }),
     }),
   );
+});
+
+test("terminal hybrid outcomes complete instead of resuming a null legacy step", async () => {
+  const graph = compileHybridFlowGraph({ branchRules, steps }).graph;
+  const ended = await dispatchHybridFlowBoundary({
+    execute: async () => ({
+      output: { reply: "The task was cancelled." },
+      signals: [{ kind: "task_outcome", triggerKey: "cancelled" }],
+    }),
+    graph,
+    responseOwner: "task",
+    sourceNodeId: "step:2",
+  });
+  const resumed = await dispatchHybridFlowBoundary({
+    execute: async () => ({
+      output: { reply: "The task completed." },
+      signals: [{ kind: "task_outcome", triggerKey: "completed" }],
+    }),
+    graph,
+    responseOwner: "task",
+    sourceNodeId: "step:2",
+  });
+
+  expect(ended.status).toBe("ended");
+  expect(resolveHybridDeterministicContinuation(ended)).toEqual({
+    kind: "complete",
+  });
+  expect(resolveHybridDeterministicContinuation(resumed)).toEqual({
+    kind: "resume",
+    targetStepId: 3,
+  });
 });
 
 test("boundary dispatcher suppresses automation while a human owns the turn", async () => {

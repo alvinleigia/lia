@@ -1,7 +1,10 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
-import { resumeChannelFlowAtStep } from "@/lib/channel-flow-runtime";
+import {
+  completeChannelFlowAfterHybridEnd,
+  resumeChannelFlowAtStep,
+} from "@/lib/channel-flow-runtime";
 import type { ChannelInboundSelectionV1 } from "@/lib/channel-inbound-contract";
 import { type ChannelType, listRecentChannelMessages } from "@/lib/channels";
 import {
@@ -61,6 +64,7 @@ import {
   reconcileTaskTurnWithAvailability,
   reconcileTaskTurnWithRuntime,
   resolveHybridBoundaryNode,
+  resolveHybridDeterministicContinuation,
   resolveHybridRuntimeResponseOwner,
   shouldCheckTaskAvailability,
 } from "@/lib/hybrid-flow-runtime";
@@ -1365,17 +1369,21 @@ export async function runHybridChannelBoundary(
       text: replyProposal.reply,
     }),
   ];
-  if (
-    dispatch.status === "ended" ||
-    (dispatch.status === "transitioned" &&
-      dispatch.targetNode?.kind !== "conversational_task")
-  ) {
+  const continuation = resolveHybridDeterministicContinuation(dispatch);
+  if (continuation?.kind === "complete") {
+    const completed = await completeChannelFlowAfterHybridEnd({
+      contactId: null,
+      projectId: input.projectId,
+      submission: input.submission,
+    });
+    replies.push(...completed.replies);
+  } else if (continuation?.kind === "resume") {
     const resumed = await resumeChannelFlowAtStep({
       action: input.action,
       contactId: null,
       projectId: input.projectId,
       submission: input.submission,
-      targetStepId: dispatch.targetNode?.sourceStepId ?? null,
+      targetStepId: continuation.targetStepId,
     });
     replies.push(...resumed.replies);
     const returnedBoundary = resumed.boundaryNodeId

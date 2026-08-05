@@ -413,6 +413,25 @@ export type HybridBoundaryDispatchResult<TOutput> = {
   transition: HybridFlowTransitionV1 | null;
 };
 
+export function resolveHybridDeterministicContinuation<TOutput>(
+  dispatch: HybridBoundaryDispatchResult<TOutput>,
+) {
+  if (dispatch.status === "ended") {
+    return { kind: "complete" as const };
+  }
+  if (
+    dispatch.status === "transitioned" &&
+    dispatch.targetNode &&
+    dispatch.targetNode.kind !== "conversational_task"
+  ) {
+    return {
+      kind: "resume" as const,
+      targetStepId: dispatch.targetNode.sourceStepId,
+    };
+  }
+  return null;
+}
+
 export type HybridTaskEntryProposal = Pick<
   TurnResultV1,
   "fieldCandidates" | "taskRecommendation"

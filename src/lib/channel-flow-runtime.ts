@@ -450,6 +450,7 @@ export function buildChannelFlowResumeReplies(input: {
 
 async function submitFlow(input: {
   contactId?: number | null;
+  includeCompletionReply?: boolean;
   projectId: number;
   submission: SelectActionSubmission;
 }) {
@@ -478,6 +479,10 @@ async function submitFlow(input: {
     return returnedResult;
   }
 
+  if (input.includeCompletionReply === false) {
+    return { replies: [] };
+  }
+
   return {
     replies: [
       createTextReply(
@@ -489,6 +494,19 @@ async function submitFlow(input: {
       ),
     ],
   };
+}
+
+export async function completeChannelFlowAfterHybridEnd(input: {
+  contactId?: number | null;
+  projectId: number;
+  submission: SelectActionSubmission;
+}) {
+  return submitFlow({
+    contactId: input.contactId,
+    includeCompletionReply: false,
+    projectId: input.projectId,
+    submission: input.submission,
+  });
 }
 
 async function cancelParentReturnFlow(input: {
