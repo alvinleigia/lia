@@ -1,4 +1,15 @@
-import { and, asc, eq, inArray, lt, lte, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  lt,
+  lte,
+  notExists,
+  or,
+  sql,
+} from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getOrCreateChannelConversation } from "@/lib/channels";
 import { db } from "@/lib/db-config";
 import {
@@ -55,6 +66,7 @@ async function claimNextOutboxMessage(input: {
 }) {
   const now = new Date();
   const leaseExpiresAt = new Date(now.getTime() + 60_000);
+  const earlierMessage = alias(outboxMessages, "earlier_outbox_message");
 
   for (let claimAttempt = 0; claimAttempt < 5; claimAttempt += 1) {
     const [candidate] = await db
@@ -67,6 +79,20 @@ async function claimNextOutboxMessage(input: {
             ? inArray(outboxMessages.topic, input.topics)
             : undefined,
           outboxClaimCondition(now),
+          notExists(
+            db
+              .select({ id: earlierMessage.id })
+              .from(earlierMessage)
+              .where(
+                and(
+                  eq(earlierMessage.projectId, outboxMessages.projectId),
+                  eq(earlierMessage.topic, outboxMessages.topic),
+                  eq(earlierMessage.destination, outboxMessages.destination),
+                  lt(earlierMessage.id, outboxMessages.id),
+                  inArray(earlierMessage.status, ["queued", "processing"]),
+                ),
+              ),
+          ),
         ),
       )
       .orderBy(asc(outboxMessages.availableAt), asc(outboxMessages.id))

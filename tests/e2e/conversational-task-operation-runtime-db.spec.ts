@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
@@ -48,6 +48,7 @@ import {
   createOperation,
   processProjectDurableOperationQueue,
 } from "../../src/lib/operations";
+import { processProjectOutboxQueue } from "../../src/lib/outbox";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 test.describe.configure({ mode: "serial" });
@@ -378,6 +379,52 @@ test.afterAll(async () => {
   await db.delete(workspaces).where(eq(workspaces.id, fixture.workspaceId));
   await db.delete(companies).where(eq(companies.id, fixture.companyId));
   await db.delete(users).where(eq(users.id, fixture.userId));
+});
+
+test("does not deliver a later WhatsApp reply before an earlier retry", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const destination = `phase13-order-${suffix}`;
+  const [earlier, later] = await db
+    .insert(outboxMessages)
+    .values([
+      {
+        availableAt: new Date(Date.now() + 60_000),
+        dedupeKey: `phase13-order-earlier-${suffix}`,
+        destination,
+        payload: {},
+        projectId: fixture.projectId,
+        topic: "whatsapp.runtime_reply",
+        traceId: `phase13-order-${suffix}`,
+      },
+      {
+        availableAt: new Date(Date.now() - 1_000),
+        dedupeKey: `phase13-order-later-${suffix}`,
+        destination,
+        payload: {},
+        projectId: fixture.projectId,
+        topic: "whatsapp.runtime_reply",
+        traceId: `phase13-order-${suffix}`,
+      },
+    ])
+    .returning();
+
+  const result = await processProjectOutboxQueue({
+    maxMessages: 2,
+    projectId: fixture.projectId,
+    workerId: `phase13-order-${suffix}`,
+  });
+  const rows = await db
+    .select({ id: outboxMessages.id, status: outboxMessages.status })
+    .from(outboxMessages)
+    .where(inArray(outboxMessages.id, [earlier.id, later.id]));
+
+  expect(result.processed).toBe(0);
+  expect(rows).toEqual(
+    expect.arrayContaining([
+      { id: earlier.id, status: "queued" },
+      { id: later.id, status: "queued" },
+    ]),
+  );
 });
 
 test("requires explicit confirmation and invalidates it after correction", async () => {

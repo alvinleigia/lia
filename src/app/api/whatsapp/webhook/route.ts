@@ -172,6 +172,7 @@ export async function POST(req: Request) {
             selection: normalizedInbound.selection,
             source: WHATSAPP_FLOW_SOURCE,
             text: runtimeText,
+            consumeTriggerMessage: result.consumeTriggerMessage,
           })
         : { replies: [] };
     const replies = [...result.replies, ...hybrid.replies];

@@ -5,7 +5,10 @@ import {
   needsExplicitPublishTerminalStep,
 } from "../../src/lib/action-flow-compiler";
 import { getProjectActionStatusAfterPublish } from "../../src/lib/action-flow-constants";
-import type { RuntimeAction } from "../../src/lib/action-runtime";
+import {
+  isExactActionTrigger,
+  type RuntimeAction,
+} from "../../src/lib/action-runtime";
 import { buildChannelFlowResumeReplies } from "../../src/lib/channel-flow-runtime";
 import {
   REFERENCE_BOOKING_PROJECT_POLICY,
@@ -50,6 +53,22 @@ import {
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 const outcomes = DEFAULT_CONVERSATIONAL_TASK_DEFINITION.outcomes;
+
+test("exact action triggers are control input, not task content", () => {
+  const action = {
+    triggerPhrases: ["phase thirteen booking parity"],
+  } as RuntimeAction;
+
+  expect(isExactActionTrigger(action, "  Phase Thirteen Booking Parity ")).toBe(
+    true,
+  );
+  expect(
+    isExactActionTrigger(
+      action,
+      "phase thirteen booking parity for a facial tomorrow",
+    ),
+  ).toBe(false);
+});
 
 test("publishing activates drafts without reactivating archived actions", () => {
   expect(getProjectActionStatusAfterPublish("draft")).toBe("active");

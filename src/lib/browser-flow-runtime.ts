@@ -10,6 +10,7 @@ import {
   findTriggeredAction,
   getRunnableActionSteps,
   isActionConfirmationStep,
+  isExactActionTrigger,
   type RuntimeAction,
 } from "@/lib/action-runtime";
 import type { BrowserFlowRuntimeResult } from "@/lib/browser-flow-contract";
@@ -179,6 +180,7 @@ async function executeBrowserFlowText(
   });
   const text = getNormalizedChannelInboundRuntimeValue(normalizedInbound);
   let action: RuntimeAction | null = null;
+  let consumeTriggerMessage = false;
 
   if (
     activeSubmission &&
@@ -300,6 +302,9 @@ async function executeBrowserFlowText(
         await listRuntimeProjectActions(input.projectId),
         text,
       );
+      consumeTriggerMessage = Boolean(
+        action && isExactActionTrigger(action, text),
+      );
     }
 
     if (!action) {
@@ -358,6 +363,7 @@ async function executeBrowserFlowText(
       selection: normalizedInbound.selection,
       source: input.source,
       text,
+      consumeTriggerMessage,
     });
     replies = [...replies, ...hybrid.replies];
   }

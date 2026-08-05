@@ -46,6 +46,7 @@ import {
   isActionMutationStep,
   isActionSubmitStep,
   isActionWaitStep,
+  isExactActionTrigger,
   isInlineOperationStep,
   isProductMessageStep,
   normalizeActionText,
@@ -100,6 +101,7 @@ const FLOW_WAIT_METADATA_KEY = "flowWait";
 
 type ChannelRuntimeResult = {
   boundaryNodeId?: string | null;
+  consumeTriggerMessage?: boolean;
   replies: RuntimeReply[];
 };
 type ReturnFlowFrame = {
@@ -2017,7 +2019,7 @@ export async function processChannelFlowText(input: {
     };
   }
 
-  return startChannelFlow({
+  const result = await startChannelFlow({
     action: triggeredAction,
     contactId: input.contactId ?? null,
     conversationId: input.conversationId,
@@ -2025,6 +2027,11 @@ export async function processChannelFlowText(input: {
     source: input.source,
     traceId: input.traceId,
   });
+
+  return {
+    ...result,
+    consumeTriggerMessage: isExactActionTrigger(triggeredAction, input.text),
+  };
 }
 
 export async function processChannelFlowMedia(input: {

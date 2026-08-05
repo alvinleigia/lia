@@ -590,6 +590,7 @@ type HybridChannelRuntimeInput = {
   selection?: ChannelInboundSelectionV1 | null;
   submission: SelectActionSubmission;
   text: string;
+  consumeTriggerMessage?: boolean;
 };
 
 type HybridChannelFlowBoundaryInput = Omit<
@@ -1275,6 +1276,53 @@ export async function runHybridChannelBoundary(
   }
   if (!sourceNode) {
     return { replies: [] };
+  }
+  if (
+    input.consumeTriggerMessage &&
+    sourceNode.kind === "conversational_task"
+  ) {
+    const taskSession = await ensureDirectTaskEntry({
+      node: sourceNode,
+      runtimeInput: input,
+    });
+    if (
+      !taskSession.execution?.activeTaskRunId ||
+      !taskSession.runtime ||
+      !taskSession.snapshot
+    ) {
+      throw new Error("The pinned conversational task runtime is unavailable.");
+    }
+    const inputRequest = await hydrateProjectResourceInputRequest({
+      fields: taskSession.runtime.fields,
+      inputRequest: getResumedTaskRuntimeInputRequest({
+        fields: taskSession.runtime.fields,
+        requestedFieldKey: taskSession.runtime.run.lastRequestedFieldKey,
+        snapshot: taskSession.snapshot,
+      }),
+      projectId: input.projectId,
+      snapshot: taskSession.snapshot,
+    });
+    if (inputRequest) {
+      await recordTaskFieldRequest({
+        conversationId: taskSession.runtime.run.conversationId,
+        inputRequest,
+        revision: taskSession.execution.revision,
+        runtimeInput: input,
+        taskRunId: taskSession.runtime.run.id,
+      });
+      const field = taskSession.snapshot.task.definition.fields.find(
+        (candidate) => candidate.key === inputRequest.fieldKey,
+      );
+      return {
+        replies: [
+          createTaskRuntimeReply({
+            inputRequest,
+            nextAction: "ask",
+            text: field?.prompt ?? `Please provide ${inputRequest.label}.`,
+          }),
+        ],
+      };
+    }
   }
   const history = toHistory(
     await listRecentChannelMessages({

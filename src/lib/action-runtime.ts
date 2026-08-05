@@ -188,6 +188,14 @@ export function findTriggeredAction(actions: RuntimeAction[], input: string) {
   );
 }
 
+export function isExactActionTrigger(action: RuntimeAction, input: string) {
+  const normalizedInput = normalizeActionText(input);
+
+  return action.triggerPhrases.some(
+    (phrase) => normalizeActionText(phrase) === normalizedInput,
+  );
+}
+
 export function getActionStepPrompt(step: RuntimeActionStep) {
   if (isProductMessageStep(step)) {
     return step.prompt || step.label || "Here are the available products.";
