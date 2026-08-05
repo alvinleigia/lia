@@ -129,7 +129,7 @@ export async function sendWhatsAppTestMessageAction(
     targetType: "project_channel",
     targetId: channel.id,
     metadata: {
-      to: parsed.data.to,
+      recipientConfigured: true,
     },
   });
 

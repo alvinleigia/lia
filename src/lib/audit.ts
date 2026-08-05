@@ -2,6 +2,51 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import { auditLogs, users } from "@/lib/db-schema";
 
+const REDACTED_AUDIT_METADATA_KEYS = new Set([
+  "accesstoken",
+  "appsecret",
+  "authorization",
+  "credential",
+  "credentials",
+  "email",
+  "guestemail",
+  "guestname",
+  "guestphone",
+  "password",
+  "payload",
+  "phone",
+  "phonenumber",
+  "privatereasoning",
+  "rawpayload",
+  "reasoning",
+  "recipient",
+  "to",
+  "verifytoken",
+]);
+
+function redactAuditMetadata(
+  metadata: Record<string, unknown>,
+): Record<string, unknown> {
+  function visit(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(visit);
+    if (!value || typeof value !== "object") return value;
+
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => {
+        const normalizedKey = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+        return [
+          key,
+          REDACTED_AUDIT_METADATA_KEYS.has(normalizedKey)
+            ? "[REDACTED]"
+            : visit(entry),
+        ];
+      }),
+    );
+  }
+
+  return visit(metadata) as Record<string, unknown>;
+}
+
 type AuditScope = {
   user?: { id: number };
   membership?: { id: number };
@@ -35,7 +80,7 @@ export async function writeAuditLog(input: WriteAuditLogInput) {
 }
 
 export async function listCompanyAuditLogs(companyId: number, limit = 100) {
-  return db
+  const rows = await db
     .select({
       auditLog: auditLogs,
       actor: {
@@ -48,4 +93,12 @@ export async function listCompanyAuditLogs(companyId: number, limit = 100) {
     .where(eq(auditLogs.companyId, companyId))
     .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
     .limit(limit);
+
+  return rows.map(({ actor, auditLog }) => ({
+    actor,
+    auditLog: {
+      ...auditLog,
+      metadata: redactAuditMetadata(auditLog.metadata),
+    },
+  }));
 }

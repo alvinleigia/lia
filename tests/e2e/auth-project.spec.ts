@@ -3630,6 +3630,7 @@ test("audit page reviews recent company-scoped events", async ({ page }) => {
   const auditAction = `e2e.audit.reviewed.${runId}`;
   const systemAuditAction = `e2e.audit.system.${runId}`;
   const metadataNote = `audit metadata ${runId}`;
+  const sensitiveRecipient = `+1555${Date.now().toString().slice(-7)}`;
 
   await signUpOrUseExistingAccount(page, {
     email,
@@ -3670,6 +3671,7 @@ test("audit page reviews recent company-scoped events", async ({ page }) => {
     metadata: {
       note: metadataNote,
       source: "e2e",
+      to: sensitiveRecipient,
     },
     project: { id: projectId },
     targetId: projectId,
@@ -3690,6 +3692,8 @@ test("audit page reviews recent company-scoped events", async ({ page }) => {
   await expect(actorRow).toContainText(String(projectId));
   await expect(actorRow).toContainText(metadataNote);
   await expect(actorRow).toContainText("e2e");
+  await expect(actorRow).toContainText("[REDACTED]");
+  await expect(actorRow).not.toContainText(sensitiveRecipient);
 
   const systemRow = page.getByRole("row", {
     name: new RegExp(
