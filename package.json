@@ -15,6 +15,7 @@
     "check:cron-config": "node scripts/check-cron-config.mjs",
     "check:domain-resolution": "node scripts/check-domain-resolution.mjs",
     "check:local-env": "node scripts/check-local-env.mjs",
+    "check:migration-journal": "node scripts/check-migration-journal.mjs",
     "check:ops-health": "node scripts/check-ops-health.mjs",
     "check:tenant-scope": "node scripts/check-tenant-scope.mjs",
     "certify:release": "node scripts/certify-release.mjs --full",

@@ -6,6 +6,7 @@ const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const npmCliPath = process.env.npm_execpath;
 const includeDatabaseGates = full || offline;
 const gates = [
+  { label: "Migration journal", script: "check:migration-journal" },
   ...(includeDatabaseGates
     ? [{ label: "Environment preflight", script: "check:local-env" }]
     : []),
