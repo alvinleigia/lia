@@ -27,6 +27,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   testDir: "./tests/e2e",
   timeout: 60_000,
+  workers: 1,
   use: {
     baseURL,
     trace: "retain-on-failure",
