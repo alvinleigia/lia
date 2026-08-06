@@ -213,6 +213,17 @@ export function normalizeWhatsAppConfig(
   } satisfies Required<WhatsAppChannelConfig>;
 }
 
+export function matchesWhatsAppVerifyToken(
+  value: Record<string, unknown> | null | undefined,
+  verifyToken: string,
+) {
+  try {
+    return decryptSecretValue(value?.verifyToken) === verifyToken;
+  } catch {
+    return false;
+  }
+}
+
 export function getWhatsAppWebhookUrl() {
   const appBaseUrl =
     process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? "";
@@ -347,9 +358,8 @@ export async function getActiveWhatsAppChannelByVerifyToken(
     );
 
   return (
-    channels.find(
-      ({ channel }) =>
-        normalizeWhatsAppConfig(channel.config).verifyToken === verifyToken,
+    channels.find(({ channel }) =>
+      matchesWhatsAppVerifyToken(channel.config, verifyToken),
     )?.channel ?? null
   );
 }

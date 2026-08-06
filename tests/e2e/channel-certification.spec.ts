@@ -9,10 +9,14 @@ import {
   CHANNEL_PROVIDER_RULES,
   listChannelProviderRules,
 } from "../../src/lib/channel-provider-rules";
+import { encryptSecretValue } from "../../src/lib/encrypted-secrets";
 import { listEnabledStepFlowComponents } from "../../src/lib/flow-components";
 import { MAX_MEDIA_UPLOAD_BYTES } from "../../src/lib/media-assets";
 import { WHATSAPP_OUTBOX_MAX_ATTEMPTS } from "../../src/lib/outbox";
-import { WHATSAPP_SERVICE_WINDOW_MS } from "../../src/lib/whatsapp";
+import {
+  matchesWhatsAppVerifyToken,
+  WHATSAPP_SERVICE_WINDOW_MS,
+} from "../../src/lib/whatsapp";
 
 test("every enabled step has one typed certification family", () => {
   const enabled = listEnabledStepFlowComponents();
@@ -118,4 +122,21 @@ test("production provider limitations stay explicit and tied to runtime constant
     outbound_media_public_url: true,
     service_window_ms: WHATSAPP_SERVICE_WINDOW_MS,
   });
+});
+
+test("webhook verification skips a config with unauthenticated ciphertext", () => {
+  const verifyToken = encryptSecretValue("expected-verify-token");
+  const tamperedVerifyToken = structuredClone(verifyToken);
+  tamperedVerifyToken.$liaEncryptedSecret.ciphertext =
+    Buffer.from("tampered").toString("base64");
+
+  expect(
+    matchesWhatsAppVerifyToken(
+      { verifyToken: tamperedVerifyToken },
+      "expected-verify-token",
+    ),
+  ).toBe(false);
+  expect(
+    matchesWhatsAppVerifyToken({ verifyToken }, "expected-verify-token"),
+  ).toBe(true);
 });
