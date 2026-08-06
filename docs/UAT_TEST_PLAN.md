@@ -80,26 +80,41 @@ Use this exact layout for the current Supabase Free account:
 
 6. In Supabase, open `ls-chatbot-staging` and click `Connect` at the top.
 7. Under `Session pooler`, copy the URI whose host ends in
-   `.pooler.supabase.com` and whose port is `5432`. Replace
-   `[YOUR-PASSWORD]` with the staging database password. Do not use the
+   `.pooler.supabase.com` and whose port is `5432`. Keep the literal
+   `[YOUR-PASSWORD]` placeholder in this URI template. Do not use the
    transaction pooler on port `6543`.
 8. Return to the Supabase project list, open `ls-chatbot`, click `Connect`, and
-   copy its separate `Session pooler` URI on port `5432`. Replace its password.
-9. Keep both URIs only in a password manager or private clipboard. Never paste
-   them into this document, chat, a screenshot, or a committed file.
+   copy its separate `Session pooler` URI template on port `5432`, also leaving
+   `[YOUR-PASSWORD]` unchanged.
+9. Keep both database passwords in a password manager. Never place either
+   password or a completed URI in this document, chat, a screenshot, a shell
+   command, or a committed file.
 
 ### Part C - Put The URLs In PowerShell Without Displaying Them
 
-10. In PowerShell, run the following block. Paste the staging URI when the first
-    hidden prompt appears and the existing `ls-chatbot` URI at the second
-    hidden prompt. PowerShell will not display the pasted characters:
+10. In PowerShell, run the following block. Paste the two password-free URI
+    templates when prompted, then paste each matching database password at its
+    hidden prompt. The passwords are URL-encoded before insertion, so reserved
+    characters such as `#`, `/`, `?`, `@`, and `%` cannot invalidate the URI:
 
     ```powershell
-    $stagingSecureUrl = Read-Host "Paste ls-chatbot-staging Session pooler URI" -AsSecureString
-    $existingSecureUrl = Read-Host "Paste ls-chatbot Session pooler URI" -AsSecureString
-    $stagingDatabaseUrl = [System.Net.NetworkCredential]::new("", $stagingSecureUrl).Password
-    $existingDatabaseUrl = [System.Net.NetworkCredential]::new("", $existingSecureUrl).Password
-    Remove-Variable stagingSecureUrl, existingSecureUrl
+    $stagingUriTemplate = Read-Host "Paste ls-chatbot-staging Session pooler URI template"
+    $existingUriTemplate = Read-Host "Paste ls-chatbot Session pooler URI template"
+    if (-not $stagingUriTemplate.Contains("[YOUR-PASSWORD]") -or -not $existingUriTemplate.Contains("[YOUR-PASSWORD]")) {
+        throw "Both URI templates must contain the literal [YOUR-PASSWORD] placeholder."
+    }
+
+    $stagingPasswordSecure = Read-Host "Paste ls-chatbot-staging database password" -AsSecureString
+    $existingPasswordSecure = Read-Host "Paste ls-chatbot database password" -AsSecureString
+    $stagingPassword = [System.Net.NetworkCredential]::new("", $stagingPasswordSecure).Password
+    $existingPassword = [System.Net.NetworkCredential]::new("", $existingPasswordSecure).Password
+
+    $stagingDatabaseUrl = $stagingUriTemplate.Replace("[YOUR-PASSWORD]", [uri]::EscapeDataString($stagingPassword))
+    $existingDatabaseUrl = $existingUriTemplate.Replace("[YOUR-PASSWORD]", [uri]::EscapeDataString($existingPassword))
+
+    Remove-Variable stagingUriTemplate, existingUriTemplate
+    Remove-Variable stagingPasswordSecure, existingPasswordSecure
+    Remove-Variable stagingPassword, existingPassword
     ```
 
 11. Expose the two private variables to this PowerShell process only:
@@ -109,14 +124,15 @@ Use this exact layout for the current Supabase Free account:
     $env:EXISTING_DATABASE_URL = $existingDatabaseUrl
     ```
 
-12. Run this safe identity check. It prints hosts, ports, databases, and users,
-    but never prints passwords:
+12. Run this safe identity check. It catches invalid values without allowing
+    Node.js to echo a rejected URI. For valid values it prints only hosts,
+    ports, databases, and users, never passwords:
 
     ```powershell
-    node -e "for(const [name,value] of [['staging',process.env.STAGING_DATABASE_URL],['existing',process.env.EXISTING_DATABASE_URL]]){const u=new URL(value);console.log(name,{host:u.hostname,port:u.port,database:u.pathname.slice(1),user:u.username})}"
+    node -e "for(const [name,value] of [['staging',process.env.STAGING_DATABASE_URL],['existing',process.env.EXISTING_DATABASE_URL]]){try{const u=new URL(value);console.log(name,{valid:true,host:u.hostname,port:u.port,database:u.pathname.slice(1),user:u.username})}catch{console.log(name,{valid:false});process.exitCode=1}}"
     ```
 
-13. Confirm both printed ports are `5432`, both hosts end in
+13. Confirm both results say `valid: true`, both printed ports are `5432`, both hosts end in
     `.pooler.supabase.com`, and the staging and existing usernames contain
     different Supabase project references. Stop if they are the same.
 
