@@ -95,6 +95,11 @@ UPLOAD_QUEUE_SECRET=""
 DURABLE_QUEUE_SECRET=""
 PROVIDER_SECRETS_ENCRYPTION_KEY=""
 PROVIDER_SECRETS_KEY_VERSION="1"
+
+# Required for production media uploads; omit for local public/uploads fallback.
+SUPABASE_URL="https://PROJECT_REF.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY=""
+SUPABASE_MEDIA_BUCKET="lia-media"
 ```
 
 Notes:
@@ -105,6 +110,9 @@ Notes:
 - `PLATFORM_ADMIN_EMAILS` controls who can access the lightweight SaaS admin area.
 - SMTP variables are only needed if you want password reset emails to send.
 - Google variables are only needed if you want Google sign-in to work.
+- The Supabase media variables are required together in production. Keep
+  `SUPABASE_SERVICE_ROLE_KEY` server-only and configure the named bucket as
+  public so Widget and WhatsApp can fetch media by HTTPS URL.
 
 ## Install
 
@@ -268,9 +276,11 @@ Use this area to:
 - Open uploaded assets for testing.
 - Archive assets that should no longer be used.
 
-Media assets are stored with `project_id` scope. The current development
-storage path is `public/uploads/media/<project_id>/...`; production should move
-this to object storage before large customer usage.
+Media assets are stored with `project_id` scope. Local development falls back
+to `public/uploads/media/<project_id>/...`. Production deployments require a
+public Supabase Storage bucket configured with `SUPABASE_URL`, the server-only
+`SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_MEDIA_BUCKET`; production uploads
+fail safely when that configuration is absent or incomplete.
 
 ### Product Catalog
 
@@ -623,8 +633,9 @@ Operations notes:
   on scoped query helpers plus static and database-backed isolation checks.
 - Audit log export is deferred for internal beta; use the read-only
   `/projects/audit` review page.
-- Production object storage is deferred for internal beta; local
-  `public/uploads` media is only suitable for small test usage.
+- Supabase Storage is the production media backend for internal beta. Local
+  `public/uploads` remains a development-only fallback; retention policies and
+  media quotas remain deferred.
 - Browser E2E has critical smoke coverage, but exhaustive browser/device
   coverage is deferred for internal beta.
 - Durable retries need a production scheduler frequency and alert threshold

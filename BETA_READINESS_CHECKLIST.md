@@ -241,7 +241,8 @@ These are not blockers for internal beta, but they must be explicitly accepted:
 - [x] Custom domains are not implemented.
 - [x] PostgreSQL RLS is not implemented.
 - [x] Audit log export is not implemented.
-- [x] Production object storage is not implemented for media.
+- [x] Automated media retention, lifecycle deletion, and storage quotas are
+  not implemented.
 - [x] Full browser E2E coverage is not complete.
 - [x] Live business operations such as availability, booking, quote, payment,
   and status checks need provider-specific setup.

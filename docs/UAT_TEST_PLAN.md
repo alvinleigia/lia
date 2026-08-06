@@ -316,6 +316,9 @@ Expected result:
    - `PROVIDER_SECRETS_KEY_VERSION`
    - `SMTP2GO_API_KEY`
    - `MAIL_FROM`
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `SUPABASE_MEDIA_BUCKET`
 
 2. Set both URL values to the same public HTTPS staging origin, with no
    trailing path. Confirm the deployment runtime is Node.js `20.9.0` or newer.
@@ -338,10 +341,27 @@ Expected result:
    approved staging recipient and confirm the success Sonner toast and device
    delivery. This also proves any historical provider credential can still be
    decrypted after key rotation.
-8. Upload one non-sensitive test image through `Projects` > `Media Library`.
-   Open its rendered URL in a private browser window and confirm it is public
-   HTTPS and does not depend on local `public/uploads`. Do not approve beta if
-   production-like object storage is not configured.
+8. Configure and verify staging object storage:
+   1. In the `ls-chatbot-staging` Supabase project, open `Storage`, click
+      `New bucket`, enter `lia-media` in `Name`, enable `Public bucket`, and
+      create the bucket. Do not reuse a production bucket.
+   2. In the `Lia Staging` deployment settings, set `SUPABASE_URL` to the
+      staging Supabase project URL, set `SUPABASE_SERVICE_ROLE_KEY` to the
+      staging server-only `service_role` key, and set
+      `SUPABASE_MEDIA_BUCKET` to `lia-media`. Never use a `NEXT_PUBLIC_`
+      variable for the service-role key and never paste it into UAT evidence.
+   3. Redeploy the same release-candidate commit and return to `Projects` >
+      `Media Library`. Confirm the `Storage` card says `Supabase Storage`.
+   4. Under `Upload Media`, use `File` to choose one small, non-sensitive PNG
+      or JPEG test image, then click `Upload Asset` once. Confirm the form
+      stays usable and reports success rather than opening a server-error page.
+   5. Under `Assets`, click `Open` for the new image. Copy its URL and open it
+      in a private browser window. Confirm it uses public HTTPS, contains
+      `/storage/v1/object/public/lia-media/`, renders without signing in, and
+      does not depend on local `public/uploads`.
+
+   Do not approve beta if the `Storage` card says `Not configured` or
+   `Misconfigured`, the upload fails, or the private-browser URL is not public.
 9. In the scheduler or cron provider, configure the documented upload and
    durable-recovery jobs with their corresponding staging secrets. From the
    repository root run:

@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import { type InsertMediaAsset, mediaAssets } from "@/lib/db-schema";
+import { uploadMediaObject } from "@/lib/media-storage";
 
 export const MAX_MEDIA_UPLOAD_BYTES = 16 * 1024 * 1024;
 
@@ -111,16 +111,13 @@ export async function saveProjectMediaBytes(input: {
   const storageKey = path
     .join(projectStoragePath, fileName)
     .replace(/\\/g, "/");
-  const uploadDirectory = path.join(
-    process.cwd(),
-    "public",
+  const storedObject = await uploadMediaObject({
+    bytes: input.bytes,
+    fileName,
+    mimeType: input.mimeType,
     projectStoragePath,
-  );
-  const diskPath = path.join(uploadDirectory, fileName);
-  const publicPath = `/${storageKey}`;
-
-  await mkdir(uploadDirectory, { recursive: true });
-  await writeFile(diskPath, input.bytes);
+    storageKey,
+  });
 
   return createMediaAsset({
     projectId: input.projectId,
@@ -130,11 +127,11 @@ export async function saveProjectMediaBytes(input: {
     mimeType: input.mimeType,
     sizeBytes: input.bytes.byteLength,
     storageKey,
-    publicPath,
+    publicPath: storedObject.publicPath,
     status: "active",
     metadata: {
       ...(input.metadata ?? {}),
-      storage: "local-public",
+      storage: storedObject.provider,
     },
   });
 }

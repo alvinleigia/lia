@@ -190,44 +190,45 @@ Before audit export launch:
 
 ## Production Object Storage For Media
 
-Decision: accepted as deferred for internal beta.
+Decision: Supabase Storage is required for internal beta staging and
+production deployments. Automated retention and quota enforcement remain
+deferred.
 
 Current state:
 
-- Reusable project media assets are stored under `public/uploads/media`.
-- Document and media upload flows are project-scoped, but local filesystem
-  storage is not durable production object storage.
+- Reusable project media assets are project-scoped and uploaded to a configured
+  public Supabase Storage bucket in production.
+- Local development falls back to `public/uploads/media`; production rejects
+  uploads safely when the Supabase configuration is absent or incomplete.
 - Native WhatsApp outbound media still depends on public HTTPS URLs so Meta can
   fetch media assets.
-- Backup and retention behavior for local uploaded files is not production
-  grade.
+- Automated retention, lifecycle deletion, backup policy, and storage quotas
+  are not yet enforced by the application.
 
-Why this is acceptable for internal beta:
+Why the remaining deferrals are acceptable for internal beta:
 
 - Internal beta can use small test media sets.
 - Media-heavy customer workloads are not part of the current beta acceptance
   target.
-- The existing media smoke tests prove project-scoped upload and review
-  behavior before storage is swapped.
+- The staging release gate verifies one public HTTPS object-storage upload in a
+  private browser before beta approval.
 
 Operational guardrail:
 
 - Keep beta media usage small.
-- Do not treat local `public/uploads` files as durable production storage.
-- Use a public HTTPS `NEXT_PUBLIC_APP_URL` or `NEXTAUTH_URL` before testing
-  WhatsApp outbound media fetches.
-- Back up local/staging uploads manually if a beta test depends on them.
+- Do not configure local `public/uploads` as a production storage backend.
+- Keep the Supabase service-role key server-only and use a staging-only bucket
+  during release certification.
+- Configure bucket retention and backups operationally when beta evidence
+  depends on uploaded media.
 
-Before production media launch:
+Before media-heavy or paid launch:
 
-- Choose object storage, such as S3-compatible storage, Vercel Blob, or another
-  managed bucket.
-- Define bucket structure, access policy, retention, and backup behavior.
-- Add signed upload/download or controlled public URL behavior as needed by
-  widgets and WhatsApp.
-- Migrate project media paths from filesystem URLs to object-storage URLs.
-- Add tests for upload, render, WhatsApp fetchability, tenant isolation, and
-  deletion/archive behavior.
+- Define bucket retention, lifecycle deletion, backup behavior, and quotas.
+- Add signed or controlled public URL behavior if later privacy requirements
+  conflict with Widget and WhatsApp fetchability.
+- Add browser coverage for upload, render, WhatsApp fetchability, tenant
+  isolation, archive behavior, and storage failure recovery.
 
 ## Full Browser E2E Coverage
 

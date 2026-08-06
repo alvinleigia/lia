@@ -17,6 +17,7 @@ import {
   listProjectMediaAssets,
   MAX_MEDIA_UPLOAD_BYTES,
 } from "@/lib/media-assets";
+import { getMediaStorageLabel } from "@/lib/media-storage";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
@@ -60,6 +61,7 @@ export default async function ProjectMediaPage({
   const { project } = context;
   const assets = await listProjectMediaAssets(project.id);
   const maxUploadMb = Math.floor(MAX_MEDIA_UPLOAD_BYTES / (1024 * 1024));
+  const storageLabel = getMediaStorageLabel();
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -100,7 +102,7 @@ export default async function ProjectMediaPage({
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                   Storage
                 </p>
-                <p className="text-xl font-semibold">Local</p>
+                <p className="text-xl font-semibold">{storageLabel}</p>
               </div>
             </div>
           </CardContent>

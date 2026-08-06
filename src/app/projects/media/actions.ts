@@ -48,13 +48,24 @@ export async function uploadMediaAssetAction(
     return { error: "Unsupported media type." };
   }
 
-  const asset = await saveProjectMediaFileUpload({
-    file,
-    projectId: context.project.id,
-    metadata: {
-      source: "media_library",
-    },
-  });
+  let asset: Awaited<ReturnType<typeof saveProjectMediaFileUpload>>;
+  try {
+    asset = await saveProjectMediaFileUpload({
+      file,
+      projectId: context.project.id,
+      metadata: {
+        source: "media_library",
+      },
+    });
+  } catch (error) {
+    console.error("Media asset upload failed:", error);
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "The media asset could not be uploaded.",
+    };
+  }
 
   await writeAuditLog({
     ...context,
