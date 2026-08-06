@@ -4,7 +4,7 @@
 
 Phase 14 of 18: Priority 2 release gate.
 
-Status: Ready for staging and live-provider UAT on 2026-08-05. Local automated
+Status: Ready for staging and live-provider UAT on 2026-08-06. Local automated
 verification is complete; beta approval remains blocked until every unchecked
 item in this section passes against the intended beta deployment.
 
@@ -30,10 +30,13 @@ Release-candidate worksheet:
 - Commit: run `git rev-parse --short HEAD` immediately before Step 1 and record
   the result in the sign-off section.
 - Staging URL: record the public `https://` URL.
-- Clean migration database: record only its provider name and database name.
-- Representative existing database: record only its provider name and database
-  name; it must contain V1 flows before migration.
-- Restore database: record only its provider name and restored backup timestamp.
+- Clean migration database: `Supabase / ls-chatbot-staging`.
+- Representative existing database: `Supabase / ls-chatbot`; it contains the
+  existing development data and published V1 flows.
+- Restore target: record the disposable restore environment and restored backup
+  timestamp. With two active Supabase Free projects, use a local disposable
+  Supabase/Postgres target for the rehearsal or temporarily obtain a separate
+  remote restore target; never overwrite `ls-chatbot`.
 - Project: use a staging project named `Phase 14 Release UAT` or record the
   existing staging project chosen by the release owner.
 - Reference task: `Book a Spa Service`, published version `v4` or the same
@@ -46,9 +49,20 @@ Never put a database URL, OpenAI key, auth secret, provider encryption key,
 WhatsApp access token, app secret, or webhook verify token in screenshots,
 terminal transcripts, tickets, commits, or this document.
 
-## Step 1 of 6 - Lock The Release Candidate And Migrate Staging
+## Step 1 of 6 - Lock The Release Candidate And Migrate Supabase
 
-Release owner actions:
+Use this exact layout for the current Supabase Free account:
+
+- `ls-chatbot` is the existing development database. Do not reset, delete, or
+  restore over it.
+- `ls-chatbot-staging` is the new clean staging database in `ap-south-1` on
+  Nano compute.
+- The `vector` extension must show as enabled in the `extensions` schema on
+  `ls-chatbot-staging`.
+- Supabase Free permits two active projects, so this test does not require a
+  third hosted project.
+
+### Part A - Record The Exact Candidate
 
 1. Open PowerShell in the repository root. Confirm the prompt ends in
    `C:\xampp\htdocs\ls-chatbot`.
@@ -57,39 +71,146 @@ Release owner actions:
    tracked source file is unexpectedly modified.
 3. Run `git rev-parse --short HEAD` and record the value under `Phase 14
    Sign-Off` as `Release candidate commit`.
-4. In the deployment provider, create or select an app named `Lia Staging`.
-   Set its production branch or source commit to the recorded release-candidate
-   commit. Do not use the production app.
-5. In the database provider, create two disposable databases:
-   `lia_phase14_clean` with no Lia tables, and `lia_phase14_existing` restored
-   from representative pre-Phase-14 data containing at least one published V1
-   flow. Confirm the `vector` extension is enabled in both databases.
-6. In a fresh PowerShell window, set `DATABASE_URL` to the clean database using
-   a private environment-variable mechanism. Do not echo the value. From the
-   repository root run:
+4. Stop any terminal running `npm run dev` or `npm run start`. The production
+   build later in this step requires port `3000` to be free.
+5. Do not edit `.env.local`. Database URLs will be set only in the current
+   PowerShell process and cleared at the end.
 
-   ```powershell
-   npx.cmd drizzle-kit migrate
-   npm.cmd run build
-   ```
+### Part B - Obtain The Two Migration-Safe Connection Strings
 
-7. Confirm migration exits with code `0`, the build ends with `Compiled
-   successfully`, and no migration asks to drop or recreate existing data.
-8. Change only the private `DATABASE_URL` environment value to
-   `lia_phase14_existing`, then run the same two commands again.
-9. Sign in to the app connected to `lia_phase14_existing`. Navigate through
-   `Automation` > `Actions`, open one older published action, and confirm its
-   version history and canvas still load. Open `Projects` > `Chat` and confirm
-   the project page loads without a database error.
-10. In the database provider, capture the migration history and table-count
-    evidence for both databases. Redact connection strings, usernames, hosts,
-    and credentials.
+6. In Supabase, open `ls-chatbot-staging` and click `Connect` at the top.
+7. Under `Session pooler`, copy the URI whose host ends in
+   `.pooler.supabase.com` and whose port is `5432`. Replace
+   `[YOUR-PASSWORD]` with the staging database password. Do not use the
+   transaction pooler on port `6543`.
+8. Return to the Supabase project list, open `ls-chatbot`, click `Connect`, and
+   copy its separate `Session pooler` URI on port `5432`. Replace its password.
+9. Keep both URIs only in a password manager or private clipboard. Never paste
+   them into this document, chat, a screenshot, or a committed file.
+
+### Part C - Put The URLs In PowerShell Without Displaying Them
+
+10. In PowerShell, run the following block. Paste the staging URI when the first
+    hidden prompt appears and the existing `ls-chatbot` URI at the second
+    hidden prompt. PowerShell will not display the pasted characters:
+
+    ```powershell
+    $stagingSecureUrl = Read-Host "Paste ls-chatbot-staging Session pooler URI" -AsSecureString
+    $existingSecureUrl = Read-Host "Paste ls-chatbot Session pooler URI" -AsSecureString
+    $stagingDatabaseUrl = [System.Net.NetworkCredential]::new("", $stagingSecureUrl).Password
+    $existingDatabaseUrl = [System.Net.NetworkCredential]::new("", $existingSecureUrl).Password
+    Remove-Variable stagingSecureUrl, existingSecureUrl
+    ```
+
+11. Expose the two private variables to this PowerShell process only:
+
+    ```powershell
+    $env:STAGING_DATABASE_URL = $stagingDatabaseUrl
+    $env:EXISTING_DATABASE_URL = $existingDatabaseUrl
+    ```
+
+12. Run this safe identity check. It prints hosts, ports, databases, and users,
+    but never prints passwords:
+
+    ```powershell
+    node -e "for(const [name,value] of [['staging',process.env.STAGING_DATABASE_URL],['existing',process.env.EXISTING_DATABASE_URL]]){const u=new URL(value);console.log(name,{host:u.hostname,port:u.port,database:u.pathname.slice(1),user:u.username})}"
+    ```
+
+13. Confirm both printed ports are `5432`, both hosts end in
+    `.pooler.supabase.com`, and the staging and existing usernames contain
+    different Supabase project references. Stop if they are the same.
+
+### Part D - Back Up The Existing Database Before Migration
+
+14. Confirm Docker Desktop is running. The Supabase CLI dump command uses
+    Docker. If Docker or the CLI cannot start, stop here and ask for setup help;
+    do not continue against `ls-chatbot` without a backup.
+15. Create a private temporary backup directory outside the repository:
+
+    ```powershell
+    $phase14Backup = Join-Path $env:TEMP "lia-phase14-backup"
+    New-Item -ItemType Directory -Force -Path $phase14Backup | Out-Null
+    ```
+
+16. Run the three official logical-backup commands against the existing
+    database:
+
+    ```powershell
+    npx.cmd supabase db dump --db-url "$existingDatabaseUrl" -f "$phase14Backup\roles.sql" --role-only
+    npx.cmd supabase db dump --db-url "$existingDatabaseUrl" -f "$phase14Backup\schema.sql"
+    npx.cmd supabase db dump --db-url "$existingDatabaseUrl" -f "$phase14Backup\data.sql" --use-copy --data-only -x "storage.buckets_vectors" -x "storage.vector_indexes"
+    ```
+
+17. Confirm all three commands exit successfully and `roles.sql`, `schema.sql`,
+    and `data.sql` exist with non-zero sizes. Keep this directory private; its
+    data dump may contain test users, phone numbers, or emails.
+
+### Part E - Migrate The Clean Staging Database
+
+18. Set only the current process to use staging, then run the migrator and
+    production build:
+
+    ```powershell
+    $env:DATABASE_URL = $stagingDatabaseUrl
+    npx.cmd drizzle-kit migrate
+    npm.cmd run build
+    ```
+
+19. Confirm both commands exit with code `0`, the build ends successfully, and
+    no command asks to drop or recreate existing data.
+20. In Supabase, open `ls-chatbot-staging` > `Table Editor`. Confirm Lia tables
+    now appear. Then open `SQL Editor`, run the following read-only query, and
+    confirm it returns one row named `vector`:
+
+    ```sql
+    select extname from pg_extension where extname = 'vector';
+    ```
+
+21. In `SQL Editor`, run this read-only migration-ledger query and confirm the
+    result is greater than zero:
+
+    ```sql
+    select count(*) as applied_migrations from drizzle.__drizzle_migrations;
+    ```
+
+### Part F - Re-run Migrations Safely On Existing Data
+
+22. Only after the three backup files from Part D exist, switch the current
+    process to the existing database and run the same migrator and build:
+
+    ```powershell
+    $env:DATABASE_URL = $existingDatabaseUrl
+    npx.cmd drizzle-kit migrate
+    npm.cmd run build
+    ```
+
+23. Confirm the commands exit with code `0` and do not report a destructive
+    schema change. A message indicating there are no pending migrations is
+    acceptable.
+24. Start the local app against the existing database with `npm.cmd run dev`.
+    Sign in, click `Automation` > `Actions`, open one older published action,
+    and confirm its version history and canvas load. Click `Projects` > `Chat`
+    and confirm no database error appears.
+25. Stop the development server. Clear all temporary database variables from
+    PowerShell:
+
+    ```powershell
+    Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:STAGING_DATABASE_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:EXISTING_DATABASE_URL -ErrorAction SilentlyContinue
+    Remove-Variable stagingDatabaseUrl, existingDatabaseUrl -ErrorAction SilentlyContinue
+    ```
+
+26. Retain redacted evidence of the two migration results, two successful
+    builds, vector query, migration count, backup file names/sizes, and the
+    older action loading. Do not include URLs, usernames, passwords, or dump
+    contents.
 
 Expected result:
 
-- Clean and representative existing databases migrate without destructive
-  prompts, builds pass against both, and an existing published flow remains
-  readable.
+- `ls-chatbot-staging` migrates from clean state, `ls-chatbot` accepts an
+  idempotent existing-data migration after backup, builds pass against both,
+  and an existing published V1 flow remains readable.
 
 ## Step 2 of 6 - Configure Public Operations And Recovery
 
@@ -147,10 +268,16 @@ Expected result:
 
 10. Confirm an unauthenticated call to the upload and durable worker endpoints
     is rejected, while the scheduled jobs using the correct secret complete.
-11. Enable daily database backups, take a manual pre-UAT backup, and record its
-    timestamp. Restore that backup into the separate restore database, point a
-    disposable staging deployment at it, and confirm sign-in, `Automation` >
-    `Actions`, and `Projects` > `Chat` load successfully.
+11. The Supabase Free account already uses its two active projects. Use the
+    Step 1 logical dump to rehearse restore into a disposable local
+    Supabase/Postgres target, or temporarily obtain a separate remote restore
+    target. Never restore over `ls-chatbot`. Record the backup timestamp,
+    restore target, and verification result. Confirm sign-in, `Automation` >
+    `Actions`, and `Projects` > `Chat` load against the restored target.
+12. Supabase Free does not satisfy the required daily hosted-backup gate by
+    itself. Before beta approval, either enable a paid Supabase backup policy
+    or configure and verify an external daily logical-backup schedule. Record
+    the selected policy, retention, owner, and one successful restore rehearsal.
 
 Expected result:
 
