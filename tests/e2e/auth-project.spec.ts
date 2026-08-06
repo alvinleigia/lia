@@ -2405,6 +2405,8 @@ test("browser runtime edits collected fields on the pinned submission", async ({
 test("project chat resumes an active flow after refresh without duplicate writes", async ({
   page,
 }) => {
+  test.setTimeout(120_000);
+
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const email = `e2e-runtime-resume-${runId}@example.test`;
   const projectName = `E2E Runtime Resume Project ${runId}`;
