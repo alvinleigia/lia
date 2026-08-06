@@ -222,11 +222,81 @@ Use this exact layout for the current Supabase Free account:
     older action loading. Do not include URLs, usernames, passwords, or dump
     contents.
 
+### Part G - Seed The Sanitized Staging Fixture
+
+27. Complete this part only after the staging beta-owner has registered and
+    can sign in. The seeder resolves that existing owner and their active
+    workspace; it never copies a user or password from `ls-chatbot`.
+28. If `$stagingDatabaseUrl` is still available from Part C, continue to the
+    next point. Otherwise reconstruct it privately with the staging Session
+    pooler URI template and its hidden password. Do not paste the completed URI
+    into the terminal command, chat, a screenshot, or a committed file:
+
+    ```powershell
+    $stagingUriTemplate = Read-Host "Paste ls-chatbot-staging Session pooler URI template"
+    if (-not $stagingUriTemplate.Contains("[YOUR-PASSWORD]")) {
+        throw "The URI template must contain the literal [YOUR-PASSWORD] placeholder."
+    }
+    $stagingPasswordSecure = Read-Host "Paste ls-chatbot-staging database password" -AsSecureString
+    $stagingPassword = [System.Net.NetworkCredential]::new("", $stagingPasswordSecure).Password
+    $stagingDatabaseUrl = $stagingUriTemplate.Replace("[YOUR-PASSWORD]", [uri]::EscapeDataString($stagingPassword))
+    Remove-Variable stagingUriTemplate, stagingPasswordSecure, stagingPassword
+    ```
+
+29. Put the completed staging URL and the email of the already registered
+    staging owner in this PowerShell process only. The seeder reads the source
+    `ls-chatbot` URL from `.env.local` unless `EXISTING_DATABASE_URL` is already
+    set:
+
+    ```powershell
+    $env:STAGING_DATABASE_URL = $stagingDatabaseUrl
+    $env:PHASE14_OWNER_EMAIL = Read-Host "Enter the registered staging owner email"
+    ```
+
+30. Run the focused transformation test, then run the staging seed exactly
+    once:
+
+    ```powershell
+    npm.cmd run test:phase14-seed
+    npm.cmd run seed:phase14-staging
+    ```
+
+31. Confirm the command reports `Seeded Phase 14 Release UAT` or reports that
+    the same fixture is already seeded. It must list the copied configuration
+    and the excluded runtime/security records. The transaction refuses to run
+    when source and target connections are identical, the target project has
+    runtime data or unrelated configuration, the source fixture has changed,
+    or a copied JSON value resembles a credential.
+32. Sign in to staging, select `Phase 14 Release UAT`, and confirm all of the
+    following before continuing:
+
+    - `Automation` > `Tasks` shows `Book a Spa Service` with immutable `v4`.
+    - `Automation` > `Actions` shows active `Book a Spa Service` with one
+      published conversational-task step.
+    - `Projects` > `Product Catalog` shows `Facial` > `Classic Facial`.
+    - `Projects` > `Chat` shows the `Book a Spa Service` action button.
+    - `Projects` > `Contacts`, `Automation` > `Submissions`, and `Admin` >
+      `Audit Logs` contain no records copied from `ls-chatbot`.
+
+    The seed intentionally excludes provider secrets, widget keys, WhatsApp
+    settings, documents, media, contacts, conversations, submissions, task
+    runs, operation attempts, channel messages, and audit logs. Configure new
+    staging-only channel credentials and public assets in Step 2.
+33. Clear the private seed variables from the current PowerShell process:
+
+    ```powershell
+    Remove-Item Env:STAGING_DATABASE_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:PHASE14_OWNER_EMAIL -ErrorAction SilentlyContinue
+    Remove-Variable stagingDatabaseUrl -ErrorAction SilentlyContinue
+    ```
+
 Expected result:
 
 - `ls-chatbot-staging` migrates from clean state, `ls-chatbot` accepts an
   idempotent existing-data migration after backup, builds pass against both,
-  and an existing published V1 flow remains readable.
+  an existing published V1 flow remains readable, and staging contains only
+  the sanitized Phase 14 configuration fixture owned by the registered staging
+  account.
 
 ## Step 2 of 6 - Configure Public Operations And Recovery
 
