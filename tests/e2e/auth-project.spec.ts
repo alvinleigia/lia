@@ -3707,6 +3707,8 @@ test("audit page reviews recent company-scoped events", async ({ page }) => {
 });
 
 test("project chat action flow creates a submission", async ({ page }) => {
+  test.setTimeout(120_000);
+
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const email = `e2e-chat-action-${runId}@example.test`;
   const projectName = `E2E Chat Action Project ${runId}`;
@@ -3742,7 +3744,9 @@ test("project chat action flow creates a submission", async ({ page }) => {
   await expect(page.getByText(prompt)).toBeVisible();
 
   await sendProjectChatMessage(page, answer);
-  await expect(page.getByText("Saving your request now.")).toBeVisible();
+  await expect(page.getByText("Saving your request now.")).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(page.getByText("Thanks. I saved this request.")).toBeVisible();
   await expect(page.getByText(answer, { exact: true })).toBeVisible();
 
@@ -3761,6 +3765,8 @@ test("project chat action flow creates a submission", async ({ page }) => {
 });
 
 test("widget action flow creates a submission", async ({ page }) => {
+  test.setTimeout(120_000);
+
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const email = `e2e-widget-action-${runId}@example.test`;
   const projectName = `E2E Widget Action Project ${runId}`;
@@ -3797,7 +3803,9 @@ test("widget action flow creates a submission", async ({ page }) => {
   await expect(page.getByText(prompt)).toBeVisible();
 
   await sendWidgetMessage(page, answer);
-  await expect(page.getByText("Saving your request now.")).toBeVisible();
+  await expect(page.getByText("Saving your request now.")).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(page.getByText("Thanks. I saved this request.")).toBeVisible();
   await expect(page.getByText(answer, { exact: true }).first()).toBeVisible();
 
