@@ -1,3 +1,4 @@
+import { loadSelectedContactMemory } from "@/lib/conversation-memory";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { projectTurnBudgetGate } from "@/lib/conversation-turn-budget";
 import type {
@@ -77,9 +78,19 @@ export async function executeProjectStructuredTurn(
   const fieldState: TurnFieldStateV1[] = activeTask
     ? initializeTurnFieldState(activeTask)
     : [];
-  const context: TurnContextValueV1[] = activeTask
+  const taskContext: TurnContextValueV1[] = activeTask
     ? selectModelVisibleTurnContext(activeTask)
     : [];
+  const taskContextKeys = new Set(taskContext.map(({ key }) => key));
+  const memoryContext = await loadSelectedContactMemory({
+    contactId: input.contactId,
+    policy: projectPolicy,
+    projectId: input.projectId,
+  });
+  const context = [
+    ...taskContext,
+    ...memoryContext.filter(({ key }) => !taskContextKeys.has(key)),
+  ];
   const execution = await executeConfiguredStructuredTurn({
     activeTask,
     assistantBehavior,

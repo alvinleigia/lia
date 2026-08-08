@@ -258,6 +258,19 @@ export const dataHandlingPolicyV1Schema = z.object({
   deletionMode: z.enum(["on_request", "automatic"]),
   exportAllowed: z.boolean(),
   fieldRetentionDays: z.number().int().min(1).max(3650),
+  memory: z
+    .object({
+      enabled: z.boolean(),
+      consentMode: z.enum(["inherit", "required", "disabled"]),
+      retentionDays: z.number().int().min(1).max(3650),
+      selectedFactKeys: z.array(stableKey).max(32),
+    })
+    .default({
+      enabled: false,
+      consentMode: "inherit",
+      retentionDays: 90,
+      selectedFactKeys: [],
+    }),
   sensitiveLogVisibility: z.literal("redacted"),
   sensitiveModelVisibility: z.enum(["denied", "task_only"]),
   messageRetentionDays: z.number().int().min(1).max(3650),
@@ -307,6 +320,12 @@ export const DEFAULT_CONVERSATION_PROJECT_POLICY: ConversationProjectPolicyV1 =
       deletionMode: "on_request",
       exportAllowed: true,
       fieldRetentionDays: 365,
+      memory: {
+        enabled: false,
+        consentMode: "inherit",
+        retentionDays: 90,
+        selectedFactKeys: [],
+      },
       sensitiveLogVisibility: "redacted",
       sensitiveModelVisibility: "task_only",
       messageRetentionDays: 90,

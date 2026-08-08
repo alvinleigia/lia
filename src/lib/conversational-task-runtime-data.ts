@@ -25,6 +25,7 @@ import {
   conversationExecutionStates,
   conversationInboundEvents,
   conversationProjectPolicies,
+  durableJobs,
 } from "@/lib/db-schema";
 
 function addDays(date: Date, days: number) {
@@ -276,6 +277,16 @@ export async function deleteConversationRuntimeData(input: {
         ),
       );
     const runIds = runs.map(({ id }) => id);
+
+    await tx
+      .delete(durableJobs)
+      .where(
+        and(
+          eq(durableJobs.projectId, input.projectId),
+          eq(durableJobs.jobType, "post_conversation"),
+          sql`${durableJobs.payload} ->> 'conversationId' = ${String(input.conversationId)}`,
+        ),
+      );
 
     await tx
       .delete(conversationalTaskAuditEvents)

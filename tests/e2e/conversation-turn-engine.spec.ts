@@ -4,6 +4,7 @@ import {
   REFERENCE_BOOKING_TASK_DEFINITION,
 } from "../../src/lib/conversation-contract-fixtures";
 import { conversationalTaskSnapshotV1Schema } from "../../src/lib/conversation-contracts";
+import { selectSelectedContactMemoryFacts } from "../../src/lib/conversation-memory";
 import type { TurnResultV1 } from "../../src/lib/conversation-turn-contracts";
 import {
   StructuredTurnEngine,
@@ -15,6 +16,10 @@ import type {
   StructuredTurnProviderInput,
   StructuredTurnProviderResult,
 } from "../../src/lib/model-provider";
+import {
+  buildPostConversationJobResult,
+  postConversationJobPayloadSchema,
+} from "../../src/lib/post-conversation-jobs";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 const snapshot = conversationalTaskSnapshotV1Schema.parse({
@@ -451,7 +456,7 @@ test("low-confidence task recommendations require focused clarification", async 
 
   const result = await engine.execute(engineInput());
 
-  expect(result.attempts).toBe(2);
+  expect(result.attempts).toBe(1);
   expect(result.proposal.nextAction).toBe("clarify");
   expect(result.proposal.ambiguity.requiresClarification).toBe(true);
 });
@@ -627,14 +632,105 @@ test("audit summaries exclude replies, field values, and private reasoning", asy
   const engine = new StructuredTurnEngine({ provider });
   const result = await engine.execute(engineInput());
 
-  const summary = buildSafeTurnDecisionSummary(result);
+  const summary = buildSafeTurnDecisionSummary(result, {
+    estimatedCostUnits: 1_200,
+    inputTokens: 120,
+    latencyMs: 250,
+    outputTokens: 80,
+    totalTokens: 200,
+  });
   const serialized = JSON.stringify(summary);
 
+  expect(summary.schemaVersion).toBe(2);
   expect(summary.fieldCandidateCount).toBe(1);
   expect(summary.nextAction).toBe("ask");
+  expect(summary.latencyMs).toBe(250);
+  expect(summary.totalTokens).toBe(200);
   expect(serialized).not.toContain("Facial");
   expect(serialized).not.toContain(result.proposal.reply);
   expect(serialized).not.toContain(result.proposal.decisionSummary);
+});
+
+test("selected contact memory requires consent and excludes stale or unselected facts", () => {
+  const now = new Date("2026-08-08T12:00:00.000Z");
+  const attributes = [
+    {
+      key: "lia_memory_consent",
+      updatedAt: now,
+      value: true,
+    },
+    {
+      key: "preferred_room",
+      updatedAt: now,
+      value: "Suite",
+    },
+    {
+      key: "unselected_fact",
+      updatedAt: now,
+      value: "Do not expose",
+    },
+    {
+      key: "stale_preference",
+      updatedAt: new Date("2026-06-01T12:00:00.000Z"),
+      value: "Old preference",
+    },
+  ];
+  const policy = {
+    consentMode: "required" as const,
+    enabled: true,
+    retentionDays: 30,
+    selectedFactKeys: ["preferred_room", "stale_preference"],
+  };
+
+  expect(
+    selectSelectedContactMemoryFacts({
+      attributes,
+      now,
+      policy,
+      projectConsentRequired: false,
+    }),
+  ).toEqual([
+    {
+      key: "preferred_room",
+      modelVisible: true,
+      sensitivity: "standard",
+      value: "Suite",
+    },
+  ]);
+  expect(
+    selectSelectedContactMemoryFacts({
+      attributes: attributes.filter(({ key }) => key !== "lia_memory_consent"),
+      now,
+      policy,
+      projectConsentRequired: false,
+    }),
+  ).toEqual([]);
+});
+
+test("post-conversation jobs only accept fixed approved processors", () => {
+  const payload = postConversationJobPayloadSchema.parse({
+    schemaVersion: 1,
+    kind: "summary",
+    conversationId: "conversation-95",
+    outcome: "completed",
+    selectedFacts: [{ key: "preferred_room", value: "Suite" }],
+    taskRunId: 95,
+  });
+
+  expect(buildPostConversationJobResult(payload)).toEqual({
+    schemaVersion: 1,
+    processorVersion: 1,
+    kind: "summary",
+    approvedToolId: "conversation_summary_v1",
+    outcome: "completed",
+    selectedFactCount: 1,
+  });
+  expect(
+    postConversationJobPayloadSchema.safeParse({
+      ...payload,
+      kind: "send_external_message",
+    }).success,
+  ).toBe(false);
 });
 
 test("multilingual visitor values retain canonical field keys", async () => {

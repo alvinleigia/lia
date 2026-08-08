@@ -42,12 +42,13 @@ export async function POST(request: Request) {
       projectAiSettings: context.project.aiSettings,
       projectName: context.project.name,
     });
+    const latencyMs = Date.now() - startedAt;
 
     await logChatRequest({
       route: "structured_turn",
       projectId,
       statusCode: 200,
-      latencyMs: Date.now() - startedAt,
+      latencyMs,
       promptTokens: result.execution.usage.inputTokens,
       completionTokens: result.execution.usage.outputTokens,
       totalTokens: result.execution.usage.totalTokens,
@@ -61,7 +62,18 @@ export async function POST(request: Request) {
       action: "structured_turn.decided",
       targetType: result.activeTask ? "conversational_task" : "project",
       targetId: result.activeTask?.id ?? projectId,
-      metadata: buildSafeTurnDecisionSummary(result.execution),
+      metadata: buildSafeTurnDecisionSummary(result.execution, {
+        estimatedCostUnits:
+          result.execution.usage.inputTokens === null ||
+          result.execution.usage.outputTokens === null
+            ? null
+            : result.execution.usage.inputTokens +
+              result.execution.usage.outputTokens * 4,
+        inputTokens: result.execution.usage.inputTokens,
+        latencyMs,
+        outputTokens: result.execution.usage.outputTokens,
+        totalTokens: result.execution.usage.totalTokens,
+      }),
     });
 
     return Response.json(result);

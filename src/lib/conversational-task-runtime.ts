@@ -60,6 +60,7 @@ import {
   matchesHybridGraphTaskReturnTarget,
   resolveHybridTaskOutcomeResume,
 } from "@/lib/hybrid-flow-runtime";
+import { enqueueDefaultPostConversationJobs } from "@/lib/post-conversation-jobs";
 
 export {
   cleanupExpiredConversationRuntime,
@@ -2297,6 +2298,51 @@ export async function applyConversationalTaskEvent(
       taskRunId: run.id,
     };
   });
+
+  const terminalOutcome = (
+    {
+      "task.cancel": "cancelled",
+      "task.complete": "completed",
+      "task.fail": "failed",
+      "task.handoff": "handoff",
+    } as Record<
+      string,
+      "cancelled" | "completed" | "failed" | "handoff" | undefined
+    >
+  )[event.type];
+
+  if (
+    terminalOutcome &&
+    applied.disposition === "applied" &&
+    applied.taskRunId !== null
+  ) {
+    const [execution] = await db
+      .select({
+        responseOwner: conversationExecutionStates.responseOwner,
+        status: conversationExecutionStates.status,
+      })
+      .from(conversationExecutionStates)
+      .where(
+        and(
+          eq(conversationExecutionStates.projectId, event.projectId),
+          eq(conversationExecutionStates.conversationId, event.conversationId),
+        ),
+      )
+      .limit(1);
+
+    if (
+      execution?.status === "closed" ||
+      execution?.responseOwner === "human"
+    ) {
+      await enqueueDefaultPostConversationJobs({
+        conversationId: String(event.conversationId),
+        outcome: terminalOutcome,
+        projectId: event.projectId,
+        taskRunId: applied.taskRunId,
+        traceId: event.eventId,
+      });
+    }
+  }
 
   if (
     event.type === "tool.requested" &&

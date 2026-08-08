@@ -184,6 +184,7 @@ export const structuredTurnRequestV1Schema = z
     channel: z
       .enum(["project_chat", "widget", "whatsapp"])
       .default("project_chat"),
+    contactId: z.number().int().positive().nullable().default(null),
     history: z.array(turnMessageV1Schema).max(50).default([]),
     projectId: z.number().int().positive(),
     stage: z.enum(TURN_MODEL_STAGES).default("knowledge"),

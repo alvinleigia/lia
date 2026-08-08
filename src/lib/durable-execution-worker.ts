@@ -5,6 +5,7 @@ import { processProjectFlowResponsePolicyQueue } from "@/lib/durable-flow-respon
 import { processProjectFlowResumeQueue } from "@/lib/durable-flow-resume";
 import { processProjectDurableOperationQueue } from "@/lib/operations";
 import { processProjectOutboxQueue } from "@/lib/outbox";
+import { processProjectPostConversationQueue } from "@/lib/post-conversation-jobs";
 
 function clampInteger(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.trunc(value)));
@@ -99,6 +100,11 @@ export async function processDurableExecutionQueue(input?: {
       projectId,
       workerId: projectWorkerId,
     });
+    const postConversation = await processProjectPostConversationQueue({
+      maxJobs: maxItemsPerQueue,
+      projectId,
+      workerId: projectWorkerId,
+    });
     const outbox = await processProjectOutboxQueue({
       maxMessages: maxItemsPerQueue,
       projectId,
@@ -108,6 +114,7 @@ export async function processDurableExecutionQueue(input?: {
     projects.push({
       operations,
       outbox,
+      postConversation,
       projectId,
       responsePolicies,
       resumes,

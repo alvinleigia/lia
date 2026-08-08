@@ -111,13 +111,24 @@ export function hasUnsafeTurnOutput(reply: string) {
   );
 }
 
-export function buildSafeTurnDecisionSummary(input: {
-  attempts: number;
-  proposal: ValidatedTurnProposalV1;
-  source: "model" | "deterministic";
-}) {
+export function buildSafeTurnDecisionSummary(
+  input: {
+    attempts: number;
+    proposal: ValidatedTurnProposalV1;
+    source: "model" | "deterministic";
+  },
+  metrics?: {
+    estimatedCostUnits?: number | null;
+    inputTokens?: number | null;
+    latencyMs?: number;
+    outputTokens?: number | null;
+    totalTokens?: number | null;
+  },
+) {
+  const citationCount = input.proposal.grounding.excerptIds.length;
+
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: input.source,
     attempts: input.attempts,
     providerModelId: input.proposal.validation.providerModelId,
@@ -131,5 +142,19 @@ export function buildSafeTurnDecisionSummary(input: {
     hasToolRequest: input.proposal.toolRequest !== null,
     hasRouteRecommendation: input.proposal.routeRecommendation !== null,
     hasOutcomeRecommendation: input.proposal.outcomeRecommendation !== null,
+    recommendedTaskId: input.proposal.taskRecommendation?.taskId ?? null,
+    recommendedTaskConfidence:
+      input.proposal.taskRecommendation?.confidence ?? null,
+    recommendedOutcomeKey:
+      input.proposal.outcomeRecommendation?.outcomeKey ?? null,
+    recommendedOutcomeConfidence:
+      input.proposal.outcomeRecommendation?.confidence ?? null,
+    retrievalExcerptCount: citationCount,
+    citationCount,
+    latencyMs: metrics?.latencyMs ?? null,
+    inputTokens: metrics?.inputTokens ?? null,
+    outputTokens: metrics?.outputTokens ?? null,
+    totalTokens: metrics?.totalTokens ?? null,
+    estimatedCostUnits: metrics?.estimatedCostUnits ?? null,
   };
 }

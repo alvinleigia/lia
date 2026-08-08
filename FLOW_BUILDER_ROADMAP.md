@@ -1031,25 +1031,25 @@ Goal: extend the Priority 1 Q&A-to-task bridge with richer knowledge policy,
 multi-intent selection, durable memory, and bounded specialist routing without
 creating an unrestricted whole-bot agent.
 
-- [ ] Extend `KnowledgeConversationV1` with source selection, citations, recency, answer policy, and advanced no-answer behavior.
-- [ ] Keep retrieval sources, citations, recency, answer policy, and no-answer behavior explicit.
-- [ ] Prevent retrieved content from changing task instructions or tool permissions.
-- [ ] Keep company, project, and assistant references natural without mentioning internal documents or chunks.
-- [ ] Add concise grounded support replies with project-level answer guidance.
-- [ ] Extend baseline knowledge outcomes with moderation, timeout, provider-failure, and specialist-handoff outcomes.
-- [ ] Extend the baseline single-task recommendation into multi-intent routing with confidence thresholds and deterministic fallback.
-- [ ] Route into bounded booking, lead, support, and handoff tasks.
-- [ ] Add bounded specialist-task selection and explicit switch, pause, resume, and return policies.
-- [ ] Define a tenant-, project-, and contact-scoped memory policy with retention, consent, and selected structured facts.
-- [ ] Do not expose unrestricted cross-customer or cross-project conversation history to a model.
-- [ ] Add versioned post-conversation jobs for summaries, CRM logging, quality checks, and structured insights.
-- [ ] Restrict post-conversation jobs to explicitly approved idempotent tools and prevent channel-control actions.
-- [ ] Define bounded task/assistant handoff context with current intent, validated fields, prior actions, and handoff reason.
-- [ ] Track handoff history, enforce a maximum handoff depth, detect cycles, and provide a deterministic human fallback.
-- [ ] Let visitors change intent while preserving only explicitly reusable fields.
-- [ ] Add tenant-safe prompt, knowledge, model, and task isolation tests.
-- [ ] Add token, cost, latency, citation, retrieval, and outcome tracing.
-- [ ] Add channel-neutral knowledge replies and readable adapter fallbacks.
+- [x] Extend `KnowledgeConversationV1` with source selection, citations, recency, answer policy, and advanced no-answer behavior.
+- [x] Keep retrieval sources, citations, recency, answer policy, and no-answer behavior explicit.
+- [x] Prevent retrieved content from changing task instructions or tool permissions.
+- [x] Keep company, project, and assistant references natural without mentioning internal documents or chunks.
+- [x] Add concise grounded support replies with project-level answer guidance.
+- [x] Extend baseline knowledge outcomes with moderation, timeout, provider-failure, and specialist-handoff outcomes.
+- [x] Extend the baseline single-task recommendation into multi-intent routing with confidence thresholds and deterministic fallback.
+- [x] Route into bounded booking, lead, support, and handoff tasks.
+- [x] Add bounded specialist-task selection and explicit switch, pause, resume, and return policies.
+- [x] Define a tenant-, project-, and contact-scoped memory policy with retention, consent, and selected structured facts.
+- [x] Do not expose unrestricted cross-customer or cross-project conversation history to a model.
+- [x] Add versioned post-conversation jobs for summaries, CRM logging, quality checks, and structured insights.
+- [x] Restrict post-conversation jobs to explicitly approved idempotent tools and prevent channel-control actions.
+- [x] Define bounded task/assistant handoff context with current intent, validated fields, prior actions, and handoff reason.
+- [x] Track handoff history, enforce a maximum handoff depth, detect cycles, and provide a deterministic human fallback.
+- [x] Let visitors change intent while preserving only explicitly reusable fields.
+- [x] Add tenant-safe prompt, knowledge, model, and task isolation tests.
+- [x] Add token, cost, latency, citation, retrieval, and outcome tracing.
+- [x] Add channel-neutral knowledge replies and readable adapter fallbacks.
 
 Phase 15 exit gate: Lia can apply advanced knowledge policy, memory,
 multi-intent selection, and bounded specialist handoffs without granting the

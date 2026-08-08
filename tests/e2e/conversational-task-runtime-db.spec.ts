@@ -44,11 +44,13 @@ import {
   conversationalTasks,
   conversationalTaskVersions,
   conversationInboundEvents,
+  durableJobs,
   productCatalogs,
   projects,
   users,
   workspaces,
 } from "../../src/lib/db-schema";
+import { POST_CONVERSATION_JOB_KINDS } from "../../src/lib/post-conversation-jobs";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 test.describe.configure({ mode: "serial" });
@@ -70,6 +72,13 @@ const runtimeTaskDefinition = {
     },
   ],
 };
+const terminalRuntimeTaskDefinition = {
+  ...runtimeTaskDefinition,
+  returnPolicy: {
+    ...runtimeTaskDefinition.returnPolicy,
+    completed: "end" as const,
+  },
+};
 
 let fixture:
   | {
@@ -77,9 +86,11 @@ let fixture:
       projectId: number;
       otherProjectId: number;
       taskId: number;
+      terminalTaskId: number;
       targetTaskId: number;
       unpublishedTaskId: number;
       taskVersionId: number;
+      terminalTaskVersionId: number;
       targetVersionId: number;
       userId: number;
       companyId: number;
@@ -239,13 +250,19 @@ test.beforeAll(async () => {
       },
     ])
     .returning();
-  const [task, targetTask, unpublishedTask] = await db
+  const [task, terminalTask, targetTask, unpublishedTask] = await db
     .insert(conversationalTasks)
     .values([
       {
         definition: runtimeTaskDefinition,
         name: "Book a Service",
         objective: "Collect and confirm a service request.",
+        projectId: project.id,
+      },
+      {
+        definition: terminalRuntimeTaskDefinition,
+        name: "Book a Service and End",
+        objective: "Collect, confirm, and close a service request.",
         projectId: project.id,
       },
       {
@@ -296,13 +313,29 @@ test.beforeAll(async () => {
       objective: targetTask.objective,
     },
   });
-  const [taskVersion, targetVersion] = await db
+  const terminalTaskSnapshot = conversationalTaskSnapshotV1Schema.parse({
+    ...taskSnapshot,
+    task: {
+      ...taskSnapshot.task,
+      definition: terminalRuntimeTaskDefinition,
+      id: terminalTask.id,
+      name: terminalTask.name,
+      objective: terminalTask.objective,
+    },
+  });
+  const [taskVersion, terminalTaskVersion, targetVersion] = await db
     .insert(conversationalTaskVersions)
     .values([
       {
         projectId: project.id,
         snapshot: taskSnapshot,
         taskId: task.id,
+        versionNumber: 1,
+      },
+      {
+        projectId: project.id,
+        snapshot: terminalTaskSnapshot,
+        taskId: terminalTask.id,
         versionNumber: 1,
       },
       {
@@ -336,6 +369,8 @@ test.beforeAll(async () => {
     targetVersionId: targetVersion.id,
     taskId: task.id,
     taskVersionId: taskVersion.id,
+    terminalTaskId: terminalTask.id,
+    terminalTaskVersionId: terminalTaskVersion.id,
     unpublishedTaskId: unpublishedTask.id,
     userId: user.id,
     workspaceId: workspace.id,
@@ -529,7 +564,7 @@ test("certifies identical booking fields and outcomes across live channel types"
         receivedAt: occurredAt,
         sessionExpiresAt: timestamp(120),
         sessionId: externalConversationId,
-        taskId: fixture?.taskId as number,
+        taskId: fixture?.terminalTaskId as number,
         verifiedContactId: null,
       });
       expect(started.disposition).toBe("applied");
@@ -644,6 +679,7 @@ test("certifies identical booking fields and outcomes across live channel types"
         ),
         outcomeKey: runtime?.run.outcomeKey,
         status: runtime?.run.status,
+        taskRunId: started.taskRunId,
         taskVersionId: runtime?.run.taskVersionId,
       };
     }),
@@ -653,10 +689,44 @@ test("certifies identical booking fields and outcomes across live channel types"
   expect(results[0]).toMatchObject({
     outcomeKey: "completed",
     status: "completed",
-    taskVersionId: fixture?.taskVersionId,
+    taskVersionId: fixture?.terminalTaskVersionId,
   });
-  expect(results[1]).toEqual(results[0]);
-  expect(results[2]).toEqual(results[0]);
+  for (const result of results) {
+    expect(result.fields).toEqual(results[0].fields);
+    expect(result).toMatchObject({
+      outcomeKey: "completed",
+      status: "completed",
+      taskVersionId: fixture?.terminalTaskVersionId,
+    });
+  }
+
+  const terminalRunIds = new Set(results.map(({ taskRunId }) => taskRunId));
+  const scheduledJobs = (
+    await db
+      .select({ payload: durableJobs.payload })
+      .from(durableJobs)
+      .where(
+        and(
+          eq(durableJobs.projectId, fixture?.projectId as number),
+          eq(durableJobs.jobType, "post_conversation"),
+        ),
+      )
+  ).filter(({ payload }) => {
+    const taskRunId = (payload as { taskRunId?: unknown }).taskRunId;
+    return typeof taskRunId === "number" && terminalRunIds.has(taskRunId);
+  });
+  expect(scheduledJobs).toHaveLength(channels.length * 4);
+  for (const taskRunId of terminalRunIds) {
+    expect(
+      scheduledJobs
+        .filter(
+          ({ payload }) =>
+            (payload as { taskRunId?: unknown }).taskRunId === taskRunId,
+        )
+        .map(({ payload }) => (payload as { kind?: unknown }).kind)
+        .sort(),
+    ).toEqual([...POST_CONVERSATION_JOB_KINDS].sort());
+  }
 });
 
 test("deduplicates replayed WhatsApp provider messages before runtime effects", async () => {
