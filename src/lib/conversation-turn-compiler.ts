@@ -61,6 +61,7 @@ export type StructuredTurnValidationContext = {
   allowedOutputPorts: Set<string>;
   allowedTaskIds: Set<number>;
   allowedTools: Map<string, Set<string>>;
+  intentRouting: ConversationProjectPolicyV1["entry"]["intentRouting"];
 };
 
 function renderJson(value: unknown) {
@@ -270,6 +271,7 @@ ${renderJson(retrieval.map(({ id, content }) => ({ id, content })))}`;
           : [],
       ),
       allowedTools,
+      intentRouting: input.projectPolicy.entry.intentRouting,
     },
   };
 }

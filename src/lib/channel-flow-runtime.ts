@@ -712,7 +712,6 @@ export async function requestHumanHandoff(input: {
 
   await runHandoffNotification({
     action: input.action,
-    fields: input.submission.fields,
     handoff,
     projectId: input.projectId,
     step: input.step,

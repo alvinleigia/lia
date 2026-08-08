@@ -20,6 +20,7 @@ import {
   turnResultV1Schema,
 } from "../../src/lib/conversation-turn-contracts";
 import {
+  applyIntentRoutingPolicy,
   TurnProposalValidationError,
   validateStructuredTurnProposal,
 } from "../../src/lib/conversation-turn-validator";
@@ -80,6 +81,12 @@ function validationContext(): StructuredTurnValidationContext {
     allowedOutputPorts: new Set(["booked"]),
     allowedTaskIds: new Set([95, 96]),
     allowedTools: new Map([["operation:204", new Set(["operation"])]]),
+    intentRouting: {
+      recommendationThreshold: 0.75,
+      ambiguityMargin: 0.1,
+      deterministicFallback: "clarify",
+      maxIntentCandidates: 3,
+    },
   };
 }
 
@@ -470,6 +477,67 @@ test("validator permits only graph-approved fields with a task recommendation", 
       "unknown_field",
     );
   }
+});
+
+test("intent routing accepts recommendations only at the configured threshold", () => {
+  const context = validationContext();
+  context.activeTaskId = null;
+  const proposal = validateStructuredTurnProposal(
+    {
+      ...validTurn(),
+      turnKind: "task_recommendation",
+      grounding: { status: "not_needed", excerptIds: [] },
+      taskRecommendation: {
+        taskId: 95,
+        confidence: 0.74,
+        reason: "Possible booking request",
+      },
+    },
+    context,
+  );
+
+  const routed = applyIntentRoutingPolicy(proposal, context);
+
+  expect(routed.taskRecommendation).toBeNull();
+  expect(routed.nextAction).toBe("clarify");
+  expect(routed.ambiguity).toEqual({
+    requiresClarification: true,
+    question: "Which task would you like help with?",
+  });
+});
+
+test("intent routing applies the configured knowledge and handoff fallbacks", () => {
+  const context = validationContext();
+  context.activeTaskId = null;
+  const proposal = validateStructuredTurnProposal(
+    {
+      ...validTurn(),
+      turnKind: "task_recommendation",
+      taskRecommendation: {
+        taskId: 95,
+        confidence: 0.7,
+        reason: "Possible booking request",
+      },
+    },
+    context,
+  );
+
+  context.intentRouting.deterministicFallback = "knowledge";
+  expect(applyIntentRoutingPolicy(proposal, context)).toMatchObject({
+    nextAction: "ask",
+    taskRecommendation: null,
+    safety: { decision: "allow" },
+  });
+
+  context.intentRouting.deterministicFallback = "handoff";
+  expect(applyIntentRoutingPolicy(proposal, context)).toMatchObject({
+    nextAction: "handoff",
+    taskRecommendation: null,
+    safety: {
+      decision: "handoff",
+      reasonCode: "low_confidence_task_match",
+    },
+  });
 });
 
 test("compiler with denied visibility excludes personal field values", () => {

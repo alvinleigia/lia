@@ -121,14 +121,6 @@ export function validateStructuredTurnProposal(
     issues.push("completion_outcome_required");
   }
   if (
-    proposal.taskRecommendation &&
-    proposal.taskRecommendation.confidence <
-      SEMANTIC_PROPOSAL_CONFIDENCE_MINIMUM &&
-    !proposal.ambiguity.requiresClarification
-  ) {
-    issues.push("ambiguous_task_requires_clarification");
-  }
-  if (
     proposal.routeRecommendation &&
     proposal.routeRecommendation.confidence <
       SEMANTIC_PROPOSAL_CONFIDENCE_MINIMUM &&
@@ -163,4 +155,87 @@ export function validateStructuredTurnProposal(
   }
 
   return proposal;
+}
+
+export function applyIntentRoutingPolicy(
+  proposal: TurnResultV1,
+  allowed: StructuredTurnValidationContext,
+): TurnResultV1 {
+  const recommendation = proposal.taskRecommendation;
+  if (
+    !recommendation ||
+    recommendation.confidence >= allowed.intentRouting.recommendationThreshold
+  ) {
+    return proposal;
+  }
+
+  const withoutActionProposals = {
+    ...proposal,
+    turnKind: "ordinary_question" as const,
+    fieldCandidates: [],
+    taskRecommendation: null,
+    toolRequest: null,
+    routeRecommendation: null,
+    outcomeRecommendation: null,
+  };
+
+  if (allowed.intentRouting.deterministicFallback === "knowledge") {
+    return turnResultV1Schema.parse({
+      ...withoutActionProposals,
+      nextAction: "ask",
+      ambiguity: {
+        requiresClarification: false,
+        question: null,
+      },
+      safety: {
+        decision: "allow",
+        reasonCode: null,
+      },
+      decisionSummary:
+        "Low-confidence task recommendation was reduced to a knowledge reply.",
+    });
+  }
+
+  if (allowed.intentRouting.deterministicFallback === "handoff") {
+    return turnResultV1Schema.parse({
+      ...withoutActionProposals,
+      reply: "I’ll connect you with someone who can help.",
+      grounding: {
+        status: "not_needed",
+        excerptIds: [],
+      },
+      nextAction: "handoff",
+      ambiguity: {
+        requiresClarification: false,
+        question: null,
+      },
+      safety: {
+        decision: "handoff",
+        reasonCode: "low_confidence_task_match",
+      },
+      decisionSummary:
+        "Low-confidence task recommendation was routed to handoff.",
+    });
+  }
+
+  const question = "Which task would you like help with?";
+  return turnResultV1Schema.parse({
+    ...withoutActionProposals,
+    reply: question,
+    grounding: {
+      status: "not_needed",
+      excerptIds: [],
+    },
+    nextAction: "clarify",
+    ambiguity: {
+      requiresClarification: true,
+      question,
+    },
+    safety: {
+      decision: "allow",
+      reasonCode: null,
+    },
+    decisionSummary:
+      "Low-confidence task recommendation requires clarification.",
+  });
 }

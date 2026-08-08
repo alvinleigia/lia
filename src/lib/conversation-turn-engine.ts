@@ -24,6 +24,7 @@ import {
   type TurnBudgetGate,
 } from "@/lib/conversation-turn-safety";
 import {
+  applyIntentRoutingPolicy,
   TurnProposalValidationError,
   validateStructuredTurnProposal,
 } from "@/lib/conversation-turn-validator";
@@ -628,8 +629,11 @@ export class StructuredTurnEngine {
             timeoutMs: modelPolicy.timeoutMs,
           });
           lastUsage = generated.usage;
-          const proposal = validateStructuredTurnProposal(
-            generated.output,
+          const proposal = applyIntentRoutingPolicy(
+            validateStructuredTurnProposal(
+              generated.output,
+              compiled.validation,
+            ),
             compiled.validation,
           );
           if (hasUnsafeTurnOutput(proposal.reply)) {
