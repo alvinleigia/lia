@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { assertPermission } from "@/lib/access-control";
 import {
   ACTION_SUBMISSION_STATUSES,
   type ActionSubmissionStatus,
@@ -20,6 +21,7 @@ import {
   getActionStepOptions,
   type RuntimeActionStep,
 } from "@/lib/action-runtime";
+import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
 import {
   type FlowMediaUploadValue,
@@ -54,6 +56,10 @@ const handoffQueueBulkActions = [
   "mark_under_review",
   "mark_completed",
   "mark_rejected",
+  "reopen_selected",
+  "resolve_selected",
+  "close_selected",
+  "cancel_selected",
 ] as const;
 
 const handoffQueueSingleActions = [
@@ -62,6 +68,10 @@ const handoffQueueSingleActions = [
   "mark_under_review",
   "mark_completed",
   "mark_rejected",
+  "reopen",
+  "resolve",
+  "close",
+  "cancel",
 ] as const;
 
 type HandoffQueueBulkAction = (typeof handoffQueueBulkActions)[number];
@@ -92,6 +102,40 @@ function isHandoffQueueSingleAction(
 
 function getQueueActionStatus(action: HandoffQueueAction) {
   switch (action) {
+    case "resolve":
+    case "resolve_selected":
+    case "close":
+    case "close_selected":
+    case "mark_completed":
+      return "completed";
+    case "cancel":
+    case "cancel_selected":
+      return "cancelled";
+    case "mark_rejected":
+      return "rejected";
+    case "reopen":
+    case "reopen_selected":
+    case "mark_under_review":
+      return "under_review";
+    default:
+      return null;
+  }
+}
+
+function getLifecycleOutcome(action: HandoffQueueAction) {
+  switch (action) {
+    case "reopen":
+    case "reopen_selected":
+      return "reopened";
+    case "resolve":
+    case "resolve_selected":
+      return "resolved";
+    case "close":
+    case "close_selected":
+      return "closed";
+    case "cancel":
+    case "cancel_selected":
+      return "cancelled";
     case "mark_completed":
       return "completed";
     case "mark_rejected":
@@ -348,7 +392,9 @@ export async function updateHandoffAssignmentAction(formData: FormData) {
     redirect("/projects/submissions?error=Invalid%20handoff%20assignment.");
   }
 
-  const { project, user } = await resolveUserAndProject();
+  const context = await resolveUserAndProject();
+  const { project, user } = context;
+  assertPermission(context.membership, "company.operations.manage");
   const existingSubmission = await getActionSubmission(
     project.id,
     parsed.data.submissionId,
@@ -418,6 +464,20 @@ export async function updateHandoffAssignmentAction(formData: FormData) {
     },
   });
 
+  await writeAuditLog({
+    ...context,
+    action:
+      parsed.data.assignmentAction === "claim"
+        ? "handoff.assigned"
+        : "handoff.released",
+    targetType: "action_submission",
+    targetId: submission.id,
+    metadata: {
+      assignmentAction: parsed.data.assignmentAction,
+      source: submission.source,
+    },
+  });
+
   revalidatePath("/projects/submissions");
   revalidatePath("/projects/handoffs");
   revalidatePath(`/projects/submissions/${submission.id}`);
@@ -440,7 +500,9 @@ export async function updateHandoffQueueAction(
     return { error: "Select at least one handoff." };
   }
 
-  const { project, user } = await resolveUserAndProject();
+  const context = await resolveUserAndProject();
+  const { project, user } = context;
+  assertPermission(context.membership, "company.operations.manage");
   let updatedCount = 0;
 
   for (const submissionId of command.submissionIds) {
@@ -462,12 +524,25 @@ export async function updateHandoffQueueAction(
     const nextStatus = getQueueActionStatus(command.action);
 
     if (nextStatus) {
-      const submission = await setActionSubmissionStatus(
-        project.id,
-        existingSubmission.id,
-        nextStatus,
-        existingSubmission.revision,
-      );
+      const changedAt = new Date().toISOString();
+      const lifecycleOutcome = getLifecycleOutcome(command.action);
+      const submission = await updateActionSubmission({
+        projectId: project.id,
+        submissionId: existingSubmission.id,
+        currentStepId: existingSubmission.currentStepId,
+        fields: existingSubmission.fields,
+        expectedRevision: existingSubmission.revision,
+        metadata: {
+          ...existingSubmission.metadata,
+          handoff: {
+            ...handoff,
+            lifecycleChangedAt: changedAt,
+            lifecycleChangedByUserId: user.id,
+            lifecycleOutcome,
+          },
+        },
+        status: nextStatus,
+      });
 
       if (!submission) {
         continue;
@@ -479,7 +554,34 @@ export async function updateHandoffQueueAction(
         eventType: "handoff.status_changed",
         message: `Handoff status changed from ${existingSubmission.status} to ${submission.status}.`,
         payload: {
+          lifecycleOutcome,
           previousStatus: existingSubmission.status,
+          status: submission.status,
+        },
+      });
+
+      await addActionSubmissionEvent({
+        projectId: project.id,
+        submissionId: submission.id,
+        eventType: "conversation.lifecycle_changed",
+        message: `Conversation lifecycle changed to ${lifecycleOutcome}.`,
+        payload: {
+          changedByUserId: user.id,
+          lifecycleOutcome,
+          previousStatus: existingSubmission.status,
+          status: submission.status,
+        },
+      });
+
+      await writeAuditLog({
+        ...context,
+        action: "conversation.lifecycle_changed",
+        targetType: "action_submission",
+        targetId: submission.id,
+        metadata: {
+          lifecycleOutcome,
+          previousStatus: existingSubmission.status,
+          source: submission.source,
           status: submission.status,
         },
       });
@@ -533,6 +635,16 @@ export async function updateHandoffQueueAction(
       payload: {
         assignedUserEmail: isClaim ? user.email : null,
         assignedUserId: isClaim ? user.id : null,
+      },
+    });
+
+    await writeAuditLog({
+      ...context,
+      action: isClaim ? "handoff.assigned" : "handoff.released",
+      targetType: "action_submission",
+      targetId: submission.id,
+      metadata: {
+        source: submission.source,
       },
     });
 
