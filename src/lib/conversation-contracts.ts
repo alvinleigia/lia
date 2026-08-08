@@ -134,6 +134,66 @@ export const assistantPolicyV1Schema = z.object({
 export const knowledgeConversationV1Schema = z.object({
   schemaVersion,
   noAnswerBehavior: z.enum(["fallback", "handoff", "task_recommendation"]),
+  sourceSelection: z
+    .object({
+      allowedSources: z
+        .array(
+          z.enum([
+            "project_documents",
+            "project_catalog",
+            "published_task_context",
+          ]),
+        )
+        .min(1)
+        .max(3),
+      maxExcerpts: z.number().int().min(1).max(12),
+    })
+    .default({
+      allowedSources: [
+        "project_documents",
+        "project_catalog",
+        "published_task_context",
+      ],
+      maxExcerpts: 8,
+    }),
+  citationPolicy: z
+    .object({
+      mode: z.enum(["when_grounded", "required", "disabled"]),
+      presentation: z.literal("natural"),
+    })
+    .default({
+      mode: "when_grounded",
+      presentation: "natural",
+    }),
+  recencyPolicy: z
+    .object({
+      mode: z.enum(["any", "prefer_recent", "require_current"]),
+      maxAgeDays: z.number().int().min(1).max(3650).nullable(),
+    })
+    .default({
+      mode: "prefer_recent",
+      maxAgeDays: 365,
+    }),
+  answerPolicy: z
+    .object({
+      style: z.enum(["concise_grounded", "project_guided", "strict_grounded"]),
+      maxSentences: z.number().int().min(1).max(12),
+      guidance: optionalText,
+    })
+    .default({
+      style: "concise_grounded",
+      maxSentences: 4,
+      guidance: null,
+    }),
+  noAnswerPolicy: z
+    .object({
+      clarificationAttempts: z.number().int().min(0).max(3),
+      exhaustedBehavior: z.enum(["fallback", "handoff", "task_recommendation"]),
+    })
+    .default({
+      clarificationAttempts: 1,
+      exhaustedBehavior: "fallback",
+    }),
   outcomes: z.array(
     z.enum([
       "answered",
@@ -141,6 +201,10 @@ export const knowledgeConversationV1Schema = z.object({
       "no_answer",
       "handoff",
       "cancelled",
+      "moderated",
+      "timed_out",
+      "provider_failed",
+      "specialist_handoff",
     ]),
   ),
   responseOwner: z.enum(["knowledge", "task", "deterministic", "human"]),
@@ -159,6 +223,19 @@ export const conversationEntryPolicyV1Schema = z.object({
   maxHandoffDepth: z.number().int().min(0).max(10),
   maxTaskSwitches: z.number().int().min(0).max(10),
   mode: z.enum(["knowledge_first", "task_first", "deterministic"]),
+  intentRouting: z
+    .object({
+      recommendationThreshold: z.number().min(0).max(1),
+      ambiguityMargin: z.number().min(0).max(1),
+      deterministicFallback: z.enum(["clarify", "knowledge", "handoff"]),
+      maxIntentCandidates: z.number().int().min(1).max(10),
+    })
+    .default({
+      recommendationThreshold: 0.75,
+      ambiguityMargin: 0.1,
+      deterministicFallback: "clarify",
+      maxIntentCandidates: 3,
+    }),
 });
 
 export const conversationIdentityV1Schema = z.object({
@@ -238,6 +315,12 @@ export const DEFAULT_CONVERSATION_PROJECT_POLICY: ConversationProjectPolicyV1 =
     entry: {
       schemaVersion: 1,
       allowTaskRecommendation: true,
+      intentRouting: {
+        recommendationThreshold: 0.75,
+        ambiguityMargin: 0.1,
+        deterministicFallback: "clarify",
+        maxIntentCandidates: 3,
+      },
       maxConnectedFlowDepth: 3,
       maxHandoffDepth: 1,
       maxTaskSwitches: 2,
@@ -250,15 +333,44 @@ export const DEFAULT_CONVERSATION_PROJECT_POLICY: ConversationProjectPolicyV1 =
     },
     knowledge: {
       schemaVersion: 1,
+      answerPolicy: {
+        style: "concise_grounded",
+        maxSentences: 4,
+        guidance: null,
+      },
+      citationPolicy: {
+        mode: "when_grounded",
+        presentation: "natural",
+      },
       noAnswerBehavior: "fallback",
+      noAnswerPolicy: {
+        clarificationAttempts: 1,
+        exhaustedBehavior: "fallback",
+      },
       outcomes: [
         "answered",
         "task_recommended",
         "no_answer",
         "handoff",
         "cancelled",
+        "moderated",
+        "timed_out",
+        "provider_failed",
+        "specialist_handoff",
       ],
+      recencyPolicy: {
+        mode: "prefer_recent",
+        maxAgeDays: 365,
+      },
       responseOwner: "knowledge",
+      sourceSelection: {
+        allowedSources: [
+          "project_documents",
+          "project_catalog",
+          "published_task_context",
+        ],
+        maxExcerpts: 8,
+      },
     },
   };
 

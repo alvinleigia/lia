@@ -4,7 +4,12 @@ import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
 } from "../../src/lib/conversation-contract-fixtures";
-import { conversationalTaskSnapshotV1Schema } from "../../src/lib/conversation-contracts";
+import {
+  conversationalTaskSnapshotV1Schema,
+  conversationProjectPolicyV1Schema,
+  DEFAULT_CONVERSATION_PROJECT_POLICY,
+  normalizeConversationProjectPolicy,
+} from "../../src/lib/conversation-contracts";
 import {
   compileStructuredTurn,
   type StructuredTurnValidationContext,
@@ -87,6 +92,70 @@ function validationCodes(value: unknown) {
     return (error as TurnProposalValidationError).codes;
   }
 }
+
+test("legacy project policies receive the Phase 15 knowledge and routing defaults", () => {
+  const legacyPolicy = {
+    ...DEFAULT_CONVERSATION_PROJECT_POLICY,
+    entry: {
+      schemaVersion: 1,
+      allowTaskRecommendation: true,
+      maxConnectedFlowDepth: 3,
+      maxHandoffDepth: 1,
+      maxTaskSwitches: 2,
+      mode: "knowledge_first",
+    },
+    knowledge: {
+      schemaVersion: 1,
+      noAnswerBehavior: "fallback",
+      outcomes: ["answered", "no_answer"],
+      responseOwner: "knowledge",
+    },
+  };
+
+  const normalized = normalizeConversationProjectPolicy(legacyPolicy);
+
+  expect(normalized.entry.intentRouting).toEqual({
+    recommendationThreshold: 0.75,
+    ambiguityMargin: 0.1,
+    deterministicFallback: "clarify",
+    maxIntentCandidates: 3,
+  });
+  expect(normalized.knowledge.sourceSelection.maxExcerpts).toBe(8);
+  expect(normalized.knowledge.citationPolicy).toEqual({
+    mode: "when_grounded",
+    presentation: "natural",
+  });
+  expect(normalized.knowledge.recencyPolicy.mode).toBe("prefer_recent");
+  expect(normalized.knowledge.answerPolicy.maxSentences).toBe(4);
+  expect(normalized.knowledge.noAnswerPolicy).toEqual({
+    clarificationAttempts: 1,
+    exhaustedBehavior: "fallback",
+  });
+});
+
+test("Phase 15 project policies validate bounded routing and advanced outcomes", () => {
+  expect(
+    conversationProjectPolicyV1Schema.safeParse({
+      ...DEFAULT_CONVERSATION_PROJECT_POLICY,
+      entry: {
+        ...DEFAULT_CONVERSATION_PROJECT_POLICY.entry,
+        intentRouting: {
+          ...DEFAULT_CONVERSATION_PROJECT_POLICY.entry.intentRouting,
+          recommendationThreshold: 1.01,
+        },
+      },
+    }).success,
+  ).toBe(false);
+
+  expect(DEFAULT_CONVERSATION_PROJECT_POLICY.knowledge.outcomes).toEqual(
+    expect.arrayContaining([
+      "moderated",
+      "timed_out",
+      "provider_failed",
+      "specialist_handoff",
+    ]),
+  );
+});
 
 test("structured turns reject unknown properties and inconsistent ambiguity", () => {
   expect(
