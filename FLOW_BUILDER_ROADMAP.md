@@ -1060,19 +1060,27 @@ model unrestricted graph or tool control.
 Goal: complete commercial conversation management and optional rich form
 experiences.
 
-- [ ] Add remove tag, subscribe, unsubscribe, assign agent, and assign team.
-- [ ] Add reopen, resolve, close, and cancel conversation outcomes.
-- [ ] Add business-hours and queue-availability conditions.
-- [ ] Preserve lifecycle actions in audit logs and contact timelines.
-- [ ] Add permission rules before exposing assignment and lifecycle controls.
-- [ ] Preserve validated task fields during an authorized human handoff.
-- [ ] Define a universal structured-form capability.
-- [ ] Keep WhatsApp Flow JSON and future provider schemas at adapter boundaries.
-- [ ] Add browser rendering or guided conversational fallback for structured forms.
-- [ ] Add secure data-exchange, provider validation, versioning, and publication controls.
+- [x] Add remove tag, subscribe, unsubscribe, assign agent, and assign team.
+- [x] Add reopen, resolve, close, and cancel conversation outcomes.
+- [x] Add business-hours and queue-availability conditions.
+- [x] Preserve lifecycle actions in audit logs and contact timelines.
+- [x] Add permission rules before exposing assignment and lifecycle controls.
+- [x] Preserve validated task fields during an authorized human handoff.
+- [x] Define a universal structured-form capability.
+- [x] Keep WhatsApp Flow JSON and future provider schemas at adapter boundaries.
+- [x] Add browser rendering or guided conversational fallback for structured forms.
+- [x] Add secure data-exchange, provider validation, versioning, and publication controls.
 
 Phase 16 exit gate: conversations can move safely between tasks, people, and
 structured forms while retaining canonical state and audit history.
+
+Implementation closure: completed on 2026-08-09 in checkpoints `1706192` and
+`4c43885`. Focused lint, TypeScript, the production build, all 164 contract
+tests, and the Phase 16 structured-form contracts passed. The repeated offline
+certification build reached its font-download step after those checks and was
+blocked only by sandboxed Google Fonts access; the separately network-enabled
+production build passed. Detailed manual sign-off is recorded in
+`docs/UAT_TEST_PLAN.md` and remains the release-owner checkpoint.
 
 ## Phase 17: Reuse, Evaluations, Analytics, And Optimization
 

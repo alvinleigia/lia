@@ -2,6 +2,325 @@
 
 ## Current Test
 
+Phase 16 of 18: contact lifecycle, governed handoff, runtime availability, and
+structured-form controls.
+
+Status: implementation and automated verification are complete as of
+2026-08-09. Complete the six manual steps below before release approval. This
+UAT deliberately uses the browser-based Project Chat path, so it does not
+require a paid messaging provider or live WhatsApp credentials.
+
+Automated evidence:
+
+- Phase 16 implementation checkpoints are `1706192` and `4c43885`.
+- Focused lint and TypeScript checks passed.
+- The production build passed with Next.js `16.2.10` and all 50 routes.
+- All 164 contract tests passed, including the four structured-form and
+  availability contracts.
+- The repeated offline certification build reached the external Google Fonts
+  fetch after the preceding checks passed. A separately network-enabled
+  production build passed, so that sandbox-only fetch failure is not a product
+  failure.
+
+UAT worksheet:
+
+- Tester: `<ENTER TESTER NAME>`
+- Date: `<ENTER DATE>`
+- Deployment URL: `<ENTER URL>`
+- Commit: run `git rev-parse --short HEAD` and enter the result here:
+  `<ENTER COMMIT>`
+- Selected project: use a disposable test project. The steps below call it
+  `Phase 16 UAT Project`; if another project is used, record its exact name:
+  `<ENTER PROJECT NAME>`
+
+## Step 1 of 6 - Create The Governed Handoff Flow
+
+This step creates one small flow that collects two canonical values and then
+requests a human handoff.
+
+1. Sign in as a project owner or project administrator.
+2. In the top navigation, open `Projects`, then click `All Projects`.
+3. Select the disposable project recorded in the worksheet. Confirm the green
+   `Selected Project` badge in the header shows that project.
+4. Open `Automation`, then click `New Action`.
+5. In `Action Name`, enter `Phase 16 Lifecycle And Forms UAT`.
+6. In `Description`, enter `Verifies governed availability, structured forms,
+   handoff context, and lifecycle controls.`
+7. In `Trigger Phrases`, enter these values on separate lines:
+
+   ```text
+   phase sixteen lifecycle
+   phase sixteen form
+   ```
+
+8. Click `Create Action`. Confirm the action opens without a validation error.
+9. Click `Canvas` if the visual canvas is not already open.
+10. In `Blocks`, click `Ask Question` to create the first node. Enter:
+    - `Step name`: `Collect Phase 16 guest name`
+    - `Message shown to the visitor`: `What name should we use for the Phase 16 review?`
+    - `Field Key`: `guestName`
+    - Keep the step enabled and required.
+    - Click `Create Step`.
+11. Click `Ask Email` to create the second node. Enter:
+    - `Step name`: `Collect Phase 16 guest email`
+    - `Message shown to the visitor`: `What email address should the Phase 16 review team use?`
+    - `Field Key`: `guestEmail`
+    - Keep the step enabled and required.
+    - Click `Create Step`.
+12. Click `Request Intervention` to create the final node. Enter:
+    - `Step name`: `Phase 16 Staff Review`
+    - `Message shown to the visitor`: `I will connect you with the Phase 16 review team.`
+    - `Priority`: `Normal`
+    - `Queue`: `phase16-uat`
+    - Enable `Notify team when requested`.
+    - Keep the step enabled.
+    - Click `Create Step`.
+13. Confirm the canvas summary shows `3` nodes and no blocker. The normal
+    ordered path must be name, email, then intervention. If the canvas requires
+    explicit connections, connect the output of the first node to the second
+    and the output of the second node to the intervention node.
+14. Click `Save Layout`. Confirm the success notification appears and that the
+    page does not unexpectedly jump away from the canvas.
+
+Expected result:
+
+- The action contains exactly three enabled nodes in the stated order.
+- The field keys are exactly `guestName` and `guestEmail`.
+- The terminal intervention is assigned to queue `phase16-uat` at `Normal`
+  priority.
+
+## Step 2 of 6 - Configure Availability And The Structured Form
+
+1. From the canvas, click `Settings`.
+2. Scroll to `Runtime Availability`.
+3. Enable `Evaluate business hours at runtime`.
+4. Enter the following exact values:
+    - `Time Zone`: `Asia/Kolkata`
+    - `Business Days`: `1, 2, 3, 4, 5`
+    - `Opens At`: `09:00`
+    - `Closes At`: `18:00`
+5. Enable `Expose handoff queue availability`.
+6. Enable `Queue currently available`.
+7. Scroll to `Structured Form` and enable
+   `Enable structured form governance`.
+8. Enter:
+    - `Form Key`: `phase16_intake`
+    - `Version`: `1.0.0`
+    - `Status`: `Draft`
+9. In `Task Field Keys`, enter these exact enabled flow field keys, one per
+   line:
+
+   ```text
+   guestName
+   guestEmail
+   ```
+
+10. Under `Optional WhatsApp Adapter`, leave `WhatsApp Schema Version` and
+    `WhatsApp Flow JSON` empty. This intentionally verifies the provider-neutral
+    guided conversational fallback.
+11. Click `Save Action`.
+12. Confirm the success toast appears, entered values remain visible, and the
+    browser remains near the submitted form instead of jumping to the top.
+13. Click `Back to action`, then `Canvas`.
+14. Open the branch-rule editor and inspect the condition-field list. Confirm it
+    includes both `Business hours open` and `Handoff queue available`. Close the
+    editor without creating a branch.
+
+Expected result:
+
+- Runtime availability and queue availability save successfully.
+- The structured form is saved as Draft version `1.0.0` and references only the
+  two enabled task fields.
+- Both availability fields are available to deterministic branch rules.
+
+## Step 3 of 6 - Verify Publication And Secret-Safety Controls
+
+1. Return to the action overview by clicking `Overview` or `Back to action`.
+2. Click `Publish` once.
+3. Confirm publication is blocked and the page reports:
+   `Structured form must be marked Published before the action can be published.`
+4. Click `Settings` and return to `Structured Form`.
+5. In `WhatsApp Schema Version`, enter `7.1`.
+6. In `WhatsApp Flow JSON`, enter:
+
+   ```json
+   {"clientSecret":"must-not-save"}
+   ```
+
+7. Click `Save Action`.
+8. Confirm the form displays
+   `WhatsApp Flow JSON must not contain credentials or secrets.` The entered
+   values should remain in the form so the tester can correct them.
+9. Clear both `WhatsApp Schema Version` and `WhatsApp Flow JSON` completely.
+   Do not store any real provider credential in either field.
+10. Change structured-form `Status` from `Draft` to `Published`.
+11. Click `Save Action` and confirm the success toast.
+12. Click `Back to action`, then click `Publish` once.
+13. Confirm `Status` is `Active`, `Published Version` is `v1`, and the page
+    reports that the draft matches the current runtime.
+
+Expected result:
+
+- Draft structured forms cannot be published.
+- Credential-like provider JSON is rejected before storage or publication.
+- The provider-neutral published configuration creates exactly one immutable
+  runtime version.
+
+## Step 4 of 6 - Run The Guided Flow And Inspect The Handoff
+
+1. Open `Projects`, then click `Chat`.
+2. Click the `Phase 16 Lifecycle And Forms UAT` action button. If the button is
+   not shown, enter `phase sixteen lifecycle` in the bottom composer and send
+   it.
+3. Confirm the first prompt is
+   `What name should we use for the Phase 16 review?`
+4. Enter `Phase 16 UAT Guest` and send it.
+5. Confirm the second prompt is
+   `What email address should the Phase 16 review team use?`
+6. Enter `phase16.uat@example.com` and send it.
+7. Confirm the visitor sees
+   `I will connect you with the Phase 16 review team.` exactly once.
+8. Open `Automation`, then click `Submissions`.
+9. Open the newest submission for `Phase 16 Lifecycle And Forms UAT`.
+10. Confirm:
+    - Status is `Under Review`.
+    - `guestName` is `Phase 16 UAT Guest`.
+    - `guestEmail` is `phase16.uat@example.com`.
+    - The event history contains the handoff request and no duplicate field
+      writes.
+11. Open `Admin`, then click `Handoff Queue`.
+12. In the `Open` or `Unassigned` view, find the new handoff and confirm:
+    - Step is `Phase 16 Staff Review`.
+    - Priority is `Normal`.
+    - Queue is `phase16-uat`.
+    - Assigned is `Unassigned`.
+13. Open `Admin`, then click `Contacts`. Select the contact created by this test
+    run and inspect `Channel Transcript`. Confirm the two inbound answers and
+    the outbound handoff message are present once and in order.
+
+Expected result:
+
+- The universal structured form falls back to normal guided collection.
+- Validated canonical fields survive the authorized human handoff.
+- The submission, queue entry, contact, and transcript refer to the same run.
+
+## Step 5 of 6 - Verify Assignment And Lifecycle Controls
+
+Use the single Phase 16 handoff created in Step 4. After every action, confirm
+the toast says `Updated 1 handoff(s).` and the queue counters update.
+
+1. Open `Admin` > `Handoff Queue`, select `Unassigned`, and find the Phase 16
+   handoff.
+2. Click `Claim`. Open `My Handoffs` and confirm it is assigned to the signed-in
+   tester.
+3. Click `Release`. Open `Unassigned` and confirm it is unassigned again.
+4. Click `Claim` again, then click `Resolve`.
+5. Open `Closed`. Confirm the handoff is present with the resolved lifecycle
+   state.
+6. Click `Reopen`. Open `Open` and confirm the same handoff is active again and
+   its collected fields were not cleared.
+7. Click `Close`. Open `Closed` and confirm the closed state.
+8. Click `Reopen` again, then click `Cancel`.
+9. Open `Closed` and confirm the final state is cancelled.
+10. Open `Admin` > `Audit Logs` and locate the records created by this test.
+    Confirm the history includes assignment/release records and
+    `conversation.lifecycle_changed` records for the lifecycle actions.
+11. Confirm audit details are scoped to the selected project and do not expose
+    passwords, authorization headers, provider tokens, or the rejected
+    `must-not-save` value from Step 3.
+12. Return to the contact from Step 4 and confirm its timeline/transcript still
+    contains the original guided answers and handoff history.
+
+Expected result:
+
+- Only an authorized project operator can see and use the controls.
+- Claim, release, resolve, reopen, close, and cancel are deterministic and
+  audited.
+- Lifecycle changes do not erase canonical task data or create a second
+  submission.
+
+## Step 6 of 6 - Verify Contact Actions And Close The UAT
+
+This step verifies the remaining deterministic contact mutations in one small
+flow. Use an active member email visible under `Admin` > `Team`; do not invent
+an email address.
+
+1. Record an active member email here: `<ENTER ACTIVE MEMBER EMAIL>`.
+2. Open `Automation` > `New Action`.
+3. Enter:
+    - `Action Name`: `Phase 16 Contact Lifecycle UAT`
+    - `Description`: `Verifies deterministic Phase 16 contact mutations.`
+    - `Trigger Phrases`: `phase sixteen contact lifecycle`
+4. Click `Create Action`, then open `Canvas`.
+5. Add these seven enabled nodes in the exact order below. Click `Create Step`
+   after completing each node:
+    1. `Add Tag`
+       - `Step name`: `Add Phase 16 tag`
+       - `Tags to add`: `Phase 16 Temporary`
+    2. `Remove Tag`
+       - `Step name`: `Remove Phase 16 tag`
+       - `Tags to remove`: `Phase 16 Temporary`
+    3. `Subscribe`
+       - `Step name`: `Subscribe Phase 16 contact`
+    4. `Unsubscribe`
+       - `Step name`: `Unsubscribe Phase 16 contact`
+    5. `Assign Agent`
+       - `Step name`: `Assign Phase 16 agent`
+       - `Agent email`: use the active member email recorded in point 1.
+    6. `Assign Team`
+       - `Step name`: `Assign Phase 16 team`
+       - `Team or queue name`: `Phase 16 UAT`
+    7. `Submit`
+       - `Step name`: `Complete Phase 16 contact actions`
+       - `Completion message`: `Phase 16 contact actions completed.`
+6. Confirm the canvas shows seven enabled nodes, a valid terminal path, and no
+   blocker. Click `Save Layout`.
+7. Return to the action overview and click `Publish` once. Confirm `v1` is
+   active.
+8. Open `Projects` > `Chat`, start `Phase 16 Contact Lifecycle UAT`, and wait
+   for `Phase 16 contact actions completed.`
+9. Open `Automation` > `Submissions`, then open the newest submission for this
+   action. Confirm its event list records, in order:
+    - tag added;
+    - tag removed;
+    - contact subscribed;
+    - contact unsubscribed;
+    - agent assigned;
+    - team assigned;
+    - submission submitted.
+10. Open `Admin` > `Contacts` and select the contact from the new run. Confirm:
+    - `Phase 16 Temporary` is not left on the contact;
+    - the recorded active agent is assigned;
+    - team or queue is `Phase 16 UAT`;
+    - the subscribe and unsubscribe changes appear in history;
+    - the transcript contains the completion message once.
+11. Open `Admin` > `Audit Logs` and confirm the contact mutation records are
+    scoped to this project and contain no provider secret.
+12. Open each disposable Phase 16 action, click `Settings`, change `Status` to
+    `Archived`, and click `Save Action`. Confirm the success toast after each
+    save. Do not republish an archived UAT action.
+
+Optional live-channel parity check:
+
+- If a live WhatsApp test channel is already configured for this deployment,
+  run `phase sixteen lifecycle` through that channel and confirm the same guided
+  name/email collection and handoff behavior. If the channel is not configured,
+  record `Not run - live provider unavailable`; this does not fail the
+  provider-neutral Phase 16 implementation UAT.
+
+Final sign-off:
+
+- [ ] Step 1 passed: flow creation and terminal handoff.
+- [ ] Step 2 passed: availability and structured-form settings.
+- [ ] Step 3 passed: publication and secret-safety controls.
+- [ ] Step 4 passed: guided collection and canonical handoff context.
+- [ ] Step 5 passed: assignment, lifecycle, audit, and timeline behavior.
+- [ ] Step 6 passed: deterministic contact mutations and cleanup.
+- Defects or notes: `<ENTER NOTES OR NONE>`
+- Tester sign-off: `<ENTER NAME AND DATE>`
+
+## Deferred Phase 14 Release Test
+
 Phase 14 of 18: Priority 2 release gate.
 
 Status: Ready for staging and live-provider UAT on 2026-08-06. Local automated
