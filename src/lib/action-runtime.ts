@@ -1,3 +1,4 @@
+import { getAvailabilityBranchFields } from "@/lib/action-availability";
 import {
   type ActionDataSourceSettings,
   resolveActionDataSourceOptions,
@@ -102,6 +103,7 @@ export type RuntimeAction = {
   name: string;
   description: string | null;
   triggerPhrases: string[];
+  settings?: Record<string, unknown>;
   steps: RuntimeActionStep[];
   branchRules: RuntimeActionBranchRule[];
   compiledGraph?: CompiledActionFlowGraph;
@@ -420,8 +422,10 @@ function getRuntimeBranchFields(
   const branchFields = { ...fields };
 
   for (const item of condition.conditions) {
-    branchFields[item.fieldKey] =
-      fields[normalizeSubmissionFieldKey(item.fieldKey)];
+    if (!(item.fieldKey in branchFields)) {
+      branchFields[item.fieldKey] =
+        fields[normalizeSubmissionFieldKey(item.fieldKey)];
+    }
   }
 
   return branchFields;
@@ -433,6 +437,10 @@ export function getNextActionStepDecision(
   currentStepIndex: number,
   fields: Record<string, unknown>,
 ): RuntimeRouteDecision {
+  const branchFields = {
+    ...fields,
+    ...getAvailabilityBranchFields(action.settings ?? {}),
+  };
   const compiledGraph =
     action.compiledGraph ?? compileRuntimeActionGraph(action);
   const branchRule = action.branchRules
@@ -443,7 +451,7 @@ export function getNextActionStepDecision(
       return condition
         ? evaluateCompiledActionFlowConditionGroup(
             condition,
-            getRuntimeBranchFields(condition, fields),
+            getRuntimeBranchFields(condition, branchFields),
           )
         : false;
     });

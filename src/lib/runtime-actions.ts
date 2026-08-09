@@ -30,6 +30,7 @@ export function toRuntimeAction(input: {
     name: input.action.name,
     description: input.action.description,
     triggerPhrases: input.action.triggerPhrases,
+    settings: input.action.settings,
     branchRules: input.branchRules.map((rule) => ({
       id: rule.id,
       sourceStepId: rule.sourceStepId,
@@ -94,6 +95,7 @@ function toRuntimeActionFromSnapshot(
     name: snapshot.action.name,
     description: snapshot.action.description,
     triggerPhrases: snapshot.action.triggerPhrases,
+    settings: snapshot.action.settings,
     branchRules: snapshot.branchRules.map((rule) => ({
       id: rule.id,
       sourceStepId: rule.sourceStepId,

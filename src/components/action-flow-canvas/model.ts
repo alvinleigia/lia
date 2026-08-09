@@ -11,6 +11,10 @@ import type {
   MediaAssetOption,
   ProductCatalogOption,
 } from "@/components/action-flow-canvas/types";
+import {
+  BUSINESS_HOURS_FIELD_KEY,
+  QUEUE_AVAILABILITY_FIELD_KEY,
+} from "@/lib/action-availability";
 import { getStoredActionFlowConditionGroup } from "@/lib/action-flow-compiler";
 import type { ActionFlowRouteValidationIssue } from "@/lib/action-flows";
 import { getStoredActionOptionRoute } from "@/lib/action-option-routing";
@@ -542,7 +546,24 @@ export function getInputFieldKeys(steps: FlowStep[]) {
 }
 
 export function getBranchFieldOptions(steps: FlowStep[]): BranchFieldOption[] {
-  const options = new Map<string, BranchFieldOption>();
+  const options = new Map<string, BranchFieldOption>([
+    [
+      BUSINESS_HOURS_FIELD_KEY,
+      {
+        fieldKey: BUSINESS_HOURS_FIELD_KEY,
+        inputType: "text",
+        label: "Business hours open",
+      },
+    ],
+    [
+      QUEUE_AVAILABILITY_FIELD_KEY,
+      {
+        fieldKey: QUEUE_AVAILABILITY_FIELD_KEY,
+        inputType: "text",
+        label: "Handoff queue available",
+      },
+    ],
+  ]);
 
   for (const step of steps) {
     if (!step.isEnabled) {

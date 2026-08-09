@@ -1,3 +1,7 @@
+import {
+  BUSINESS_HOURS_FIELD_KEY,
+  QUEUE_AVAILABILITY_FIELD_KEY,
+} from "@/lib/action-availability";
 import { resolveActionDataSourceOptions } from "@/lib/action-data-sources";
 import {
   ACTION_BRANCH_OPERATORS,
@@ -343,7 +347,10 @@ function inferStepFieldType(
 }
 
 export function getActionFlowFieldTypes(steps: ActionFlowCompilerStep[]) {
-  const fieldTypes: Record<string, ActionFlowConditionValueType> = {};
+  const fieldTypes: Record<string, ActionFlowConditionValueType> = {
+    [BUSINESS_HOURS_FIELD_KEY]: "boolean",
+    [QUEUE_AVAILABILITY_FIELD_KEY]: "boolean",
+  };
 
   for (const step of steps) {
     if (!step.isEnabled) {

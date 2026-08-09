@@ -1,5 +1,7 @@
 import {
   ArrowLeft,
+  CalendarClock,
+  ClipboardList,
   FlaskConical,
   LayoutTemplate,
   Save,
@@ -18,11 +20,13 @@ import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { getActionAvailabilitySettings } from "@/lib/action-availability";
 import { getProjectAction } from "@/lib/action-flows";
 import {
   getActiveProjectIdCookie,
   resolvePageUserAndProject,
 } from "@/lib/protected-page";
+import { getStructuredFormSettings } from "@/lib/structured-forms";
 import {
   deleteProjectActionBuilderAction,
   updateProjectActionBuilderAction,
@@ -113,6 +117,9 @@ export default async function ActionSettingsPage({
 
   const experiment = getExperimentSettings(action.settings);
   const template = getTemplateSettings(action.settings);
+  const availability = getActionAvailabilitySettings(action.settings);
+  const structuredForm = getStructuredFormSettings(action.settings);
+  const whatsAppForm = structuredForm.providers.whatsapp;
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -195,6 +202,208 @@ export default async function ActionSettingsPage({
                   name="triggerPhrases"
                   defaultValue={action.triggerPhrases.join("\n")}
                 />
+              </div>
+
+              <div className="rounded-md border bg-white p-4 space-y-4">
+                <div className="flex items-start gap-3">
+                  <CalendarClock className="mt-0.5 h-5 w-5" />
+                  <div className="space-y-1">
+                    <p className="font-medium">Runtime Availability</p>
+                    <p className="text-sm text-muted-foreground">
+                      Expose deterministic business-hours and handoff-queue
+                      values to branch rules without relying on model output.
+                    </p>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    name="businessHoursEnabled"
+                    defaultChecked={availability.businessHours.enabled}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  Evaluate business hours at runtime
+                </label>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="businessHoursTimeZone">Time Zone</Label>
+                    <Input
+                      id="businessHoursTimeZone"
+                      name="businessHoursTimeZone"
+                      defaultValue={availability.businessHours.timeZone}
+                      placeholder="Asia/Kolkata"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="businessHoursWeekdays">Business Days</Label>
+                    <Input
+                      id="businessHoursWeekdays"
+                      name="businessHoursWeekdays"
+                      defaultValue={availability.businessHours.weekdays.join(
+                        ", ",
+                      )}
+                      placeholder="1, 2, 3, 4, 5"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use 0 for Sunday through 6 for Saturday.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="businessHoursStartTime">Opens At</Label>
+                    <Input
+                      id="businessHoursStartTime"
+                      name="businessHoursStartTime"
+                      type="time"
+                      defaultValue={availability.businessHours.startTime}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="businessHoursEndTime">Closes At</Label>
+                    <Input
+                      id="businessHoursEndTime"
+                      name="businessHoursEndTime"
+                      type="time"
+                      defaultValue={availability.businessHours.endTime}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      name="queueAvailabilityEnabled"
+                      defaultChecked={availability.queue.enabled}
+                      className="h-4 w-4 rounded border-input"
+                    />
+                    Expose handoff queue availability
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      name="queueAvailable"
+                      defaultChecked={availability.queue.available}
+                      className="h-4 w-4 rounded border-input"
+                    />
+                    Queue currently available
+                  </label>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Use Business hours open or Handoff queue available as a branch
+                  field on the canvas, with comparison value true or false.
+                </p>
+              </div>
+
+              <div className="rounded-md border bg-white p-4 space-y-4">
+                <div className="flex items-start gap-3">
+                  <ClipboardList className="mt-0.5 h-5 w-5" />
+                  <div className="space-y-1">
+                    <p className="font-medium">Structured Form</p>
+                    <p className="text-sm text-muted-foreground">
+                      Govern one versioned set of task fields. Browser channels
+                      use the existing guided collection flow; optional WhatsApp
+                      Flow JSON remains at the provider boundary.
+                    </p>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    name="structuredFormEnabled"
+                    defaultChecked={structuredForm.enabled}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  Enable structured form governance
+                </label>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="structuredFormKey">Form Key</Label>
+                    <Input
+                      id="structuredFormKey"
+                      name="structuredFormKey"
+                      defaultValue={structuredForm.key}
+                      placeholder="booking_details"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="structuredFormVersion">Version</Label>
+                    <Input
+                      id="structuredFormVersion"
+                      name="structuredFormVersion"
+                      defaultValue={structuredForm.version}
+                      placeholder="1.0.0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="structuredFormStatus">Status</Label>
+                    <select
+                      id="structuredFormStatus"
+                      name="structuredFormStatus"
+                      defaultValue={structuredForm.status}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="published">Published</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="structuredFormFieldKeys">
+                    Task Field Keys
+                  </Label>
+                  <Textarea
+                    id="structuredFormFieldKeys"
+                    name="structuredFormFieldKeys"
+                    defaultValue={structuredForm.fieldKeys.join("\n")}
+                    placeholder={"guestName\nguestEmail\npreferredDate"}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter one exact enabled collection-step field key per line.
+                  </p>
+                </div>
+
+                <div className="border-t pt-4 space-y-4">
+                  <div>
+                    <p className="font-medium">Optional WhatsApp Adapter</p>
+                    <p className="text-sm text-muted-foreground">
+                      Leave both fields blank to use guided conversational
+                      fallback. Provider JSON must not contain credentials.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="structuredFormWhatsAppSchemaVersion">
+                      WhatsApp Schema Version
+                    </Label>
+                    <Input
+                      id="structuredFormWhatsAppSchemaVersion"
+                      name="structuredFormWhatsAppSchemaVersion"
+                      defaultValue={whatsAppForm?.schemaVersion ?? ""}
+                      placeholder="7.1"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="structuredFormWhatsAppFlow">
+                      WhatsApp Flow JSON
+                    </Label>
+                    <Textarea
+                      id="structuredFormWhatsAppFlow"
+                      name="structuredFormWhatsAppFlow"
+                      className="min-h-40 font-mono text-xs"
+                      defaultValue={
+                        whatsAppForm
+                          ? JSON.stringify(whatsAppForm.flow, null, 2)
+                          : ""
+                      }
+                      placeholder={'{\n  "screens": []\n}'}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="rounded-md border bg-white p-4 space-y-4">

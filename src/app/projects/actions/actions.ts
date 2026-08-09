@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
+import { isValidTimeZone } from "@/lib/action-availability";
 import {
   importActionFlowExport,
   parseActionFlowExportJson,
@@ -61,6 +62,11 @@ import {
   listProjectCatalogProductsByIds,
   listProjectCatalogProductsForCatalog,
 } from "@/lib/product-catalogs";
+import {
+  parseStructuredFormFlowJson,
+  STRUCTURED_FORM_STATUSES,
+  validateStructuredFormForPublication,
+} from "@/lib/structured-forms";
 
 const actionIdSchema = z.coerce.number().int().positive();
 const templateKeySchema = z.string().trim().min(1).max(120);
@@ -88,30 +94,150 @@ const actionDetailsSchema = z
     ),
     templateEnabled: z.boolean().optional(),
     templateVersion: z.string().trim().max(40).optional(),
+    businessHoursEnabled: z.boolean().optional(),
+    businessHoursTimeZone: z.string().trim().max(80).optional(),
+    businessHoursWeekdays: z.string().trim().max(40).optional(),
+    businessHoursStartTime: z.string().trim().max(5).optional(),
+    businessHoursEndTime: z.string().trim().max(5).optional(),
+    queueAvailabilityEnabled: z.boolean().optional(),
+    queueAvailable: z.boolean().optional(),
+    structuredFormEnabled: z.boolean().optional(),
+    structuredFormKey: z.string().trim().max(120).optional(),
+    structuredFormVersion: z.string().trim().max(40).optional(),
+    structuredFormStatus: z.enum(STRUCTURED_FORM_STATUSES).optional(),
+    structuredFormFieldKeys: z.string().max(2000).optional(),
+    structuredFormWhatsAppSchemaVersion: z.string().trim().max(40).optional(),
+    structuredFormWhatsAppFlow: z.string().max(100000).optional(),
     status: z.enum(PROJECT_ACTION_STATUSES),
     triggerPhrases: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    if (!data.experimentEnabled) {
-      return;
+    if (data.experimentEnabled) {
+      if (!data.experimentKey?.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Experiment key is required.",
+          path: ["experimentKey"],
+        });
+      }
+
+      if (!data.experimentVariantLabel?.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Variant label is required.",
+          path: ["experimentVariantLabel"],
+        });
+      }
     }
 
-    if (!data.experimentKey?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Experiment key is required.",
-        path: ["experimentKey"],
-      });
+    if (data.businessHoursEnabled) {
+      if (
+        !data.businessHoursTimeZone ||
+        !isValidTimeZone(data.businessHoursTimeZone)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter a valid IANA time zone.",
+          path: ["businessHoursTimeZone"],
+        });
+      }
+      const weekdays = parseWeekdays(data.businessHoursWeekdays);
+      if (weekdays.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Select at least one business day.",
+          path: ["businessHoursWeekdays"],
+        });
+      }
+      const validTime = (value?: string) =>
+        /^([01]\d|2[0-3]):[0-5]\d$/.test(value ?? "");
+      if (!validTime(data.businessHoursStartTime)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter a valid start time.",
+          path: ["businessHoursStartTime"],
+        });
+      }
+      if (!validTime(data.businessHoursEndTime)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter a valid end time.",
+          path: ["businessHoursEndTime"],
+        });
+      }
+      if (
+        validTime(data.businessHoursStartTime) &&
+        validTime(data.businessHoursEndTime) &&
+        data.businessHoursStartTime === data.businessHoursEndTime
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "End time must be different from start time.",
+          path: ["businessHoursEndTime"],
+        });
+      }
     }
 
-    if (!data.experimentVariantLabel?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Variant label is required.",
-        path: ["experimentVariantLabel"],
-      });
+    if (data.structuredFormEnabled) {
+      if (
+        !data.structuredFormKey ||
+        !/^[a-z][a-z0-9_-]*$/.test(data.structuredFormKey)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter a lowercase structured form key.",
+          path: ["structuredFormKey"],
+        });
+      }
+      if (!data.structuredFormVersion) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Structured form version is required.",
+          path: ["structuredFormVersion"],
+        });
+      }
+      if (parseActionStepLines(data.structuredFormFieldKeys).length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Add at least one task field key.",
+          path: ["structuredFormFieldKeys"],
+        });
+      }
+      const flow = parseStructuredFormFlowJson(
+        data.structuredFormWhatsAppFlow ?? "",
+      );
+      if ("error" in flow) {
+        ctx.addIssue({
+          code: "custom",
+          message: flow.error,
+          path: ["structuredFormWhatsAppFlow"],
+        });
+      }
+      const hasWhatsAppSchemaVersion = Boolean(
+        data.structuredFormWhatsAppSchemaVersion?.trim(),
+      );
+      const hasWhatsAppFlow = Boolean(data.structuredFormWhatsAppFlow?.trim());
+      if (hasWhatsAppSchemaVersion !== hasWhatsAppFlow) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "Provide both the WhatsApp schema version and Flow JSON, or leave both blank.",
+          path: ["structuredFormWhatsAppFlow"],
+        });
+      }
     }
   });
+
+function parseWeekdays(value?: string) {
+  return Array.from(
+    new Set(
+      (value ?? "")
+        .split(/[\s,]+/)
+        .map(Number)
+        .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6),
+    ),
+  );
+}
 
 const actionStepSchema = createActionStepSchema(
   {
@@ -201,6 +327,20 @@ function buildActionSettings(input: {
   experimentWeight?: number;
   templateEnabled?: boolean;
   templateVersion?: string;
+  businessHoursEnabled?: boolean;
+  businessHoursTimeZone?: string;
+  businessHoursWeekdays?: string;
+  businessHoursStartTime?: string;
+  businessHoursEndTime?: string;
+  queueAvailabilityEnabled?: boolean;
+  queueAvailable?: boolean;
+  structuredFormEnabled?: boolean;
+  structuredFormKey?: string;
+  structuredFormVersion?: string;
+  structuredFormStatus?: (typeof STRUCTURED_FORM_STATUSES)[number];
+  structuredFormFieldKeys?: string;
+  structuredFormWhatsAppSchemaVersion?: string;
+  structuredFormWhatsAppFlow?: string;
 }) {
   const settings = { ...input.existingSettings };
 
@@ -235,6 +375,47 @@ function buildActionSettings(input: {
     };
   } else {
     delete settings.customTemplate;
+  }
+
+  if (input.businessHoursEnabled || input.queueAvailabilityEnabled) {
+    settings.availability = {
+      businessHours: {
+        enabled: input.businessHoursEnabled === true,
+        timeZone: input.businessHoursTimeZone?.trim() || "UTC",
+        weekdays: parseWeekdays(input.businessHoursWeekdays),
+        startTime: input.businessHoursStartTime?.trim() || "09:00",
+        endTime: input.businessHoursEndTime?.trim() || "17:00",
+      },
+      queue: {
+        enabled: input.queueAvailabilityEnabled === true,
+        available: input.queueAvailable === true,
+      },
+    };
+  } else {
+    delete settings.availability;
+  }
+
+  if (input.structuredFormEnabled) {
+    const parsedFlow = parseStructuredFormFlowJson(
+      input.structuredFormWhatsAppFlow ?? "",
+    );
+    const schemaVersion =
+      input.structuredFormWhatsAppSchemaVersion?.trim() ?? "";
+    const providers =
+      "data" in parsedFlow && parsedFlow.data && schemaVersion
+        ? { whatsapp: { schemaVersion, flow: parsedFlow.data } }
+        : {};
+    settings.structuredForm = {
+      enabled: true,
+      key: input.structuredFormKey?.trim() ?? "",
+      version: input.structuredFormVersion?.trim() || "1.0.0",
+      status: input.structuredFormStatus ?? "draft",
+      fieldKeys: parseActionStepLines(input.structuredFormFieldKeys),
+      presentation: "adaptive",
+      providers,
+    };
+  } else {
+    delete settings.structuredForm;
   }
 
   return settings;
@@ -786,6 +967,22 @@ export async function updateProjectActionBuilderAction(
     experimentWeight: formData.get("experimentWeight"),
     templateEnabled: formData.get("templateEnabled") === "on",
     templateVersion: formData.get("templateVersion"),
+    businessHoursEnabled: formData.get("businessHoursEnabled") === "on",
+    businessHoursTimeZone: formData.get("businessHoursTimeZone"),
+    businessHoursWeekdays: formData.get("businessHoursWeekdays"),
+    businessHoursStartTime: formData.get("businessHoursStartTime"),
+    businessHoursEndTime: formData.get("businessHoursEndTime"),
+    queueAvailabilityEnabled: formData.get("queueAvailabilityEnabled") === "on",
+    queueAvailable: formData.get("queueAvailable") === "on",
+    structuredFormEnabled: formData.get("structuredFormEnabled") === "on",
+    structuredFormKey: formData.get("structuredFormKey"),
+    structuredFormVersion: formData.get("structuredFormVersion"),
+    structuredFormStatus: formData.get("structuredFormStatus"),
+    structuredFormFieldKeys: formData.get("structuredFormFieldKeys"),
+    structuredFormWhatsAppSchemaVersion: formData.get(
+      "structuredFormWhatsAppSchemaVersion",
+    ),
+    structuredFormWhatsAppFlow: formData.get("structuredFormWhatsAppFlow"),
     status: formData.get("status") ?? "draft",
     triggerPhrases: formData.get("triggerPhrases"),
   });
@@ -811,6 +1008,21 @@ export async function updateProjectActionBuilderAction(
       experimentWeight: parsed.data.experimentWeight,
       templateEnabled: parsed.data.templateEnabled,
       templateVersion: parsed.data.templateVersion,
+      businessHoursEnabled: parsed.data.businessHoursEnabled,
+      businessHoursTimeZone: parsed.data.businessHoursTimeZone,
+      businessHoursWeekdays: parsed.data.businessHoursWeekdays,
+      businessHoursStartTime: parsed.data.businessHoursStartTime,
+      businessHoursEndTime: parsed.data.businessHoursEndTime,
+      queueAvailabilityEnabled: parsed.data.queueAvailabilityEnabled,
+      queueAvailable: parsed.data.queueAvailable,
+      structuredFormEnabled: parsed.data.structuredFormEnabled,
+      structuredFormKey: parsed.data.structuredFormKey,
+      structuredFormVersion: parsed.data.structuredFormVersion,
+      structuredFormStatus: parsed.data.structuredFormStatus,
+      structuredFormFieldKeys: parsed.data.structuredFormFieldKeys,
+      structuredFormWhatsAppSchemaVersion:
+        parsed.data.structuredFormWhatsAppSchemaVersion,
+      structuredFormWhatsAppFlow: parsed.data.structuredFormWhatsAppFlow,
     }),
   });
 
@@ -824,8 +1036,12 @@ export async function updateProjectActionBuilderAction(
     targetId: action.id,
     metadata: {
       experimentEnabled: parsed.data.experimentEnabled === true,
+      availabilityEnabled:
+        parsed.data.businessHoursEnabled === true ||
+        parsed.data.queueAvailabilityEnabled === true,
       name: action.name,
       status: action.status,
+      structuredFormEnabled: parsed.data.structuredFormEnabled === true,
       templateEnabled: parsed.data.templateEnabled === true,
     },
   });
@@ -861,6 +1077,19 @@ export async function publishProjectActionVersionAction(formData: FormData) {
   if (countBlockingActionFlowIssues(routeIssues) > 0) {
     redirect(
       `/projects/actions/${action.id}?error=Fix%20route%20issues%20before%20publishing.`,
+    );
+  }
+
+  const structuredFormIssues = validateStructuredFormForPublication(
+    action.settings,
+    enabledSteps
+      .map((step) => step.fieldKey)
+      .filter((fieldKey): fieldKey is string => Boolean(fieldKey)),
+  );
+
+  if (structuredFormIssues.length > 0) {
+    redirect(
+      `/projects/actions/${action.id}?error=${encodeURIComponent(structuredFormIssues[0])}`,
     );
   }
 
