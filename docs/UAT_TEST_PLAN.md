@@ -806,6 +806,12 @@ Expected result:
   redacted, identity/export/delete stay project-scoped, handoff prevents dual
   ownership, and uncertain operations remain open for reconciliation.
 
+### Phase 14 UAT Findings
+
+| ID | Step | Severity | Status | Finding | Expected follow-up |
+| --- | --- | --- | --- | --- | --- |
+| `P14-UAT-01` | 4.6 | Low | Open | The Handoff Queue `Claim` button remains enabled and shows no processing state after it is clicked. | Disable the submitted control immediately and show a spinner or `Claiming...` label until the claim succeeds or fails, preventing duplicate submissions and user uncertainty. |
+
 ## Step 5 of 6 - Certify Project Chat, Widget, And WhatsApp
 
 Complete the same booking once per channel. Use the exact values in the
