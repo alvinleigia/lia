@@ -246,9 +246,9 @@ show workspace as a product concept unless real customer needs appear.
   access can happen.
 - [x] Keep customer-facing roles minimal for now: company owner/member only when
   invitations are added.
-- [ ] Defer domain mapping, subscriptions, billing plans, custom domains, and
+- [x] Defer domain mapping, subscriptions, billing plans, custom domains, and
   PostgreSQL RLS until the core SaaS flow is stable.
-- [ ] Add browser E2E tests for sign-up, project creation, tenant disable,
+- [x] Add browser E2E tests for sign-up, project creation, tenant disable,
   cross-tenant access denial, widget access, and action submissions.
 
 ## Design Guardrails

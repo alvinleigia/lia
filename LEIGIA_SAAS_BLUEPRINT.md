@@ -334,7 +334,9 @@ Before production, confirm:
 
 ## New SaaS App Checklist
 
-Use this checklist when starting another SaaS product.
+Use this reusable template when starting another SaaS product. It is not Lia's
+active TODO list; Lia status is tracked only in `FLOW_BUILDER_ROADMAP.md` and
+`BETA_READINESS_CHECKLIST.md`.
 
 - [ ] Define tenant hierarchy names.
 - [ ] Decide central platform domain.

@@ -102,7 +102,7 @@ by `docs/UAT_TEST_PLAN.md`, then continue Phase 17 implementation.
 | 1-7 | Complete | Passed | None. |
 | 8 | Priority 1 exit gate complete | Passed on 2026-08-03 | One deferred enhancement remains: map typed-input requests to a configured native WhatsApp Flow control. |
 | 9-13 | Complete | Passed by 2026-08-05 | None. |
-| 14 | Local implementation and offline gates complete; 13 release items remain unchecked | Steps 1-3 passed; Step 4 has open findings; Steps 5-6 and release-owner approval remain | Complete staging, live-model, cross-channel, recovery, restore, defect, and approval gates. |
+| 14 | Local implementation and offline gates complete | Steps 1-3 passed; Step 4 has open findings; Steps 5-6 and release-owner approval remain | Complete the authoritative gates in `BETA_READINESS_CHECKLIST.md` and `docs/UAT_TEST_PLAN.md`. |
 | 15 | Complete | Six-step manual UAT pending | Run after Phase 14 release UAT. |
 | 16 | Complete | Six-step manual UAT pending | Run after Phase 15 UAT. |
 | 17 | Foundation only; 12 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
@@ -1003,35 +1003,13 @@ browser/database scenarios, and tenant isolation. The 24 task-runtime database
 scenarios also passed independently. Staging, restore, paid live-model, and
 intended-deployment channel gates remain open.
 
-- [x] `npm run certify:release:fast` exists.
-- [x] `npm run certify:release` exists.
-- [ ] Create or confirm a staging app and staging database.
-- [ ] Apply migrations to both a clean database and an existing database containing V1 flows.
-- [ ] Confirm rollback, restore, and abandoned-task cleanup procedures.
-- [ ] Configure HTTPS, media delivery, cron recovery, encrypted secrets, model provider, and UAT channel credentials.
-- [ ] Set project and platform model rate, token, cost, timeout, and retention limits.
-- [x] Confirm anonymous-session expiry, verified contact association, cross-channel linking, export, and deletion policies.
-- [x] Confirm the reconciliation queue and operator procedure for uncertain external-operation outcomes.
-- [x] Run deterministic task fixtures without a live model.
-- [ ] Run approved live-model evaluation fixtures.
-- [x] Run prompt-injection, tool-abuse, PII-redaction, and cross-tenant security checks.
-- [x] Run duplicate, delayed, out-of-order, and concurrent inbound-event tests.
-- [x] Run human-takeover and authorized automation-resume tests with no dual replies.
-- [x] Run the degraded-mode matrix for model, retrieval, business tools, and outbound delivery.
-- [x] Run `npm run lint`.
-- [x] Run `npm run typecheck`.
-- [x] Run `npm run check:tenant-scope`.
-- [x] Run `npm run test:tenant-isolation`.
-- [x] Run `npm run test:channel-certification`.
-- [ ] Run `npm run test:e2e`.
-- [x] Run `npm run build`.
-- [x] Run `npm run certify:release:offline`.
-- [ ] Run `npm run certify:release`.
-- [ ] Record Project Chat as Pass, Pass with accepted limitations, or Fail.
-- [ ] Record Website Widget as Pass, Pass with accepted limitations, or Fail.
-- [ ] Record WhatsApp as Pass, Pass with accepted limitations, or Fail.
-- [ ] Confirm no unresolved Critical or High Priority 1 or Priority 2 defect.
-- [ ] Approve the hybrid platform for production-like beta traffic.
+To avoid maintaining three copies of the same release status, Phase 14 has no
+separate checklist here:
+
+- `BETA_READINESS_CHECKLIST.md` owns the release gates and approval decision.
+- `docs/UAT_TEST_PLAN.md` owns the exact remaining staging, live-model,
+  cross-channel, recovery, defect, and sign-off procedure.
+- This roadmap records only the implementation boundary and exit gate.
 
 Priority 2 exit gate: automated certification and live UAT approve both
 conversational tasks and deterministic flows for beta traffic.
