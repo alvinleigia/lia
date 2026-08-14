@@ -14,8 +14,8 @@ approval gates without duplicating subsystem implementation plans.
 
 - `FLOW_BUILDER_ROADMAP.md` is authoritative for flow builder, conversational
   task, tool, runtime, adapter, and flow-verification implementation status.
-- `docs/UAT_TEST_PLAN.md` is the manual test procedure and test-run evidence,
-  including the exact Phase 14 staging and provider runbook.
+- `docs/UAT_TEST_PLAN.md` is the single concise manual checklist and test-run
+  record for the remaining Phase 14-16 UI and release checks.
 - `docs/OPERATIONS_READINESS.md` contains detailed operational procedures.
 - `LEIGIA_BLUEPRINT_ALIGNMENT_AUDIT.md` is architectural background and does
   not control current status.
@@ -288,8 +288,9 @@ These are not blockers for internal beta, but they must be explicitly accepted:
 - [x] Classify remaining beta-readiness items by local, staging, provider and
   production setup.
 - [x] Add local `.env.local` preflight without printing secret values.
-- [x] Document staging migration, build, and beta verification in the Phase 14
-      section of `docs/UAT_TEST_PLAN.md`.
+- [x] Document detailed staging and recovery procedures in
+      `docs/OPERATIONS_READINESS.md` and keep their tester-facing acceptance
+      checks in `docs/UAT_TEST_PLAN.md`.
 - [x] Document provider requirements for database, hosting, email, WhatsApp,
       storage, and secrets in this checklist, `docs/OPERATIONS_READINESS.md`,
       and the Phase 14 UAT.

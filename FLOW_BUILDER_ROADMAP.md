@@ -102,7 +102,7 @@ by `docs/UAT_TEST_PLAN.md`, then continue Phase 17 implementation.
 | 1-7 | Complete | Passed | None. |
 | 8 | Priority 1 exit gate complete | Passed on 2026-08-03 | One deferred enhancement remains: map typed-input requests to a configured native WhatsApp Flow control. |
 | 9-13 | Complete | Passed by 2026-08-05 | None. |
-| 14 | Local implementation and offline gates complete | Steps 1-3 passed; Step 4 has open findings; Steps 5-6 and release-owner approval remain | Complete the authoritative gates in `BETA_READINESS_CHECKLIST.md` and `docs/UAT_TEST_PLAN.md`. |
+| 14 | Local implementation and offline gates complete | The policy and handoff check has open findings; channel, recovery, and release approval remain | Complete the authoritative gates in `BETA_READINESS_CHECKLIST.md` and `docs/UAT_TEST_PLAN.md`. |
 | 15 | Complete | Six-step manual UAT pending | Run after Phase 14 release UAT. |
 | 16 | Complete | Six-step manual UAT pending | Run after Phase 15 UAT. |
 | 17 | Foundation only; 12 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
@@ -1007,8 +1007,8 @@ To avoid maintaining three copies of the same release status, Phase 14 has no
 separate checklist here:
 
 - `BETA_READINESS_CHECKLIST.md` owns the release gates and approval decision.
-- `docs/UAT_TEST_PLAN.md` owns the exact remaining staging, live-model,
-  cross-channel, recovery, defect, and sign-off procedure.
+- `docs/UAT_TEST_PLAN.md` owns the concise remaining staging, live-model,
+  cross-channel, recovery, defect, and sign-off checklist.
 - This roadmap records only the implementation boundary and exit gate.
 
 Priority 2 exit gate: automated certification and live UAT approve both
