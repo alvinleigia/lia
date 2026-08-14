@@ -811,7 +811,7 @@ Expected result:
 | ID | Step | Severity | Status | Finding | Expected follow-up |
 | --- | --- | --- | --- | --- | --- |
 | `P14-UAT-01` | 4.6 | Low | Open | The Handoff Queue `Claim` button remains enabled and shows no processing state after it is clicked. | Disable the submitted control immediately and show a spinner or `Claiming...` label until the claim succeeds or fails, preventing duplicate submissions and user uncertainty. |
-| `P14-UAT-02` | 4.7 | Untriaged | Open | Handoff `#44` was claimed and completed successfully, but neither lifecycle audit event appeared in Admin > Audit Logs after a hard refresh. | Investigate audit persistence and visibility for successful claim and completion actions. Retain the existing run as evidence and do not repeat the handoff solely to reproduce it. See [the detailed finding](./UAT_PHASE_14_FINDINGS.md). |
+| `P14-UAT-02` | 4.7 | Untriaged | Open | Handoff `#44` was claimed and completed successfully, but neither lifecycle audit event appeared in Admin > Audit Logs after a hard refresh. | Ensure successful claim and completion each create a company/project-scoped audit event with the actor, submission target, project, timestamp, and non-sensitive metadata. Retain the existing run as evidence and do not repeat the handoff solely to reproduce it. |
 
 ## Step 5 of 6 - Certify Project Chat, Widget, And WhatsApp
 
@@ -1196,6 +1196,14 @@ Phase 15 sign-off:
 - Accepted limitations: `<ENTER DETAILS OR NONE>`
 - Evidence locations: `<ENTER LINKS OR PATHS>`
 - Tester sign-off: `<ENTER NAME AND DATE>`
+
+## Historical Passed UAT - Phases 8-13
+
+The procedures below are retained as historical evidence and are not pending
+work. Active manual work is limited to Phases 14-16 above.
+
+<details>
+<summary>Show completed Phase 8-13 procedures and sign-offs</summary>
 
 ## Previous Sign-Off - Phase 13
 
@@ -3018,3 +3026,5 @@ Expected result:
 Checkpoint 6 and Priority 1 passed manual UAT on 2026-08-03. The Step 4 form
 feedback defect found during UAT was corrected, covered by focused browser
 regressions, and included in the passing post-UAT offline release gate.
+
+</details>
