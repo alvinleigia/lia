@@ -30,6 +30,7 @@ import {
   companies,
   conversationalTasks,
   conversationalTaskVersions,
+  conversationExecutionStates,
   conversationInboundEvents,
   durableJobs,
   integrationProviders,
@@ -583,6 +584,60 @@ test("queues one durable attempt and completes from sanitized mapped output", as
   expect(exported.confirmations).toContainEqual(
     expect.objectContaining({ id: pending.id, status: "consumed" }),
   );
+});
+
+test("queues a confirmed operation after the runtime timestamp advances", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const run = await startReadyRun(fixture.manualTaskId);
+  const pending = await prepareTaskOperationConfirmation({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+    toolId: fixture.manualToolId,
+  });
+  const confirmed = await confirmTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  if (!confirmed.confirmedAt) throw new Error("Confirmation time is missing.");
+  const refreshedAt = new Date(confirmed.confirmedAt.getTime() + 1);
+  await db
+    .update(conversationExecutionStates)
+    .set({ lastEventOccurredAt: refreshedAt })
+    .where(
+      and(
+        eq(conversationExecutionStates.projectId, fixture.projectId),
+        eq(conversationExecutionStates.conversationId, run.conversationId),
+      ),
+    );
+
+  const queued = await executeConfirmedTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+
+  expect(queued.created).toBe(true);
+  const [requestEvent] = await db
+    .select({
+      occurredAt: conversationInboundEvents.occurredAt,
+      status: conversationInboundEvents.status,
+    })
+    .from(conversationInboundEvents)
+    .where(
+      and(
+        eq(conversationInboundEvents.projectId, fixture.projectId),
+        eq(conversationInboundEvents.taskRunId, run.taskRunId),
+        eq(conversationInboundEvents.eventType, "tool.requested"),
+      ),
+    )
+    .limit(1);
+  expect(requestEvent).toMatchObject({
+    occurredAt: refreshedAt,
+    status: "applied",
+  });
 });
 
 test("retries a confirmed operation after queue reservation becomes available", async () => {

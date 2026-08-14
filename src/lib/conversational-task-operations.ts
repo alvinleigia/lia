@@ -701,7 +701,12 @@ export async function executeConfirmedTaskOperation(input: {
     versionId: confirmation.taskVersionId,
   });
   const requestId = `operation:${hashValue(idempotencyKey).slice(0, 40)}`;
-  const requestedAt = confirmation.confirmedAt ?? now;
+  const confirmedAt = confirmation.confirmedAt ?? now;
+  const lastEventOccurredAt = context.runtime.execution?.lastEventOccurredAt;
+  const requestedAt =
+    lastEventOccurredAt && lastEventOccurredAt > confirmedAt
+      ? lastEventOccurredAt
+      : confirmedAt;
   const [existingRequest] = await db
     .select()
     .from(conversationalTaskToolRequests)
