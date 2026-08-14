@@ -101,6 +101,12 @@ the entry point. Do not use the older `Book Spa Service` action. If you already
 archived the test action after 14.1, open its `Settings`, change `Status` back
 to `Active`, and click `Save Action`.
 
+If the app is running at `http://localhost:3000`, run Project Chat and the
+Website Widget as local smoke checks only. Enter `http://localhost:3000` under
+Widget `Allowed Domains`, mark WhatsApp `Not configured`, and do not mark 14.2
+or Phase 14 as passed. Repeat Phase 14 on a public HTTPS staging deployment for
+release sign-off.
+
 Use the same disposable values in all channels:
 
 - Category: `Facial`
