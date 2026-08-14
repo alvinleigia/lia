@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Selected project: `Phase 14 Release UAT (#1)`
-- Minimum release-candidate commit: `5f65659`
+- Minimum release-candidate commit: `3283879`
 
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
@@ -14,7 +14,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | Phase | Status | Next action |
 | --- | --- | --- |
 | 1-13 | Complete | None. |
-| 14 - Beta release | Blocked | Fix the staging booking fixture and reply latency findings below, redeploy, then resume 14.2. |
+| 14 - Beta release | Blocked | Deploy `3283879`, run the fixture repair, then retest 14.2. |
 | 15 - Knowledge and memory | Pending | Start only after Phase 14 passes. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
@@ -28,7 +28,7 @@ contact details.
 - Date: `<date>`
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
-- Expected minimum commit: `5f65659`
+- Expected minimum commit: `3283879`
 - Actual deployed commit: `<short commit from the hosting dashboard>`
 - Deployment status: [ ] Successful
 - Staging WhatsApp configured: [ ] Yes [ ] No
@@ -40,7 +40,9 @@ contact details.
 Ask the release owner to confirm:
 
 - [ ] The hosting dashboard shows a successful staging deployment for commit
-      `5f65659` or a later commit from `main`.
+      `3283879` or a later commit from `main`.
+- [ ] The release owner ran `npm run seed:phase14-staging` with the staging
+      fixture variables and saw `Repaired Phase 14 Release UAT as project #1.`
 - [ ] Clean and existing-database migrations passed.
 - [ ] A backup was restored into a disposable environment.
 - [ ] Staging secrets, public media storage, and scheduled jobs work.
@@ -118,9 +120,9 @@ If this screen shows `Complete` instead of `Resolve`, stop and record
 
 ## 14.2 Repeat One Booking In Each Channel
 
-Status: `Blocked`. Do not continue this section until `P14-UAT-03` is fixed
-and the staging fixture is reseeded. After the fix, start a new booking rather
-than continuing the failed run.
+Status: `Blocked pending staging validation`. After commit `3283879` is
+deployed and the fixture repair runs, start a new booking rather than
+continuing the failed run.
 
 Use this exact data for every available channel:
 
@@ -220,8 +222,8 @@ Result: [ ] Pass [ ] Fail
 | --- | --- | --- |
 | `P14-UAT-01` | Open - Low | `Claim` does not disable or show a processing label while the request runs. |
 | `P14-UAT-02` | Open - Untriaged | Successful claim and lifecycle events were not visible in `Admin` > `Audit Logs`. |
-| `P14-UAT-03` | Open - High | The staging task snapshot keeps source project ID `194` in its built-in tool definitions instead of staging project ID `1`, so `Classic Facial` availability cannot be verified and booking cannot complete. |
-| `P14-UAT-04` | Open - Untriaged | Website Widget conversational replies repeatedly took more than 20 seconds. The configured model timeout is 15 seconds with one retry; capture server request timings before tuning or fixing the runtime. |
+| `P14-UAT-03` | Fix committed; staging retest pending | Commit `3283879` repairs existing and newly seeded tool-definition project IDs. |
+| `P14-UAT-04` | Fix committed; staging retest pending | Commit `3283879` bypasses model calls for explicit selections and exact typed values, and uses the low-latency structured model first for remaining extraction turns. |
 
 ### Phase 14 Sign-Off
 
