@@ -22,6 +22,11 @@
 # production
 /build
 
+# local runtime and generated artifacts
+/public/uploads/
+**/__pycache__/
+*.py[cod]
+
 # misc
 .DS_Store
 *.pem
