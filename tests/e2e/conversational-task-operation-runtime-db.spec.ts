@@ -30,6 +30,7 @@ import {
   companies,
   conversationalTasks,
   conversationalTaskVersions,
+  conversationInboundEvents,
   durableJobs,
   integrationProviders,
   operationAttempts,
@@ -582,6 +583,71 @@ test("queues one durable attempt and completes from sanitized mapped output", as
   expect(exported.confirmations).toContainEqual(
     expect.objectContaining({ id: pending.id, status: "consumed" }),
   );
+});
+
+test("retries a confirmed operation after queue reservation becomes available", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const run = await startReadyRun(fixture.manualTaskId);
+  const pending = await prepareTaskOperationConfirmation({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+    toolId: fixture.manualToolId,
+  });
+  await confirmTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  const operationId = Number(fixture.manualToolId.split(":").at(-1));
+  await db
+    .update(operations)
+    .set({ status: "disabled" })
+    .where(
+      and(
+        eq(operations.id, operationId),
+        eq(operations.projectId, fixture.projectId),
+      ),
+    );
+  try {
+    await expect(
+      executeConfirmedTaskOperation({
+        confirmationId: pending.id,
+        principal,
+        projectId: fixture.projectId,
+        taskRunId: run.taskRunId,
+      }),
+    ).rejects.toThrow("The operation or provider is unavailable.");
+  } finally {
+    await db
+      .update(operations)
+      .set({ status: "active" })
+      .where(
+        and(
+          eq(operations.id, operationId),
+          eq(operations.projectId, fixture.projectId),
+        ),
+      );
+  }
+
+  await db
+    .update(conversationInboundEvents)
+    .set({ payloadHash: `legacy-retry-${suffix}` })
+    .where(
+      and(
+        eq(conversationInboundEvents.projectId, fixture.projectId),
+        eq(conversationInboundEvents.taskRunId, run.taskRunId),
+        eq(conversationInboundEvents.eventType, "tool.requested"),
+      ),
+    );
+
+  const retried = await executeConfirmedTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  expect(retried.created).toBe(true);
 });
 
 test("reclaims an interrupted operation without allowing a stale worker to overwrite it", async () => {

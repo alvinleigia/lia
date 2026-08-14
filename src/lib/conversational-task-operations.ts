@@ -701,35 +701,63 @@ export async function executeConfirmedTaskOperation(input: {
     versionId: confirmation.taskVersionId,
   });
   const requestId = `operation:${hashValue(idempotencyKey).slice(0, 40)}`;
-  const eventResult = await applyConversationalTaskEvent({
-    authentication: authentication(input.principal, now),
-    channelIdentity: context.conversation.metadata,
-    channelType: context.conversation.channelType,
-    conversationId: context.runtime.run.conversationId,
-    eventId: `${requestId}:requested`,
-    expectedRevision: null,
-    idempotencyKey,
-    input: confirmation.canonicalInput,
-    occurredAt: now.toISOString(),
-    projectId: input.projectId,
-    providerSequence: null,
-    receivedAt: now.toISOString(),
-    requestId,
-    requestMode: "asynchronous",
-    schemaVersion: 1,
-    stage: "operation",
-    taskRunId: input.taskRunId,
-    timeoutAt: null,
-    toolId: confirmation.toolId,
-    type: "tool.requested",
-  });
+  const requestedAt = confirmation.confirmedAt ?? now;
+  const [existingRequest] = await db
+    .select()
+    .from(conversationalTaskToolRequests)
+    .where(
+      and(
+        eq(conversationalTaskToolRequests.projectId, input.projectId),
+        eq(conversationalTaskToolRequests.taskRunId, input.taskRunId),
+        eq(conversationalTaskToolRequests.requestId, requestId),
+      ),
+    )
+    .limit(1);
   if (
-    eventResult.disposition !== "applied" &&
-    eventResult.reason !== "duplicate_event"
+    existingRequest &&
+    (existingRequest.taskVersionId !== confirmation.taskVersionId ||
+      existingRequest.toolId !== confirmation.toolId ||
+      existingRequest.idempotencyKey !== idempotencyKey ||
+      existingRequest.stage !== "operation" ||
+      existingRequest.status !== "pending" ||
+      (existingRequest.confirmationId !== null &&
+        existingRequest.confirmationId !== confirmation.id))
   ) {
     throw new Error(
-      eventResult.reason ?? "The operation request could not be reserved.",
+      "The existing operation request does not match this confirmation.",
     );
+  }
+  if (!existingRequest) {
+    const eventResult = await applyConversationalTaskEvent({
+      authentication: authentication(input.principal, requestedAt),
+      channelIdentity: context.conversation.metadata,
+      channelType: context.conversation.channelType,
+      conversationId: context.runtime.run.conversationId,
+      eventId: `${requestId}:requested`,
+      expectedRevision: null,
+      idempotencyKey,
+      input: confirmation.canonicalInput,
+      occurredAt: requestedAt.toISOString(),
+      projectId: input.projectId,
+      providerSequence: null,
+      receivedAt: requestedAt.toISOString(),
+      requestId,
+      requestMode: "asynchronous",
+      schemaVersion: 1,
+      stage: "operation",
+      taskRunId: input.taskRunId,
+      timeoutAt: null,
+      toolId: confirmation.toolId,
+      type: "tool.requested",
+    });
+    if (
+      eventResult.disposition !== "applied" &&
+      eventResult.reason !== "duplicate_event"
+    ) {
+      throw new Error(
+        eventResult.reason ?? "The operation request could not be reserved.",
+      );
+    }
   }
   const [toolRequest] = await db
     .update(conversationalTaskToolRequests)
