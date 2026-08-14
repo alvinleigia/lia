@@ -14,7 +14,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | Phase | Status | Next action |
 | --- | --- | --- |
 | 1-13 | Complete | None. |
-| 14 - Beta release | In progress | Confirm staging deployed `5f65659` or later, then run this checklist. |
+| 14 - Beta release | Blocked | Fix the staging booking fixture and reply latency findings below, redeploy, then resume 14.2. |
 | 15 - Knowledge and memory | Pending | Start only after Phase 14 passes. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
@@ -118,6 +118,10 @@ If this screen shows `Complete` instead of `Resolve`, stop and record
 
 ## 14.2 Repeat One Booking In Each Channel
 
+Status: `Blocked`. Do not continue this section until `P14-UAT-03` is fixed
+and the staging fixture is reseeded. After the fix, start a new booking rather
+than continuing the failed run.
+
 Use this exact data for every available channel:
 
 - Category: `Facial`
@@ -216,6 +220,8 @@ Result: [ ] Pass [ ] Fail
 | --- | --- | --- |
 | `P14-UAT-01` | Open - Low | `Claim` does not disable or show a processing label while the request runs. |
 | `P14-UAT-02` | Open - Untriaged | Successful claim and lifecycle events were not visible in `Admin` > `Audit Logs`. |
+| `P14-UAT-03` | Open - High | The staging task snapshot keeps source project ID `194` in its built-in tool definitions instead of staging project ID `1`, so `Classic Facial` availability cannot be verified and booking cannot complete. |
+| `P14-UAT-04` | Open - Untriaged | Website Widget conversational replies repeatedly took more than 20 seconds. The configured model timeout is 15 seconds with one retry; capture server request timings before tuning or fixing the runtime. |
 
 ### Phase 14 Sign-Off
 
