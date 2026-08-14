@@ -307,10 +307,16 @@ async function fixtureAlreadyExists(tx, projectId) {
   );
 }
 
-async function repairExistingFixture(tx, projectId, sourceProjectId) {
+async function repairExistingFixture(
+  tx,
+  projectId,
+  sourceProjectId,
+  sourceOperationId,
+  targetOperationId,
+) {
   const version = expectExactlyOne(
     await tx`
-      select tv.id, tv.snapshot
+      select t.id as task_id, t.definition, tv.id, tv.snapshot
       from conversational_task_versions tv
       inner join conversational_tasks t
         on t.id = tv.task_id and t.project_id = tv.project_id
@@ -320,20 +326,42 @@ async function repairExistingFixture(tx, projectId, sourceProjectId) {
     `,
     "Existing staging task version",
   );
+  const definition = remapOperationReferences(
+    version.definition,
+    sourceOperationId,
+    targetOperationId,
+  );
   const snapshot = remapTaskSnapshotProjectIds(
-    version.snapshot,
+    remapOperationReferences(
+      version.snapshot,
+      sourceOperationId,
+      targetOperationId,
+    ),
     sourceProjectId,
     projectId,
   );
-  if (JSON.stringify(snapshot) === JSON.stringify(version.snapshot)) {
-    return false;
+  const definitionChanged =
+    JSON.stringify(definition) !== JSON.stringify(version.definition);
+  const snapshotChanged =
+    JSON.stringify(snapshot) !== JSON.stringify(version.snapshot);
+  if (!definitionChanged && !snapshotChanged) return false;
+
+  if (definitionChanged) {
+    assertSanitizedConfiguration("Repaired task definition", definition);
+    await tx`
+      update conversational_tasks
+      set definition = ${tx.json(definition)}, updated_at = now()
+      where id = ${version.task_id} and project_id = ${projectId}
+    `;
   }
-  assertSanitizedConfiguration("Repaired task snapshot", snapshot);
-  await tx`
-    update conversational_task_versions
-    set snapshot = ${tx.json(snapshot)}
-    where id = ${version.id} and project_id = ${projectId}
-  `;
+  if (snapshotChanged) {
+    assertSanitizedConfiguration("Repaired task snapshot", snapshot);
+    await tx`
+      update conversational_task_versions
+      set snapshot = ${tx.json(snapshot)}
+      where id = ${version.id} and project_id = ${projectId}
+    `;
+  }
   return true;
 }
 
@@ -412,10 +440,13 @@ async function seedTarget(tx, source, ownerEmail) {
     `;
   } else {
     if (await fixtureAlreadyExists(tx, project.id)) {
+      const { operation } = await resolveManualReview(tx, project.id, source);
       const repaired = await repairExistingFixture(
         tx,
         project.id,
         source.project.id,
+        source.operation.id,
+        operation.id,
       );
       return { projectId: project.id, repaired, seeded: false };
     }

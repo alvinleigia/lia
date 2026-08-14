@@ -84,11 +84,13 @@ export function remapOperationReferences(value, sourceId, targetId) {
   const sourceReference = `operation:${sourceId}`;
   const targetReference = `operation:${targetId}`;
 
-  return visit(cloneValue(value), "$", (item) =>
-    typeof item === "string"
-      ? item.replaceAll(sourceReference, targetReference)
-      : item,
-  );
+  return visit(cloneValue(value), "$", (item, path) => {
+    if (typeof item !== "string") return item;
+    if (path.endsWith(".execution.handler") && item === String(sourceId)) {
+      return String(targetId);
+    }
+    return item.replaceAll(sourceReference, targetReference);
+  });
 }
 
 export function remapTaskSnapshotProjectIds(
