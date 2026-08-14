@@ -1,6 +1,6 @@
 # Beta Readiness Checklist
 
-Status date: 2026-07-26
+Status date: 2026-08-14
 
 This checklist turns `LEIGIA_BLUEPRINT_ALIGNMENT_AUDIT.md` into a practical
 beta-readiness track. Use it before putting real customers or production-like
@@ -43,8 +43,9 @@ Authoritative product implementation status:
 - Priority 2, Phases 9-13 implementation and focused manual UAT are complete.
 - Priority 2, Phase 14 local offline gates are complete; staging, provider, and
   release approval gates remain in progress.
-- Priority 3, Phases 15-18 are advanced post-beta work unless an earlier beta
-  requirement explicitly depends on them.
+- Priority 3, Phases 15-16 are implementation-complete with manual UAT pending.
+  Phases 17-18 remain incomplete. All four remain post-beta work unless an
+  earlier beta requirement explicitly depends on them.
 
 Completed foundations:
 
@@ -214,7 +215,7 @@ Subdomain note:
 - [x] Conversational-task publication rejects unresolved trusted-context
   references.
 - [x] Pass a cross-cutting form UX regression against the local release candidate.
-- [ ] Complete Priority 1, Phases 1-8 in `FLOW_BUILDER_ROADMAP.md`.
+- [x] Complete Priority 1, Phases 1-8 in `FLOW_BUILDER_ROADMAP.md`.
 - [ ] Complete Priority 2, Phases 9-14 in `FLOW_BUILDER_ROADMAP.md`.
 - [ ] Create and pass the phase-specific `docs/UAT_TEST_PLAN.md` after every
   completed roadmap phase.
@@ -297,13 +298,13 @@ These are not blockers for internal beta, but they must be explicitly accepted:
 ## Recommended Next Implementation Order
 
 1. Complete Priority 2, Phase 14 and the non-voice cross-channel release gate.
-3. Keep local environment, tenant-safety, migration, and operations checks
+2. Keep local environment, tenant-safety, migration, and operations checks
    passing while product implementation proceeds.
-4. Create or refresh staging app and database environments before live channel
+3. Create or refresh staging app and database environments before live channel
    certification.
-5. Run staging migrations, the complete UAT plan, and the required beta command
+4. Run staging migrations, the complete UAT plan, and the required beta command
    suite against the exact release candidate.
-6. Complete provider backup, restore, public URL, email, and WhatsApp checks.
-7. Defer DNS/subdomain setup until domain routing needs a staging test.
-8. Keep RLS activation and provider billing checkout deferred until their
+5. Complete provider backup, restore, public URL, email, and WhatsApp checks.
+6. Defer DNS/subdomain setup until domain routing needs a staging test.
+7. Keep RLS activation and provider billing checkout deferred until their
    documented prerequisites are approved.

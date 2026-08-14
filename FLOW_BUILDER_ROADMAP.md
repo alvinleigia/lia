@@ -1,6 +1,6 @@
 # Lia Conversational Flow Roadmap
 
-Status date: 2026-08-04
+Status date: 2026-08-14
 
 ## Document Authority
 
@@ -86,11 +86,27 @@ database, backup, and provider readiness work.
 - [x] Live cross-channel UAT is complete.
 - [ ] Priority 2 release approval is not complete.
 
-Current phase: Priority 2, Phase 14 of 18. Phases 8 through 13 completed
-implementation, automated verification, and manual UAT by 2026-08-05.
+Active release gate: Priority 2, Phase 14 of 18. Engineering implementation has
+advanced through Phase 16, but that does not bypass the unfinished Phase 14
+staging, live-provider, recovery, and release-owner gates.
 
-Current target: approve the hybrid conversational platform for production-like
-beta traffic through the Priority 2 release gate.
+Current target: finish Phase 14 release UAT and approve the hybrid
+conversational platform for production-like beta traffic. After that gate,
+complete the pending Phase 15 and Phase 16 manual UAT in the sequence defined
+by `docs/UAT_TEST_PLAN.md`, then continue Phase 17 implementation.
+
+### Phase Tracking Snapshot
+
+| Phase | Implementation status | Manual verification or release status | Remaining work |
+| --- | --- | --- | --- |
+| 1-7 | Complete | Passed | None. |
+| 8 | Priority 1 exit gate complete | Passed on 2026-08-03 | One deferred enhancement remains: map typed-input requests to a configured native WhatsApp Flow control. |
+| 9-13 | Complete | Passed by 2026-08-05 | None. |
+| 14 | Local implementation and offline gates complete; 13 release items remain unchecked | Steps 1-3 passed; Step 4 has open findings; Steps 5-6 and release-owner approval remain | Complete staging, live-model, cross-channel, recovery, restore, defect, and approval gates. |
+| 15 | Complete | Six-step manual UAT pending | Run after Phase 14 release UAT. |
+| 16 | Complete | Six-step manual UAT pending | Run after Phase 15 UAT. |
+| 17 | Foundation only; 12 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
+| 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
 
 ## Product Direction
 
@@ -1054,6 +1070,12 @@ creating an unrestricted whole-bot agent.
 Phase 15 exit gate: Lia can apply advanced knowledge policy, memory,
 multi-intent selection, and bounded specialist handoffs without granting the
 model unrestricted graph or tool control.
+
+Implementation closure: completed on 2026-08-08 in checkpoints `52604cd`,
+`bba8c6e`, and `b5e0f9c`. Focused contract and runtime tests cover advanced
+knowledge policy, bounded intent and handoff routing, governed memory, and
+approved post-conversation jobs. The six-step manual UAT in
+`docs/UAT_TEST_PLAN.md` remains pending.
 
 ## Phase 16: Contact Lifecycle, Handoff, And Structured Forms
 
