@@ -198,6 +198,10 @@ export function isExactActionTrigger(action: RuntimeAction, input: string) {
   );
 }
 
+export function getActionStartControlText(action: RuntimeAction) {
+  return action.triggerPhrases.find((phrase) => phrase.trim().length > 0);
+}
+
 export function getActionStepPrompt(step: RuntimeActionStep) {
   if (isProductMessageStep(step)) {
     return step.prompt || step.label || "Here are the available products.";

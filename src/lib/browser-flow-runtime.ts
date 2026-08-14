@@ -313,6 +313,9 @@ async function executeBrowserFlowText(
         () =>
           getRuntimeProjectAction(input.projectId, input.actionId as number),
       );
+      consumeTriggerMessage = Boolean(
+        action && text && isExactActionTrigger(action, text),
+      );
     } else if (text) {
       action = findTriggeredAction(
         await measureRuntimeStage("runtime_actions", input.recordTiming, () =>

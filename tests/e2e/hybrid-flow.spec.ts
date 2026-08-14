@@ -6,6 +6,7 @@ import {
 } from "../../src/lib/action-flow-compiler";
 import { getProjectActionStatusAfterPublish } from "../../src/lib/action-flow-constants";
 import {
+  getActionStartControlText,
   isExactActionTrigger,
   type RuntimeAction,
 } from "../../src/lib/action-runtime";
@@ -69,6 +70,12 @@ test("exact action triggers are control input, not task content", () => {
       "phase thirteen booking parity for a facial tomorrow",
     ),
   ).toBe(false);
+  expect(
+    getActionStartControlText({
+      name: "Phase Thirteen Booking Parity",
+      triggerPhrases: ["", "phase thirteen booking parity"],
+    } as RuntimeAction),
+  ).toBe("phase thirteen booking parity");
 });
 
 test("publishing activates drafts without reactivating archived actions", () => {

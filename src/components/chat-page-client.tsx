@@ -32,6 +32,7 @@ import {
   type ActiveActionFlow,
   type FlowChatMessage,
   type FlowEditSection,
+  getActionStartControlText,
   getActionStepChoiceDisplayMode,
   getActionStepOptions,
   getRunnableActionSteps,
@@ -310,7 +311,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     await runCanonicalFlow({
       actionId: action.id,
       displayUserText: Boolean(openingText),
-      text: openingText,
+      text: openingText ?? getActionStartControlText(action),
     });
   };
 
