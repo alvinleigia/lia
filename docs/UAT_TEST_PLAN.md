@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Selected project: `Phase 14 Release UAT (#1)`
-- Minimum release-candidate commit: `3283879`
+- Minimum release-candidate commit: `39a7367`
 
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
@@ -14,7 +14,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | Phase | Status | Next action |
 | --- | --- | --- |
 | 1-13 | Complete | None. |
-| 14 - Beta release | Blocked | Deploy `3283879`, run the fixture repair, then retest 14.2. |
+| 14 - Beta release | In progress | Continue the staging checks from 14.2. |
 | 15 - Knowledge and memory | Pending | Start only after Phase 14 passes. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
@@ -28,7 +28,7 @@ contact details.
 - Date: `<date>`
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
-- Expected minimum commit: `3283879`
+- Expected minimum commit: `39a7367`
 - Actual deployed commit: `<short commit from the hosting dashboard>`
 - Deployment status: [ ] Successful
 - Staging WhatsApp configured: [ ] Yes [ ] No
@@ -40,7 +40,7 @@ contact details.
 Ask the release owner to confirm:
 
 - [ ] The hosting dashboard shows a successful staging deployment for commit
-      `3283879` or a later commit from `main`.
+      `39a7367` or a later commit from `main`.
 - [ ] The release owner ran `npm run seed:phase14-staging` with the staging
       fixture variables and saw `Repaired Phase 14 Release UAT as project #1.`
 - [ ] Clean and existing-database migrations passed.
@@ -120,9 +120,9 @@ If this screen shows `Complete` instead of `Resolve`, stop and record
 
 ## 14.2 Repeat One Booking In Each Channel
 
-Status: `Blocked pending staging validation`. After commit `3283879` is
-deployed and the fixture repair runs, start a new booking rather than
-continuing the failed run.
+Status: `Ready for staging UAT`. Commit `39a7367` is deployed, the fixture was
+repaired, and the Widget response-time fix was verified on staging. Start a
+new booking rather than continuing an older run.
 
 Use this exact data for every available channel:
 
@@ -143,7 +143,7 @@ After choosing the service, replace the date below and send the message:
 ### Project Chat
 
 1. Open `Projects` > `Chat` and click `Book a Spa Service`.
-2. Wait for the acknowledgement, then send `I want to book a spa service.`
+2. Wait for `Please provide Service Category.`
 3. Choose `Facial`, then `Classic Facial`.
 4. Send the remaining five values using the message above.
 5. Confirm the review contains all seven values.
@@ -162,7 +162,7 @@ Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
    `Save Allowed Domains` if it is not already present.
 4. Scroll below `Embed Snippet`, click `Open Widget Preview`, then click
    `Book a Spa Service`.
-5. Send `I want to book a spa service.`, choose `Facial` and
+5. Wait for `Please provide Service Category.`, choose `Facial` and
    `Classic Facial`, then send the same remaining five values.
 6. Before confirming, close and reopen the preview. Confirm the same run and
    seven values return.
@@ -222,8 +222,8 @@ Result: [ ] Pass [ ] Fail
 | --- | --- | --- |
 | `P14-UAT-01` | Open - Low | `Claim` does not disable or show a processing label while the request runs. |
 | `P14-UAT-02` | Open - Untriaged | Successful claim and lifecycle events were not visible in `Admin` > `Audit Logs`. |
-| `P14-UAT-03` | Fix committed; staging retest pending | Commit `3283879` repairs existing and newly seeded tool-definition project IDs. |
-| `P14-UAT-04` | Fix committed; staging retest pending | Commit `3283879` bypasses model calls for explicit selections and exact typed values, and uses the low-latency structured model first for remaining extraction turns. |
+| `P14-UAT-03` | Staging fixture repaired | The staging repair completed for project `#1`; commit `3283879` repairs existing and newly seeded tool-definition project IDs. |
+| `P14-UAT-04` | Fixed and staging verified | Commit `39a7367` colocates the runtime with the database and skips the redundant trigger model turn. Measured server time fell from `57.15 s` to `0.754 s` for starting the booking and was `0.697 s` for the next selection. |
 
 ### Phase 14 Sign-Off
 
