@@ -63,9 +63,11 @@ Stop Phase 14 if any prerequisite is missing.
    6. Open `Settings`, change `Status` from `Draft` to `Active`, and click
       `Save Action`.
 5. Open `Projects` > `Chat`. If an earlier `Book Spa Service` run is asking for
-   a category, send `cancel` and wait for the cancellation reply. Do not use
-   that similarly named button here; it starts the older sequential action.
-   Refresh once and confirm `Phase 14 Handoff UAT` is now visible.
+   a category or either action button is greyed out, send `cancel` in the
+   bottom composer. Wait for `No problem. I cancelled this request.`, then
+   refresh once. Do not continue until `Phase 14 Handoff UAT` has dark text
+   and is clickable. Do not click `Book Spa Service`; it starts the older
+   sequential action.
 6. Send:
 
    ```text
