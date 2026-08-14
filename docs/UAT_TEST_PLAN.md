@@ -811,6 +811,7 @@ Expected result:
 | ID | Step | Severity | Status | Finding | Expected follow-up |
 | --- | --- | --- | --- | --- | --- |
 | `P14-UAT-01` | 4.6 | Low | Open | The Handoff Queue `Claim` button remains enabled and shows no processing state after it is clicked. | Disable the submitted control immediately and show a spinner or `Claiming...` label until the claim succeeds or fails, preventing duplicate submissions and user uncertainty. |
+| `P14-UAT-02` | 4.7 | Untriaged | Open | Handoff `#44` was claimed and completed successfully, but neither lifecycle audit event appeared in Admin > Audit Logs after a hard refresh. | Investigate audit persistence and visibility for successful claim and completion actions. Retain the existing run as evidence and do not repeat the handoff solely to reproduce it. See [the detailed finding](./UAT_PHASE_14_FINDINGS.md). |
 
 ## Step 5 of 6 - Certify Project Chat, Widget, And WhatsApp
 
