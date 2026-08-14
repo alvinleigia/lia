@@ -51,13 +51,21 @@ Stop Phase 14 if any prerequisite is missing.
 3. Expand `Advanced model and transition limits`. Confirm the model timeout,
    output tokens, retries, task switches, connected-flow depth, handoff depth,
    turn rate, and cost are bounded rather than unlimited.
-4. Open `Automation` > `Actions` and create a disposable blank action named
-   `Phase 14 Handoff UAT`. On its `Canvas`, add one `Business Task` block,
-   select the latest published `Book a Spa Service` task, set every
-   `After the Task` outcome to `End Conversation`, then publish the action.
+4. Create and activate the disposable handoff test action:
+   1. Open `Automation` > `Actions` > `New Action` > `Blank Action`.
+   2. Set `Action Name` to `Phase 14 Handoff UAT`, set `Trigger Phrases` to
+      `phase fourteen handoff test`, then click `Create Action`.
+   3. Open `Canvas`. Under `Blocks` > `Actions`, click `Business Task`.
+   4. Set `Step Name` to `Run Phase 14 handoff`, select the latest published
+      `Book a Spa Service` task, set every `After the Task` outcome to
+      `End Conversation`, then click `Create Business Task Step`.
+   5. Return to the action overview and click `Publish`.
+   6. Open `Settings`, change `Status` from `Draft` to `Active`, and click
+      `Save Action`.
 5. Open `Projects` > `Chat`. If an earlier `Book Spa Service` run is asking for
    a category, send `cancel` and wait for the cancellation reply. Do not use
    that similarly named button here; it starts the older sequential action.
+   Refresh once and confirm `Phase 14 Handoff UAT` is now visible.
 6. Send:
 
    ```text
