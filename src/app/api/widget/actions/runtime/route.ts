@@ -5,6 +5,12 @@ import {
   runBrowserFlowText,
 } from "@/lib/browser-flow-runtime";
 import { channelInboundSelectionInputV1Schema } from "@/lib/channel-inbound-contract";
+import { resolveTraceId } from "@/lib/execution-trace";
+import {
+  formatRuntimeServerTiming,
+  measureRuntimeStage,
+  type RuntimeStageTiming,
+} from "@/lib/runtime-stage-timing";
 import { resolveWidgetTokenAccessForRequest } from "@/lib/widget-keys";
 
 const requestSchema = z
@@ -32,6 +38,10 @@ async function readJsonBody(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const requestStartedAt = performance.now();
+  const timings: RuntimeStageTiming[] = [];
+  const traceId = resolveTraceId(req.headers.get("x-lia-trace-id"));
+
   try {
     const json = await readJsonBody(req);
     const parsed = requestSchema.safeParse(json.body);
@@ -57,10 +67,15 @@ export async function POST(req: Request) {
       );
     }
 
-    const accessResult = await resolveWidgetTokenAccessForRequest({
-      headers: req.headers,
-      token: parsed.data.token,
-    });
+    const accessResult = await measureRuntimeStage(
+      "widget_access",
+      (timing) => timings.push(timing),
+      () =>
+        resolveWidgetTokenAccessForRequest({
+          headers: req.headers,
+          token: parsed.data.token,
+        }),
+    );
 
     if (!accessResult.widgetAccess) {
       return NextResponse.json(
@@ -77,10 +92,12 @@ export async function POST(req: Request) {
       editSection: parsed.data.editSection,
       expectedRevision: parsed.data.expectedRevision,
       projectId: accessResult.widgetAccess.projectId,
+      recordTiming: (timing) => timings.push(timing),
       resume: parsed.data.resume,
       selection: parsed.data.selection,
       source: "widget_chat",
       text: parsed.data.text,
+      traceId,
     });
 
     if (parsed.data.actionId && !result.handled) {
@@ -101,7 +118,26 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json(result);
+    timings.push({
+      durationMs: Math.round((performance.now() - requestStartedAt) * 10) / 10,
+      stage: "request_total",
+    });
+    console.info(
+      JSON.stringify({
+        actionId: parsed.data.actionId ?? null,
+        event: "widget_runtime_timing",
+        projectId: accessResult.widgetAccess.projectId,
+        timings,
+        traceId,
+      }),
+    );
+
+    return NextResponse.json(result, {
+      headers: {
+        "Server-Timing": formatRuntimeServerTiming(timings),
+        "X-Lia-Trace-Id": traceId,
+      },
+    });
   } catch (error) {
     if (error instanceof BrowserFlowCommandError) {
       return NextResponse.json(

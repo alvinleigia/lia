@@ -49,6 +49,11 @@ import {
   getRuntimeProjectActionForSubmission,
   listRuntimeProjectActions,
 } from "@/lib/runtime-actions";
+import {
+  measureRuntimeStage,
+  type RuntimeTimingRecorder,
+  recordRuntimeStage,
+} from "@/lib/runtime-stage-timing";
 
 type RunBrowserFlowTextInput = {
   actionId?: number;
@@ -66,6 +71,7 @@ type RunBrowserFlowTextInput = {
   source: string;
   text?: string;
   traceId?: string | null;
+  recordTiming?: RuntimeTimingRecorder;
 };
 
 export class BrowserFlowCommandError extends Error {
@@ -168,11 +174,16 @@ async function getBrowserFlowState(input: {
 async function executeBrowserFlowText(
   input: RunBrowserFlowTextInput,
 ): Promise<BrowserFlowRuntimeResult> {
-  const activeSubmission = await getActiveActionSubmissionForConversation({
-    conversationId: input.conversationId,
-    projectId: input.projectId,
-    source: input.source,
-  });
+  const activeSubmission = await measureRuntimeStage(
+    "active_submission",
+    input.recordTiming,
+    () =>
+      getActiveActionSubmissionForConversation({
+        conversationId: input.conversationId,
+        projectId: input.projectId,
+        source: input.source,
+      }),
+  );
   const normalizedInbound = normalizeChannelInboundV1({
     channelType: input.channelType,
     selection: input.selection,
@@ -296,10 +307,17 @@ async function executeBrowserFlowText(
 
   if (!activeSubmission) {
     if (input.actionId) {
-      action = await getRuntimeProjectAction(input.projectId, input.actionId);
+      action = await measureRuntimeStage(
+        "runtime_action",
+        input.recordTiming,
+        () =>
+          getRuntimeProjectAction(input.projectId, input.actionId as number),
+      );
     } else if (text) {
       action = findTriggeredAction(
-        await listRuntimeProjectActions(input.projectId),
+        await measureRuntimeStage("runtime_actions", input.recordTiming, () =>
+          listRuntimeProjectActions(input.projectId),
+        ),
         text,
       );
       consumeTriggerMessage = Boolean(
@@ -312,6 +330,7 @@ async function executeBrowserFlowText(
     }
   }
 
+  let stageStartedAt = performance.now();
   const inboundRecord = text
     ? await recordChannelInboundMessage({
         channelType: input.channelType,
@@ -330,6 +349,9 @@ async function executeBrowserFlowText(
           projectId: input.projectId,
         }),
       };
+  recordRuntimeStage("record_inbound", stageStartedAt, input.recordTiming);
+
+  stageStartedAt = performance.now();
   const result = activeSubmission
     ? await processChannelFlowText({
         activeSubmission,
@@ -348,10 +370,16 @@ async function executeBrowserFlowText(
           source: input.source,
           traceId: input.traceId,
         })
-      : { replies: [] };
+      : { boundaryNodeId: null, replies: [] };
+  recordRuntimeStage(
+    activeSubmission ? "advance_flow" : "start_flow",
+    stageStartedAt,
+    input.recordTiming,
+  );
 
   let replies = result.replies;
   if (result.boundaryNodeId && text && "message" in inboundRecord) {
+    stageStartedAt = performance.now();
     const hybrid = await runHybridChannelFlowBoundary({
       boundaryNodeId: result.boundaryNodeId,
       channelConversationId: inboundRecord.conversation.id,
@@ -360,26 +388,32 @@ async function executeBrowserFlowText(
       externalUserId: input.externalUserId,
       inboundMessageId: inboundRecord.message.id,
       projectId: input.projectId,
+      recordTiming: input.recordTiming,
       selection: normalizedInbound.selection,
       source: input.source,
       text,
       consumeTriggerMessage,
     });
+    recordRuntimeStage("hybrid_boundary", stageStartedAt, input.recordTiming);
     replies = [...replies, ...hybrid.replies];
   }
 
+  stageStartedAt = performance.now();
   await recordBrowserFlowReplies({
     channelType: input.channelType,
     conversationId: input.conversationId,
     projectId: input.projectId,
     replies,
   });
+  recordRuntimeStage("record_outbound", stageStartedAt, input.recordTiming);
 
+  stageStartedAt = performance.now();
   const state = await getBrowserFlowState({
     conversationId: input.conversationId,
     projectId: input.projectId,
     source: input.source,
   });
+  recordRuntimeStage("load_flow_state", stageStartedAt, input.recordTiming);
 
   return {
     ...state,
@@ -411,14 +445,19 @@ export async function runBrowserFlowText(
     return executeBrowserFlowText(tracedInput);
   }
 
-  const claim = await claimFlowRuntimeCommand<BrowserFlowRuntimeResult>({
-    commandId: tracedInput.commandId,
-    conversationId: tracedInput.conversationId,
-    projectId: tracedInput.projectId,
-    requestHash: hashBrowserFlowCommand(tracedInput),
-    source: tracedInput.source,
-    traceId: tracedInput.traceId,
-  });
+  const claim = await measureRuntimeStage(
+    "claim_command",
+    tracedInput.recordTiming,
+    () =>
+      claimFlowRuntimeCommand<BrowserFlowRuntimeResult>({
+        commandId: tracedInput.commandId as string,
+        conversationId: tracedInput.conversationId,
+        projectId: tracedInput.projectId,
+        requestHash: hashBrowserFlowCommand(tracedInput),
+        source: tracedInput.source,
+        traceId: tracedInput.traceId,
+      }),
+  );
 
   if (claim.state === "replay") {
     return claim.result;
@@ -435,11 +474,16 @@ export async function runBrowserFlowText(
 
   try {
     const result = await executeBrowserFlowText(tracedInput);
-    await completeFlowRuntimeCommand({
-      commandId: claim.commandId,
-      projectId: tracedInput.projectId,
-      result,
-    });
+    await measureRuntimeStage(
+      "complete_command",
+      tracedInput.recordTiming,
+      () =>
+        completeFlowRuntimeCommand({
+          commandId: claim.commandId,
+          projectId: tracedInput.projectId,
+          result,
+        }),
+    );
     return result;
   } catch (error) {
     await failFlowRuntimeCommand({

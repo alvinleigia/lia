@@ -78,6 +78,10 @@ import {
   createTaskRuntimeReply,
   type RuntimeReply,
 } from "@/lib/runtime-replies";
+import {
+  measureRuntimeStage,
+  type RuntimeTimingRecorder,
+} from "@/lib/runtime-stage-timing";
 
 type ProjectTurnContext = {
   companyName: string;
@@ -589,6 +593,7 @@ type HybridChannelRuntimeInput = {
   externalUserId?: string | null;
   inboundMessageId: number;
   projectId: number;
+  recordTiming?: RuntimeTimingRecorder;
   selection?: ChannelInboundSelectionV1 | null;
   submission: SelectActionSubmission;
   text: string;
@@ -772,11 +777,16 @@ async function ensureDirectTaskEntry(input: {
   node: Extract<HybridFlowNodeV1, { kind: "conversational_task" }>;
   runtimeInput: HybridChannelRuntimeInput;
 }) {
-  const existing = await getConversationTaskRuntimeSession({
-    channelType: input.runtimeInput.channelType,
-    externalConversationId: input.runtimeInput.externalConversationId,
-    projectId: input.runtimeInput.projectId,
-  });
+  const existing = await measureRuntimeStage(
+    "task_session_lookup",
+    input.runtimeInput.recordTiming,
+    () =>
+      getConversationTaskRuntimeSession({
+        channelType: input.runtimeInput.channelType,
+        externalConversationId: input.runtimeInput.externalConversationId,
+        projectId: input.runtimeInput.projectId,
+      }),
+  );
   if (existing.execution?.activeTaskRunId) {
     return existing;
   }
@@ -793,23 +803,33 @@ async function ensureDirectTaskEntry(input: {
     return existing;
   }
 
-  await startConversationalTaskRun({
-    ...startEnvelope(
-      input.runtimeInput,
-      input.runtimeInput.channelConversationId,
-    ),
-    activeNodeId: input.node.id,
-    initializationContext: {},
-    returnTarget,
-    taskId: input.node.settings.task.taskId,
-    taskVersionId: input.node.settings.task.taskVersionId,
-  });
+  await measureRuntimeStage(
+    "task_run_start",
+    input.runtimeInput.recordTiming,
+    () =>
+      startConversationalTaskRun({
+        ...startEnvelope(
+          input.runtimeInput,
+          input.runtimeInput.channelConversationId,
+        ),
+        activeNodeId: input.node.id,
+        initializationContext: {},
+        returnTarget,
+        taskId: input.node.settings.task.taskId,
+        taskVersionId: input.node.settings.task.taskVersionId,
+      }),
+  );
 
-  return getConversationTaskRuntimeSession({
-    channelType: input.runtimeInput.channelType,
-    externalConversationId: input.runtimeInput.externalConversationId,
-    projectId: input.runtimeInput.projectId,
-  });
+  return measureRuntimeStage(
+    "task_session_reload",
+    input.runtimeInput.recordTiming,
+    () =>
+      getConversationTaskRuntimeSession({
+        channelType: input.runtimeInput.channelType,
+        externalConversationId: input.runtimeInput.externalConversationId,
+        projectId: input.runtimeInput.projectId,
+      }),
+  );
 }
 
 async function executeTaskBoundary(input: {
@@ -1270,14 +1290,19 @@ export async function runHybridChannelBoundary(
     return { replies: [] };
   }
 
-  const [project, session] = await Promise.all([
-    getProjectTurnContext(input.projectId),
-    getConversationTaskRuntimeSession({
-      channelType: input.channelType,
-      externalConversationId: input.externalConversationId,
-      projectId: input.projectId,
-    }),
-  ]);
+  const [project, session] = await measureRuntimeStage(
+    "hybrid_context",
+    input.recordTiming,
+    () =>
+      Promise.all([
+        getProjectTurnContext(input.projectId),
+        getConversationTaskRuntimeSession({
+          channelType: input.channelType,
+          externalConversationId: input.externalConversationId,
+          projectId: input.projectId,
+        }),
+      ]),
+  );
   if (!project) {
     return { replies: [] };
   }
@@ -1329,25 +1354,35 @@ export async function runHybridChannelBoundary(
     ) {
       throw new Error("The pinned conversational task runtime is unavailable.");
     }
-    const inputRequest = await hydrateProjectResourceInputRequest({
-      fields: taskSession.runtime.fields,
-      inputRequest: getResumedTaskRuntimeInputRequest({
-        fields: taskSession.runtime.fields,
-        requestedFieldKey: taskSession.runtime.run.lastRequestedFieldKey,
-        snapshot: taskSession.snapshot,
-      }),
-      projectId: input.projectId,
-      snapshot: taskSession.snapshot,
-    });
+    const execution = taskSession.execution;
+    const runtime = taskSession.runtime;
+    const snapshot = taskSession.snapshot;
+    const inputRequest = await measureRuntimeStage(
+      "task_input_options",
+      input.recordTiming,
+      () =>
+        hydrateProjectResourceInputRequest({
+          fields: runtime.fields,
+          inputRequest: getResumedTaskRuntimeInputRequest({
+            fields: runtime.fields,
+            requestedFieldKey: runtime.run.lastRequestedFieldKey,
+            snapshot,
+          }),
+          projectId: input.projectId,
+          snapshot,
+        }),
+    );
     if (inputRequest) {
-      await recordTaskFieldRequest({
-        conversationId: taskSession.runtime.run.conversationId,
-        inputRequest,
-        revision: taskSession.execution.revision,
-        runtimeInput: input,
-        taskRunId: taskSession.runtime.run.id,
-      });
-      const field = taskSession.snapshot.task.definition.fields.find(
+      await measureRuntimeStage("task_field_request", input.recordTiming, () =>
+        recordTaskFieldRequest({
+          conversationId: runtime.run.conversationId,
+          inputRequest,
+          revision: execution.revision,
+          runtimeInput: input,
+          taskRunId: runtime.run.id,
+        }),
+      );
+      const field = snapshot.task.definition.fields.find(
         (candidate) => candidate.key === inputRequest.fieldKey,
       );
       return {
@@ -1509,18 +1544,24 @@ export async function runHybridChannelBoundary(
 export async function runHybridChannelFlowBoundary(
   input: HybridChannelFlowBoundaryInput,
 ): Promise<HybridChannelBoundaryResult> {
-  const submission = await getActiveActionSubmissionForConversation({
-    conversationId: input.externalConversationId,
-    projectId: input.projectId,
-    source: input.source,
-  });
+  const submission = await measureRuntimeStage(
+    "hybrid_submission",
+    input.recordTiming,
+    () =>
+      getActiveActionSubmissionForConversation({
+        conversationId: input.externalConversationId,
+        projectId: input.projectId,
+        source: input.source,
+      }),
+  );
   if (!submission) {
     return { replies: [] };
   }
 
-  const action = await getRuntimeProjectActionForSubmission(
-    input.projectId,
-    submission,
+  const action = await measureRuntimeStage(
+    "hybrid_action",
+    input.recordTiming,
+    () => getRuntimeProjectActionForSubmission(input.projectId, submission),
   );
   if (!action) {
     return { replies: [] };

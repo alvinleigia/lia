@@ -20,6 +20,7 @@ export default defineConfig({
     "flow-message-editor.spec.ts",
     "hybrid-flow.spec.ts",
     "media-storage-contract.spec.ts",
+    "runtime-stage-timing.spec.ts",
     "whatsapp-template-contracts.spec.ts",
   ],
   timeout: 30_000,
