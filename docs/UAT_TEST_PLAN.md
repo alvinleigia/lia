@@ -87,30 +87,48 @@ Stop Phase 14 if any prerequisite is missing.
 11. Open `Admin` > `Audit Logs`. Confirm `handoff.assigned` and
    `conversation.lifecycle_changed` appear with the actor, project, target,
    and timestamp but no private values.
-12. Return to `Automation` > `Actions`, open `Phase 14 Handoff UAT`, and set its
-    status to `Archived`.
+
+Keep `Phase 14 Handoff UAT` active for 14.2. It is archived after the channel
+checks.
 
 Result: [ ] Pass [ ] Fail
 
-## 14.2 Run The Same Booking In Every Channel
+## 14.2 Repeat One Booking In Every Channel
+
+Complete the same booking once in Project Chat, once in the Website Widget,
+and once in WhatsApp if WhatsApp is configured. Use `Phase 14 Handoff UAT` as
+the entry point. Do not use the older `Book Spa Service` action. If you already
+archived the test action after 14.1, open its `Settings`, change `Status` back
+to `Active`, and click `Save Action`.
 
 Use the same disposable values in all channels:
 
 - Category: `Facial`
 - Service: `Classic Facial`
-- Date: choose a future available date
+- Date: choose one future available date and reuse it in every channel
 - Time: `16:30`
 - Name: `Phase 14 Release Guest`
 - Email: `phase14.release@example.com`
 - Phone: `+919876543211`
 
+After choosing the service, send the remaining five values in this format,
+replacing the date with the future date you chose:
+
+```text
+<YYYY-MM-DD> at 16:30 for Phase 14 Release Guest, phase14.release@example.com, +919876543211.
+```
+
 ### Project Chat
 
-1. Open `Projects` > `Chat` and click `Book a Spa Service`.
-2. Choose `Facial`, then `Classic Facial`.
-3. Enter the remaining date, time, name, email, and phone in one message.
-4. Confirm the review shows all seven values.
-5. Click `Confirm` once and wait for the successful `Manual Review` result.
+1. Open `Projects` > `Chat`. If the action buttons are greyed out, send
+   `cancel` and wait for the cancellation reply.
+2. Click `Phase 14 Handoff UAT` and wait for its acknowledgement.
+3. Send `I want to book a spa service.`
+4. Choose `Facial`, then `Classic Facial`.
+5. When Lia asks for the date, send the date, time, name, email, and phone in
+   one message.
+6. Confirm the review shows all seven values, click `Confirm` once, and wait
+   for the successful `Manual Review` result.
 
 Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
 
@@ -119,11 +137,13 @@ Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
 1. Open `Projects` > `Widget`.
 2. Confirm `Allowed Domains` includes the staging host and click
    `Save Allowed Domains` if needed.
-3. Click `Open Widget Preview` and complete the same booking.
-4. Close and reopen the preview before confirmation. Confirm the same run and
-   values return.
-5. Complete the booking and confirm one successful result.
-6. Check the widget at approximately `320 x 568`; the header, messages,
+3. Click `Open Widget Preview`, then click `Phase 14 Handoff UAT`.
+4. Send `I want to book a spa service.`, choose `Facial` and `Classic Facial`,
+   then send the same remaining five values used in Project Chat.
+5. Before clicking `Confirm`, close and reopen the preview. Confirm the same
+   run and seven values return.
+6. Click `Confirm` once and wait for one successful result.
+7. Check the widget at approximately `320 x 568`; the header, messages,
    composer, and close control must remain usable.
 
 Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
@@ -132,11 +152,13 @@ Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
 
 Run this only when the staging WhatsApp channel is configured.
 
-1. Send `I want to book a spa service.` to the staging number.
-2. Complete the same booking and confirm once.
-3. Confirm the device receives one successful completion reply.
-4. Replay one stored provider message ID with the approved test tool. Confirm
-   it does not create a duplicate message, submission, or operation.
+1. Send `phase fourteen handoff test` to the staging number. This starts the
+   correct wrapper without triggering the older action.
+2. Choose `Facial`, then `Classic Facial`.
+3. Send the same remaining five values used in Project Chat.
+4. Review all seven values, then send or select `Confirm` once.
+5. Confirm the device receives one successful completion reply and no
+   duplicate reply.
 
 Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail [ ] Not configured
 
@@ -148,6 +170,8 @@ Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail [ ] Not configured
    canonical values, and has exactly one completed `Manual Review` attempt.
 4. Open `Automation` > `Contacts`. Confirm each contact has the correct channel
    badge and its own `Channel Transcript`.
+5. Return to `Automation` > `Actions`, open `Phase 14 Handoff UAT` > `Settings`,
+   change `Status` to `Archived`, and click `Save Action`.
 
 Result: [ ] Pass [ ] Fail
 
