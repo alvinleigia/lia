@@ -95,9 +95,10 @@ Result: [ ] Pass [ ] Fail
 
 7. Confirm Lia gives a readable human-help response and stops asking booking
    questions.
-8. Open `Automation` > `Handoff Queue` > `Unassigned`. Open the new handoff,
-   click `Claim`, then click `Resolve`.
-9. Confirm the handoff moves to `Closed`.
+8. Open `Automation` > `Handoff Queue` > `Open`. Open the new handoff. If it is
+   unassigned, click `Claim` first. When it shows your name and `Under Review`,
+   click `Complete` (`Resolve` on builds using that label).
+9. Confirm the handoff disappears from `Open` and appears under `Closed`.
 10. Open `Admin` > `Audit Logs`. Look for `handoff.assigned` and
     `conversation.lifecycle_changed` with actor, project, target, and timestamp
     but no private values.
