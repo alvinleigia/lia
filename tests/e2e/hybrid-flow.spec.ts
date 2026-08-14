@@ -32,6 +32,7 @@ import {
   bindRequestedTaskSelection,
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
+  createRequestedTaskSelectionProposal,
   dispatchHybridFlowBoundary,
   getRequiredCompletionOperationDefinition,
   getResumedTaskRuntimeInputRequest,
@@ -648,6 +649,33 @@ test("explicit task selections override model-rewritten resource IDs", () => {
       source: "visitor",
     },
   ]);
+});
+
+test("requested project-resource selections can skip the model", () => {
+  expect(
+    createRequestedTaskSelectionProposal({
+      requestedFieldKey: "serviceId",
+      selectionValue: "product:71",
+    }),
+  ).toMatchObject({
+    fieldCandidates: [
+      {
+        confidence: 1,
+        fieldKey: "serviceId",
+        naturalValue: "product:71",
+        source: "visitor",
+      },
+    ],
+    nextAction: "ask",
+    safety: { decision: "allow", reasonCode: null },
+    turnKind: "field_answer",
+  });
+  expect(
+    createRequestedTaskSelectionProposal({
+      requestedFieldKey: null,
+      selectionValue: "product:71",
+    }),
+  ).toBeNull();
 });
 
 test("task turns ask for the next unresolved field before confirmation", () => {

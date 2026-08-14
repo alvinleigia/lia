@@ -31,6 +31,8 @@ import {
 import {
   AiSdkStructuredTurnProvider,
   PLATFORM_DEFAULT_MODEL_ID,
+  PLATFORM_EXTRACTION_FALLBACK_MODEL_ID,
+  PLATFORM_EXTRACTION_MODEL_ID,
   PLATFORM_FALLBACK_MODEL_ID,
   type StructuredTurnProvider,
   type StructuredTurnProviderResult,
@@ -193,6 +195,12 @@ function resolveModelIds(
 ) {
   const modelPolicy = policy.assistant.modelPolicy;
   if (modelPolicy.mode === "platform_default") {
+    if (stage === "extraction") {
+      return {
+        primary: PLATFORM_EXTRACTION_MODEL_ID,
+        fallback: PLATFORM_EXTRACTION_FALLBACK_MODEL_ID,
+      };
+    }
     return {
       primary: PLATFORM_DEFAULT_MODEL_ID,
       fallback: PLATFORM_FALLBACK_MODEL_ID,
@@ -293,8 +301,9 @@ function modelFailureProposal(input: ExecuteStructuredTurnInput) {
   });
 }
 
-function directFieldRecoveryProposal(
+function directFieldProposal(
   input: ExecuteStructuredTurnInput,
+  reasonCode: "model_unavailable" | null,
 ): TurnResultV1 | null {
   if (!input.activeTask) return null;
 
@@ -350,10 +359,12 @@ function directFieldRecoveryProposal(
     },
     safety: {
       decision: "allow",
-      reasonCode: "model_unavailable",
+      reasonCode,
     },
     decisionSummary:
-      "Recovered one unambiguous visitor field after model failure.",
+      reasonCode === "model_unavailable"
+        ? "Recovered one unambiguous visitor field after model failure."
+        : "Accepted one unambiguous typed visitor field without model inference.",
   });
 }
 
@@ -557,6 +568,16 @@ export class StructuredTurnEngine {
       };
     }
 
+    const directField = directFieldProposal(input, null);
+    if (directField) {
+      return {
+        attempts: 0,
+        proposal: asValidatedDeterministic(directField),
+        source: "deterministic",
+        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+      };
+    }
+
     const modelIds = resolveModelIds(input.projectPolicy, input.stage);
     const budget = await this.budgetGate.admit({
       estimatedCostUnits: admission.estimatedCostUnits ?? 0,
@@ -674,7 +695,8 @@ export class StructuredTurnEngine {
     }
 
     const fallback =
-      directFieldRecoveryProposal(input) ?? modelFailureProposal(input);
+      directFieldProposal(input, "model_unavailable") ??
+      modelFailureProposal(input);
     return {
       attempts,
       proposal: {

@@ -7,6 +7,7 @@ import {
   buildActionSnapshot,
   buildTaskSnapshot,
   remapOperationReferences,
+  remapTaskSnapshotProjectIds,
   remapTaskWrapperSettings,
 } from "./lib/phase14-staging-fixture.mjs";
 
@@ -306,6 +307,36 @@ async function fixtureAlreadyExists(tx, projectId) {
   );
 }
 
+async function repairExistingFixture(tx, projectId, sourceProjectId) {
+  const version = expectExactlyOne(
+    await tx`
+      select tv.id, tv.snapshot
+      from conversational_task_versions tv
+      inner join conversational_tasks t
+        on t.id = tv.task_id and t.project_id = tv.project_id
+      where tv.project_id = ${projectId}
+        and t.name = ${SOURCE_TASK_NAME}
+        and tv.version_number = ${SOURCE_TASK_VERSION}
+    `,
+    "Existing staging task version",
+  );
+  const snapshot = remapTaskSnapshotProjectIds(
+    version.snapshot,
+    sourceProjectId,
+    projectId,
+  );
+  if (JSON.stringify(snapshot) === JSON.stringify(version.snapshot)) {
+    return false;
+  }
+  assertSanitizedConfiguration("Repaired task snapshot", snapshot);
+  await tx`
+    update conversational_task_versions
+    set snapshot = ${tx.json(snapshot)}
+    where id = ${version.id} and project_id = ${projectId}
+  `;
+  return true;
+}
+
 async function resolveManualReview(tx, projectId, source) {
   const providers = await tx`
     select * from integration_providers
@@ -380,10 +411,15 @@ async function seedTarget(tx, source, ownerEmail) {
       ) returning *
     `;
   } else {
-    await assertNoRuntimeRows(tx, project.id);
     if (await fixtureAlreadyExists(tx, project.id)) {
-      return { projectId: project.id, seeded: false };
+      const repaired = await repairExistingFixture(
+        tx,
+        project.id,
+        source.project.id,
+      );
+      return { projectId: project.id, repaired, seeded: false };
     }
+    await assertNoRuntimeRows(tx, project.id);
 
     const counts = await getConfigurationCounts(tx, project.id);
     const unexpected = Object.entries(counts).filter(
@@ -463,8 +499,10 @@ async function seedTarget(tx, source, ownerEmail) {
   const taskSnapshot = buildTaskSnapshot({
     snapshot: source.taskVersion.snapshot,
     sourceOperationId: source.operation.id,
+    sourceProjectId: source.project.id,
     sourceTaskId: source.task.id,
     targetOperationId: operation.id,
+    targetProjectId: project.id,
     targetTaskId: task.id,
   });
   const [taskVersion] = await tx`
@@ -537,7 +575,7 @@ async function seedTarget(tx, source, ownerEmail) {
     where id = ${action.id} and project_id = ${project.id}
   `;
 
-  return { projectId: project.id, seeded: true };
+  return { projectId: project.id, repaired: false, seeded: true };
 }
 
 async function main() {
@@ -581,7 +619,9 @@ async function main() {
     console.log(
       result.seeded
         ? `Seeded ${TARGET_PROJECT_NAME} as project #${result.projectId}.`
-        : `${TARGET_PROJECT_NAME} is already seeded as project #${result.projectId}.`,
+        : result.repaired
+          ? `Repaired ${TARGET_PROJECT_NAME} as project #${result.projectId}.`
+          : `${TARGET_PROJECT_NAME} is already seeded as project #${result.projectId}.`,
     );
     console.log(
       "Copied configuration: conversation policy, task v4, one catalog product, Manual Review, and one published task wrapper.",

@@ -127,6 +127,36 @@ export function bindRequestedTaskSelection(input: {
   };
 }
 
+export function createRequestedTaskSelectionProposal(input: {
+  requestedFieldKey: string | null;
+  selectionValue: string | null;
+}): TurnResultV1 | null {
+  if (!input.requestedFieldKey || !input.selectionValue) return null;
+
+  return {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: `Accepted the explicit selection for ${input.requestedFieldKey}.`,
+    fieldCandidates: [
+      {
+        confidence: 1,
+        fieldKey: input.requestedFieldKey,
+        naturalValue: input.selectionValue,
+        source: "visitor",
+      },
+    ],
+    grounding: { excerptIds: [], status: "not_needed" },
+    nextAction: "ask",
+    outcomeRecommendation: null,
+    reply: "Thanks. I recorded your selection.",
+    routeRecommendation: null,
+    safety: { decision: "allow", reasonCode: null },
+    schemaVersion: 1,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_answer",
+  };
+}
+
 function findUnresolvedTaskField(input: TaskRuntimeReconciliationInput) {
   if (!canRequestTaskField(input.proposal)) {
     return null;

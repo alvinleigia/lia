@@ -4,6 +4,7 @@ import {
   buildActionSnapshot,
   buildTaskSnapshot,
   remapOperationReferences,
+  remapTaskSnapshotProjectIds,
   remapTaskWrapperSettings,
 } from "./lib/phase14-staging-fixture.mjs";
 
@@ -27,16 +28,24 @@ assert.equal(taskSettings.conversationalTask.task.taskId, 3);
 const taskSnapshot = buildTaskSnapshot({
   snapshot: {
     task: { id: 3, definition: { tools: [{ id: "operation:204" }] } },
-    toolDefinitions: [{ id: "operation:204" }],
+    toolDefinitions: [{ id: "operation:204", projectId: 194 }],
   },
   sourceOperationId: 204,
+  sourceProjectId: 194,
   sourceTaskId: 3,
   targetOperationId: 904,
+  targetProjectId: 1,
   targetTaskId: 30,
 });
 assert.equal(taskSnapshot.task.id, 30);
 assert.equal(taskSnapshot.task.definition.tools[0].id, "operation:904");
 assert.equal(taskSnapshot.toolDefinitions[0].id, "operation:904");
+assert.equal(taskSnapshot.toolDefinitions[0].projectId, 1);
+assert.equal(
+  remapTaskSnapshotProjectIds(taskSnapshot, 194, 1).toolDefinitions[0]
+    .projectId,
+  1,
+);
 
 const sourceActionSnapshot = {
   action: {

@@ -56,6 +56,7 @@ import {
   bindRequestedTaskSelection,
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
+  createRequestedTaskSelectionProposal,
   dispatchHybridFlowBoundary,
   getRequiredCompletionOperationDefinition,
   getResumedTaskRuntimeInputRequest,
@@ -836,38 +837,48 @@ async function executeTaskBoundary(input: {
   });
   if (confirmationExecution) return confirmationExecution;
 
-  const execution = await executeConfiguredStructuredTurn({
-    activeTask: session.snapshot,
-    assistantBehavior: normalizeProjectAiSettings(
-      session.snapshot.assistantBehavior,
-    ),
-    assistantIntroduced: input.history.some(
-      (message) => message.role === "assistant",
-    ),
-    channel: input.runtimeInput.channelType,
-    companyName: input.project.companyName,
-    context: toRuntimeContext(session.runtime),
-    fieldState: toRuntimeFieldState({
-      runtime: session.runtime,
-      snapshot: session.snapshot,
-    }),
-    history: input.history,
-    projectId: input.runtimeInput.projectId,
-    projectName: input.project.projectName,
-    projectPolicy: session.snapshot.conversationPolicy,
-    publishedTasks: [],
-    stage: "extraction",
-    visitorMessage: input.runtimeInput.text,
-  });
   const requestedField = session.snapshot.task.definition.fields.find(
     (field) => field.key === session.runtime?.run.lastRequestedFieldKey,
   );
-  const proposal = bindRequestedTaskSelection({
-    proposal: execution.proposal,
+  const selectionProposal = createRequestedTaskSelectionProposal({
     requestedFieldKey:
       requestedField?.type === "project_resource" ? requestedField.key : null,
     selectionValue: input.runtimeInput.selection?.value ?? null,
   });
+  const proposal = selectionProposal
+    ? selectionProposal
+    : bindRequestedTaskSelection({
+        proposal: (
+          await executeConfiguredStructuredTurn({
+            activeTask: session.snapshot,
+            assistantBehavior: normalizeProjectAiSettings(
+              session.snapshot.assistantBehavior,
+            ),
+            assistantIntroduced: input.history.some(
+              (message) => message.role === "assistant",
+            ),
+            channel: input.runtimeInput.channelType,
+            companyName: input.project.companyName,
+            context: toRuntimeContext(session.runtime),
+            fieldState: toRuntimeFieldState({
+              runtime: session.runtime,
+              snapshot: session.snapshot,
+            }),
+            history: input.history,
+            projectId: input.runtimeInput.projectId,
+            projectName: input.project.projectName,
+            projectPolicy: session.snapshot.conversationPolicy,
+            publishedTasks: [],
+            stage: "extraction",
+            visitorMessage: input.runtimeInput.text,
+          })
+        ).proposal,
+        requestedFieldKey:
+          requestedField?.type === "project_resource"
+            ? requestedField.key
+            : null,
+        selectionValue: input.runtimeInput.selection?.value ?? null,
+      });
   let revision = session.execution.revision;
 
   if (proposal.turnKind === "side_question") {

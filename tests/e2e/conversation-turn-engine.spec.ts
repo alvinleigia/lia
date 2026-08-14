@@ -388,13 +388,8 @@ test("provider failures use bounded primary and fallback attempts", async () => 
   expect(new Set(provider.calls.map(({ modelId }) => modelId)).size).toBe(2);
 });
 
-test("model failure preserves an unambiguous typed field answer", async () => {
-  const provider = new QueueProvider([
-    new Error("primary failed"),
-    new Error("primary repair failed"),
-    new Error("fallback failed"),
-    new Error("fallback repair failed"),
-  ]);
+test("unambiguous typed field answers bypass the model", async () => {
+  const provider = new QueueProvider([]);
   const engine = new StructuredTurnEngine({ provider });
 
   const result = await engine.execute({
@@ -413,6 +408,8 @@ test("model failure preserves an unambiguous typed field answer", async () => {
   });
 
   expect(result.source).toBe("deterministic");
+  expect(result.attempts).toBe(0);
+  expect(provider.calls).toHaveLength(0);
   expect(result.proposal.fieldCandidates).toEqual([
     {
       fieldKey: "guestEmail",
@@ -422,7 +419,7 @@ test("model failure preserves an unambiguous typed field answer", async () => {
     },
   ]);
   expect(result.proposal.reply).not.toContain("availability");
-  expect(result.proposal.safety.reasonCode).toBe("model_unavailable");
+  expect(result.proposal.safety.reasonCode).toBeNull();
 });
 
 test("low-confidence task recommendations require focused clarification", async () => {
@@ -791,4 +788,14 @@ test("published stage overrides select the configured model", async () => {
 
   expect(provider.calls).toHaveLength(1);
   expect(provider.calls[0]?.modelId).toBe("stage-model");
+});
+
+test("platform-default extraction uses the low-latency structured model", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  await engine.execute(engineInput());
+
+  expect(provider.calls).toHaveLength(1);
+  expect(provider.calls[0]?.modelId).toBe("gpt-4.1-mini");
 });

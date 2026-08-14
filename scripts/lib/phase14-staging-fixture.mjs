@@ -91,17 +91,39 @@ export function remapOperationReferences(value, sourceId, targetId) {
   );
 }
 
+export function remapTaskSnapshotProjectIds(
+  snapshot,
+  sourceProjectId,
+  targetProjectId,
+) {
+  const remapped = cloneValue(snapshot);
+  for (const definition of remapped.toolDefinitions ?? []) {
+    if (
+      definition.projectId !== sourceProjectId &&
+      definition.projectId !== targetProjectId
+    ) {
+      throw new Error(
+        "Source task snapshot contains a tool for an unexpected project.",
+      );
+    }
+    definition.projectId = targetProjectId;
+  }
+  return remapped;
+}
+
 export function buildTaskSnapshot({
   snapshot,
   sourceOperationId,
+  sourceProjectId,
   sourceTaskId,
   targetOperationId,
+  targetProjectId,
   targetTaskId,
 }) {
-  const remapped = remapOperationReferences(
-    snapshot,
-    sourceOperationId,
-    targetOperationId,
+  const remapped = remapTaskSnapshotProjectIds(
+    remapOperationReferences(snapshot, sourceOperationId, targetOperationId),
+    sourceProjectId,
+    targetProjectId,
   );
 
   if (!remapped.task || remapped.task.id !== sourceTaskId) {
