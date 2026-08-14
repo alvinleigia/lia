@@ -4,6 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Selected project: `Phase 14 Release UAT (#1)`
+- Minimum release-candidate commit: `5f65659`
 
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
@@ -13,7 +14,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | Phase | Status | Next action |
 | --- | --- | --- |
 | 1-13 | Complete | None. |
-| 14 - Beta release | In progress | Run this staging checklist and obtain release approval. |
+| 14 - Beta release | In progress | Confirm staging deployed `5f65659` or later, then run this checklist. |
 | 15 - Knowledge and memory | Pending | Start only after Phase 14 passes. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
@@ -27,7 +28,9 @@ contact details.
 - Date: `<date>`
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
-- Deployed commit: `<short commit>`
+- Expected minimum commit: `5f65659`
+- Actual deployed commit: `<short commit from the hosting dashboard>`
+- Deployment status: [ ] Successful
 - Staging WhatsApp configured: [ ] Yes [ ] No
 
 # Phase 14 - Beta Release
@@ -36,11 +39,16 @@ contact details.
 
 Ask the release owner to confirm:
 
-- [ ] The recorded commit is deployed at the staging URL.
+- [ ] The hosting dashboard shows a successful staging deployment for commit
+      `5f65659` or a later commit from `main`.
 - [ ] Clean and existing-database migrations passed.
 - [ ] A backup was restored into a disposable environment.
 - [ ] Staging secrets, public media storage, and scheduled jobs work.
 - [ ] `npm run certify:release` passed, including live-model checks.
+
+A successful GitHub push is not deployment proof. Stop and record
+`Stale staging deployment` if the hosting dashboard cannot identify the
+deployed commit or reports an older commit.
 
 Then verify the seeded UI fixture:
 
@@ -97,13 +105,16 @@ Result: [ ] Pass [ ] Fail
    questions.
 8. Open `Automation` > `Handoff Queue` > `Open`. Open the new handoff. If it is
    unassigned, click `Claim` first. When it shows your name and `Under Review`,
-   click `Complete` (`Resolve` on builds using that label).
+   click `Resolve`.
 9. Confirm the handoff disappears from `Open` and appears under `Closed`.
 10. Open `Admin` > `Audit Logs`. Look for `handoff.assigned` and
     `conversation.lifecycle_changed` with actor, project, target, and timestamp
     but no private values.
 
 Result: [ ] Pass [ ] Fail
+
+If this screen shows `Complete` instead of `Resolve`, stop and record
+`Stale staging deployment`; the release-candidate code uses `Resolve`.
 
 ## 14.2 Repeat One Booking In Each Channel
 
