@@ -148,15 +148,20 @@ Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
 ### Website Widget
 
 1. Open `Projects` > `Widget`.
-2. Add `lia-staging.leigia.com` to `Allowed Domains` and click
+2. If `Open Widget Preview` is not visible, click `Generate Widget Token` or
+   `Rotate Widget Token` once. Rotation invalidates the previous token but
+   preserves `Allowed Domains`. Do this only in the disposable staging project
+   and never copy the shown token into screenshots or UAT notes.
+3. Add `lia-staging.leigia.com` to `Allowed Domains` and click
    `Save Allowed Domains` if it is not already present.
-3. Click `Open Widget Preview`, then click `Book a Spa Service`.
-4. Send `I want to book a spa service.`, choose `Facial` and
+4. Scroll below `Embed Snippet`, click `Open Widget Preview`, then click
+   `Book a Spa Service`.
+5. Send `I want to book a spa service.`, choose `Facial` and
    `Classic Facial`, then send the same remaining five values.
-5. Before confirming, close and reopen the preview. Confirm the same run and
+6. Before confirming, close and reopen the preview. Confirm the same run and
    seven values return.
-6. Click `Confirm` once and wait for one successful result.
-7. At approximately `320 x 568`, confirm the header, messages, composer, and
+7. Click `Confirm` once and wait for one successful result.
+8. At approximately `320 x 568`, confirm the header, messages, composer, and
    close control remain usable.
 
 Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
