@@ -83,7 +83,7 @@ database, backup, and provider readiness work.
 - [x] Grounded Q&A can enter a bounded task and return to Q&A within one version-pinned conversation.
 - [ ] Full rich-content parity with `docs/Flow Builder v2.pdf` is not complete.
 - [x] Direct button, list-row, product, and result-to-node mapping is complete.
-- [ ] Phase 14 live cross-channel UAT is in progress; final WhatsApp, result-comparison, recovery, and release-owner checks remain.
+- [ ] Phase 14 live cross-channel UAT is in progress; final result-comparison, recovery, and release-owner checks remain.
 - [ ] Priority 2 release approval is not complete.
 
 Active release gate: Priority 2, Phase 14 of 18. Engineering implementation has
@@ -102,7 +102,7 @@ by `docs/UAT_TEST_PLAN.md`, then continue Phase 17 implementation.
 | 1-7 | Complete | Passed | None. |
 | 8 | Priority 1 exit gate complete | Passed on 2026-08-03 | One deferred enhancement remains: map typed-input requests to a configured native WhatsApp Flow control. |
 | 9-13 | Complete | Passed by 2026-08-05 | None. |
-| 14 | Local implementation and offline gates complete; WhatsApp ordering hardening is pushed through `d89605f` | Fixture repair, Widget submission, response time, and auto-scroll passed; WhatsApp hardening needs staging verification and the remaining channel, recovery, and release gates are open | Verify `d89605f` on staging, then finish 14.2 Project Chat, Widget close/reopen and small-screen checks, WhatsApp, result comparison, and 14.3. |
+| 14 | Local implementation and offline gates complete; WhatsApp delivery hardening is verified through `923f042` | Fixture repair, Widget submission, response time, auto-scroll, and one complete WhatsApp booking passed; remaining browser-channel, comparison, recovery, and release gates are open | Finish 14.2 Project Chat, Widget close/reopen and small-screen checks, result comparison, and 14.3. |
 | 15 | Complete | Staging UAT pending | Activate its detailed checklist after Phase 14 passes. |
 | 16 | Complete | Staging UAT pending | Activate its detailed checklist after Phase 15 passes. |
 | 17 | Foundation only; 12 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |

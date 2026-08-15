@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Selected project: `Phase 14 Release UAT (#1)`
-- Minimum release-candidate commit: `d89605f`
+- Minimum release-candidate commit: `923f042`
 
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
@@ -28,10 +28,10 @@ contact details.
 - Date: `<date>`
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
-- Expected minimum commit: `d89605f`
-- Actual deployed commit: `<short commit from the hosting dashboard>`
-- Deployment status: [ ] Successful
-- Staging WhatsApp configured: [ ] Yes [ ] No
+- Expected minimum commit: `923f042`
+- Actual deployed commit: `923f042`
+- Deployment status: [x] Successful
+- Staging WhatsApp configured: [x] Yes [ ] No
 
 # Phase 14 - Beta Release
 
@@ -39,9 +39,9 @@ contact details.
 
 Ask the release owner to confirm:
 
-- [ ] The hosting dashboard shows a successful staging deployment for commit
-      `d89605f` or a later commit from `main`.
-- [ ] The release owner ran `npm run seed:phase14-staging` with the staging
+- [x] The hosting dashboard shows a successful staging deployment for commit
+      `923f042` or a later commit from `main`.
+- [x] The release owner ran `npm run seed:phase14-staging` with the staging
       fixture variables and saw `Repaired Phase 14 Release UAT as project #1.`
 - [ ] Clean and existing-database migrations passed.
 - [ ] A backup was restored into a disposable environment.
@@ -196,7 +196,13 @@ Run this only if the staging WhatsApp channel is configured.
 If WhatsApp is not configured, mark `Environment blocker`; Phase 14 remains in
 progress until the release owner resolves or formally accepts the limitation.
 
-Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail [ ] Environment blocker
+Verified on 2026-08-15 against `923f042`: the complete seven-field booking
+finished once through Manual Review. Replies remained ordered, obsolete queued
+replies were cancelled, current buttons worked, and no duplicate prompt or
+completion reply appeared. The expired UAT access token was replaced before
+the successful run.
+
+Result: [x] Pass [ ] Pass with accepted limitation [ ] Fail [ ] Environment blocker
 
 ### Compare The Results
 
@@ -236,7 +242,7 @@ Result: [ ] Pass [ ] Fail
 | `P14-UAT-04` | Fixed and staging verified | Commit `39a7367` colocates the runtime with the database and skips the redundant trigger model turn. Measured server time fell from `57.15 s` to `0.754 s` for starting the booking and was `0.697 s` for the next selection. |
 | `P14-UAT-05` | Fixed and staging verified | Commits `0681065` and `6b344b7` make confirmed operations retry-safe and preserve runtime event order. The Widget completed one Manual Review submission successfully. |
 | `P14-UAT-06` | Fixed and staging verified | Commit `a218441` automatically shows the newest Widget message and reply without manual scrolling. |
-| `P14-UAT-07` | Fixed - staging verification pending | Commits `1394ae8`, `0957d03`, and `d89605f` reject late provider events and stale selections, scope immediate delivery to the active recipient, cancel queued replies superseded by newer input, and block an old turn's reply before provider delivery. |
+| `P14-UAT-07` | Fixed and staging verified | Commits `1394ae8`, `0957d03`, `d89605f`, and `923f042` reject late provider events and stale selections, cancel obsolete queued replies, block an old turn's reply, and use the database clock for immediate outbox claims. A complete WhatsApp booking passed once after the expired UAT token was replaced. |
 
 ### Phase 14 Sign-Off
 
