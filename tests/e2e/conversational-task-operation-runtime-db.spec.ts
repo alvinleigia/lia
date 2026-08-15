@@ -27,6 +27,7 @@ import { resolveProjectTaskToolDefinition } from "../../src/lib/conversational-t
 import { db } from "../../src/lib/db-config";
 import {
   channelConversations,
+  channelMessages,
   companies,
   conversationalTasks,
   conversationalTaskVersions,
@@ -50,8 +51,12 @@ import {
   createOperation,
   processProjectDurableOperationQueue,
 } from "../../src/lib/operations";
-import { processProjectOutboxQueue } from "../../src/lib/outbox";
+import {
+  cancelPendingWhatsAppReplies,
+  processProjectOutboxQueue,
+} from "../../src/lib/outbox";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
+import { createTextReply } from "../../src/lib/runtime-replies";
 
 test.describe.configure({ mode: "serial" });
 
@@ -458,6 +463,127 @@ test("scopes immediate WhatsApp outbox draining to one destination", async () =>
 
   expect(result.processed).toBe(0);
   expect(stored?.status).toBe("queued");
+});
+
+test("cancels queued WhatsApp replies superseded by new inbound activity", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const destination = `phase14-cancel-queued-${suffix}`;
+  const [target, unrelated] = await db
+    .insert(outboxMessages)
+    .values([
+      {
+        dedupeKey: `phase14-cancel-target-${suffix}`,
+        destination,
+        payload: {},
+        projectId: fixture.projectId,
+        topic: "whatsapp.runtime_reply",
+        traceId: `phase14-cancel-target-${suffix}`,
+      },
+      {
+        availableAt: new Date(Date.now() + 60_000),
+        dedupeKey: `phase14-cancel-unrelated-${suffix}`,
+        destination: `${destination}-other`,
+        payload: {},
+        projectId: fixture.projectId,
+        topic: "whatsapp.runtime_reply",
+        traceId: `phase14-cancel-unrelated-${suffix}`,
+      },
+    ])
+    .returning();
+
+  expect(
+    await cancelPendingWhatsAppReplies({
+      destination,
+      projectId: fixture.projectId,
+    }),
+  ).toBe(1);
+  const rows = await db
+    .select({ id: outboxMessages.id, status: outboxMessages.status })
+    .from(outboxMessages)
+    .where(inArray(outboxMessages.id, [target.id, unrelated.id]));
+
+  expect(rows).toEqual(
+    expect.arrayContaining([
+      { id: target.id, status: "cancelled" },
+      { id: unrelated.id, status: "queued" },
+    ]),
+  );
+});
+
+test("does not deliver a WhatsApp reply owned by an older inbound turn", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const destination = `phase14-stale-reply-${suffix}`;
+  const [conversation] = await db
+    .insert(channelConversations)
+    .values({
+      channelType: "whatsapp",
+      externalConversationId: destination,
+      projectId: fixture.projectId,
+    })
+    .returning();
+  conversationIds.push(conversation.id);
+  const [sourceInbound] = await db
+    .insert(channelMessages)
+    .values({
+      conversationId: conversation.id,
+      direction: "inbound",
+      messageType: "text",
+      projectId: fixture.projectId,
+      text: "book a spa service",
+    })
+    .returning();
+  const reply = createTextReply("Please provide Service Category.");
+  const [outbound] = await db
+    .insert(channelMessages)
+    .values({
+      conversationId: conversation.id,
+      direction: "outbound",
+      messageType: reply.type,
+      payload: { runtimeReply: reply },
+      projectId: fixture.projectId,
+      text: reply.fallbackText,
+    })
+    .returning();
+  await db.insert(channelMessages).values({
+    conversationId: conversation.id,
+    direction: "inbound",
+    messageType: "text",
+    projectId: fixture.projectId,
+    text: "cancel",
+  });
+  const [queued] = await db
+    .insert(outboxMessages)
+    .values({
+      dedupeKey: `phase14-stale-reply-${suffix}`,
+      destination,
+      payload: {
+        channelId: 999_999,
+        channelMessageId: outbound.id,
+        conversationId: conversation.id,
+        runtimeReply: reply,
+        sourceInboundMessageId: sourceInbound.id,
+        to: destination,
+      },
+      projectId: fixture.projectId,
+      topic: "whatsapp.runtime_reply",
+      traceId: `phase14-stale-reply-${suffix}`,
+    })
+    .returning();
+
+  const result = await processProjectOutboxQueue({
+    destination,
+    maxMessages: 1,
+    projectId: fixture.projectId,
+    workerId: `phase14-stale-reply-${suffix}`,
+  });
+  const [stored] = await db
+    .select({ status: outboxMessages.status })
+    .from(outboxMessages)
+    .where(eq(outboxMessages.id, queued.id))
+    .limit(1);
+
+  expect(result).toMatchObject({ cancelled: 1, delivered: 0, failed: 0 });
+  expect(stored?.status).toBe("cancelled");
 });
 
 test("requires explicit confirmation and invalidates it after correction", async () => {

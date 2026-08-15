@@ -271,6 +271,7 @@ export async function markChannelMessageIgnored(input: {
   await db
     .update(channelMessages)
     .set({
+      messageType: "ignored",
       payload: sql`${channelMessages.payload} || ${JSON.stringify({
         processing: { reason: input.reason, status: "ignored" },
       })}::jsonb`,

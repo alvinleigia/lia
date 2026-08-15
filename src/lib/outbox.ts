@@ -2,9 +2,11 @@ import {
   and,
   asc,
   eq,
+  gt,
   inArray,
   lt,
   lte,
+  ne,
   notExists,
   or,
   sql,
@@ -211,6 +213,7 @@ export async function enqueueWhatsAppRuntimeReplies(input: {
   phoneNumberId: string;
   projectId: number;
   replies: RuntimeReply[];
+  sourceInboundMessageId?: number | null;
   to: string;
   traceId?: string | null;
 }) {
@@ -238,6 +241,7 @@ export async function enqueueWhatsAppRuntimeReplies(input: {
             event: "whatsapp.flow_reply_queued",
             phoneNumberId: input.phoneNumberId,
             runtimeReply: reply,
+            sourceInboundMessageId: input.sourceInboundMessageId ?? null,
             traceId,
           },
           projectId: input.projectId,
@@ -253,7 +257,9 @@ export async function enqueueWhatsAppRuntimeReplies(input: {
           payload: {
             channelId: input.channelId,
             channelMessageId: channelMessage.id,
+            conversationId: conversation.id,
             runtimeReply: reply,
+            sourceInboundMessageId: input.sourceInboundMessageId ?? null,
             to: input.to,
           },
           projectId: input.projectId,
@@ -272,7 +278,9 @@ export async function enqueueWhatsAppRuntimeReplies(input: {
 function parseWhatsAppOutboxPayload(payload: Record<string, unknown>) {
   const channelId = payload.channelId;
   const channelMessageId = payload.channelMessageId;
+  const conversationId = payload.conversationId;
   const reply = parseRuntimeReply(payload.runtimeReply);
+  const sourceInboundMessageId = payload.sourceInboundMessageId;
   const to = payload.to;
 
   if (
@@ -289,13 +297,77 @@ function parseWhatsAppOutboxPayload(payload: Record<string, unknown>) {
     return null;
   }
 
-  return { channelId, channelMessageId, reply, to };
+  return {
+    channelId,
+    channelMessageId,
+    conversationId:
+      typeof conversationId === "number" &&
+      Number.isInteger(conversationId) &&
+      conversationId > 0
+        ? conversationId
+        : null,
+    reply,
+    sourceInboundMessageId:
+      typeof sourceInboundMessageId === "number" &&
+      Number.isInteger(sourceInboundMessageId) &&
+      sourceInboundMessageId > 0
+        ? sourceInboundMessageId
+        : null,
+    to,
+  };
+}
+
+export async function cancelPendingWhatsAppReplies(input: {
+  destination: string;
+  projectId: number;
+}) {
+  const now = new Date();
+  const cancelled = await db
+    .update(outboxMessages)
+    .set({
+      leaseExpiresAt: null,
+      leaseOwner: null,
+      status: "cancelled",
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(outboxMessages.projectId, input.projectId),
+        eq(outboxMessages.topic, "whatsapp.runtime_reply"),
+        eq(outboxMessages.destination, input.destination),
+        eq(outboxMessages.status, "queued"),
+      ),
+    )
+    .returning({ payload: outboxMessages.payload });
+  const channelMessageIds = cancelled.flatMap(({ payload }) => {
+    const id = payload.channelMessageId;
+    return typeof id === "number" && Number.isInteger(id) && id > 0 ? [id] : [];
+  });
+
+  if (channelMessageIds.length > 0) {
+    await db
+      .update(channelMessages)
+      .set({
+        payload: sql`${channelMessages.payload} || ${JSON.stringify({
+          deliveryStatus: "cancelled",
+          event: "whatsapp.flow_reply_superseded",
+        })}::jsonb`,
+      })
+      .where(
+        and(
+          eq(channelMessages.projectId, input.projectId),
+          inArray(channelMessages.id, channelMessageIds),
+        ),
+      );
+  }
+
+  return cancelled.length;
 }
 
 async function updateOutboxChannelMessage(input: {
   deliveryError?: string | null;
   deliveryMode?: string;
-  deliveryStatus: "failed" | "sent";
+  deliveryStatus: "cancelled" | "failed" | "sent";
   messageId: number;
   messageType?: string;
   projectId: number;
@@ -329,7 +401,9 @@ async function updateOutboxChannelMessage(input: {
         event:
           input.deliveryStatus === "sent"
             ? "whatsapp.flow_reply_sent"
-            : "whatsapp.flow_reply_failed",
+            : input.deliveryStatus === "failed"
+              ? "whatsapp.flow_reply_failed"
+              : "whatsapp.flow_reply_superseded",
         traceId: input.traceId,
       },
       text: input.text ?? message.text,
@@ -345,6 +419,65 @@ async function updateOutboxChannelMessage(input: {
   return updated ?? null;
 }
 
+async function isWhatsAppOutboxReplySuperseded(input: {
+  conversationId: number | null;
+  projectId: number;
+  sourceInboundMessageId: number | null;
+}) {
+  if (!input.conversationId || !input.sourceInboundMessageId) return false;
+
+  const [newerInbound] = await db
+    .select({ id: channelMessages.id })
+    .from(channelMessages)
+    .where(
+      and(
+        eq(channelMessages.projectId, input.projectId),
+        eq(channelMessages.conversationId, input.conversationId),
+        eq(channelMessages.direction, "inbound"),
+        gt(channelMessages.id, input.sourceInboundMessageId),
+        ne(channelMessages.messageType, "ignored"),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(newerInbound);
+}
+
+async function cancelClaimedOutboxMessage(input: {
+  channelMessageId: number;
+  messageId: number;
+  projectId: number;
+  traceId: string;
+  workerId: string;
+}) {
+  const [cancelled] = await db
+    .update(outboxMessages)
+    .set({
+      leaseExpiresAt: null,
+      leaseOwner: null,
+      status: "cancelled",
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(outboxMessages.projectId, input.projectId),
+        eq(outboxMessages.id, input.messageId),
+        eq(outboxMessages.status, "processing"),
+        eq(outboxMessages.leaseOwner, input.workerId),
+      ),
+    )
+    .returning({ id: outboxMessages.id });
+  if (!cancelled) return null;
+
+  await updateOutboxChannelMessage({
+    deliveryStatus: "cancelled",
+    messageId: input.channelMessageId,
+    projectId: input.projectId,
+    traceId: input.traceId,
+  });
+  return cancelled;
+}
+
 export async function processProjectOutboxQueue(input: {
   destination?: string;
   maxMessages?: number;
@@ -356,6 +489,7 @@ export async function processProjectOutboxQueue(input: {
     Math.min(Math.trunc(input.maxMessages ?? 10), 50),
   );
   let delivered = 0;
+  let cancelled = 0;
   let failed = 0;
   let processed = 0;
   let rescheduled = 0;
@@ -374,6 +508,24 @@ export async function processProjectOutboxQueue(input: {
 
     processed += 1;
     const payload = parseWhatsAppOutboxPayload(message.payload);
+    if (
+      payload &&
+      (await isWhatsAppOutboxReplySuperseded({
+        conversationId: payload.conversationId,
+        projectId: input.projectId,
+        sourceInboundMessageId: payload.sourceInboundMessageId,
+      }))
+    ) {
+      await cancelClaimedOutboxMessage({
+        channelMessageId: payload.channelMessageId,
+        messageId: message.id,
+        projectId: input.projectId,
+        traceId: message.traceId,
+        workerId: input.workerId,
+      });
+      cancelled += 1;
+      continue;
+    }
     const [channel] = payload
       ? await db
           .select()
@@ -450,6 +602,7 @@ export async function processProjectOutboxQueue(input: {
   }
 
   return {
+    cancelled,
     delivered,
     failed,
     idle: processed === 0,

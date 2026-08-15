@@ -59,6 +59,7 @@ import {
   bindRequestedTaskSelection,
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
+  createMismatchedTaskSelectionProposal,
   createRequestedTaskSelectionProposal,
   dispatchHybridFlowBoundary,
   getRequiredCompletionOperationDefinition,
@@ -853,6 +854,8 @@ async function executeTaskBoundary(input: {
   ) {
     throw new Error("The pinned conversational task runtime is unavailable.");
   }
+  const runtime = session.runtime;
+  const snapshot = session.snapshot;
 
   const confirmationExecution = await executeTaskConfirmation({
     runtimeInput: input.runtimeInput,
@@ -863,11 +866,32 @@ async function executeTaskBoundary(input: {
   const requestedField = session.snapshot.task.definition.fields.find(
     (field) => field.key === session.runtime?.run.lastRequestedFieldKey,
   );
-  let selectionValue = input.runtimeInput.selection?.value ?? null;
+  const requestedFieldIsProjectResource =
+    requestedField?.type === "project_resource" ||
+    requestedField?.optionSource?.kind === "project_resource";
+  const rejectMismatchedSelection = async () => ({
+    inputRequest: await hydrateProjectResourceInputRequest({
+      fields: runtime.fields,
+      inputRequest: getResumedTaskRuntimeInputRequest({
+        fields: runtime.fields,
+        requestedFieldKey: runtime.run.lastRequestedFieldKey,
+        snapshot,
+      }),
+      projectId: input.runtimeInput.projectId,
+      snapshot,
+    }),
+    output: createMismatchedTaskSelectionProposal({
+      requestedFieldPrompt:
+        requestedField?.prompt ??
+        (requestedField ? `Please provide ${requestedField.label}.` : null),
+    }),
+    signals: [],
+  });
+  let selectionValue: string | null = null;
   if (
-    !selectionValue &&
-    requestedField?.type === "project_resource" &&
-    input.runtimeInput.text.trim()
+    requestedFieldIsProjectResource &&
+    requestedField &&
+    (input.runtimeInput.selection || input.runtimeInput.text.trim())
   ) {
     const fieldValues = new Map<string, unknown>();
     for (const field of session.runtime.fields) {
@@ -881,15 +905,25 @@ async function executeTaskBoundary(input: {
       field: requestedField,
       fieldValues,
       projectId: input.runtimeInput.projectId,
-      value: input.runtimeInput.text,
+      value: input.runtimeInput.selection?.value ?? input.runtimeInput.text,
     });
     if (resolvedSelection.status === "resolved") {
       selectionValue = resolvedSelection.id;
+    } else if (input.runtimeInput.selection) {
+      return rejectMismatchedSelection();
     }
+  } else if (input.runtimeInput.selection) {
+    const selectedOption =
+      requestedField?.optionSource?.kind === "static"
+        ? requestedField.optionSource.options.find(
+            (option) => option.value === input.runtimeInput.selection?.value,
+          )
+        : null;
+    if (!selectedOption) return rejectMismatchedSelection();
+    selectionValue = selectedOption.value;
   }
   const selectionProposal = createRequestedTaskSelectionProposal({
-    requestedFieldKey:
-      requestedField?.type === "project_resource" ? requestedField.key : null,
+    requestedFieldKey: selectionValue ? (requestedField?.key ?? null) : null,
     selectionValue,
   });
   const proposal = selectionProposal
@@ -920,10 +954,9 @@ async function executeTaskBoundary(input: {
             visitorMessage: input.runtimeInput.text,
           })
         ).proposal,
-        requestedFieldKey:
-          requestedField?.type === "project_resource"
-            ? requestedField.key
-            : null,
+        requestedFieldKey: selectionValue
+          ? (requestedField?.key ?? null)
+          : null,
         selectionValue,
       });
   let revision = session.execution.revision;

@@ -33,6 +33,7 @@ import {
   bindRequestedTaskSelection,
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
+  createMismatchedTaskSelectionProposal,
   createRequestedTaskSelectionProposal,
   dispatchHybridFlowBoundary,
   getRequiredCompletionOperationDefinition,
@@ -683,6 +684,20 @@ test("requested project-resource selections can skip the model", () => {
       selectionValue: "product:71",
     }),
   ).toBeNull();
+});
+
+test("stale task selections re-prompt without proposing a field mutation", () => {
+  expect(
+    createMismatchedTaskSelectionProposal({
+      requestedFieldPrompt: "Please provide Preferred Date.",
+    }),
+  ).toMatchObject({
+    fieldCandidates: [],
+    nextAction: "ask",
+    reply: "That option is no longer active. Please provide Preferred Date.",
+    safety: { decision: "allow", reasonCode: null },
+    turnKind: "field_correction",
+  });
 });
 
 test("task turns ask for the next unresolved field before confirmation", () => {

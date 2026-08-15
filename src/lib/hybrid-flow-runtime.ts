@@ -157,6 +157,29 @@ export function createRequestedTaskSelectionProposal(input: {
   };
 }
 
+export function createMismatchedTaskSelectionProposal(input: {
+  requestedFieldPrompt: string | null;
+}): TurnResultV1 {
+  return {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary:
+      "The server rejected a selection that does not belong to the currently requested field.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" },
+    nextAction: "ask",
+    outcomeRecommendation: null,
+    reply: input.requestedFieldPrompt
+      ? `That option is no longer active. ${input.requestedFieldPrompt}`
+      : "That option is no longer active. Please answer the current question.",
+    routeRecommendation: null,
+    safety: { decision: "allow", reasonCode: null },
+    schemaVersion: 1,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_correction",
+  };
+}
+
 function findUnresolvedTaskField(input: TaskRuntimeReconciliationInput) {
   if (!canRequestTaskField(input.proposal)) {
     return null;

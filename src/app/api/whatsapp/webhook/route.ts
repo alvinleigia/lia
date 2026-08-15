@@ -16,6 +16,7 @@ import {
 import { resolveTraceId } from "@/lib/execution-trace";
 import { runHybridChannelFlowBoundary } from "@/lib/hybrid-channel-runtime";
 import {
+  cancelPendingWhatsAppReplies,
   enqueueWhatsAppRuntimeReplies,
   processProjectOutboxQueue,
 } from "@/lib/outbox";
@@ -159,6 +160,11 @@ export async function POST(req: Request) {
       continue;
     }
 
+    await cancelPendingWhatsAppReplies({
+      destination: change.message.from,
+      projectId: channel.projectId,
+    });
+
     const activeSubmission = await getActiveActionSubmissionForConversation({
       projectId: channel.projectId,
       conversationId: change.message.from,
@@ -209,6 +215,7 @@ export async function POST(req: Request) {
         phoneNumberId: change.phoneNumberId,
         projectId: channel.projectId,
         replies,
+        sourceInboundMessageId: inboundRecord.message.id,
         to: change.message.from,
         traceId,
       });
