@@ -14,7 +14,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | Phase | Status | Next action |
 | --- | --- | --- |
 | 1-13 | Complete | None. |
-| 14 - Beta release | In progress | Provide a disposable test database; full certification and backup restore are blocked. |
+| 14 - Beta release | In progress | Verify the latest staging deployment, then resolve or accept the remaining handoff and backup-restore findings. |
 | 15 - Knowledge and memory | Pending | Start only after Phase 14 passes. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
@@ -28,8 +28,8 @@ contact details.
 - Date: `<date>`
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
-- Expected minimum commit: `8715f88`
-- Actual deployed commit: at least `8715f88` (exact dashboard commit not recorded)
+- Expected minimum commit: `6ef4a4b`
+- Actual deployed commit: at least `8715f88`; verify `6ef4a4b` or later after deployment
 - Deployment status: [x] Expected cancellation behavior verified on staging
 - Staging WhatsApp configured: [x] Yes [ ] No
 
@@ -46,7 +46,7 @@ Ask the release owner to confirm:
 - [ ] Clean and existing-database migrations passed.
 - [ ] A backup was restored into a disposable environment.
 - [ ] Staging secrets, public media storage, and scheduled jobs work.
-- [ ] `npm run certify:release` passed, including live-model checks.
+- [x] `npm run certify:release` passed, including live-model checks.
 
 A successful GitHub push is not deployment proof. Stop and record
 `Stale staging deployment` if the hosting dashboard cannot identify the
@@ -278,10 +278,12 @@ the deterministic channel contracts, including the configured degraded and
 failure outcomes. The full database and live-model release gate remains a
 separate prerequisite above.
 
-Full certification: `Environment blocker`. The local `DATABASE_URL` resolves
-to a different Supabase project than staging. Because its ownership is not
-confirmed and the full suite writes test data, `npm run certify:release` was
-not run. A disposable test database is required.
+Full certification passed on 2026-08-15 after the release owner confirmed the
+configured non-staging database is an approved testing target. The first run
+found a durable-wait clock mismatch, fixed in `6ef4a4b`; `635d5fa` also made
+the Widget Escape-key check tolerate iframe hydration. The final run passed all
+10 gates, including 171 channel contracts, 315 database-backed E2E tests, the
+production build, live-model checks, and tenant isolation.
 
 Tenant disable and re-enable verified on 2026-08-15: protected pages redirected
 to `Account Disabled`, WhatsApp produced no reply, and the Widget reported
@@ -311,7 +313,7 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 | `P14-UAT-11` | Fixed and staging verified | Widget user bubbles expanded across most of the transcript even for short text such as `cancel`. Commit `955e020` sizes both Widget user-message paths to their content, caps them at 80%, and safely wraps long text; the staging recheck passed. |
 | `P14-UAT-12` | Fixed and staging verified | Cancelled Widget submission `#66` had a cancelled task run but a submitted parent submission and `submission.submitted` event. Commit `8715f88` preserves terminal hybrid cancellation at the parent. Submission `#67` verified matching cancelled statuses, no submitted timestamp, no operation attempt, and `flow.cancelled` without `submission.submitted`. |
 | `P14-UAT-13` | Environment blocker | Backup restore cannot be tested safely because only production and active staging instances exist. A third disposable database/environment is required. |
-| `P14-UAT-14` | Environment blocker | Full certification cannot run safely because the configured `DATABASE_URL` targets a non-staging database whose ownership is unconfirmed. A disposable test database is required. |
+| `P14-UAT-14` | Resolved - full certification passed | The release owner confirmed the configured non-staging database is an approved testing target. The suite found a durable-wait clock mismatch; `6ef4a4b` now schedules waits from the database clock, and `635d5fa` hardens the Widget Escape-key check against iframe hydration. The final 10-gate certification passed. |
 
 ### Phase 14 Sign-Off
 
@@ -319,7 +321,7 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 - [ ] Safety, handoff, and audit checks passed.
 - [x] Project Chat and Website Widget passed.
 - [x] WhatsApp passed or has a release-owner-approved limitation.
-- [ ] Recovery and tenant-disable checks passed.
+- [x] Recovery and tenant-disable checks passed.
 - [ ] No Critical or High defect remains open.
 - [ ] Release owner approved production-like beta traffic.
 
