@@ -355,7 +355,6 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       const proposal = payload.execution.proposal;
       setFlowMessages((current) => [
         ...current,
-        makeFlowMessage("user", text),
         makeFlowMessage("assistant", proposal.reply),
       ]);
 
@@ -466,8 +465,10 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     }
 
     setInput("");
+    const optimisticUserMessage = makeFlowMessage("user", text);
+    setFlowMessages((current) => [...current, optimisticUserMessage]);
+
     const handledByFlow = await runCanonicalFlow({
-      displayUserText: true,
       text,
     });
     if (handledByFlow) {
@@ -478,6 +479,9 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       return;
     }
 
+    setFlowMessages((current) =>
+      current.filter((message) => message.id !== optimisticUserMessage.id),
+    );
     sendMessage({
       text,
     });
