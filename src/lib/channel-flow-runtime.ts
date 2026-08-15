@@ -2,6 +2,7 @@ import {
   ActionSubmissionConflictError,
   awaitActionFlowResponse,
   cancelActionFlowSubmission,
+  FLOW_WAIT_METADATA_KEY,
   pauseActionFlowSubmission,
   recordActionFlowProgress,
   startActionFlowSubmission,
@@ -73,7 +74,7 @@ import {
   formatFlowMediaUploadValue,
   isFlowMediaUploadValue,
 } from "@/lib/flow-media-values";
-import { getFlowWaitAvailableAt } from "@/lib/flow-wait";
+import { getFlowWaitDurationMs } from "@/lib/flow-wait";
 import { buildHandoffMetadata, runHandoffNotification } from "@/lib/handoff";
 import { runOperationForSubmission } from "@/lib/operations";
 import {
@@ -97,7 +98,6 @@ const INPUT_CANCEL_WORDS = new Set(["cancel", "stop", "exit"]);
 const MAX_CONNECTED_FLOW_DEPTH = 5;
 const FLOW_EDIT_POSITION_KEY = "flowEditPosition";
 const FLOW_EDIT_STEP_IDS_KEY = "flowEditStepIds";
-const FLOW_WAIT_METADATA_KEY = "flowWait";
 
 type ChannelRuntimeResult = {
   boundaryNodeId?: string | null;
@@ -940,26 +940,19 @@ async function advanceFlowToNextStep(input: {
         stepIndex,
         submission.fields,
       );
-      const availableAt = getFlowWaitAvailableAt(step.settings);
       const paused = await pauseActionFlowSubmission({
-        availableAt,
         channelType: getChannelTypeForFlowSource(submission.source),
         conversationId:
           submission.conversationId ?? `submission-${submission.id}`,
         currentStepId: decision.targetStepId,
         expectedRevision: submission.revision,
         fields: submission.fields,
-        metadata: {
-          ...submission.metadata,
-          [FLOW_WAIT_METADATA_KEY]: {
-            availableAt: availableAt.toISOString(),
-            stepId: step.id,
-          },
-        },
+        metadata: submission.metadata,
         projectId: input.projectId,
         source: submission.source,
         submissionId: submission.id,
         traceId: submission.traceId,
+        waitDurationMs: getFlowWaitDurationMs(step.settings),
         waitStepId: step.id,
       });
 

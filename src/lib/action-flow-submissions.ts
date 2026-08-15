@@ -20,6 +20,8 @@ import { resolveTraceId } from "@/lib/execution-trace";
 import { runSubmissionOperations } from "@/lib/operations";
 import { getRuntimeProjectAction } from "@/lib/runtime-actions";
 
+export const FLOW_WAIT_METADATA_KEY = "flowWait";
+
 type StartActionFlowSubmissionInput = {
   projectId: number;
   actionId: number;
@@ -61,7 +63,6 @@ type CancelActionFlowSubmissionInput = {
 };
 
 type PauseActionFlowSubmissionInput = {
-  availableAt: Date;
   channelType: string;
   conversationId: string;
   currentStepId: number | null;
@@ -73,6 +74,7 @@ type PauseActionFlowSubmissionInput = {
   source: string;
   submissionId: number;
   traceId?: string | null;
+  waitDurationMs: number;
   waitStepId: number;
 };
 
@@ -229,33 +231,10 @@ export async function pauseActionFlowSubmission(
   const nextRevision = input.expectedRevision + 1;
 
   return db.transaction(async (tx) => {
-    const [submission] = await tx
-      .update(actionSubmissions)
-      .set({
-        currentStepId: input.currentStepId,
-        fields: input.fields,
-        metadata: input.metadata,
-        revision: sql`${actionSubmissions.revision} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(actionSubmissions.projectId, input.projectId),
-          eq(actionSubmissions.id, input.submissionId),
-          eq(actionSubmissions.status, "in_progress"),
-          eq(actionSubmissions.revision, input.expectedRevision),
-        ),
-      )
-      .returning();
-
-    if (!submission) {
-      throw new ActionSubmissionConflictError();
-    }
-
     const [job] = await tx
       .insert(durableJobs)
       .values({
-        availableAt: input.availableAt,
+        availableAt: sql`CURRENT_TIMESTAMP + (${input.waitDurationMs} * INTERVAL '1 millisecond')`,
         dedupeKey: `submission:${input.submissionId}:revision:${nextRevision}`,
         jobType: "flow_resume",
         payload: {
@@ -276,11 +255,40 @@ export async function pauseActionFlowSubmission(
       throw new Error("Could not schedule the flow resume job.");
     }
 
+    const [submission] = await tx
+      .update(actionSubmissions)
+      .set({
+        currentStepId: input.currentStepId,
+        fields: input.fields,
+        metadata: {
+          ...input.metadata,
+          [FLOW_WAIT_METADATA_KEY]: {
+            availableAt: job.availableAt.toISOString(),
+            stepId: input.waitStepId,
+          },
+        },
+        revision: sql`${actionSubmissions.revision} + 1`,
+        updatedAt: sql`CURRENT_TIMESTAMP`,
+      })
+      .where(
+        and(
+          eq(actionSubmissions.projectId, input.projectId),
+          eq(actionSubmissions.id, input.submissionId),
+          eq(actionSubmissions.status, "in_progress"),
+          eq(actionSubmissions.revision, input.expectedRevision),
+        ),
+      )
+      .returning();
+
+    if (!submission) {
+      throw new ActionSubmissionConflictError();
+    }
+
     await tx.insert(actionSubmissionEvents).values({
       eventType: "flow.paused",
       message: "Flow paused for a scheduled wait.",
       payload: {
-        availableAt: input.availableAt.toISOString(),
+        availableAt: job.availableAt.toISOString(),
         nextStepId: input.currentStepId,
         waitStepId: input.waitStepId,
       },
