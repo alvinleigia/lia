@@ -300,7 +300,7 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 
 | ID | Status | Finding |
 | --- | --- | --- |
-| `P14-UAT-01` | Open - Low | `Claim` does not disable or show a processing label while the request runs. |
+| `P14-UAT-01` | Fixed - staging retest pending | Commit `5b56f61` gives the active queue action a processing label, disables the queue controls while it runs, replaces `Claim` with `Release` after assignment, and rejects stale claim or release requests on the server. |
 | `P14-UAT-02` | Open - Untriaged | Successful claim and lifecycle events were not visible in `Admin` > `Audit Logs`. |
 | `P14-UAT-03` | Staging fixture repaired | The staging repair completed for project `#1`; commits `3283879` and `0cfe573` repair seeded project IDs and operation handlers. |
 | `P14-UAT-04` | Fixed and staging verified | Commit `39a7367` colocates the runtime with the database and skips the redundant trigger model turn. Measured server time fell from `57.15 s` to `0.754 s` for starting the booking and was `0.697 s` for the next selection. |
@@ -325,7 +325,8 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 - [ ] No Critical or High defect remains open.
 - [ ] Release owner approved production-like beta traffic.
 
-- Notes: `<none or defect IDs>`
+- Notes: Retest `P14-UAT-01`, investigate `P14-UAT-02`, and retain the
+  `P14-UAT-13` environment blocker until a disposable restore target exists.
 - Release owner/date: `<name and timestamp>`
 
 # Later Phases - Do Not Start Yet
@@ -347,7 +348,7 @@ cleanup checks. Do not run it in production or on the Phase 14 fixture.
 
 # Final Release Record
 
-- Phase 14: [ ] Pass [ ] Fail [ ] In progress
+- Phase 14: [ ] Pass [ ] Fail [x] In progress
 - Phase 15: [ ] Pass [ ] Fail [ ] Pending
 - Phase 16: [ ] Pass [ ] Fail [ ] Pending
 - Critical defects open: `<count>`

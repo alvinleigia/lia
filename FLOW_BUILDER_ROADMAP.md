@@ -996,12 +996,14 @@ outcomes without introducing channel-specific task or graph persistence.
 Goal: approve the hybrid conversational platform for production-like beta
 traffic.
 
-Local release evidence recorded on 2026-08-05: environment preflight and the
-production build passed; `npm run certify:release:offline` passed lint over 436
-files, TypeScript, tenant-scope, cron, 154 channel contracts, 285 offline
-browser/database scenarios, and tenant isolation. The 24 task-runtime database
-scenarios also passed independently. Staging, restore, paid live-model, and
-intended-deployment channel gates remain open.
+Current release evidence recorded on 2026-08-15: the full 10-gate
+`npm run certify:release` run passed the production build, 171 channel
+contracts, 315 database-backed browser scenarios, tenant isolation, and the
+configured live-model path. Project Chat, Widget, and WhatsApp completed the
+same staging booking with equivalent canonical fields and one Manual Review
+attempt. Phase 14 remains in progress while the focused handoff UI correction
+awaits staging retest, audit visibility is investigated, and backup restore is
+blocked until a third disposable environment exists.
 
 To avoid maintaining three copies of the same release status, Phase 14 has no
 separate checklist here:
