@@ -29,8 +29,8 @@ contact details.
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
 - Expected minimum commit: `955e020`
-- Actual deployed commit: `eccfd27`
-- Deployment status: [ ] Successful after `955e020`
+- Actual deployed commit: `90e7c46`
+- Deployment status: [x] Successful
 - Staging WhatsApp configured: [x] Yes [ ] No
 
 # Phase 14 - Beta Release
@@ -39,7 +39,7 @@ contact details.
 
 Ask the release owner to confirm:
 
-- [ ] The hosting dashboard shows a successful staging deployment for commit
+- [x] The hosting dashboard shows a successful staging deployment for commit
       `955e020` or a later commit from `main`.
 - [x] The release owner ran `npm run seed:phase14-staging` with the staging
       fixture variables and saw `Repaired Phase 14 Release UAT as project #1.`
@@ -189,9 +189,10 @@ fixed, all seven values advanced correctly, and Manual Review completed once
 with the response automatically scrolled into view. Closing and reopening a
 new partial run also restored the correct Service prompt and option. The
 `320 x 568` header, transcript, composer, send, close, cancellation, and
-auto-scroll checks passed. A user-bubble width fix remains to be rechecked.
+auto-scroll checks passed. The final staging recheck confirmed that the short
+`cancel` user bubble now sizes to its content.
 
-Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
+Result: [x] Pass [ ] Pass with accepted limitation [ ] Fail
 
 ### WhatsApp
 
@@ -263,13 +264,13 @@ Result: [ ] Pass [ ] Fail
 | `P14-UAT-08` | Fixed and staging verified | WhatsApp submission `#61` completed correctly but displayed `Started: Not started` for its completed Manual Review attempt. Commit `7848bae` records the first durable-operation start time; Project Chat submission `#62` then showed one completed attempt with matching `Started` and `Finished` timestamps. |
 | `P14-UAT-09` | Fixed and staging verified | Project Chat remained at `Manual Review is being processed.` because durable-job eligibility and recovery discovery used the application clock. Commit `91ecfbb` uses the database clock for immediate job creation, claims, leases, and recovery scans; the queued Manual Review then recovered successfully on staging. |
 | `P14-UAT-10` | Fixed and staging verified | Widget displayed `Phase 14 Release Guest` but repeated `Please provide Guest Name.` because the extractor returned no field candidate. Commit `5f8f6a4` binds a safe direct answer to the requested plain-text field while preserving side questions, cancellation, handoff, and existing candidates; the staging retest advanced normally and completed once. |
-| `P14-UAT-11` | Fixed - staging verification pending | Widget user bubbles expanded across most of the transcript even for short text such as `cancel`. Commit `955e020` sizes both Widget user-message paths to their content, caps them at 80%, and safely wraps long text. |
+| `P14-UAT-11` | Fixed and staging verified | Widget user bubbles expanded across most of the transcript even for short text such as `cancel`. Commit `955e020` sizes both Widget user-message paths to their content, caps them at 80%, and safely wraps long text; the staging recheck passed. |
 
 ### Phase 14 Sign-Off
 
 - [ ] Staging prerequisites and fixture passed.
 - [ ] Safety, handoff, and audit checks passed.
-- [ ] Project Chat and Website Widget passed.
+- [x] Project Chat and Website Widget passed.
 - [ ] WhatsApp passed or has a release-owner-approved limitation.
 - [ ] Recovery and tenant-disable checks passed.
 - [ ] No Critical or High defect remains open.
