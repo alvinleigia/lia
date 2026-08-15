@@ -29,8 +29,8 @@ contact details.
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
 - Expected minimum commit: `91ecfbb`
-- Actual deployed commit: `7848bae`
-- Deployment status: [ ] Successful after `91ecfbb`
+- Actual deployed commit: `ea12e9f`
+- Deployment status: [x] Successful
 - Staging WhatsApp configured: [x] Yes [ ] No
 
 # Phase 14 - Beta Release
@@ -39,7 +39,7 @@ contact details.
 
 Ask the release owner to confirm:
 
-- [ ] The hosting dashboard shows a successful staging deployment for commit
+- [x] The hosting dashboard shows a successful staging deployment for commit
       `91ecfbb` or a later commit from `main`.
 - [x] The release owner ran `npm run seed:phase14-staging` with the staging
       fixture variables and saw `Repaired Phase 14 Release UAT as project #1.`
@@ -152,6 +152,11 @@ After choosing the service, replace the date below and send the message:
 If `Manual Review is being processed.` remains for more than 10 seconds, stop
 and record a failure. Do not keep waiting or submit a second booking.
 
+Verified on 2026-08-15 against `ea12e9f`: the previously queued Manual Review
+recovered and returned one successful completion after the database-clock fix.
+A clean start-to-finish Project Chat run is still required before marking this
+channel `Pass`.
+
 Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
 
 ### Website Widget
@@ -247,7 +252,7 @@ Result: [ ] Pass [ ] Fail
 | `P14-UAT-06` | Fixed and staging verified | Commit `a218441` automatically shows the newest Widget message and reply without manual scrolling. |
 | `P14-UAT-07` | Fixed and staging verified | Commits `1394ae8`, `0957d03`, `d89605f`, and `923f042` reject late provider events and stale selections, cancel obsolete queued replies, block an old turn's reply, and use the database clock for immediate outbox claims. A complete WhatsApp booking passed once after the expired UAT token was replaced. |
 | `P14-UAT-08` | Fixed - staging verification pending | WhatsApp submission `#61` completed correctly but displayed `Started: Not started` for its completed Manual Review attempt. Commit `7848bae` records the first durable-operation start time and verifies it is not later than the finish time. |
-| `P14-UAT-09` | Fixed - staging verification pending | Project Chat remained at `Manual Review is being processed.` because durable-job eligibility and recovery discovery used the application clock. Commit `91ecfbb` uses the database clock for immediate job creation, claims, leases, and recovery scans. |
+| `P14-UAT-09` | Fixed and staging verified | Project Chat remained at `Manual Review is being processed.` because durable-job eligibility and recovery discovery used the application clock. Commit `91ecfbb` uses the database clock for immediate job creation, claims, leases, and recovery scans; the queued Manual Review then recovered successfully on staging. |
 
 ### Phase 14 Sign-Off
 
