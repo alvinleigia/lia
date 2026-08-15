@@ -83,12 +83,12 @@ database, backup, and provider readiness work.
 - [x] Grounded Q&A can enter a bounded task and return to Q&A within one version-pinned conversation.
 - [ ] Full rich-content parity with `docs/Flow Builder v2.pdf` is not complete.
 - [x] Direct button, list-row, product, and result-to-node mapping is complete.
-- [ ] Phase 14 live cross-channel UAT is in progress; the restore decision and release-owner approval remain.
+- [ ] Phase 14 live cross-channel UAT is in progress; final release-owner approval remains.
 - [ ] Priority 2 release approval is not complete.
 
 Active release gate: Priority 2, Phase 14 of 18. Engineering implementation has
 advanced through Phase 16, but that does not bypass the unfinished Phase 14
-restore decision and release-owner gate.
+release-owner gate.
 
 Current target: finish Phase 14 release UAT and approve the hybrid
 conversational platform for production-like beta traffic. After that gate,
@@ -102,7 +102,7 @@ by `docs/UAT_TEST_PLAN.md`, then continue Phase 17 implementation.
 | 1-7 | Complete | Passed | None. |
 | 8 | Priority 1 exit gate complete | Passed on 2026-08-03 | One deferred enhancement remains: map typed-input requests to a configured native WhatsApp Flow control. |
 | 9-13 | Complete | Passed by 2026-08-05 | None. |
-| 14 | Local implementation complete; terminal cancellation in `8715f88` is staging verified and durable waits use the database clock in `6ef4a4b` | Project Chat, Widget, WhatsApp, response time, operation timestamps, auto-scroll, resume, small-screen, cancellation, submission comparison, Contacts, browser-refresh recovery, failure handling, tenant disable, handoff actions, audit visibility, and the full 10-gate release certification passed; database restore remains blocked by the missing disposable restore environment | Resolve or formally accept the restore blocker, then complete release-owner approval. |
+| 14 | Local implementation complete; terminal cancellation in `8715f88` is staging verified and durable waits use the database clock in `6ef4a4b` | Project Chat, Widget, WhatsApp, response time, operation timestamps, auto-scroll, resume, small-screen, cancellation, submission comparison, Contacts, browser-refresh recovery, failure handling, tenant disable, handoff actions, audit visibility, and the full 10-gate release certification passed; the missing disposable restore environment is an accepted beta limitation | Complete release-owner approval. |
 | 15 | Complete | Staging UAT pending | Activate its detailed checklist after Phase 14 passes. |
 | 16 | Complete | Staging UAT pending | Activate its detailed checklist after Phase 15 passes. |
 | 17 | Foundation only; 12 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
@@ -1002,9 +1002,9 @@ contracts, 315 database-backed browser scenarios, tenant isolation, and the
 configured live-model path. Project Chat, Widget, and WhatsApp completed the
 same staging booking with equivalent canonical fields and one Manual Review
 attempt. The focused handoff UI correction, shared form feedback, and handoff
-audit visibility passed their staging retests. Phase 14 remains in progress
-while backup restore is blocked until a third disposable environment exists
-and release-owner approval remains unsigned.
+audit visibility passed their staging retests. The release owner accepted the
+missing disposable restore environment as a beta limitation. Phase 14 remains
+in progress only because final release-owner approval is unsigned.
 
 To avoid maintaining three copies of the same release status, Phase 14 has no
 separate checklist here:

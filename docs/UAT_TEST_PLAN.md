@@ -14,7 +14,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | Phase | Status | Next action |
 | --- | --- | --- |
 | 1-13 | Complete | None. |
-| 14 - Beta release | In progress | Verify the latest staging deployment, then resolve or accept the remaining handoff and backup-restore findings. |
+| 14 - Beta release | In progress | Complete final release-owner approval; the backup-restore limitation is accepted. |
 | 15 - Knowledge and memory | Pending | Start only after Phase 14 passes. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
@@ -291,13 +291,13 @@ to `Account Disabled`, WhatsApp produced no reply, and the Widget reported
 `Widget is unavailable`. Re-enabling the `Leigia` tenant restored normal
 Projects access.
 
-Database restore: `Environment blocker`. Only production and active staging
-instances exist, so there is no safe disposable restore target. Neither
-existing instance will be overwritten for this check.
+Database restore: `Accepted environment limitation`. Only production and
+active staging instances exist, so there is no safe disposable restore target.
+Neither existing instance will be overwritten for this check.
 
-Result: [ ] Pass [ ] Fail [x] Environment blocker
+Result: [ ] Pass [ ] Fail [x] Accepted limitation
 
-### Open Phase 14 Findings
+### Phase 14 Findings
 
 | ID | Status | Finding |
 | --- | --- | --- |
@@ -313,7 +313,7 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 | `P14-UAT-10` | Fixed and staging verified | Widget displayed `Phase 14 Release Guest` but repeated `Please provide Guest Name.` because the extractor returned no field candidate. Commit `5f8f6a4` binds a safe direct answer to the requested plain-text field while preserving side questions, cancellation, handoff, and existing candidates; the staging retest advanced normally and completed once. |
 | `P14-UAT-11` | Fixed and staging verified | Widget user bubbles expanded across most of the transcript even for short text such as `cancel`. Commit `955e020` sizes both Widget user-message paths to their content, caps them at 80%, and safely wraps long text; the staging recheck passed. |
 | `P14-UAT-12` | Fixed and staging verified | Cancelled Widget submission `#66` had a cancelled task run but a submitted parent submission and `submission.submitted` event. Commit `8715f88` preserves terminal hybrid cancellation at the parent. Submission `#67` verified matching cancelled statuses, no submitted timestamp, no operation attempt, and `flow.cancelled` without `submission.submitted`. |
-| `P14-UAT-13` | Environment blocker | Backup restore cannot be tested safely because only production and active staging instances exist. A third disposable database/environment is required. |
+| `P14-UAT-13` | Accepted environment limitation | Backup restore cannot be tested safely because only production and active staging instances exist. On 2026-08-15, the release owner accepted this limitation for Phase 14 beta rather than risk either active environment. |
 | `P14-UAT-14` | Resolved - full certification passed | The release owner confirmed the configured non-staging database is an approved testing target. The suite found a durable-wait clock mismatch; `6ef4a4b` now schedules waits from the database clock, and `635d5fa` hardens the Widget Escape-key check against iframe hydration. The final 10-gate certification passed. |
 
 ### Phase 14 Sign-Off
@@ -326,8 +326,8 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 - [x] No Critical or High defect remains open.
 - [ ] Release owner approved production-like beta traffic.
 
-- Notes: Retain the `P14-UAT-13` environment blocker until a disposable
-  restore target exists or the release owner formally accepts the limitation.
+- Notes: `P14-UAT-13` is accepted for this beta gate. Run the restore test when
+  a disposable environment becomes available.
 - Release owner/date: `<name and timestamp>`
 
 # Later Phases - Do Not Start Yet
