@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Bot, Loader2, Send } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ActionFlowContentMedia } from "@/components/action-flow-content-media";
 import { ActionFlowProductCards } from "@/components/action-flow-product-cards";
 import {
@@ -69,6 +69,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
   const [serverActiveAction, setServerActiveAction] =
     useState<RuntimeAction | null>(null);
   const [isSavingSubmission, setIsSavingSubmission] = useState(false);
+  const transcriptRef = useRef<HTMLDivElement>(null);
 
   const apiPath = useMemo(
     () => `/api/widget/chat?token=${encodeURIComponent(token)}`,
@@ -85,6 +86,12 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
   const { messages, sendMessage, status, error } = useChat({
     transport,
   });
+
+  useEffect(() => {
+    if (messages.length === 0 && flowMessages.length === 0) return;
+    const transcript = transcriptRef.current;
+    if (transcript) transcript.scrollTop = transcript.scrollHeight;
+  }, [flowMessages, messages]);
 
   const isLoading = status === "submitted" || status === "streaming";
   const isBusy = !conversationId || isLoading || isSavingSubmission;
@@ -490,7 +497,12 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div
+        aria-live="polite"
+        className="flex-1 overflow-y-auto p-3 space-y-3"
+        ref={transcriptRef}
+        role="log"
+      >
         {actions.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {actions.map((action) => (

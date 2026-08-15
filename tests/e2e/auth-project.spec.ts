@@ -3766,6 +3766,7 @@ test("project chat action flow creates a submission", async ({ page }) => {
 
 test("widget action flow creates a submission", async ({ page }) => {
   test.setTimeout(120_000);
+  await page.setViewportSize({ width: 420, height: 360 });
 
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const email = `e2e-widget-action-${runId}@example.test`;
@@ -3808,6 +3809,16 @@ test("widget action flow creates a submission", async ({ page }) => {
   });
   await expect(page.getByText("Thanks. I saved this request.")).toBeVisible();
   await expect(page.getByText(answer, { exact: true }).first()).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .getByRole("log")
+        .evaluate(
+          (element) =>
+            element.scrollHeight - element.scrollTop - element.clientHeight,
+        ),
+    )
+    .toBeLessThanOrEqual(1);
 
   await page.goto("/projects/submissions");
   await expect(page.getByText(`Submissions: ${projectName}`)).toBeVisible();
