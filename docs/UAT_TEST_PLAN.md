@@ -14,7 +14,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | Phase | Status | Next action |
 | --- | --- | --- |
 | 1-13 | Complete | None. |
-| 14 - Beta release | In progress | Run the 14.3 recovery check. |
+| 14 - Beta release | In progress | Run the 14.3 failure-handling checks. |
 | 15 - Knowledge and memory | Pending | Start only after Phase 14 passes. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
@@ -266,6 +266,10 @@ Result: [x] Pass [ ] Fail
    while it is disabled.
 4. Confirm the restored staging database still opens its actions, submissions,
    contacts, and audit history.
+
+Recovery verified on 2026-08-15: after selecting `Facial` in Project Chat, a
+browser refresh restored the same run at the Service prompt. Sending `cancel`
+then returned `No problem. I cancelled this request.`
 
 Result: [ ] Pass [ ] Fail
 
