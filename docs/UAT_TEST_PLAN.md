@@ -382,9 +382,11 @@ Restore after Phase 15 testing:
 1. [x] In `Projects` > `Chat`, send
    `When does Phase 15 hotel check-in begin?`
    - Expect `15:00` without internal document or chunk details.
-2. Open the task's `Test` tab. Set `Conversation Context` to `Knowledge only`
-   and `Turn Purpose` to `Answer a question`. Enter the same check-in question
-   and click `Test Turn`.
+2. Open `Automation` > `Tasks` > `Book a Spa Service`. Click
+   `Configure Conversation`, open the `Test` tab, then click
+   `Open Conversation Test`. On the `Structured Conversation Test` screen,
+   set `Conversation Context` to `Knowledge only` and `Turn Purpose` to
+   `Answer a question`. Enter the same check-in question and click `Test Turn`.
    - Expect `Grounding` to be `grounded` and `Sources` not to be `None`.
 3. In `Projects` > `Chat`, send `Is late checkout guaranteed?`
    - Expect staff approval is required and it is not guaranteed.
