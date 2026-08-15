@@ -14,7 +14,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | Phase | Status | Next action |
 | --- | --- | --- |
 | 1-13 | Complete | None. |
-| 14 - Beta release | In progress | Run full certification; restore environment is blocked. |
+| 14 - Beta release | In progress | Provide a disposable test database; full certification and backup restore are blocked. |
 | 15 - Knowledge and memory | Pending | Start only after Phase 14 passes. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
@@ -278,6 +278,11 @@ the deterministic channel contracts, including the configured degraded and
 failure outcomes. The full database and live-model release gate remains a
 separate prerequisite above.
 
+Full certification: `Environment blocker`. The local `DATABASE_URL` resolves
+to a different Supabase project than staging. Because its ownership is not
+confirmed and the full suite writes test data, `npm run certify:release` was
+not run. A disposable test database is required.
+
 Tenant disable and re-enable verified on 2026-08-15: protected pages redirected
 to `Account Disabled`, WhatsApp produced no reply, and the Widget reported
 `Widget is unavailable`. Re-enabling the `Leigia` tenant restored normal
@@ -306,6 +311,7 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 | `P14-UAT-11` | Fixed and staging verified | Widget user bubbles expanded across most of the transcript even for short text such as `cancel`. Commit `955e020` sizes both Widget user-message paths to their content, caps them at 80%, and safely wraps long text; the staging recheck passed. |
 | `P14-UAT-12` | Fixed and staging verified | Cancelled Widget submission `#66` had a cancelled task run but a submitted parent submission and `submission.submitted` event. Commit `8715f88` preserves terminal hybrid cancellation at the parent. Submission `#67` verified matching cancelled statuses, no submitted timestamp, no operation attempt, and `flow.cancelled` without `submission.submitted`. |
 | `P14-UAT-13` | Environment blocker | Backup restore cannot be tested safely because only production and active staging instances exist. A third disposable database/environment is required. |
+| `P14-UAT-14` | Environment blocker | Full certification cannot run safely because the configured `DATABASE_URL` targets a non-staging database whose ownership is unconfirmed. A disposable test database is required. |
 
 ### Phase 14 Sign-Off
 
