@@ -157,10 +157,10 @@ recovered and returned one successful completion after the database-clock fix.
 A review of Project Chat submission `#62` confirmed task version `v4`, all
 seven canonical fields, one completed Manual Review attempt, and matching
 `Started` and `Finished` timestamps.
-A clean start-to-finish Project Chat run is still required before marking this
-channel `Pass`.
+The following clean run also started without prefilled values, collected the
+same seven values, and returned one successful Manual Review completion.
 
-Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
+Result: [x] Pass [ ] Pass with accepted limitation [ ] Fail
 
 ### Website Widget
 
