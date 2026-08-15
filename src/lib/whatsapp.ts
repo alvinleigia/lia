@@ -428,6 +428,35 @@ export function getWhatsAppInboundSelection(message: WhatsAppWebhookMessage) {
   };
 }
 
+function getWhatsAppMessageTimestamp(value: unknown) {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const timestamp = Number(value);
+  return Number.isSafeInteger(timestamp) ? timestamp : null;
+}
+
+export function hasNewerWhatsAppInboundMessage(input: {
+  message: WhatsAppWebhookMessage;
+  recentMessages: Array<{
+    direction: string;
+    payload: unknown;
+  }>;
+}) {
+  const timestamp = getWhatsAppMessageTimestamp(input.message.timestamp);
+  if (timestamp === null) return false;
+
+  return input.recentMessages.some((record) => {
+    if (record.direction !== "inbound") return false;
+    const payload = record.payload;
+    if (!payload || typeof payload !== "object") return false;
+    const message = (payload as { message?: unknown }).message;
+    if (!message || typeof message !== "object") return false;
+    const recordedTimestamp = getWhatsAppMessageTimestamp(
+      (message as { timestamp?: unknown }).timestamp,
+    );
+    return recordedTimestamp !== null && recordedTimestamp > timestamp;
+  });
+}
+
 export function getWhatsAppInboundProducts(message: WhatsAppWebhookMessage) {
   return (message.order?.product_items ?? []).flatMap((item) => {
     const retailerId = item.product_retailer_id?.trim();

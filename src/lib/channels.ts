@@ -263,6 +263,27 @@ export async function listRecentChannelMessages(input: {
   return rows.reverse();
 }
 
+export async function markChannelMessageIgnored(input: {
+  messageId: number;
+  projectId: number;
+  reason: string;
+}) {
+  await db
+    .update(channelMessages)
+    .set({
+      payload: sql`${channelMessages.payload} || ${JSON.stringify({
+        processing: { reason: input.reason, status: "ignored" },
+      })}::jsonb`,
+      text: null,
+    })
+    .where(
+      and(
+        eq(channelMessages.id, input.messageId),
+        eq(channelMessages.projectId, input.projectId),
+      ),
+    );
+}
+
 export async function markChannelConversationForReview(input: {
   channelType: ChannelType;
   externalConversationId: string;

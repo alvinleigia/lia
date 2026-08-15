@@ -8,7 +8,11 @@ import {
   getNormalizedChannelInboundRuntimeValue,
   normalizeChannelInboundV1,
 } from "@/lib/channel-inbound-contract";
-import { recordChannelInboundMessage } from "@/lib/channels";
+import {
+  listRecentChannelMessages,
+  markChannelMessageIgnored,
+  recordChannelInboundMessage,
+} from "@/lib/channels";
 import { resolveTraceId } from "@/lib/execution-trace";
 import { runHybridChannelFlowBoundary } from "@/lib/hybrid-channel-runtime";
 import {
@@ -24,6 +28,7 @@ import {
   getWhatsAppInboundProducts,
   getWhatsAppInboundSelection,
   getWhatsAppInboundText,
+  hasNewerWhatsAppInboundMessage,
   normalizeWhatsAppConfig,
   verifyWhatsAppSignature,
   type WhatsAppWebhookPayload,
@@ -127,6 +132,26 @@ export async function POST(req: Request) {
     });
 
     if (inboundRecord.duplicate) {
+      continue;
+    }
+
+    const recentMessages = await listRecentChannelMessages({
+      beforeMessageId: inboundRecord.message.id,
+      conversationId: inboundRecord.conversation.id,
+      limit: 50,
+      projectId: channel.projectId,
+    });
+    if (
+      hasNewerWhatsAppInboundMessage({
+        message: change.message,
+        recentMessages,
+      })
+    ) {
+      await markChannelMessageIgnored({
+        messageId: inboundRecord.message.id,
+        projectId: channel.projectId,
+        reason: "out_of_order_provider_timestamp",
+      });
       continue;
     }
 

@@ -32,7 +32,10 @@ import {
   processAndReconcileTaskOperation,
   type TaskOperationPrincipal,
 } from "@/lib/conversational-task-operations";
-import { listProjectTaskResourceOptions } from "@/lib/conversational-task-project-resources";
+import {
+  listProjectTaskResourceOptions,
+  resolveProjectTaskResource,
+} from "@/lib/conversational-task-project-resources";
 import {
   applyConversationalTaskEvent,
   ConversationalTaskRuntimeConflictError,
@@ -860,10 +863,34 @@ async function executeTaskBoundary(input: {
   const requestedField = session.snapshot.task.definition.fields.find(
     (field) => field.key === session.runtime?.run.lastRequestedFieldKey,
   );
+  let selectionValue = input.runtimeInput.selection?.value ?? null;
+  if (
+    !selectionValue &&
+    requestedField?.type === "project_resource" &&
+    input.runtimeInput.text.trim()
+  ) {
+    const fieldValues = new Map<string, unknown>();
+    for (const field of session.runtime.fields) {
+      if (field.state !== "valid" && field.state !== "confirmed") continue;
+      const value = field.canonicalValue ?? field.naturalValue;
+      if (value !== null && value !== undefined) {
+        fieldValues.set(field.fieldKey, value);
+      }
+    }
+    const resolvedSelection = await resolveProjectTaskResource({
+      field: requestedField,
+      fieldValues,
+      projectId: input.runtimeInput.projectId,
+      value: input.runtimeInput.text,
+    });
+    if (resolvedSelection.status === "resolved") {
+      selectionValue = resolvedSelection.id;
+    }
+  }
   const selectionProposal = createRequestedTaskSelectionProposal({
     requestedFieldKey:
       requestedField?.type === "project_resource" ? requestedField.key : null,
-    selectionValue: input.runtimeInput.selection?.value ?? null,
+    selectionValue,
   });
   const proposal = selectionProposal
     ? selectionProposal
@@ -897,7 +924,7 @@ async function executeTaskBoundary(input: {
           requestedField?.type === "project_resource"
             ? requestedField.key
             : null,
-        selectionValue: input.runtimeInput.selection?.value ?? null,
+        selectionValue,
       });
   let revision = session.execution.revision;
 

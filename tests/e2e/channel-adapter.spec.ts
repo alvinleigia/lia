@@ -20,7 +20,10 @@ import {
   type RuntimeReplyOption,
   type RuntimeReplyProduct,
 } from "../../src/lib/runtime-replies";
-import { createWhatsAppChannelAdapter } from "../../src/lib/whatsapp";
+import {
+  createWhatsAppChannelAdapter,
+  hasNewerWhatsAppInboundMessage,
+} from "../../src/lib/whatsapp";
 
 function createOptions(count: number): RuntimeReplyOption[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -47,6 +50,43 @@ function createProduct(input: {
     whatsappRetailerId: input.retailerId,
   };
 }
+
+test("late WhatsApp replies cannot overtake newer inbound messages", () => {
+  const recentMessages = [
+    {
+      direction: "inbound",
+      payload: { message: { timestamp: "1786766160" } },
+    },
+  ];
+
+  expect(
+    hasNewerWhatsAppInboundMessage({
+      message: { from: "15551234567", timestamp: "1786766100" },
+      recentMessages,
+    }),
+  ).toBe(true);
+  expect(
+    hasNewerWhatsAppInboundMessage({
+      message: { from: "15551234567", timestamp: "1786766160" },
+      recentMessages,
+    }),
+  ).toBe(false);
+  expect(
+    hasNewerWhatsAppInboundMessage({
+      message: { from: "15551234567" },
+      recentMessages,
+    }),
+  ).toBe(false);
+  expect(
+    hasNewerWhatsAppInboundMessage({
+      message: { from: "15551234567", timestamp: "1786766100" },
+      recentMessages: recentMessages.map((message) => ({
+        ...message,
+        direction: "outbound",
+      })),
+    }),
+  ).toBe(false);
+});
 
 test("browser adapters keep project chat and widget replies in parity", () => {
   const product = createProduct({
