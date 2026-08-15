@@ -15,7 +15,47 @@ test("redirecting action forms preserve scroll and show toast feedback", async (
   const scrollBeforeSubmit = await page.evaluate(() => window.scrollY);
   expect(scrollBeforeSubmit).toBeGreaterThan(800);
 
-  await page.getByRole("button", { name: "Send Reset Link" }).click();
+  let postIntercepted = false;
+  await page.route("**/*", async (route) => {
+    if (route.request().method() === "POST") {
+      postIntercepted = true;
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    }
+    await route.continue();
+  });
+  const submitButton = page.getByRole("button", { name: "Send Reset Link" });
+  await submitButton.evaluate((button) => {
+    const windowWithPendingState = window as typeof window & {
+      pendingSubmitObserved?: boolean;
+    };
+    const recordPendingState = () => {
+      if (
+        button.hasAttribute("disabled") &&
+        button.getAttribute("aria-busy") === "true" &&
+        button.textContent?.includes("Sending...")
+      ) {
+        windowWithPendingState.pendingSubmitObserved = true;
+      }
+    };
+    new MutationObserver(recordPendingState).observe(button, {
+      attributes: true,
+    });
+    recordPendingState();
+  });
+  await submitButton.evaluate((button) =>
+    (button as HTMLButtonElement).click(),
+  );
+
+  await expect.poll(() => postIntercepted).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as typeof window & { pendingSubmitObserved?: boolean })
+            .pendingSubmitObserved === true,
+      ),
+    )
+    .toBe(true);
 
   await expect(
     page.getByText("If that email exists, a reset link has been sent."),

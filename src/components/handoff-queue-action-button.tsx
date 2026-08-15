@@ -29,6 +29,7 @@ export function HandoffQueueActionButton({
       variant="outline"
       disabled={pending}
       aria-busy={isActiveAction}
+      pendingBehavior="manual"
     >
       {isActiveAction ? (
         <>

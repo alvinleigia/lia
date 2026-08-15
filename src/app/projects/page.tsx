@@ -80,15 +80,16 @@ export default async function ProjectsPage({
                       name="redirectTo"
                       value={`/projects/${project.id}`}
                     />
-                    <button
+                    <Button
                       type="submit"
-                      className="w-full text-left rounded-md px-1 py-1 hover:bg-accent/50"
+                      variant="ghost"
+                      className="h-auto w-full justify-start whitespace-normal rounded-md px-1 py-1 text-left"
                     >
                       <p className="font-medium">{project.name}</p>
                       <p className="text-xs text-muted-foreground">
                         ID: {project.id}
                       </p>
-                    </button>
+                    </Button>
                   </form>
                   <div className="flex items-center gap-2">
                     <Button asChild variant="outline">

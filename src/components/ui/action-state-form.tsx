@@ -12,6 +12,7 @@ import {
 } from "react";
 import type { ActionFormState } from "@/lib/action-form-state";
 import { cn } from "@/lib/utils";
+import { FormPendingProvider } from "./form-pending-context";
 
 type ActionStateFormAction = (
   previousState: ActionFormState,
@@ -145,7 +146,7 @@ function StatefulActionStateForm({
   preserveScroll = true,
   ...props
 }: Omit<ActionStateFormProps, "resetKey">) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionState(action, {});
   const formRef = useRef<HTMLFormElement>(null);
   const snapshotRef = useRef<ControlSnapshot[]>([]);
   const handleSubmit: NonNullable<ComponentProps<"form">["onSubmit"]> = (
@@ -163,15 +164,17 @@ function StatefulActionStateForm({
 
   return (
     <FormStateContext.Provider value={state}>
-      <form
-        action={formAction}
-        data-preserve-scroll={preserveScroll ? "true" : undefined}
-        onSubmit={handleSubmit}
-        ref={formRef}
-        {...props}
-      >
-        {children}
-      </form>
+      <FormPendingProvider pending={pending}>
+        <form
+          action={formAction}
+          data-preserve-scroll={preserveScroll ? "true" : undefined}
+          onSubmit={handleSubmit}
+          ref={formRef}
+          {...props}
+        >
+          {children}
+        </form>
+      </FormPendingProvider>
     </FormStateContext.Provider>
   );
 }
