@@ -199,6 +199,12 @@ Submission `#67` verified the fix: both statuses are cancelled, `Submitted`
 shows `Not submitted`, no operation ran, and the only terminal event is
 `flow.cancelled`.
 
+Completed Widget submission `#65` is the Widget result for cross-channel
+comparison. It uses task version `v4`, contains all seven confirmed canonical
+fields, and has exactly one completed Manual Review attempt. Its empty Action
+Wrapper Fields are expected because the wrapper delegates collection to the
+linked task.
+
 Result: [x] Pass [ ] Pass with accepted limitation [ ] Fail
 
 ### WhatsApp
@@ -237,6 +243,11 @@ Result: [x] Pass [ ] Pass with accepted limitation [ ] Fail [ ] Environment bloc
    seven values, and exactly one completed `Manual Review` attempt.
 4. Open `Automation` > `Contacts`. Confirm each contact has the correct channel
    badge and its own `Channel Transcript`.
+
+Submission comparison verified: Project Chat `#62`, Widget `#65`, and WhatsApp
+`#61` each use task version `v4`, contain the same seven canonical values, and
+show one completed Manual Review attempt. The Contacts/channel-transcript check
+is still pending.
 
 Do not archive or edit the seeded `Book a Spa Service` action.
 
