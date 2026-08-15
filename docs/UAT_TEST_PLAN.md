@@ -409,11 +409,17 @@ Result: [x] Pass [ ] Fail
 
 ### 15.3 Test Isolation, Handoff, And Cleanup
 
-1. Enter the guest name `Phase 15 Memory Marker`, then reset the conversation.
-2. Ask `What guest name did I use before?` Confirm the new anonymous
+1. [x] During a disposable booking, enter the guest name
+   `Phase 15 Memory Marker`, then send `cancel`. Open a completely new browser
+   tab, go to `Projects` > `Chat`, and start a new conversation.
+2. [x] Ask `What guest name did I use before?` Confirm the new anonymous
    conversation does not recall it.
-3. Open `Projects` > `Widget` > `Open Widget Preview` and ask the same question.
-   Confirm Widget does not inherit the Project Chat value.
+   - Verified on staging: Project Chat replied that current information did not
+     list a previously used guest name.
+3. [x] Open `Projects` > `Widget` > `Open Widget Preview` and ask the same
+   question. Confirm Widget does not inherit the Project Chat value.
+   - Verified on staging: Widget replied that the detail was not verified in
+     the available project information and did not reveal the marker.
 4. Request a person during a disposable booking.
 5. Open `Automation` > `Handoff Queue` > `Unassigned`. Confirm one new handoff,
    then `Claim` and `Resolve` it.
