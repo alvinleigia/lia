@@ -2121,6 +2121,19 @@ export async function processProjectDurableOperationQueue(input: {
         throw new Error("The operation or provider is no longer active.");
       }
 
+      if (!attempt.startedAt) {
+        await db
+          .update(operationAttempts)
+          .set({ startedAt: new Date() })
+          .where(
+            and(
+              eq(operationAttempts.projectId, input.projectId),
+              eq(operationAttempts.id, attempt.id),
+              eq(operationAttempts.status, "pending"),
+            ),
+          );
+      }
+
       const result = await executeConfiguredProvider({
         config: provider.config,
         idempotencyKey: attempt.idempotencyKey ?? job.dedupeKey,

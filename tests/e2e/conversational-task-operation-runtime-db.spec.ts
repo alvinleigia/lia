@@ -715,6 +715,12 @@ test("queues one durable attempt and completes from sanitized mapped output", as
     workerId: `phase-5-success-${suffix}`,
   });
   expect(processed.attempt.status).toBe("completed");
+  if (!processed.attempt.startedAt || !processed.attempt.finishedAt) {
+    throw new Error("The completed attempt timestamps are missing.");
+  }
+  expect(processed.attempt.finishedAt.getTime()).toBeGreaterThanOrEqual(
+    processed.attempt.startedAt.getTime(),
+  );
   const runtime = await getConversationalTaskRuntime({
     projectId: fixture.projectId,
     taskRunId: run.taskRunId,
