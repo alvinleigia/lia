@@ -531,7 +531,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
                 key={`${message.id}-${idx}`}
                 className={
                   message.role === "user"
-                    ? "ml-8 rounded-lg bg-black text-white p-2 text-sm"
+                    ? "ml-auto w-fit max-w-[80%] rounded-lg bg-black p-2 text-sm text-white whitespace-pre-wrap break-words"
                     : "mr-8 rounded-lg bg-gray-100 text-gray-900 p-2 text-sm"
                 }
               >
@@ -545,7 +545,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
             key={message.id}
             className={
               message.role === "user"
-                ? "ml-8 rounded-lg bg-black text-white p-2 text-sm whitespace-pre-wrap"
+                ? "ml-auto w-fit max-w-[80%] rounded-lg bg-black p-2 text-sm text-white whitespace-pre-wrap break-words"
                 : "mr-8 rounded-lg bg-gray-100 text-gray-900 p-2 text-sm whitespace-pre-wrap"
             }
           >
