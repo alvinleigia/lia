@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Selected project: `Phase 14 Release UAT (#1)`
-- Minimum release-candidate commit: `91ecfbb`
+- Minimum release-candidate commit: `5f8f6a4`
 
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
@@ -28,9 +28,9 @@ contact details.
 - Date: `<date>`
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
-- Expected minimum commit: `91ecfbb`
+- Expected minimum commit: `5f8f6a4`
 - Actual deployed commit: `ea12e9f`
-- Deployment status: [x] Successful
+- Deployment status: [ ] Successful after `5f8f6a4`
 - Staging WhatsApp configured: [x] Yes [ ] No
 
 # Phase 14 - Beta Release
@@ -39,8 +39,8 @@ contact details.
 
 Ask the release owner to confirm:
 
-- [x] The hosting dashboard shows a successful staging deployment for commit
-      `91ecfbb` or a later commit from `main`.
+- [ ] The hosting dashboard shows a successful staging deployment for commit
+      `5f8f6a4` or a later commit from `main`.
 - [x] The release owner ran `npm run seed:phase14-staging` with the staging
       fixture variables and saw `Repaired Phase 14 Release UAT as project #1.`
 - [ ] Clean and existing-database migrations passed.
@@ -175,6 +175,8 @@ Result: [x] Pass [ ] Pass with accepted limitation [ ] Fail
    `Book a Spa Service`.
 5. Wait for `Please provide Service Category.`, choose `Facial` and
    `Classic Facial`, then send the same remaining five values.
+   Each accepted value must advance to the next field; a repeated prompt is a
+   failure unless a visible validation message explains it.
 6. Before confirming, close and reopen the preview. Confirm the same run and
    seven values return.
 7. Click `Confirm` once and wait for one successful result.
@@ -256,6 +258,7 @@ Result: [ ] Pass [ ] Fail
 | `P14-UAT-07` | Fixed and staging verified | Commits `1394ae8`, `0957d03`, `d89605f`, and `923f042` reject late provider events and stale selections, cancel obsolete queued replies, block an old turn's reply, and use the database clock for immediate outbox claims. A complete WhatsApp booking passed once after the expired UAT token was replaced. |
 | `P14-UAT-08` | Fixed and staging verified | WhatsApp submission `#61` completed correctly but displayed `Started: Not started` for its completed Manual Review attempt. Commit `7848bae` records the first durable-operation start time; Project Chat submission `#62` then showed one completed attempt with matching `Started` and `Finished` timestamps. |
 | `P14-UAT-09` | Fixed and staging verified | Project Chat remained at `Manual Review is being processed.` because durable-job eligibility and recovery discovery used the application clock. Commit `91ecfbb` uses the database clock for immediate job creation, claims, leases, and recovery scans; the queued Manual Review then recovered successfully on staging. |
+| `P14-UAT-10` | Fixed - staging verification pending | Widget displayed `Phase 14 Release Guest` but repeated `Please provide Guest Name.` because the extractor returned no field candidate. Commit `5f8f6a4` binds a safe direct answer to the requested plain-text field while preserving side questions, cancellation, handoff, and existing candidates. |
 
 ### Phase 14 Sign-Off
 
