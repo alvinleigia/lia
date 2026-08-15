@@ -427,8 +427,12 @@ Result: [x] Pass [ ] Fail
    handoff, then `Claim` and `Resolve` it.
    - Verified on staging: handoff `#74` appeared as an unassigned Widget Chat
      handoff, was assigned to `Leigia`, and moved to `Closed` as `Completed`.
-6. Open `Automation` > `Operations` > `Execution Health`. Confirm no related
-   job remains unexpectedly `Processing` or `Failed`.
+6. [x] Open `Automation` > `Operations` > `Execution Health`. Confirm no
+   related job remains unexpectedly `Processing` or `Failed`.
+   - Verified on staging after manually running the protected durable worker:
+     `Queued 0`, `Processing 0`, `Failed 0`, and `Completed 108`.
+   - Automatic scheduling remains tracked as `P15-UAT-01` in
+     `docs/UAT_DEFERRED_ITEMS.md`.
 7. Open `Admin` > `Audit Logs`. Confirm the test is explainable without private
    prompts, raw document chunks, credentials, or unrestricted history.
 8. Restore the settings recorded in 15.1 and delete only
