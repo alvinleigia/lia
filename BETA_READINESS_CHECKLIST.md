@@ -26,14 +26,14 @@ beta only when its own gates and the referenced roadmap exit gates pass.
 
 ## Current Position
 
-Overall beta status: Automated certification and the Phase 14 staging checks
-have passed. The restore limitation is accepted, and final release-owner
-approval for continued single-tester internal testing remains. Real customer
-traffic is outside the current UAT scope.
+Overall beta status: Phase 14 is approved for continued single-tester staging
+and internal beta testing. The restore limitation is tracked in
+`docs/UAT_DEFERRED_ITEMS.md`. Real customer traffic is outside the current UAT
+scope, and Phase 15 manual staging UAT is now active.
 
 Authoritative product implementation status:
 
-- Flow roadmap target: Priority 2, Phase 14 release gate.
+- Flow roadmap target: Priority 3, Phase 15 manual staging gate.
 - Priority 1, Phase 1 implementation and manual UAT are complete.
 - Priority 1, Phase 2 implementation and manual UAT are complete.
 - Priority 1, Phase 3 implementation and manual UAT are complete.
@@ -43,9 +43,9 @@ Authoritative product implementation status:
 - Priority 1, Phase 7 implementation and focused manual UAT are complete.
 - Priority 1, Phase 8 implementation and focused manual UAT are complete.
 - Priority 2, Phases 9-13 implementation and focused manual UAT are complete.
-- Priority 2, Phase 14 local offline gates are complete; staging, provider, and
-  release approval gates remain in progress.
-- Priority 3, Phases 15-16 are implementation-complete with manual UAT pending.
+- Priority 2, Phase 14 implementation and staging UAT are complete.
+- Priority 3, Phases 15-16 are implementation-complete; Phase 15 manual UAT is
+  active and Phase 16 manual UAT remains pending.
   Phases 17-18 remain incomplete. All four remain post-beta work unless an
   earlier beta requirement explicitly depends on them.
 
@@ -218,21 +218,21 @@ Subdomain note:
   references.
 - [x] Pass a cross-cutting form UX regression against the local release candidate.
 - [x] Complete Priority 1, Phases 1-8 in `FLOW_BUILDER_ROADMAP.md`.
-- [ ] Complete Priority 2, Phases 9-14 in `FLOW_BUILDER_ROADMAP.md`.
-- [ ] Create and pass the phase-specific `docs/UAT_TEST_PLAN.md` after every
-  completed roadmap phase.
+- [x] Complete Priority 2, Phases 9-14 in `FLOW_BUILDER_ROADMAP.md`.
+- [x] Create and pass the Phase 14 checks in `docs/UAT_TEST_PLAN.md`.
+- [ ] Complete the active Phase 15 and pending Phase 16 manual UAT.
 - [x] Verify anonymous sessions, verified contact association, and cross-channel identity linking cannot expose another visitor's state locally.
 - [x] Verify configured retention, export, and deletion behavior for messages, task fields, model traces, and operation records locally.
 - [x] Verify duplicate, delayed, out-of-order, and concurrent events cannot repeat operations or overwrite newer state locally.
 - [x] Verify model, retrieval, business-tool, and outbound-channel outages use the approved degraded behavior locally.
 - [x] Verify human takeover stops automated replies and authorized release resumes the correct published target locally.
 - [x] Verify uncertain external-operation results enter reconciliation and never produce a false success response locally.
-- [ ] Execute the complete UAT plan against the intended beta deployment and
-  record its commit.
-- [ ] Pass project chat, website widget, and WhatsApp live channel
+- [x] Execute the Phase 14 UAT against the intended beta deployment and record
+  its commits.
+- [x] Pass project chat, website widget, and WhatsApp live channel
   certification within the declared non-voice scope.
-- [ ] Pass `npm run certify:release`.
-- [ ] Confirm no unresolved Critical or High flow-builder, conversational-task,
+- [x] Pass `npm run certify:release`.
+- [x] Confirm no unresolved Critical or High flow-builder, conversational-task,
   tenant-safety, or channel defect.
 
 ## Gate 10: Known Deferred Items
@@ -302,7 +302,7 @@ These are not blockers for internal beta, but they must be explicitly accepted:
 
 ## Recommended Next Implementation Order
 
-1. Complete Priority 2, Phase 14 and the non-voice cross-channel release gate.
+1. Complete the active Phase 15 manual staging UAT.
 2. Keep local environment, tenant-safety, migration, and operations checks
    passing while product implementation proceeds.
 3. Create or refresh staging app and database environments before live channel
