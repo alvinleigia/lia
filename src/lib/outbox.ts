@@ -60,6 +60,7 @@ function outboxClaimCondition(now: Date) {
 }
 
 async function claimNextOutboxMessage(input: {
+  destination?: string;
   projectId: number;
   topics?: OutboxTopic[];
   workerId: string;
@@ -75,6 +76,9 @@ async function claimNextOutboxMessage(input: {
       .where(
         and(
           eq(outboxMessages.projectId, input.projectId),
+          input.destination
+            ? eq(outboxMessages.destination, input.destination)
+            : undefined,
           input.topics?.length
             ? inArray(outboxMessages.topic, input.topics)
             : undefined,
@@ -342,6 +346,7 @@ async function updateOutboxChannelMessage(input: {
 }
 
 export async function processProjectOutboxQueue(input: {
+  destination?: string;
   maxMessages?: number;
   projectId: number;
   workerId: string;
@@ -357,6 +362,7 @@ export async function processProjectOutboxQueue(input: {
 
   for (let index = 0; index < maxMessages; index += 1) {
     const message = await claimNextOutboxMessage({
+      destination: input.destination,
       projectId: input.projectId,
       topics: ["whatsapp.runtime_reply"],
       workerId: input.workerId,

@@ -213,7 +213,8 @@ export async function POST(req: Request) {
         traceId,
       });
       await processProjectOutboxQueue({
-        maxMessages: replies.length,
+        destination: change.message.from,
+        maxMessages: 50,
         projectId: channel.projectId,
         workerId: `whatsapp-webhook:${change.message.id}`,
       });

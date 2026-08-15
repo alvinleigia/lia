@@ -429,6 +429,37 @@ test("does not deliver a later WhatsApp reply before an earlier retry", async ()
   );
 });
 
+test("scopes immediate WhatsApp outbox draining to one destination", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const destination = `phase13-scope-${suffix}`;
+  const [message] = await db
+    .insert(outboxMessages)
+    .values({
+      dedupeKey: `phase13-scope-${suffix}`,
+      destination,
+      payload: {},
+      projectId: fixture.projectId,
+      topic: "whatsapp.runtime_reply",
+      traceId: `phase13-scope-${suffix}`,
+    })
+    .returning();
+
+  const result = await processProjectOutboxQueue({
+    destination: `${destination}-other`,
+    maxMessages: 1,
+    projectId: fixture.projectId,
+    workerId: `phase13-scope-${suffix}`,
+  });
+  const [stored] = await db
+    .select({ status: outboxMessages.status })
+    .from(outboxMessages)
+    .where(eq(outboxMessages.id, message.id))
+    .limit(1);
+
+  expect(result.processed).toBe(0);
+  expect(stored?.status).toBe("queued");
+});
+
 test("requires explicit confirmation and invalidates it after correction", async () => {
   if (!fixture) throw new Error("The operation fixture is not ready.");
   const run = await startReadyRun(fixture.manualTaskId);
