@@ -1001,9 +1001,10 @@ Current release evidence recorded on 2026-08-15: the full 10-gate
 contracts, 315 database-backed browser scenarios, tenant isolation, and the
 configured live-model path. Project Chat, Widget, and WhatsApp completed the
 same staging booking with equivalent canonical fields and one Manual Review
-attempt. Phase 14 remains in progress while the focused handoff UI correction
-awaits staging retest, audit visibility is investigated, and backup restore is
-blocked until a third disposable environment exists.
+attempt. The focused handoff UI correction passed its staging retest, and
+shared form actions now expose consistent pending feedback. Phase 14 remains in
+progress while audit visibility is investigated and backup restore is blocked
+until a third disposable environment exists.
 
 To avoid maintaining three copies of the same release status, Phase 14 has no
 separate checklist here:

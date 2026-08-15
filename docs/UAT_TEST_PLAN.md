@@ -107,7 +107,8 @@ Result: [ ] Pass [ ] Fail
    questions.
 8. Open `Automation` > `Handoff Queue` > `Open`. Open the new handoff. If it is
    unassigned, click `Claim` first. When it shows your name and `Under Review`,
-   click `Resolve`.
+   click `Resolve`. While an action is running, its button shows progress and
+   the queue buttons are disabled; do not click the action twice.
 9. Confirm the handoff disappears from `Open` and appears under `Closed`.
 10. Open `Admin` > `Audit Logs`. Look for `handoff.assigned` and
     `conversation.lifecycle_changed` with actor, project, target, and timestamp
@@ -300,7 +301,7 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 
 | ID | Status | Finding |
 | --- | --- | --- |
-| `P14-UAT-01` | Fixed - staging retest pending | Commit `5b56f61` gives the active queue action a processing label, disables the queue controls while it runs, replaces `Claim` with `Release` after assignment, and rejects stale claim or release requests on the server. |
+| `P14-UAT-01` | Fixed and staging verified | Commit `5b56f61` gives the active queue action a processing label, disables the queue controls while it runs, replaces `Claim` with `Release` after assignment, and rejects stale claim or release requests on the server. The staging Claim retest updated once and exposed `Release` as expected. Commit `547f8e0` extends the same disabled-and-processing feedback to shared form submit buttons across the app while preserving action-specific queue labels. |
 | `P14-UAT-02` | Open - Untriaged | Successful claim and lifecycle events were not visible in `Admin` > `Audit Logs`. |
 | `P14-UAT-03` | Staging fixture repaired | The staging repair completed for project `#1`; commits `3283879` and `0cfe573` repair seeded project IDs and operation handlers. |
 | `P14-UAT-04` | Fixed and staging verified | Commit `39a7367` colocates the runtime with the database and skips the redundant trigger model turn. Measured server time fell from `57.15 s` to `0.754 s` for starting the booking and was `0.697 s` for the next selection. |
@@ -325,8 +326,8 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 - [ ] No Critical or High defect remains open.
 - [ ] Release owner approved production-like beta traffic.
 
-- Notes: Retest `P14-UAT-01`, investigate `P14-UAT-02`, and retain the
-  `P14-UAT-13` environment blocker until a disposable restore target exists.
+- Notes: Investigate `P14-UAT-02` and retain the `P14-UAT-13` environment
+  blocker until a disposable restore target exists.
 - Release owner/date: `<name and timestamp>`
 
 # Later Phases - Do Not Start Yet
