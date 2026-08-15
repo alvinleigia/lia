@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Selected project: `Phase 14 Release UAT (#1)`
-- Minimum release-candidate commit: `a218441`
+- Minimum release-candidate commit: `d89605f`
 
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
@@ -28,7 +28,7 @@ contact details.
 - Date: `<date>`
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
-- Expected minimum commit: `a218441`
+- Expected minimum commit: `d89605f`
 - Actual deployed commit: `<short commit from the hosting dashboard>`
 - Deployment status: [ ] Successful
 - Staging WhatsApp configured: [ ] Yes [ ] No
@@ -40,7 +40,7 @@ contact details.
 Ask the release owner to confirm:
 
 - [ ] The hosting dashboard shows a successful staging deployment for commit
-      `a218441` or a later commit from `main`.
+      `d89605f` or a later commit from `main`.
 - [ ] The release owner ran `npm run seed:phase14-staging` with the staging
       fixture variables and saw `Repaired Phase 14 Release UAT as project #1.`
 - [ ] Clean and existing-database migrations passed.
@@ -180,12 +180,18 @@ Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
 
 Run this only if the staging WhatsApp channel is configured.
 
-1. Send `book a spa service` to the staging WhatsApp number.
-2. Choose `Facial`, then `Classic Facial`.
-3. Send the same remaining five values.
-4. Review all seven values, then send or select `Confirm` once.
-5. Confirm the device receives one successful completion reply with no
-   duplicate reply.
+1. If an older booking is still active, send `cancel` once and wait for
+   `No problem. I cancelled this request.` Do not send the trigger yet.
+2. Send `book a spa service` once. Wait until both the acknowledgement and
+   `Please provide Service Category.` arrive.
+3. Choose or type `Facial` once. Wait for `Please provide Service.`
+4. Choose or type `Classic Facial` once. Wait for the date prompt.
+5. Send the same remaining five values, one response at a time, waiting for
+   each next prompt.
+6. Review all seven values, then send or select `Confirm` once.
+7. Confirm the device receives one successful completion reply. No older
+   prompt, duplicate reply, or out-of-order reply may appear after a newer
+   answer.
 
 If WhatsApp is not configured, mark `Environment blocker`; Phase 14 remains in
 progress until the release owner resolves or formally accepts the limitation.
@@ -230,6 +236,7 @@ Result: [ ] Pass [ ] Fail
 | `P14-UAT-04` | Fixed and staging verified | Commit `39a7367` colocates the runtime with the database and skips the redundant trigger model turn. Measured server time fell from `57.15 s` to `0.754 s` for starting the booking and was `0.697 s` for the next selection. |
 | `P14-UAT-05` | Fixed and staging verified | Commits `0681065` and `6b344b7` make confirmed operations retry-safe and preserve runtime event order. The Widget completed one Manual Review submission successfully. |
 | `P14-UAT-06` | Fixed and staging verified | Commit `a218441` automatically shows the newest Widget message and reply without manual scrolling. |
+| `P14-UAT-07` | Fixed - staging verification pending | Commits `1394ae8`, `0957d03`, and `d89605f` reject late provider events and stale selections, scope immediate delivery to the active recipient, cancel queued replies superseded by newer input, and block an old turn's reply before provider delivery. |
 
 ### Phase 14 Sign-Off
 
