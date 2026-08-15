@@ -2569,12 +2569,21 @@ test("project chat resumes an active flow after refresh without duplicate writes
   const duplicateCommandId = `duplicate-command-${runId}`;
   const firstResult = await runBrowserFlowText({
     actionId: action.id,
+    announceStart: false,
     channelType: "project_chat",
     commandId: duplicateCommandId,
     conversationId: duplicateConversationId,
     projectId,
     source: "project_chat",
   });
+  expect(
+    firstResult.replies.some(
+      (reply) => reply.fallbackText === `Sure, I can help with ${actionName}.`,
+    ),
+  ).toBe(false);
+  expect(
+    firstResult.replies.some((reply) => reply.fallbackText === firstPrompt),
+  ).toBe(true);
   const duplicateSubmission = await getActiveActionSubmissionForConversation({
     conversationId: duplicateConversationId,
     projectId,
@@ -2588,6 +2597,7 @@ test("project chat resumes an active flow after refresh without duplicate writes
 
   const replayedResult = await runBrowserFlowText({
     actionId: action.id,
+    announceStart: false,
     channelType: "project_chat",
     commandId: duplicateCommandId,
     conversationId: duplicateConversationId,

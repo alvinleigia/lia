@@ -221,6 +221,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
 
   const runCanonicalFlow = async (input: {
     actionId?: number;
+    announceStart?: boolean;
     displayText?: string;
     displayUserText?: boolean;
     editSection?: FlowEditSection;
@@ -245,6 +246,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     try {
       const response = await postBrowserFlowCommand("/api/actions/runtime", {
         actionId: input.actionId,
+        announceStart: input.announceStart,
         commandId: createBrowserCommandId(),
         conversationId,
         editSection: input.editSection,
@@ -310,9 +312,11 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
   const startActionFlow = async (
     action: RuntimeAction,
     openingText?: string,
+    announceStart = true,
   ) => {
     await runCanonicalFlow({
       actionId: action.id,
+      announceStart,
       displayUserText: Boolean(openingText),
       text: openingText ?? getActionStartControlText(action),
     });
@@ -361,7 +365,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
           proposal.taskRecommendation.taskId,
         );
         if (action) {
-          await startActionFlow(action);
+          await startActionFlow(action, undefined, false);
         }
       }
       return true;

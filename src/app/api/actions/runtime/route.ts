@@ -18,6 +18,7 @@ import {
 const requestSchema = z
   .object({
     actionId: z.number().int().positive().optional(),
+    announceStart: z.boolean().optional(),
     commandId: z.string().trim().min(1).max(120).optional(),
     conversationId: z.string().trim().min(1).max(120),
     editSection: z
@@ -91,6 +92,7 @@ export async function POST(req: Request) {
     const { project } = await resolveUserAndProject(parsed.data.projectId);
     const result = await runBrowserFlowText({
       actionId: parsed.data.actionId,
+      announceStart: parsed.data.announceStart,
       channelType: "project_chat",
       commandId: parsed.data.commandId,
       conversationId: parsed.data.conversationId,

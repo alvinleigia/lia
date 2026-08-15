@@ -288,6 +288,7 @@ test("compiler exposes only allowed task contracts and model-visible context", (
   expect(compiled.system).toContain(
     "Missing details for a clear task match are not ambiguity",
   );
+  expect(compiled.system).toContain("do not ask whether they want to proceed");
   expect(compiled.system).toContain(
     "fieldCandidates are allowed only when recommending a task",
   );

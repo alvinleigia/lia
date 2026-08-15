@@ -1293,6 +1293,7 @@ function findStepIndexById(action: RuntimeAction, stepId: number | null) {
 
 export async function startChannelFlow(input: {
   action: RuntimeAction;
+  announceStart?: boolean;
   contactId?: number | null;
   conversationId: string;
   projectId: number;
@@ -1346,7 +1347,9 @@ export async function startChannelFlow(input: {
   return {
     boundaryNodeId: result.boundaryNodeId,
     replies: [
-      createTextReply(`Sure, I can help with ${input.action.name}.`),
+      ...(input.announceStart === false
+        ? []
+        : [createTextReply(`Sure, I can help with ${input.action.name}.`)]),
       ...result.replies,
     ],
   };

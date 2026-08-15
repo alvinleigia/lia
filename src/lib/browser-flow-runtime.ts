@@ -57,6 +57,7 @@ import {
 
 type RunBrowserFlowTextInput = {
   actionId?: number;
+  announceStart?: boolean;
   channelType: ChannelType;
   commandId?: string;
   conversationId: string;
@@ -367,6 +368,7 @@ async function executeBrowserFlowText(
     : action
       ? await startChannelFlow({
           action,
+          announceStart: input.announceStart,
           contactId: inboundRecord.conversation.contactId,
           conversationId: input.conversationId,
           projectId: input.projectId,
@@ -430,6 +432,7 @@ function hashBrowserFlowCommand(input: RunBrowserFlowTextInput) {
     .update(
       JSON.stringify({
         actionId: input.actionId ?? null,
+        announceStart: input.announceStart ?? null,
         editSection: input.editSection ?? null,
         expectedRevision: input.expectedRevision ?? null,
         selection: input.selection ?? null,
