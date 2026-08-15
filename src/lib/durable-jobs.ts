@@ -105,7 +105,7 @@ export async function enqueueDurableJob(input: EnqueueDurableJobInput) {
   const [created] = await db
     .insert(durableJobs)
     .values({
-      availableAt: input.availableAt ?? new Date(),
+      availableAt: input.availableAt ?? sql`CURRENT_TIMESTAMP`,
       dedupeKey,
       jobType: input.jobType,
       maxAttempts: clampInteger(
@@ -145,14 +145,19 @@ export async function enqueueDurableJob(input: EnqueueDurableJobInput) {
   return { created: false, job: existing } as const;
 }
 
-function claimableJobCondition(now: Date) {
+function claimableJobCondition(now?: Date) {
+  const currentTime = now ?? sql`CURRENT_TIMESTAMP`;
+
   return and(
     lt(durableJobs.attempts, durableJobs.maxAttempts),
     or(
-      and(eq(durableJobs.status, "queued"), lte(durableJobs.availableAt, now)),
+      and(
+        eq(durableJobs.status, "queued"),
+        lte(durableJobs.availableAt, currentTime),
+      ),
       and(
         eq(durableJobs.status, "processing"),
-        lte(durableJobs.leaseExpiresAt, now),
+        lte(durableJobs.leaseExpiresAt, currentTime),
       ),
     ),
   );
@@ -161,14 +166,17 @@ function claimableJobCondition(now: Date) {
 export async function claimNextDurableJob(
   input: ClaimDurableJobInput,
 ): Promise<SelectDurableJob | null> {
-  const now = input.now ?? new Date();
+  const now = input.now;
   const workerId = normalizeWorkerId(input.workerId);
   const leaseMs = clampInteger(
     input.leaseMs ?? DEFAULT_LEASE_MS,
     MIN_LEASE_MS,
     MAX_LEASE_MS,
   );
-  const leaseExpiresAt = new Date(now.getTime() + leaseMs);
+  const leaseExpiresAt = now
+    ? new Date(now.getTime() + leaseMs)
+    : sql`CURRENT_TIMESTAMP + (${leaseMs} * INTERVAL '1 millisecond')`;
+  const updatedAt = now ?? sql`CURRENT_TIMESTAMP`;
 
   for (let claimAttempt = 0; claimAttempt < 5; claimAttempt += 1) {
     const jobTypeFilter =
@@ -200,7 +208,7 @@ export async function claimNextDurableJob(
         leaseExpiresAt,
         leaseOwner: workerId,
         status: "processing",
-        updatedAt: now,
+        updatedAt,
       })
       .where(
         and(

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lte, or } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import { durableJobs, outboxMessages } from "@/lib/db-schema";
 import { processProjectFlowResponsePolicyQueue } from "@/lib/durable-flow-response-policy";
@@ -11,31 +11,33 @@ function clampInteger(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.trunc(value)));
 }
 
-function dueDurableJobCondition(now: Date) {
+function dueDurableJobCondition() {
   return or(
-    and(eq(durableJobs.status, "queued"), lte(durableJobs.availableAt, now)),
+    and(
+      eq(durableJobs.status, "queued"),
+      lte(durableJobs.availableAt, sql`CURRENT_TIMESTAMP`),
+    ),
     and(
       eq(durableJobs.status, "processing"),
-      lte(durableJobs.leaseExpiresAt, now),
+      lte(durableJobs.leaseExpiresAt, sql`CURRENT_TIMESTAMP`),
     ),
   );
 }
 
-function dueOutboxMessageCondition(now: Date) {
+function dueOutboxMessageCondition() {
   return or(
     and(
       eq(outboxMessages.status, "queued"),
-      lte(outboxMessages.availableAt, now),
+      lte(outboxMessages.availableAt, sql`CURRENT_TIMESTAMP`),
     ),
     and(
       eq(outboxMessages.status, "processing"),
-      lte(outboxMessages.leaseExpiresAt, now),
+      lte(outboxMessages.leaseExpiresAt, sql`CURRENT_TIMESTAMP`),
     ),
   );
 }
 
 async function listDueProjectIds(maxProjects: number) {
-  const now = new Date();
   const [jobProjects, outboxProjects] = await Promise.all([
     db
       .selectDistinct({ projectId: durableJobs.projectId })
@@ -43,7 +45,7 @@ async function listDueProjectIds(maxProjects: number) {
       .where(
         and(
           inArray(durableJobs.status, ["queued", "processing"]),
-          dueDurableJobCondition(now),
+          dueDurableJobCondition(),
         ),
       )
       .orderBy(asc(durableJobs.projectId))
@@ -54,7 +56,7 @@ async function listDueProjectIds(maxProjects: number) {
       .where(
         and(
           inArray(outboxMessages.status, ["queued", "processing"]),
-          dueOutboxMessageCondition(now),
+          dueOutboxMessageCondition(),
         ),
       )
       .orderBy(asc(outboxMessages.projectId))
