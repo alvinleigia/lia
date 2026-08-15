@@ -6,6 +6,9 @@ This file records items that are intentionally accepted as non-blockers for
 internal beta. These decisions are not removals from scope. They are explicit
 deferrals so the app can be tested safely before paid SaaS operations begin.
 
+Manual checks deferred during phase UAT are tracked separately in
+[`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
+
 ## Billing Plans And Subscriptions
 
 Decision: accepted as deferred for internal beta.

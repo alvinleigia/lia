@@ -6,6 +6,9 @@ This is the only active UAT document. Run the official checks at:
 - Selected project: `Phase 14 Release UAT (#1)`
 - Minimum release-candidate commit: `8715f88`
 
+Checks explicitly accepted for later retesting are kept in
+[`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
+
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 
@@ -313,7 +316,7 @@ Result: [ ] Pass [ ] Fail [x] Accepted limitation
 | `P14-UAT-10` | Fixed and staging verified | Widget displayed `Phase 14 Release Guest` but repeated `Please provide Guest Name.` because the extractor returned no field candidate. Commit `5f8f6a4` binds a safe direct answer to the requested plain-text field while preserving side questions, cancellation, handoff, and existing candidates; the staging retest advanced normally and completed once. |
 | `P14-UAT-11` | Fixed and staging verified | Widget user bubbles expanded across most of the transcript even for short text such as `cancel`. Commit `955e020` sizes both Widget user-message paths to their content, caps them at 80%, and safely wraps long text; the staging recheck passed. |
 | `P14-UAT-12` | Fixed and staging verified | Cancelled Widget submission `#66` had a cancelled task run but a submitted parent submission and `submission.submitted` event. Commit `8715f88` preserves terminal hybrid cancellation at the parent. Submission `#67` verified matching cancelled statuses, no submitted timestamp, no operation attempt, and `flow.cancelled` without `submission.submitted`. |
-| `P14-UAT-13` | Accepted environment limitation | Backup restore cannot be tested safely because only production and active staging instances exist. On 2026-08-15, the release owner accepted this limitation for Phase 14 beta rather than risk either active environment. |
+| `P14-UAT-13` | Accepted environment limitation | The disposable backup-restore check is tracked in [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md). |
 | `P14-UAT-14` | Resolved - full certification passed | The release owner confirmed the configured non-staging database is an approved testing target. The suite found a durable-wait clock mismatch; `6ef4a4b` now schedules waits from the database clock, and `635d5fa` hardens the Widget Escape-key check against iframe hydration. The final 10-gate certification passed. |
 
 ### Phase 14 Sign-Off
@@ -326,8 +329,8 @@ Result: [ ] Pass [ ] Fail [x] Accepted limitation
 - [x] No Critical or High defect remains open.
 - [ ] Release owner approved production-like beta traffic.
 
-- Notes: `P14-UAT-13` is accepted for this beta gate. Run the restore test when
-  a disposable environment becomes available.
+- Notes: `P14-UAT-13` is accepted for this beta gate and recorded in
+  [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 - Release owner/date: `<name and timestamp>`
 
 # Later Phases - Do Not Start Yet
@@ -354,5 +357,5 @@ cleanup checks. Do not run it in production or on the Phase 14 fixture.
 - Phase 16: [ ] Pass [ ] Fail [ ] Pending
 - Critical defects open: `<count>`
 - High defects open: `<count>`
-- Accepted limitations: `<none or details>`
+- Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 - Final approver/date: `<name and timestamp>`
