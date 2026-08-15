@@ -186,8 +186,9 @@ Result: [x] Pass [ ] Pass with accepted limitation [ ] Fail
 
 Verified on 2026-08-15 against `eccfd27`: the repeated Guest Name defect was
 fixed, all seven values advanced correctly, and Manual Review completed once
-with the response automatically scrolled into view. Steps 6 and 9 still
-require their explicit checks before marking this channel `Pass`.
+with the response automatically scrolled into view. Closing and reopening a
+new partial run also restored the correct Service prompt and option. Step 9
+still requires its explicit check before marking this channel `Pass`.
 
 Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
 
