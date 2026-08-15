@@ -353,7 +353,7 @@ a time and stop when a result fails.
    - `Cross-channel linking`: `Verified contacts only`
 3. Expand `Advanced model and transition limits`. Set `Maximum Task Switches`,
    `Connected Flow Depth`, and `Handoff Depth` to `2`. Click `Save Policy`.
-4. Open `Outcomes` > `Behavior and Safety`. Set `Response Length` to `Short`
+4. Open `Workflow` > `Behavior and Safety`. Set `Response Length` to `Short`
    and `Task Consent` to `Use project policy`. Click `Save Policies`.
 5. Create a local file named `phase15-hotel-policy.txt` containing:
 
