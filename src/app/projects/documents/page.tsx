@@ -1,9 +1,6 @@
-import { Files, ListChecks, RefreshCw, Trash2 } from "lucide-react";
-import {
-  deleteAllDocumentsFromUploadAction,
-  deleteSourceDocumentFromUploadAction,
-  processQueuedDocumentsAction,
-} from "@/app/upload/actions";
+import { Files, ListChecks, RefreshCw } from "lucide-react";
+import { processQueuedDocumentsAction } from "@/app/upload/actions";
+import { DocumentDeleteButton } from "@/components/document-delete-button";
 import { NoProjectState } from "@/components/no-project-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
@@ -119,19 +116,10 @@ export default async function ProjectDocumentsPage({
             )}
 
             {sourceDocumentList.length > 0 && (
-              <form action={deleteAllDocumentsFromUploadAction}>
-                <input
-                  type="hidden"
-                  name="projectId"
-                  value={selectedProject.id}
-                />
-                <FormSubmitButton
-                  label="Delete All Documents in This Project"
-                  pendingLabel="Deleting..."
-                  variant="destructive"
-                  icon={<Trash2 className="h-4 w-4" />}
-                />
-              </form>
+              <DocumentDeleteButton
+                projectId={selectedProject.id}
+                projectName={selectedProject.name}
+              />
             )}
 
             {sourceDocumentList.length === 0 ? (
@@ -162,24 +150,12 @@ export default async function ProjectDocumentsPage({
                         </p>
                       )}
                     </div>
-                    <form action={deleteSourceDocumentFromUploadAction}>
-                      <input
-                        type="hidden"
-                        name="projectId"
-                        value={selectedProject.id}
-                      />
-                      <input
-                        type="hidden"
-                        name="sourceDocumentId"
-                        value={doc.id}
-                      />
-                      <FormSubmitButton
-                        label="Delete"
-                        pendingLabel="Deleting..."
-                        variant="destructive"
-                        icon={<Trash2 className="h-4 w-4" />}
-                      />
-                    </form>
+                    <DocumentDeleteButton
+                      documentTitle={doc.title}
+                      projectId={selectedProject.id}
+                      projectName={selectedProject.name}
+                      sourceDocumentId={doc.id}
+                    />
                   </div>
                 ))}
               </div>
