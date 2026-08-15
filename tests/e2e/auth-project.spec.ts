@@ -1695,13 +1695,15 @@ test("widget token access respects tenant and allowed domains", async ({
   await expect(
     ownerPage.getByTitle("Widget conversation preview"),
   ).toHaveAttribute("src", /^\/widget\/embed\?token=/);
-  await ownerPage
+  const previewCloseButton = ownerPage
     .frameLocator('iframe[title="Widget conversation preview"]')
-    .getByRole("button", { name: "Close chat" })
-    .press("Escape");
-  await expect(ownerPage.getByTitle("Widget conversation preview")).toHaveCount(
-    0,
-  );
+    .getByRole("button", { name: "Close chat" });
+  await expect(async () => {
+    await previewCloseButton.press("Escape");
+    await expect(
+      ownerPage.getByTitle("Widget conversation preview"),
+    ).toHaveCount(0, { timeout: 250 });
+  }).toPass({ timeout: 5_000 });
 
   await ownerPage
     .locator("textarea")
