@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Selected project: `Phase 14 Release UAT (#1)`
-- Minimum release-candidate commit: `923f042`
+- Minimum release-candidate commit: `7848bae`
 
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
@@ -28,7 +28,7 @@ contact details.
 - Date: `<date>`
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
-- Expected minimum commit: `923f042`
+- Expected minimum commit: `7848bae`
 - Actual deployed commit: `923f042`
 - Deployment status: [x] Successful
 - Staging WhatsApp configured: [x] Yes [ ] No
@@ -40,7 +40,7 @@ contact details.
 Ask the release owner to confirm:
 
 - [x] The hosting dashboard shows a successful staging deployment for commit
-      `923f042` or a later commit from `main`.
+      `7848bae` or a later commit from `main`.
 - [x] The release owner ran `npm run seed:phase14-staging` with the staging
       fixture variables and saw `Repaired Phase 14 Release UAT as project #1.`
 - [ ] Clean and existing-database migrations passed.
@@ -243,6 +243,7 @@ Result: [ ] Pass [ ] Fail
 | `P14-UAT-05` | Fixed and staging verified | Commits `0681065` and `6b344b7` make confirmed operations retry-safe and preserve runtime event order. The Widget completed one Manual Review submission successfully. |
 | `P14-UAT-06` | Fixed and staging verified | Commit `a218441` automatically shows the newest Widget message and reply without manual scrolling. |
 | `P14-UAT-07` | Fixed and staging verified | Commits `1394ae8`, `0957d03`, `d89605f`, and `923f042` reject late provider events and stale selections, cancel obsolete queued replies, block an old turn's reply, and use the database clock for immediate outbox claims. A complete WhatsApp booking passed once after the expired UAT token was replaced. |
+| `P14-UAT-08` | Fixed - staging verification pending | WhatsApp submission `#61` completed correctly but displayed `Started: Not started` for its completed Manual Review attempt. Commit `7848bae` records the first durable-operation start time and verifies it is not later than the finish time. |
 
 ### Phase 14 Sign-Off
 
