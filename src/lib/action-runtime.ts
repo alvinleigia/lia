@@ -190,6 +190,21 @@ export function findTriggeredAction(actions: RuntimeAction[], input: string) {
   );
 }
 
+export function findActionForTaskRecommendation(
+  actions: RuntimeAction[],
+  taskId: number,
+) {
+  return (
+    actions.find((action) =>
+      action.hybridGraph?.nodes.some(
+        (node) =>
+          node.kind === "conversational_task" &&
+          node.settings.task.taskId === taskId,
+      ),
+    ) ?? null
+  );
+}
+
 export function isExactActionTrigger(action: RuntimeAction, input: string) {
   const normalizedInput = normalizeActionText(input);
 

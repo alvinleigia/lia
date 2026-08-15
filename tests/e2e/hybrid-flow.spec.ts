@@ -6,6 +6,7 @@ import {
 } from "../../src/lib/action-flow-compiler";
 import { getProjectActionStatusAfterPublish } from "../../src/lib/action-flow-constants";
 import {
+  findActionForTaskRecommendation,
   getActionStartControlText,
   isExactActionTrigger,
   type RuntimeAction,
@@ -78,6 +79,34 @@ test("exact action triggers are control input, not task content", () => {
       triggerPhrases: ["", "phase thirteen booking parity"],
     } as RuntimeAction),
   ).toBe("phase thirteen booking parity");
+});
+
+test("task recommendations resolve only to an action containing that published task", () => {
+  const actions = [
+    {
+      hybridGraph: {
+        nodes: [
+          {
+            kind: "conversational_task",
+            settings: { task: { taskId: 40 } },
+          },
+        ],
+      },
+    },
+    {
+      hybridGraph: {
+        nodes: [
+          {
+            kind: "conversational_task",
+            settings: { task: { taskId: 41 } },
+          },
+        ],
+      },
+    },
+  ] as RuntimeAction[];
+
+  expect(findActionForTaskRecommendation(actions, 41)).toBe(actions[1]);
+  expect(findActionForTaskRecommendation(actions, 99)).toBeNull();
 });
 
 test("publishing activates drafts without reactivating archived actions", () => {

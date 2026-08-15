@@ -32,6 +32,7 @@ import {
   type ActiveActionFlow,
   type FlowChatMessage,
   type FlowEditSection,
+  findActionForTaskRecommendation,
   getActionStartControlText,
   getActionStepChoiceDisplayMode,
   getActionStepOptions,
@@ -57,6 +58,8 @@ import {
   shouldRenderActionStepInlineControl,
   shouldRenderRuntimeInputControl,
 } from "@/lib/browser-input-presentation";
+import type { TurnMessageV1 } from "@/lib/conversation-turn-contracts";
+import type { ProjectStructuredTurnResult } from "@/lib/conversation-turn-service";
 
 type ChatPageClientProps = {
   actions: RuntimeAction[];
@@ -315,6 +318,60 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     });
   };
 
+  const runStructuredKnowledgeTurn = async (text: string) => {
+    const history: TurnMessageV1[] = flowMessages.slice(-48).map((message) => ({
+      content: message.text,
+      role: message.role,
+    }));
+
+    setIsSavingSubmission(true);
+    try {
+      const response = await fetch("/api/conversation/turn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activeTaskId: null,
+          assistantIntroduced:
+            messages.length > 0 ||
+            history.some(({ role }) => role === "assistant"),
+          channel: "project_chat",
+          history,
+          projectId,
+          stage: "knowledge",
+          visitorMessage: text,
+        }),
+      });
+      const payload = (await response.json()) as
+        | ProjectStructuredTurnResult
+        | { error?: string };
+      if (!response.ok || !("execution" in payload)) {
+        return false;
+      }
+
+      const proposal = payload.execution.proposal;
+      setFlowMessages((current) => [
+        ...current,
+        makeFlowMessage("user", text),
+        makeFlowMessage("assistant", proposal.reply),
+      ]);
+
+      if (proposal.taskRecommendation) {
+        const action = findActionForTaskRecommendation(
+          actions,
+          proposal.taskRecommendation.taskId,
+        );
+        if (action) {
+          await startActionFlow(action);
+        }
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setIsSavingSubmission(false);
+    }
+  };
+
   const handleFlowFileUpload = async (file: File, flow: ActiveActionFlow) => {
     const action = actions.find((item) => item.id === flow.actionId);
 
@@ -410,6 +467,10 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       text,
     });
     if (handledByFlow) {
+      return;
+    }
+
+    if (await runStructuredKnowledgeTurn(text)) {
       return;
     }
 
