@@ -127,6 +127,36 @@ export function bindRequestedTaskSelection(input: {
   };
 }
 
+export function bindRequestedTaskTextAnswer(input: {
+  proposal: TurnResultV1;
+  requestedFieldKey: string | null;
+  text: string;
+}): TurnResultV1 {
+  const value = input.text.trim();
+  if (
+    !input.requestedFieldKey ||
+    !value ||
+    input.proposal.fieldCandidates.length > 0 ||
+    input.proposal.safety.decision !== "allow" ||
+    (input.proposal.turnKind !== "field_answer" &&
+      input.proposal.turnKind !== "field_correction")
+  ) {
+    return input.proposal;
+  }
+
+  return {
+    ...input.proposal,
+    fieldCandidates: [
+      {
+        confidence: 1,
+        fieldKey: input.requestedFieldKey,
+        naturalValue: value,
+        source: "visitor",
+      },
+    ],
+  };
+}
+
 export function createRequestedTaskSelectionProposal(input: {
   requestedFieldKey: string | null;
   selectionValue: string | null;

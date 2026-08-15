@@ -57,6 +57,7 @@ import type {
 } from "@/lib/hybrid-flow-contracts";
 import {
   bindRequestedTaskSelection,
+  bindRequestedTaskTextAnswer,
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   createMismatchedTaskSelectionProposal,
@@ -926,7 +927,7 @@ async function executeTaskBoundary(input: {
     requestedFieldKey: selectionValue ? (requestedField?.key ?? null) : null,
     selectionValue,
   });
-  const proposal = selectionProposal
+  const extractedProposal = selectionProposal
     ? selectionProposal
     : bindRequestedTaskSelection({
         proposal: (
@@ -959,6 +960,14 @@ async function executeTaskBoundary(input: {
           : null,
         selectionValue,
       });
+  const proposal =
+    requestedField?.type === "text" && !requestedField.optionSource
+      ? bindRequestedTaskTextAnswer({
+          proposal: extractedProposal,
+          requestedFieldKey: requestedField.key,
+          text: input.runtimeInput.text,
+        })
+      : extractedProposal;
   let revision = session.execution.revision;
 
   if (proposal.turnKind === "side_question") {

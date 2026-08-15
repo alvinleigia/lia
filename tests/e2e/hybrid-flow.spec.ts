@@ -31,6 +31,7 @@ import {
 } from "../../src/lib/hybrid-flow-contracts";
 import {
   bindRequestedTaskSelection,
+  bindRequestedTaskTextAnswer,
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   createMismatchedTaskSelectionProposal,
@@ -657,6 +658,46 @@ test("explicit task selections override model-rewritten resource IDs", () => {
       source: "visitor",
     },
   ]);
+});
+
+test("direct answers fill the requested text field when extraction returns no candidate", () => {
+  const proposal = {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor answered the requested field.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" as const },
+    nextAction: "ask" as const,
+    outcomeRecommendation: null,
+    reply: "Please provide Guest Name.",
+    routeRecommendation: null,
+    safety: { decision: "allow" as const, reasonCode: null },
+    schemaVersion: 1 as const,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_answer" as const,
+  };
+
+  expect(
+    bindRequestedTaskTextAnswer({
+      proposal,
+      requestedFieldKey: "guestName",
+      text: "  Phase 14 Release Guest  ",
+    }).fieldCandidates,
+  ).toEqual([
+    {
+      confidence: 1,
+      fieldKey: "guestName",
+      naturalValue: "Phase 14 Release Guest",
+      source: "visitor",
+    },
+  ]);
+  expect(
+    bindRequestedTaskTextAnswer({
+      proposal: { ...proposal, turnKind: "side_question" },
+      requestedFieldKey: "guestName",
+      text: "Why do you need my name?",
+    }),
+  ).toEqual({ ...proposal, turnKind: "side_question" });
 });
 
 test("requested project-resource selections can skip the model", () => {
