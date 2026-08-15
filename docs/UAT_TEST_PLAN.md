@@ -420,9 +420,13 @@ Result: [x] Pass [ ] Fail
    question. Confirm Widget does not inherit the Project Chat value.
    - Verified on staging: Widget replied that the detail was not verified in
      the available project information and did not reveal the marker.
-4. Request a person during a disposable booking.
-5. Open `Automation` > `Handoff Queue` > `Unassigned`. Confirm one new handoff,
-   then `Claim` and `Resolve` it.
+4. [x] Request a person during a disposable booking.
+   - Verified on staging Widget: Lia replied that it would connect the visitor
+     with the spa team and created handoff `#74`.
+5. [x] Open `Automation` > `Handoff Queue` > `Unassigned`. Confirm one new
+   handoff, then `Claim` and `Resolve` it.
+   - Verified on staging: handoff `#74` appeared as an unassigned Widget Chat
+     handoff, was assigned to `Leigia`, and moved to `Closed` as `Completed`.
 6. Open `Automation` > `Operations` > `Execution Health`. Confirm no related
    job remains unexpectedly `Processing` or `Failed`.
 7. Open `Admin` > `Audit Logs`. Confirm the test is explainable without private
