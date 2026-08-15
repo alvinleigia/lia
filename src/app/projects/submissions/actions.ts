@@ -27,6 +27,7 @@ import {
   type FlowMediaUploadValue,
   isFlowMediaUploadValue,
 } from "@/lib/flow-media-values";
+import { getHandoffAssignmentAvailability } from "@/lib/handoff-queue";
 import { runSubmissionOperations } from "@/lib/operations";
 import { importWhatsAppMediaReference } from "@/lib/whatsapp";
 
@@ -521,6 +522,21 @@ export async function updateHandoffQueueAction(
       continue;
     }
 
+    const isClaim =
+      command.action === "claim" || command.action === "claim_selected";
+    const isRelease =
+      command.action === "release" || command.action === "release_selected";
+    const assignmentAvailability = getHandoffAssignmentAvailability(
+      handoff.assignedUserId,
+    );
+
+    if (
+      (isClaim && !assignmentAvailability.canClaim) ||
+      (isRelease && !assignmentAvailability.canRelease)
+    ) {
+      continue;
+    }
+
     const nextStatus = getQueueActionStatus(command.action);
 
     if (nextStatus) {
@@ -621,9 +637,6 @@ export async function updateHandoffQueueAction(
     if (!submission) {
       continue;
     }
-
-    const isClaim =
-      command.action === "claim" || command.action === "claim_selected";
 
     await addActionSubmissionEvent({
       projectId: project.id,

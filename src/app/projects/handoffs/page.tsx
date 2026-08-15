@@ -9,18 +9,19 @@ import {
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { HandoffQueueActionButton } from "@/components/handoff-queue-action-button";
 import { NoProjectState } from "@/components/no-project-state";
 import {
   ActionFormError,
   ActionStateForm,
 } from "@/components/ui/action-state-form";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { canAccess } from "@/lib/access-control";
 import {
   ACTION_SUBMISSION_STATUS_LABELS,
   listActionSubmissionsWithActions,
 } from "@/lib/action-flows";
+import { getHandoffAssignmentAvailability } from "@/lib/handoff-queue";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
@@ -306,212 +307,183 @@ export default async function HandoffsPage({
                     <span className="mr-2 text-sm font-medium">
                       Selected rows
                     </span>
-                    <Button
-                      type="submit"
-                      name="queueAction"
+                    <HandoffQueueActionButton
                       value="claim_selected"
-                      variant="outline"
-                    >
-                      <UserCheck className="h-4 w-4" />
-                      Claim
-                    </Button>
-                    <Button
-                      type="submit"
-                      name="queueAction"
+                      icon={<UserCheck className="h-4 w-4" />}
+                      label="Claim"
+                      pendingLabel="Claiming..."
+                    />
+                    <HandoffQueueActionButton
                       value="release_selected"
-                      variant="outline"
-                    >
-                      <UserX className="h-4 w-4" />
-                      Release
-                    </Button>
-                    <Button
-                      type="submit"
-                      name="queueAction"
+                      icon={<UserX className="h-4 w-4" />}
+                      label="Release"
+                      pendingLabel="Releasing..."
+                    />
+                    <HandoffQueueActionButton
                       value="reopen_selected"
-                      variant="outline"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Reopen
-                    </Button>
-                    <Button
-                      type="submit"
-                      name="queueAction"
+                      icon={<RotateCcw className="h-4 w-4" />}
+                      label="Reopen"
+                      pendingLabel="Reopening..."
+                    />
+                    <HandoffQueueActionButton
                       value="resolve_selected"
-                      variant="outline"
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Resolve
-                    </Button>
-                    <Button
-                      type="submit"
-                      name="queueAction"
+                      icon={<CheckCircle2 className="h-4 w-4" />}
+                      label="Resolve"
+                      pendingLabel="Resolving..."
+                    />
+                    <HandoffQueueActionButton
                       value="close_selected"
-                      variant="outline"
-                    >
-                      <Archive className="h-4 w-4" />
-                      Close
-                    </Button>
-                    <Button
-                      type="submit"
-                      name="queueAction"
+                      icon={<Archive className="h-4 w-4" />}
+                      label="Close"
+                      pendingLabel="Closing..."
+                    />
+                    <HandoffQueueActionButton
                       value="cancel_selected"
-                      variant="outline"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Cancel
-                    </Button>
+                      icon={<XCircle className="h-4 w-4" />}
+                      label="Cancel"
+                      pendingLabel="Cancelling..."
+                    />
                   </div>
                 )}
 
                 <div className="space-y-3">
-                  {filteredHandoffs.map(({ action, handoff, submission }) => (
-                    <div
-                      key={submission.id}
-                      className="rounded-md border bg-white p-4"
-                    >
-                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div className="flex gap-3">
-                          {canManageHandoffs && (
-                            <input
-                              type="checkbox"
-                              name="submissionIds"
-                              value={submission.id}
-                              aria-label={`Select handoff ${submission.id}`}
-                              className="mt-1 h-4 w-4 rounded border-input"
-                            />
-                          )}
-                          <div className="space-y-2">
-                            <div>
-                              <Link
-                                href={`/projects/submissions/${submission.id}`}
-                                className="font-semibold underline-offset-4 hover:underline"
-                              >
-                                #{submission.id} {action.name}
-                              </Link>
-                              {handoff.stepLabel && (
-                                <p className="text-sm text-muted-foreground">
-                                  Step: {handoff.stepLabel}
+                  {filteredHandoffs.map(({ action, handoff, submission }) => {
+                    const assignmentAvailability =
+                      getHandoffAssignmentAvailability(handoff.assignedUserId);
+
+                    return (
+                      <div
+                        key={submission.id}
+                        className="rounded-md border bg-white p-4"
+                      >
+                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                          <div className="flex gap-3">
+                            {canManageHandoffs && (
+                              <input
+                                type="checkbox"
+                                name="submissionIds"
+                                value={submission.id}
+                                aria-label={`Select handoff ${submission.id}`}
+                                className="mt-1 h-4 w-4 rounded border-input"
+                              />
+                            )}
+                            <div className="space-y-2">
+                              <div>
+                                <Link
+                                  href={`/projects/submissions/${submission.id}`}
+                                  className="font-semibold underline-offset-4 hover:underline"
+                                >
+                                  #{submission.id} {action.name}
+                                </Link>
+                                {handoff.stepLabel && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Step: {handoff.stepLabel}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-2 text-xs">
+                                <span
+                                  className={cn(
+                                    "rounded-md border px-2 py-1 font-medium capitalize",
+                                    getPriorityClass(handoff.priority),
+                                  )}
+                                >
+                                  {handoff.priority}
+                                </span>
+                                <span className="rounded-md border px-2 py-1 capitalize">
+                                  {formatStatus(submission.status)}
+                                </span>
+                                <span className="rounded-md border px-2 py-1 capitalize">
+                                  {formatSource(submission.source)}
+                                </span>
+                                <span className="rounded-md border px-2 py-1">
+                                  Queue: {handoff.queue ?? "Default"}
+                                </span>
+                              </div>
+                              <div className="grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
+                                <p>
+                                  Assigned:{" "}
+                                  <span className="text-foreground">
+                                    {handoff.assignedUserName ??
+                                      handoff.assignedUserEmail ??
+                                      "Unassigned"}
+                                  </span>
                                 </p>
+                                <p>
+                                  Requested:{" "}
+                                  <span className="text-foreground">
+                                    {formatDate(handoff.requestedAt)}
+                                  </span>
+                                </p>
+                                <p>
+                                  Assigned At:{" "}
+                                  <span className="text-foreground">
+                                    {formatDate(handoff.assignedAt)}
+                                  </span>
+                                </p>
+                                <p>
+                                  Created:{" "}
+                                  <span className="text-foreground">
+                                    {formatDate(submission.createdAt)}
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {canManageHandoffs && (
+                            <div className="flex flex-wrap gap-2 md:justify-end">
+                              {closedStatuses.has(submission.status) ? (
+                                <HandoffQueueActionButton
+                                  value={`single:reopen:${submission.id}`}
+                                  icon={<RotateCcw className="h-4 w-4" />}
+                                  label="Reopen"
+                                  pendingLabel="Reopening..."
+                                />
+                              ) : (
+                                <>
+                                  {assignmentAvailability.canClaim && (
+                                    <HandoffQueueActionButton
+                                      value={`single:claim:${submission.id}`}
+                                      icon={<UserCheck className="h-4 w-4" />}
+                                      label="Claim"
+                                      pendingLabel="Claiming..."
+                                    />
+                                  )}
+                                  {assignmentAvailability.canRelease && (
+                                    <HandoffQueueActionButton
+                                      value={`single:release:${submission.id}`}
+                                      icon={<UserX className="h-4 w-4" />}
+                                      label="Release"
+                                      pendingLabel="Releasing..."
+                                    />
+                                  )}
+                                  <HandoffQueueActionButton
+                                    value={`single:resolve:${submission.id}`}
+                                    icon={<CheckCircle2 className="h-4 w-4" />}
+                                    label="Resolve"
+                                    pendingLabel="Resolving..."
+                                  />
+                                  <HandoffQueueActionButton
+                                    value={`single:close:${submission.id}`}
+                                    icon={<Archive className="h-4 w-4" />}
+                                    label="Close"
+                                    pendingLabel="Closing..."
+                                  />
+                                  <HandoffQueueActionButton
+                                    value={`single:cancel:${submission.id}`}
+                                    icon={<XCircle className="h-4 w-4" />}
+                                    label="Cancel"
+                                    pendingLabel="Cancelling..."
+                                  />
+                                </>
                               )}
                             </div>
-                            <div className="flex flex-wrap gap-2 text-xs">
-                              <span
-                                className={cn(
-                                  "rounded-md border px-2 py-1 font-medium capitalize",
-                                  getPriorityClass(handoff.priority),
-                                )}
-                              >
-                                {handoff.priority}
-                              </span>
-                              <span className="rounded-md border px-2 py-1 capitalize">
-                                {formatStatus(submission.status)}
-                              </span>
-                              <span className="rounded-md border px-2 py-1 capitalize">
-                                {formatSource(submission.source)}
-                              </span>
-                              <span className="rounded-md border px-2 py-1">
-                                Queue: {handoff.queue ?? "Default"}
-                              </span>
-                            </div>
-                            <div className="grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
-                              <p>
-                                Assigned:{" "}
-                                <span className="text-foreground">
-                                  {handoff.assignedUserName ??
-                                    handoff.assignedUserEmail ??
-                                    "Unassigned"}
-                                </span>
-                              </p>
-                              <p>
-                                Requested:{" "}
-                                <span className="text-foreground">
-                                  {formatDate(handoff.requestedAt)}
-                                </span>
-                              </p>
-                              <p>
-                                Assigned At:{" "}
-                                <span className="text-foreground">
-                                  {formatDate(handoff.assignedAt)}
-                                </span>
-                              </p>
-                              <p>
-                                Created:{" "}
-                                <span className="text-foreground">
-                                  {formatDate(submission.createdAt)}
-                                </span>
-                              </p>
-                            </div>
-                          </div>
+                          )}
                         </div>
-
-                        {canManageHandoffs && (
-                          <div className="flex flex-wrap gap-2 md:justify-end">
-                            {closedStatuses.has(submission.status) ? (
-                              <Button
-                                type="submit"
-                                name="queueAction"
-                                value={`single:reopen:${submission.id}`}
-                                variant="outline"
-                              >
-                                <RotateCcw className="h-4 w-4" />
-                                Reopen
-                              </Button>
-                            ) : (
-                              <>
-                                <Button
-                                  type="submit"
-                                  name="queueAction"
-                                  value={`single:claim:${submission.id}`}
-                                  variant="outline"
-                                >
-                                  <UserCheck className="h-4 w-4" />
-                                  Claim
-                                </Button>
-                                {handoff.assignedUserId && (
-                                  <Button
-                                    type="submit"
-                                    name="queueAction"
-                                    value={`single:release:${submission.id}`}
-                                    variant="outline"
-                                  >
-                                    <UserX className="h-4 w-4" />
-                                    Release
-                                  </Button>
-                                )}
-                                <Button
-                                  type="submit"
-                                  name="queueAction"
-                                  value={`single:resolve:${submission.id}`}
-                                  variant="outline"
-                                >
-                                  <CheckCircle2 className="h-4 w-4" />
-                                  Resolve
-                                </Button>
-                                <Button
-                                  type="submit"
-                                  name="queueAction"
-                                  value={`single:close:${submission.id}`}
-                                  variant="outline"
-                                >
-                                  <Archive className="h-4 w-4" />
-                                  Close
-                                </Button>
-                                <Button
-                                  type="submit"
-                                  name="queueAction"
-                                  value={`single:cancel:${submission.id}`}
-                                  variant="outline"
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                  Cancel
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ActionStateForm>
             )}

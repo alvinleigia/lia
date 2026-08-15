@@ -1,5 +1,17 @@
 import { expect, test } from "@playwright/test";
 import { buildBoundedHandoffContext } from "../../src/lib/handoff";
+import { getHandoffAssignmentAvailability } from "../../src/lib/handoff-queue";
+
+test("handoff assignment actions match the current owner state", () => {
+  expect(getHandoffAssignmentAvailability(null)).toEqual({
+    canClaim: true,
+    canRelease: false,
+  });
+  expect(getHandoffAssignmentAvailability(42)).toEqual({
+    canClaim: false,
+    canRelease: true,
+  });
+});
 
 test("handoff context is bounded and excludes internal or secret fields", () => {
   const fields = Object.fromEntries(
