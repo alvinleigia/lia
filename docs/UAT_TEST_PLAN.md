@@ -399,10 +399,13 @@ Restore after Phase 15 testing:
    - Verified on staging: Lia answered `15:00`, entered the booking task without
      a duplicate acknowledgement, collected all seven fields, and completed
      Manual Review successfully.
-7. During that booking, ask `Is late checkout guaranteed?`
+7. [x] During that booking, ask `Is late checkout guaranteed?`
    - Expect the answer and then a return to the same booking field.
+   - Verified on staging: Lia answered that staff approval is required and late
+     checkout is not guaranteed, resumed `Preferred Date`, then accepted the
+     date and time without losing the booking state.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
 ### 15.3 Test Isolation, Handoff, And Cleanup
 
