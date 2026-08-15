@@ -45,17 +45,17 @@ function parseRuntimeReply(value: unknown): RuntimeReply | null {
   return normalizeRuntimeReply(value);
 }
 
-function outboxClaimCondition(now: Date) {
+function outboxClaimCondition() {
   return and(
     lt(outboxMessages.attempts, outboxMessages.maxAttempts),
     or(
       and(
         eq(outboxMessages.status, "queued"),
-        lte(outboxMessages.availableAt, now),
+        lte(outboxMessages.availableAt, sql`CURRENT_TIMESTAMP`),
       ),
       and(
         eq(outboxMessages.status, "processing"),
-        lte(outboxMessages.leaseExpiresAt, now),
+        lte(outboxMessages.leaseExpiresAt, sql`CURRENT_TIMESTAMP`),
       ),
     ),
   );
@@ -67,8 +67,6 @@ async function claimNextOutboxMessage(input: {
   topics?: OutboxTopic[];
   workerId: string;
 }) {
-  const now = new Date();
-  const leaseExpiresAt = new Date(now.getTime() + 60_000);
   const earlierMessage = alias(outboxMessages, "earlier_outbox_message");
 
   for (let claimAttempt = 0; claimAttempt < 5; claimAttempt += 1) {
@@ -84,7 +82,7 @@ async function claimNextOutboxMessage(input: {
           input.topics?.length
             ? inArray(outboxMessages.topic, input.topics)
             : undefined,
-          outboxClaimCondition(now),
+          outboxClaimCondition(),
           notExists(
             db
               .select({ id: earlierMessage.id })
@@ -113,16 +111,16 @@ async function claimNextOutboxMessage(input: {
       .set({
         attempts: sql`${outboxMessages.attempts} + 1`,
         lastError: null,
-        leaseExpiresAt,
+        leaseExpiresAt: sql`CURRENT_TIMESTAMP + INTERVAL '60 seconds'`,
         leaseOwner: input.workerId,
         status: "processing",
-        updatedAt: now,
+        updatedAt: sql`CURRENT_TIMESTAMP`,
       })
       .where(
         and(
           eq(outboxMessages.projectId, input.projectId),
           eq(outboxMessages.id, candidate.id),
-          outboxClaimCondition(now),
+          outboxClaimCondition(),
         ),
       )
       .returning();
