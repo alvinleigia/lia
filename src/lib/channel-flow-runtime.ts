@@ -511,6 +511,20 @@ export async function completeChannelFlowAfterHybridEnd(input: {
   });
 }
 
+export async function cancelChannelFlowAfterHybridEnd(input: {
+  projectId: number;
+  submission: SelectActionSubmission;
+}) {
+  await cancelActionFlowSubmission({
+    expectedRevision: input.submission.revision,
+    projectId: input.projectId,
+    submissionId: input.submission.id,
+  });
+  await cancelParentReturnFlow(input);
+
+  return { replies: [] };
+}
+
 async function cancelParentReturnFlow(input: {
   projectId: number;
   submission: SelectActionSubmission;

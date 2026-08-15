@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
 import {
+  cancelChannelFlowAfterHybridEnd,
   completeChannelFlowAfterHybridEnd,
   requestHumanHandoff,
   resumeChannelFlowAtStep,
@@ -1559,7 +1560,13 @@ export async function runHybridChannelBoundary(
     }),
   ];
   const continuation = resolveHybridDeterministicContinuation(dispatch);
-  if (
+  if (continuation?.kind === "cancel") {
+    const cancelled = await cancelChannelFlowAfterHybridEnd({
+      projectId: input.projectId,
+      submission: input.submission,
+    });
+    replies.push(...cancelled.replies);
+  } else if (
     replyProposal.nextAction === "handoff" &&
     continuation?.kind === "complete"
   ) {

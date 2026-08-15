@@ -500,6 +500,15 @@ export function resolveHybridDeterministicContinuation<TOutput>(
   dispatch: HybridBoundaryDispatchResult<TOutput>,
 ) {
   if (dispatch.status === "ended") {
+    const output = dispatch.execution?.output;
+    if (
+      output &&
+      typeof output === "object" &&
+      "nextAction" in output &&
+      output.nextAction === "cancel"
+    ) {
+      return { kind: "cancel" as const };
+    }
     return { kind: "complete" as const };
   }
   if (

@@ -1267,11 +1267,11 @@ test("boundary dispatcher invokes one owner and stops at the selected target", a
   );
 });
 
-test("terminal hybrid outcomes complete instead of resuming a null legacy step", async () => {
+test("terminal hybrid outcomes preserve cancellation instead of resuming", async () => {
   const graph = compileHybridFlowGraph({ branchRules, steps }).graph;
   const ended = await dispatchHybridFlowBoundary({
     execute: async () => ({
-      output: { reply: "The task was cancelled." },
+      output: { nextAction: "cancel", reply: "The task was cancelled." },
       signals: [{ kind: "task_outcome", triggerKey: "cancelled" }],
     }),
     graph,
@@ -1290,7 +1290,7 @@ test("terminal hybrid outcomes complete instead of resuming a null legacy step",
 
   expect(ended.status).toBe("ended");
   expect(resolveHybridDeterministicContinuation(ended)).toEqual({
-    kind: "complete",
+    kind: "cancel",
   });
   expect(resolveHybridDeterministicContinuation(resumed)).toEqual({
     kind: "resume",
