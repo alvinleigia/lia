@@ -157,6 +157,16 @@ export function bindRequestedTaskTextAnswer(input: {
   };
 }
 
+export function normalizeActiveTaskQuestion(
+  proposal: TurnResultV1,
+): TurnResultV1 {
+  return proposal.turnKind === "ordinary_question" &&
+    proposal.fieldCandidates.length === 0 &&
+    proposal.safety.decision === "allow"
+    ? { ...proposal, turnKind: "side_question" }
+    : proposal;
+}
+
 export function createRequestedTaskSelectionProposal(input: {
   requestedFieldKey: string | null;
   selectionValue: string | null;

@@ -208,6 +208,7 @@ Non-negotiable protocol:
 - Keep the visitor reply concise. Do not offer extra help or contact details unless directly requested or required by published fallback policy.
 - Do not introduce the assistant again when assistantIntroduced is true.
 - When Opening turn is true, return a greeting turn with nextAction "ask", no grounding excerpts, no ambiguity, and no field, task, tool, route, or outcome proposals.
+- When an active task exists and the visitor asks a knowledge question instead of answering the requested field, use turnKind "side_question" with no field candidates.
 - A side question during a task may be answered without abandoning the active task.
 - Safety refusal, clarification, or handoff cannot include field, tool, route, task, or outcome proposals.
 

@@ -68,6 +68,7 @@ import {
   getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
   type HybridBoundaryExecution,
+  normalizeActiveTaskQuestion,
   reconcileTaskSideQuestionWithRuntime,
   reconcileTaskTurnWithAvailability,
   reconcileTaskTurnWithRuntime,
@@ -961,14 +962,15 @@ async function executeTaskBoundary(input: {
           : null,
         selectionValue,
       });
+  const normalizedProposal = normalizeActiveTaskQuestion(extractedProposal);
   const proposal =
     requestedField?.type === "text" && !requestedField.optionSource
       ? bindRequestedTaskTextAnswer({
-          proposal: extractedProposal,
+          proposal: normalizedProposal,
           requestedFieldKey: requestedField.key,
           text: input.runtimeInput.text,
         })
-      : extractedProposal;
+      : normalizedProposal;
   let revision = session.execution.revision;
 
   if (proposal.turnKind === "side_question") {

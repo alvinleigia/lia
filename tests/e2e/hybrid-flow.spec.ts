@@ -42,6 +42,7 @@ import {
   getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
   matchesHybridGraphTaskReturnTarget,
+  normalizeActiveTaskQuestion,
   prepareHybridTaskEntry,
   reconcileTaskSideQuestionWithRuntime,
   reconcileTaskTurnWithAvailability,
@@ -931,6 +932,22 @@ test("side questions resume the exact requested task field without mutations", (
     state: field.key === "preferredTime" ? "missing" : "valid",
     validation: {},
   }));
+
+  expect(
+    normalizeActiveTaskQuestion({
+      ...proposal,
+      fieldCandidates: [],
+      turnKind: "ordinary_question",
+    }).turnKind,
+  ).toBe("side_question");
+  expect(
+    normalizeActiveTaskQuestion({
+      ...proposal,
+      fieldCandidates: [],
+      safety: { decision: "refuse", reasonCode: "policy_refusal" },
+      turnKind: "ordinary_question",
+    }).turnKind,
+  ).toBe("ordinary_question");
 
   const result = reconcileTaskSideQuestionWithRuntime({
     fields,
