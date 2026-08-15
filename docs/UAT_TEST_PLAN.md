@@ -433,8 +433,11 @@ Result: [x] Pass [ ] Fail
      `Queued 0`, `Processing 0`, `Failed 0`, and `Completed 108`.
    - Automatic scheduling remains tracked as `P15-UAT-01` in
      `docs/UAT_DEFERRED_ITEMS.md`.
-7. Open `Admin` > `Audit Logs`. Confirm the test is explainable without private
-   prompts, raw document chunks, credentials, or unrestricted history.
+7. [x] Open `Admin` > `Audit Logs`. Confirm the test is explainable without
+   private prompts, raw document chunks, credentials, or unrestricted history.
+   - Verified on staging: handoff `#74` recorded `handoff.assigned` and a
+     resolved `conversation.lifecycle_changed` event with safe operational
+     metadata only.
 8. Restore the settings recorded in 15.1 and delete only
    `phase15-hotel-policy.txt` from `Projects` > `Documents`.
 
