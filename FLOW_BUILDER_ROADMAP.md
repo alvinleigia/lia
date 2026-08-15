@@ -86,12 +86,12 @@ database, backup, and provider readiness work.
 - [x] Phase 14 staging cross-channel UAT passed under the single-tester scope on 2026-08-15.
 - [x] Priority 2 release approval is complete for continued internal testing.
 
-Active manual gate: Priority 3, Phase 15 of 18. Engineering implementation is
-complete through Phase 16, while Phase 15 manual staging UAT is now active.
+Active manual gate: Priority 3, Phase 16 of 18. Engineering implementation is
+complete through Phase 16, and Phase 15 manual staging UAT passed under the
+single-tester scope on 2026-08-16.
 
-Current target: complete Phase 15 and Phase 16 manual staging UAT in the
-sequence defined by `docs/UAT_TEST_PLAN.md`, then continue Phase 17
-implementation.
+Current target: complete Phase 16 manual staging UAT in the sequence defined by
+`docs/UAT_TEST_PLAN.md`, then continue Phase 17 implementation.
 
 ### Phase Tracking Snapshot
 
@@ -101,8 +101,8 @@ implementation.
 | 8 | Priority 1 exit gate complete | Passed on 2026-08-03 | One deferred enhancement remains: map typed-input requests to a configured native WhatsApp Flow control. |
 | 9-13 | Complete | Passed by 2026-08-05 | None. |
 | 14 | Complete | Passed on staging under the single-tester scope on 2026-08-15; the missing disposable restore environment is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
-| 15 | Complete | Staging UAT in progress | Run the active checklist in `docs/UAT_TEST_PLAN.md`. |
-| 16 | Complete | Staging UAT pending | Activate its detailed checklist after Phase 15 passes. |
+| 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
+| 16 | Complete | Staging UAT pending | Run the next checklist in `docs/UAT_TEST_PLAN.md`. |
 | 17 | Foundation only; 12 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
 
@@ -1053,8 +1053,9 @@ model unrestricted graph or tool control.
 Implementation closure: completed on 2026-08-08 in checkpoints `52604cd`,
 `bba8c6e`, and `b5e0f9c`. Focused contract and runtime tests cover advanced
 knowledge policy, bounded intent and handoff routing, governed memory, and
-approved post-conversation jobs. Manual staging UAT is active in
-`docs/UAT_TEST_PLAN.md`.
+approved post-conversation jobs. Manual staging UAT passed under the
+single-tester scope on 2026-08-16; the accepted automatic durable-worker
+scheduling limitation remains tracked in `docs/UAT_DEFERRED_ITEMS.md`.
 
 ## Phase 16: Contact Lifecycle, Handoff, And Structured Forms
 

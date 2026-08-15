@@ -18,8 +18,8 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | --- | --- | --- |
 | 1-13 | Complete | None. |
 | 14 - Beta release | Complete | Passed on staging under the single-tester scope. |
-| 15 - Knowledge and memory | In progress | Continue with 15.2 knowledge checks. |
-| 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
+| 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
+| 16 - Lifecycle and forms | Pending | Begin the Phase 16 staging checklist. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -338,8 +338,8 @@ Result: [ ] Pass [ ] Fail [x] Accepted limitation
 
 ## Phase 15 - Knowledge, Memory, And Routing
 
-Status: `In progress`. Use the current staging project. Complete one section at
-a time and stop when a result fails.
+Status: `Complete`. Passed on staging under the single-tester scope on
+2026-08-16.
 
 ### 15.1 Configure The Knowledge Test
 
@@ -438,31 +438,36 @@ Result: [x] Pass [ ] Fail
    - Verified on staging: handoff `#74` recorded `handoff.assigned` and a
      resolved `conversation.lifecycle_changed` event with safe operational
      metadata only.
-8. Restore the settings recorded in 15.1 and delete only
+8. [x] Restore the settings recorded in 15.1 and delete only
    `phase15-hotel-policy.txt` from `Projects` > `Documents`.
+   - Verified on staging: the policy values were restored, the temporary
+     document and its indexed chunk were removed, and commit `bae79d0` added
+     a confirmation dialog for individual and project-wide document deletion.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
 ### Phase 15 Sign-Off
 
-- [ ] Configuration saved and restored after testing.
-- [ ] Grounded answers, refusal, unknown-answer handling, and routing passed.
-- [ ] Project Chat and Widget memory remained isolated.
-- [ ] Handoff, job, audit, and cleanup checks passed.
-- Notes: `<none or defect IDs>`
-- Tester/date: `<name and date>`
+- [x] Configuration saved and restored after testing.
+- [x] Grounded answers, refusal, unknown-answer handling, and routing passed.
+- [x] Project Chat and Widget memory remained isolated.
+- [x] Handoff, job, audit, and cleanup checks passed.
+- Notes: Automatic durable-worker scheduling remains accepted for this
+  single-tester gate as deferred item `P15-UAT-01`.
+- Tester/date: `Single tester / release owner - 2026-08-16`
 
 ## Phase 16 - Lifecycle And Structured Forms
 
-Status: `Pending`. Run only after Phase 15 passes. Create a separate disposable
-staging project for its actions, forms, handoff lifecycle, contact changes, and
-cleanup checks. Do not run it in production or on the Phase 14 fixture.
+Status: `Pending`. Phase 15 has passed, so this is the next manual gate.
+Create a separate disposable staging project for its actions, forms, handoff
+lifecycle, contact changes, and cleanup checks. Do not run it in production or
+on the Phase 14 fixture.
 
 # Final Release Record
 
 - Phase 14: [x] Pass [ ] Fail
-- Phase 15: [ ] Pass [ ] Fail [x] In progress
-- Phase 16: [ ] Pass [ ] Fail [ ] Pending
+- Phase 15: [x] Pass [ ] Fail [ ] In progress
+- Phase 16: [ ] Pass [ ] Fail [x] Pending
 - Critical defects open: `<count>`
 - High defects open: `<count>`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
