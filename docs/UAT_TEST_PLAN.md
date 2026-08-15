@@ -14,7 +14,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | Phase | Status | Next action |
 | --- | --- | --- |
 | 1-13 | Complete | None. |
-| 14 - Beta release | In progress | Compare the three completed submissions. |
+| 14 - Beta release | In progress | Run the 14.3 recovery check. |
 | 15 - Knowledge and memory | Pending | Start only after Phase 14 passes. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
@@ -246,12 +246,13 @@ Result: [x] Pass [ ] Pass with accepted limitation [ ] Fail [ ] Environment bloc
 
 Submission comparison verified: Project Chat `#62`, Widget `#65`, and WhatsApp
 `#61` each use task version `v4`, contain the same seven canonical values, and
-show one completed Manual Review attempt. The Contacts/channel-transcript check
-is still pending.
+show one completed Manual Review attempt. Contacts also showed the correct
+Widget, Project Chat, and WhatsApp badges, their own conversations and ordered
+transcripts, and the related Flow Submissions.
 
 Do not archive or edit the seeded `Book a Spa Service` action.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
 ## 14.3 Recovery And Release Decision
 
@@ -290,7 +291,7 @@ Result: [ ] Pass [ ] Fail
 - [ ] Staging prerequisites and fixture passed.
 - [ ] Safety, handoff, and audit checks passed.
 - [x] Project Chat and Website Widget passed.
-- [ ] WhatsApp passed or has a release-owner-approved limitation.
+- [x] WhatsApp passed or has a release-owner-approved limitation.
 - [ ] Recovery and tenant-disable checks passed.
 - [ ] No Critical or High defect remains open.
 - [ ] Release owner approved production-like beta traffic.
