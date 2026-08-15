@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Selected project: `Phase 14 Release UAT (#1)`
-- Minimum release-candidate commit: `955e020`
+- Minimum release-candidate commit: `8715f88`
 
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
@@ -14,7 +14,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | Phase | Status | Next action |
 | --- | --- | --- |
 | 1-13 | Complete | None. |
-| 14 - Beta release | In progress | Continue the staging checks from 14.2. |
+| 14 - Beta release | In progress | Verify `8715f88`, then compare the three completed submissions. |
 | 15 - Knowledge and memory | Pending | Start only after Phase 14 passes. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
@@ -28,9 +28,9 @@ contact details.
 - Date: `<date>`
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
-- Expected minimum commit: `955e020`
+- Expected minimum commit: `8715f88`
 - Actual deployed commit: `90e7c46`
-- Deployment status: [x] Successful
+- Deployment status: [ ] Verified for expected commit
 - Staging WhatsApp configured: [x] Yes [ ] No
 
 # Phase 14 - Beta Release
@@ -39,8 +39,8 @@ contact details.
 
 Ask the release owner to confirm:
 
-- [x] The hosting dashboard shows a successful staging deployment for commit
-      `955e020` or a later commit from `main`.
+- [ ] The hosting dashboard shows a successful staging deployment for commit
+      `8715f88` or a later commit from `main`.
 - [x] The release owner ran `npm run seed:phase14-staging` with the staging
       fixture variables and saw `Repaired Phase 14 Release UAT as project #1.`
 - [ ] Clean and existing-database migrations passed.
@@ -192,6 +192,11 @@ new partial run also restored the correct Service prompt and option. The
 auto-scroll checks passed. The final staging recheck confirmed that the short
 `cancel` user bubble now sizes to its content.
 
+Cancelled Widget submission `#66` is not the completed Widget evidence for the
+comparison below. It exposed `P14-UAT-12`: its linked task was correctly
+cancelled, but the parent submission was incorrectly marked submitted. Retest
+that cancellation after staging deploys `8715f88`.
+
 Result: [x] Pass [ ] Pass with accepted limitation [ ] Fail
 
 ### WhatsApp
@@ -265,6 +270,7 @@ Result: [ ] Pass [ ] Fail
 | `P14-UAT-09` | Fixed and staging verified | Project Chat remained at `Manual Review is being processed.` because durable-job eligibility and recovery discovery used the application clock. Commit `91ecfbb` uses the database clock for immediate job creation, claims, leases, and recovery scans; the queued Manual Review then recovered successfully on staging. |
 | `P14-UAT-10` | Fixed and staging verified | Widget displayed `Phase 14 Release Guest` but repeated `Please provide Guest Name.` because the extractor returned no field candidate. Commit `5f8f6a4` binds a safe direct answer to the requested plain-text field while preserving side questions, cancellation, handoff, and existing candidates; the staging retest advanced normally and completed once. |
 | `P14-UAT-11` | Fixed and staging verified | Widget user bubbles expanded across most of the transcript even for short text such as `cancel`. Commit `955e020` sizes both Widget user-message paths to their content, caps them at 80%, and safely wraps long text; the staging recheck passed. |
+| `P14-UAT-12` | Fixed in code - staging verification pending | Cancelled Widget submission `#66` had a cancelled task run but a submitted parent submission and `submission.submitted` event. Commit `8715f88` preserves terminal hybrid cancellation at the parent, records `flow.cancelled`, and does not run submission operations. |
 
 ### Phase 14 Sign-Off
 

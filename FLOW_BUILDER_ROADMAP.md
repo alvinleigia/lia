@@ -102,7 +102,7 @@ by `docs/UAT_TEST_PLAN.md`, then continue Phase 17 implementation.
 | 1-7 | Complete | Passed | None. |
 | 8 | Priority 1 exit gate complete | Passed on 2026-08-03 | One deferred enhancement remains: map typed-input requests to a configured native WhatsApp Flow control. |
 | 9-13 | Complete | Passed by 2026-08-05 | None. |
-| 14 | Local implementation and offline gates complete; WhatsApp delivery hardening is verified through `923f042`, with operation timestamp fix `7848bae` pending staging verification | Fixture repair, Widget submission, response time, auto-scroll, and one complete WhatsApp booking passed; remaining browser-channel, comparison, recovery, and release gates are open | Verify `7848bae`, then finish 14.2 Project Chat, Widget close/reopen and small-screen checks, result comparison, and 14.3. |
+| 14 | Local implementation and offline gates complete; cross-channel fixes now include terminal cancellation propagation in `8715f88` | Project Chat, Widget, WhatsApp, response time, operation timestamps, auto-scroll, resume, and small-screen checks passed; cancellation fix, result comparison, recovery, and release gates remain open | Verify `8715f88`, compare the three completed submissions, then finish 14.3. |
 | 15 | Complete | Staging UAT pending | Activate its detailed checklist after Phase 14 passes. |
 | 16 | Complete | Staging UAT pending | Activate its detailed checklist after Phase 15 passes. |
 | 17 | Foundation only; 12 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
