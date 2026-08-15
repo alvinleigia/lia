@@ -327,7 +327,8 @@ Result: [ ] Pass [ ] Fail [x] Accepted limitation
 - [x] WhatsApp passed or has a release-owner-approved limitation.
 - [x] Recovery and tenant-disable checks passed.
 - [x] No Critical or High defect remains open.
-- [ ] Release owner approved production-like beta traffic.
+- [ ] Release owner approved Phase 14 for continued single-tester staging UAT
+      and internal beta testing.
 
 - Notes: `P14-UAT-13` is accepted for this beta gate and recorded in
   [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).

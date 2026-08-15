@@ -26,9 +26,10 @@ beta only when its own gates and the referenced roadmap exit gates pass.
 
 ## Current Position
 
-Overall beta status: Local offline release verification is complete. Staging,
-paid live-model, provider, restore, and release-owner approval are still
-required before production-like beta traffic.
+Overall beta status: Automated certification and the Phase 14 staging checks
+have passed. The restore limitation is accepted, and final release-owner
+approval for continued single-tester internal testing remains. Real customer
+traffic is outside the current UAT scope.
 
 Authoritative product implementation status:
 

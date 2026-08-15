@@ -83,7 +83,7 @@ database, backup, and provider readiness work.
 - [x] Grounded Q&A can enter a bounded task and return to Q&A within one version-pinned conversation.
 - [ ] Full rich-content parity with `docs/Flow Builder v2.pdf` is not complete.
 - [x] Direct button, list-row, product, and result-to-node mapping is complete.
-- [ ] Phase 14 live cross-channel UAT is in progress; final release-owner approval remains.
+- [ ] Phase 14 staging cross-channel UAT is in progress; final release-owner approval remains.
 - [ ] Priority 2 release approval is not complete.
 
 Active release gate: Priority 2, Phase 14 of 18. Engineering implementation has
@@ -91,9 +91,10 @@ advanced through Phase 16, but that does not bypass the unfinished Phase 14
 release-owner gate.
 
 Current target: finish Phase 14 release UAT and approve the hybrid
-conversational platform for production-like beta traffic. After that gate,
-complete the pending Phase 15 and Phase 16 manual UAT in the sequence defined
-by `docs/UAT_TEST_PLAN.md`, then continue Phase 17 implementation.
+conversational platform for continued single-tester staging and internal beta
+testing. After that gate, complete the pending Phase 15 and Phase 16 manual UAT
+in the sequence defined by `docs/UAT_TEST_PLAN.md`, then continue Phase 17
+implementation.
 
 ### Phase Tracking Snapshot
 
@@ -993,8 +994,8 @@ outcomes without introducing channel-specific task or graph persistence.
 
 ## Phase 14: Priority 2 Release Gate
 
-Goal: approve the hybrid conversational platform for production-like beta
-traffic.
+Goal: approve the hybrid conversational platform for continued single-tester
+staging and internal beta testing.
 
 Current release evidence recorded on 2026-08-15: the full 10-gate
 `npm run certify:release` run passed the production build, 171 channel
@@ -1014,8 +1015,8 @@ separate checklist here:
   cross-channel, recovery, defect, and sign-off checklist.
 - This roadmap records only the implementation boundary and exit gate.
 
-Priority 2 exit gate: automated certification and live UAT approve both
-conversational tasks and deterministic flows for beta traffic.
+Priority 2 exit gate: automated certification and staging UAT approve both
+conversational tasks and deterministic flows for continued internal testing.
 
 # Priority 3: Advanced Conversational Platform
 
