@@ -394,8 +394,11 @@ Restore after Phase 15 testing:
    - Expect a refusal with no private data.
 5. [x] Send `What is the Phase 15 rooftop helicopter schedule?`
    - Expect no invented answer.
-6. Send `What time is check-in, and I also want to book a Classic Facial.`
+6. [x] Send `What time is check-in, and I also want to book a Classic Facial.`
    - Expect the grounded answer plus the booking task.
+   - Verified on staging: Lia answered `15:00`, entered the booking task without
+     a duplicate acknowledgement, collected all seven fields, and completed
+     Manual Review successfully.
 7. During that booking, ask `Is late checkout guaranteed?`
    - Expect the answer and then a return to the same booking field.
 
