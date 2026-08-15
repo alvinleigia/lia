@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Selected project: `Phase 14 Release UAT (#1)`
-- Minimum release-candidate commit: `39a7367`
+- Minimum release-candidate commit: `a218441`
 
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
@@ -28,7 +28,7 @@ contact details.
 - Date: `<date>`
 - URL: `https://lia-staging.leigia.com/`
 - Project: `Phase 14 Release UAT (#1)`
-- Expected minimum commit: `39a7367`
+- Expected minimum commit: `a218441`
 - Actual deployed commit: `<short commit from the hosting dashboard>`
 - Deployment status: [ ] Successful
 - Staging WhatsApp configured: [ ] Yes [ ] No
@@ -40,7 +40,7 @@ contact details.
 Ask the release owner to confirm:
 
 - [ ] The hosting dashboard shows a successful staging deployment for commit
-      `39a7367` or a later commit from `main`.
+      `a218441` or a later commit from `main`.
 - [ ] The release owner ran `npm run seed:phase14-staging` with the staging
       fixture variables and saw `Repaired Phase 14 Release UAT as project #1.`
 - [ ] Clean and existing-database migrations passed.
@@ -120,9 +120,9 @@ If this screen shows `Complete` instead of `Resolve`, stop and record
 
 ## 14.2 Repeat One Booking In Each Channel
 
-Status: `Ready for staging UAT`. Commit `39a7367` is deployed, the fixture was
-repaired, and the Widget response-time fix was verified on staging. Start a
-new booking rather than continuing an older run.
+Status: `In progress`. The staging fixture, Widget response time, confirmed
+Manual Review submission, and transcript auto-scroll have been verified. Start
+a new booking rather than continuing an older run.
 
 Use this exact data for every available channel:
 
@@ -169,6 +169,10 @@ Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
 7. Click `Confirm` once and wait for one successful result.
 8. At approximately `320 x 568`, confirm the header, messages, composer, and
    close control remain usable.
+
+Verified on 2026-08-15: step 7 passed and the completed Manual Review response
+automatically scrolled into view. Steps 6 and 8 still require their explicit
+checks before marking this channel `Pass`.
 
 Result: [ ] Pass [ ] Pass with accepted limitation [ ] Fail
 
@@ -222,8 +226,10 @@ Result: [ ] Pass [ ] Fail
 | --- | --- | --- |
 | `P14-UAT-01` | Open - Low | `Claim` does not disable or show a processing label while the request runs. |
 | `P14-UAT-02` | Open - Untriaged | Successful claim and lifecycle events were not visible in `Admin` > `Audit Logs`. |
-| `P14-UAT-03` | Staging fixture repaired | The staging repair completed for project `#1`; commit `3283879` repairs existing and newly seeded tool-definition project IDs. |
+| `P14-UAT-03` | Staging fixture repaired | The staging repair completed for project `#1`; commits `3283879` and `0cfe573` repair seeded project IDs and operation handlers. |
 | `P14-UAT-04` | Fixed and staging verified | Commit `39a7367` colocates the runtime with the database and skips the redundant trigger model turn. Measured server time fell from `57.15 s` to `0.754 s` for starting the booking and was `0.697 s` for the next selection. |
+| `P14-UAT-05` | Fixed and staging verified | Commits `0681065` and `6b344b7` make confirmed operations retry-safe and preserve runtime event order. The Widget completed one Manual Review submission successfully. |
+| `P14-UAT-06` | Fixed and staging verified | Commit `a218441` automatically shows the newest Widget message and reply without manual scrolling. |
 
 ### Phase 14 Sign-Off
 
