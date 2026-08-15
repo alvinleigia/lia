@@ -302,7 +302,7 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 | ID | Status | Finding |
 | --- | --- | --- |
 | `P14-UAT-01` | Fixed and staging verified | Commit `5b56f61` gives the active queue action a processing label, disables the queue controls while it runs, replaces `Claim` with `Release` after assignment, and rejects stale claim or release requests on the server. The staging Claim and Resolve retests each updated once with the expected action feedback. Commit `547f8e0` extends the same disabled-and-processing feedback to shared form submit buttons across the app while preserving action-specific queue labels; the staging `Save Profile` retest displayed `Saving...`, prevented a repeat click, and completed successfully. |
-| `P14-UAT-02` | Open - Untriaged | Successful claim and lifecycle events were not visible in `Admin` > `Audit Logs`. |
+| `P14-UAT-02` | Resolved - staging verified | `Admin` > `Audit Logs` displayed `handoff.assigned` and `conversation.lifecycle_changed` for submission `#69`, including the actor, target, project, timestamp, and non-sensitive status/source metadata. |
 | `P14-UAT-03` | Staging fixture repaired | The staging repair completed for project `#1`; commits `3283879` and `0cfe573` repair seeded project IDs and operation handlers. |
 | `P14-UAT-04` | Fixed and staging verified | Commit `39a7367` colocates the runtime with the database and skips the redundant trigger model turn. Measured server time fell from `57.15 s` to `0.754 s` for starting the booking and was `0.697 s` for the next selection. |
 | `P14-UAT-05` | Fixed and staging verified | Commits `0681065` and `6b344b7` make confirmed operations retry-safe and preserve runtime event order. The Widget completed one Manual Review submission successfully. |
@@ -318,16 +318,16 @@ Result: [ ] Pass [ ] Fail [x] Environment blocker
 
 ### Phase 14 Sign-Off
 
-- [ ] Staging prerequisites and fixture passed.
-- [ ] Safety, handoff, and audit checks passed.
+- [x] Staging prerequisites and fixture passed.
+- [x] Safety, handoff, and audit checks passed.
 - [x] Project Chat and Website Widget passed.
 - [x] WhatsApp passed or has a release-owner-approved limitation.
 - [x] Recovery and tenant-disable checks passed.
-- [ ] No Critical or High defect remains open.
+- [x] No Critical or High defect remains open.
 - [ ] Release owner approved production-like beta traffic.
 
-- Notes: Investigate `P14-UAT-02` and retain the `P14-UAT-13` environment
-  blocker until a disposable restore target exists.
+- Notes: Retain the `P14-UAT-13` environment blocker until a disposable
+  restore target exists or the release owner formally accepts the limitation.
 - Release owner/date: `<name and timestamp>`
 
 # Later Phases - Do Not Start Yet
