@@ -18,7 +18,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | --- | --- | --- |
 | 1-13 | Complete | None. |
 | 14 - Beta release | Complete | Passed on staging under the single-tester scope. |
-| 15 - Knowledge and memory | In progress | Start with 15.1 configuration below. |
+| 15 - Knowledge and memory | In progress | Continue with 15.2 knowledge checks. |
 | 16 - Lifecycle and forms | Pending | Start only after Phase 15 passes. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
@@ -367,7 +367,15 @@ a time and stop when a result fails.
    `When the answer is not available` to `Recommend a relevant task`, enable
    `Recommend published tasks`, and click `Save Knowledge Settings`.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
+
+Restore after Phase 15 testing:
+
+- `Connected Flow Depth`: `3`
+- `Handoff Depth`: `1`
+- `When the answer is not available`: `Use the project fallback`
+- The other checked settings already matched the test values and were not
+  changed.
 
 ### 15.2 Test Knowledge, Safety, And Routing
 
