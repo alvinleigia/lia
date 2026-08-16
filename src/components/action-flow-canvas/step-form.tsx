@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus, Save } from "lucide-react";
+import { Plus, Save } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import {
   CANVAS_INPUT_TYPES,
@@ -1013,9 +1013,7 @@ export function StepCreateForm({
       </StepAdvancedOptions>
 
       <Button type="submit" disabled={isPending} className="w-full">
-        {isPending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : submitLabel.toLowerCase().includes("save") ? (
+        {submitLabel.toLowerCase().includes("save") ? (
           <Save className="h-4 w-4" />
         ) : (
           <Plus className="h-4 w-4" />
