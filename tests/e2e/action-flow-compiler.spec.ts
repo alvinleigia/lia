@@ -11,6 +11,8 @@ import {
   getNextActionStepDecision,
   type RuntimeAction,
 } from "../../src/lib/action-runtime";
+import { listActionTemplates } from "../../src/lib/action-templates";
+import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
 
 function createStep(
   id: number,
@@ -49,6 +51,30 @@ function createRule(
     ...input,
   };
 }
+
+test("bundled templates do not place steps after a terminal confirmation", () => {
+  for (const template of listActionTemplates()) {
+    const graph = compileHybridFlowGraph({
+      actionSettings: template.action.settings,
+      branchRules: [],
+      steps: template.steps.map((step, index) =>
+        createStep(index + 1, step.sortOrder, {
+          fieldKey: step.fieldKey,
+          inputType: step.inputType,
+          isEnabled: step.isEnabled ?? true,
+          nextStepId: step.nextStepId ?? null,
+          settings: step.settings,
+          stepType: step.stepType,
+        }),
+      ),
+    });
+
+    expect(
+      graph.issues.filter((issue) => issue.code === "hybrid_step_unreachable"),
+      template.name,
+    ).toEqual([]);
+  }
+});
 
 test("compiler mirrors ordered runtime flow and terminal boundaries", () => {
   const graph = compileActionFlowGraph({

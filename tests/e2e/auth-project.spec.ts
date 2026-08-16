@@ -661,9 +661,9 @@ test("company owner can apply a bundled action template", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText("Changes saved.")).toBeVisible();
   await expect(page.getByText("Flow Steps").first()).toBeVisible();
-  await expect(page.getByText("7/7")).toBeVisible();
+  await expect(page.getByText("6/6")).toBeVisible();
   await expect(page.getByText("Issue Category").first()).toBeVisible();
-  await expect(page.getByText("Submit Ticket").first()).toBeVisible();
+  await expect(page.getByText("Confirm Ticket").first()).toBeVisible();
 
   const overviewUrl = page.url();
   const downloadPromise = page.waitForEvent("download");

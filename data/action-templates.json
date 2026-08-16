@@ -119,17 +119,6 @@
           "isRequired": false,
           "options": [],
           "settings": {}
-        },
-        {
-          "sortOrder": 9,
-          "stepType": "submit",
-          "fieldKey": null,
-          "label": "Submit Request",
-          "prompt": "Submitting your spa appointment request.",
-          "inputType": null,
-          "isRequired": false,
-          "options": [],
-          "settings": {}
         }
       ]
     },
@@ -252,17 +241,6 @@
           "isRequired": false,
           "options": [],
           "settings": {}
-        },
-        {
-          "sortOrder": 9,
-          "stepType": "submit",
-          "fieldKey": null,
-          "label": "Submit Request",
-          "prompt": "Submitting your salon appointment request.",
-          "inputType": null,
-          "isRequired": false,
-          "options": [],
-          "settings": {}
         }
       ]
     },
@@ -362,17 +340,6 @@
           "fieldKey": null,
           "label": "Confirm Enquiry",
           "prompt": "Please review your hotel enquiry before we save it.",
-          "inputType": null,
-          "isRequired": false,
-          "options": [],
-          "settings": {}
-        },
-        {
-          "sortOrder": 8,
-          "stepType": "submit",
-          "fieldKey": null,
-          "label": "Submit Enquiry",
-          "prompt": "Submitting your hotel enquiry.",
           "inputType": null,
           "isRequired": false,
           "options": [],
@@ -480,17 +447,6 @@
           "isRequired": false,
           "options": [],
           "settings": {}
-        },
-        {
-          "sortOrder": 8,
-          "stepType": "submit",
-          "fieldKey": null,
-          "label": "Submit Reservation",
-          "prompt": "Submitting your restaurant reservation.",
-          "inputType": null,
-          "isRequired": false,
-          "options": [],
-          "settings": {}
         }
       ]
     },
@@ -584,17 +540,6 @@
           "fieldKey": null,
           "label": "Confirm Ticket",
           "prompt": "Please review your support ticket before we save it.",
-          "inputType": null,
-          "isRequired": false,
-          "options": [],
-          "settings": {}
-        },
-        {
-          "sortOrder": 7,
-          "stepType": "submit",
-          "fieldKey": null,
-          "label": "Submit Ticket",
-          "prompt": "Submitting your support ticket.",
           "inputType": null,
           "isRequired": false,
           "options": [],
@@ -693,17 +638,6 @@
           "fieldKey": null,
           "label": "Confirm Enquiry",
           "prompt": "Please review your enquiry before we save it.",
-          "inputType": null,
-          "isRequired": false,
-          "options": [],
-          "settings": {}
-        },
-        {
-          "sortOrder": 7,
-          "stepType": "submit",
-          "fieldKey": null,
-          "label": "Submit Enquiry",
-          "prompt": "Submitting your enquiry.",
           "inputType": null,
           "isRequired": false,
           "options": [],
