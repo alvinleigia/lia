@@ -152,8 +152,8 @@ export default async function HybridFlowTestPage({
                       Published version v{version.versionNumber}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Structural and core input checks run against the immutable
-                      published version.
+                      Structural, core input, and resource-backed checks run
+                      against the immutable published version.
                     </p>
                   </div>
                   <form action={runAutomatedFlowTestAction}>
@@ -222,6 +222,9 @@ export default async function HybridFlowTestPage({
                                   {report.behavioral
                                     ? ` · ${report.behavioral.casesRun} input cases`
                                     : ""}
+                                  {report.resources
+                                    ? ` · ${report.resources.checks.length} resource checks`
+                                    : ""}
                                 </p>
                               </div>
 
@@ -273,7 +276,7 @@ export default async function HybridFlowTestPage({
                                       0 && (
                                       <div>
                                         <p className="font-medium">
-                                          Needs a later test milestone
+                                          Covered by another check in this run
                                         </p>
                                         <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
                                           {report.behavioral.skippedSteps.map(
@@ -304,6 +307,58 @@ export default async function HybridFlowTestPage({
                                           </li>
                                         ),
                                       )}
+                                    </ul>
+                                  </div>
+                                </details>
+                              )}
+
+                              {report.resources && (
+                                <details className="mt-3 text-sm">
+                                  <summary className="cursor-pointer font-medium">
+                                    View resource-backed behavior
+                                  </summary>
+                                  <div className="mt-2 space-y-3 rounded-md border p-3">
+                                    <p>
+                                      <span className="font-medium">
+                                        {report.resources.checksPassed} passed
+                                      </span>
+                                      {" · "}
+                                      {report.resources.checksFailed} failed
+                                      {" · "}
+                                      {report.resources.stepsTested} of{" "}
+                                      {report.resources.stepsConsidered}{" "}
+                                      resource-backed blocks tested
+                                    </p>
+                                    {report.resources.warnings.length > 0 && (
+                                      <div>
+                                        <p className="font-medium">
+                                          Channel fallbacks
+                                        </p>
+                                        <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                                          {report.resources.warnings.map(
+                                            (warning) => (
+                                              <li key={warning}>{warning}</li>
+                                            ),
+                                          )}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    <ul className="space-y-1">
+                                      {report.resources.checks.map((check) => (
+                                        <li
+                                          key={check.key}
+                                          className={
+                                            check.status === "passed"
+                                              ? "text-muted-foreground"
+                                              : "text-red-700"
+                                          }
+                                        >
+                                          <span className="font-medium text-foreground">
+                                            {check.stepLabel}
+                                          </span>
+                                          : {check.detail}
+                                        </li>
+                                      ))}
                                     </ul>
                                   </div>
                                 </details>

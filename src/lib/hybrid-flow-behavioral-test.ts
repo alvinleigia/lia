@@ -304,7 +304,7 @@ export function runBehavioralHybridFlowTest(
     if (step.stepType === "file_upload") {
       skippedSteps.push({
         reason:
-          "File validation requires an uploaded media object, not generated text.",
+          "File object and acceptance rules are covered by the resource-backed checks in this run.",
         stepId: step.id,
         stepLabel,
       });
@@ -313,7 +313,7 @@ export function runBehavioralHybridFlowTest(
     if (step.stepType === "product_selection") {
       skippedSteps.push({
         reason:
-          "Product selection requires catalog fixtures and is covered by the catalog test milestone.",
+          "Published catalog options are covered by the resource-backed checks in this run.",
         stepId: step.id,
         stepLabel,
       });

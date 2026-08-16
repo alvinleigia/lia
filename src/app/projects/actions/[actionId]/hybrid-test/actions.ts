@@ -13,6 +13,7 @@ import {
 } from "@/lib/hybrid-flow-automated-test";
 import { runBehavioralHybridFlowTest } from "@/lib/hybrid-flow-behavioral-test";
 import { compiledHybridFlowGraphV1Schema } from "@/lib/hybrid-flow-contracts";
+import { runResourceBackedHybridFlowTest } from "@/lib/hybrid-flow-resource-test";
 import { resolveStrictPageUserAndProject } from "@/lib/protected-page";
 
 const automatedTestInputSchema = z.object({
@@ -74,16 +75,27 @@ export async function runAutomatedFlowTestAction(formData: FormData) {
   const structuralReport = runAutomatedHybridFlowTest(graph.data);
   const snapshot = version.snapshot as { steps?: RuntimeActionStep[] };
   const behavioralReport = runBehavioralHybridFlowTest(snapshot.steps ?? []);
+  const resourceReport = runResourceBackedHybridFlowTest(snapshot.steps ?? []);
   const report = {
     ...structuralReport,
     behavioral: behavioralReport,
-    errors: [...structuralReport.errors, ...behavioralReport.errors],
+    errors: [
+      ...structuralReport.errors,
+      ...behavioralReport.errors,
+      ...resourceReport.errors,
+    ],
+    resources: resourceReport,
     status:
       structuralReport.status === "passed" &&
-      behavioralReport.status === "passed"
+      behavioralReport.status === "passed" &&
+      resourceReport.status === "passed"
         ? ("passed" as const)
         : ("failed" as const),
-    warnings: [...structuralReport.warnings, ...behavioralReport.warnings],
+    warnings: [
+      ...structuralReport.warnings,
+      ...behavioralReport.warnings,
+      ...resourceReport.warnings,
+    ],
   };
   await writeAuditLog({
     ...context,

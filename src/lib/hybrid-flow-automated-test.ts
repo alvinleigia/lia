@@ -4,6 +4,7 @@ import type {
   CompiledHybridFlowGraphV1,
   HybridFlowNodeV1,
 } from "@/lib/hybrid-flow-contracts";
+import { resourceFlowTestReportV1Schema } from "@/lib/hybrid-flow-resource-test";
 
 export const AUTOMATED_FLOW_TEST_AUDIT_ACTION =
   "chatbot_action.automated_test_completed";
@@ -23,6 +24,7 @@ export const automatedFlowTestReportV1Schema = z.object({
   errors: z.array(z.string()),
   maximumDepth: z.number().int().nonnegative(),
   nodesTested: z.number().int().nonnegative(),
+  resources: resourceFlowTestReportV1Schema.optional(),
   routesTested: z.number().int().nonnegative(),
   schemaVersion: z.literal(1),
   status: z.enum(["failed", "passed"]),

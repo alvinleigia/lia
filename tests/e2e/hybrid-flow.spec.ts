@@ -33,6 +33,7 @@ import {
   parseHybridGraphTaskReturnTarget,
   taskSuspensionReturnTargetV1Schema,
 } from "../../src/lib/hybrid-flow-contracts";
+import { runResourceBackedHybridFlowTest } from "../../src/lib/hybrid-flow-resource-test";
 import {
   bindRequestedTaskSelection,
   bindRequestedTaskTextAnswer,
@@ -603,7 +604,7 @@ test("behavioral flow test exercises production validators for core inputs", () 
   );
 });
 
-test("behavioral flow test records unsupported live-object inputs", () => {
+test("behavioral flow test delegates resource-backed inputs", () => {
   const report = runBehavioralHybridFlowTest([
     createRuntimeInputStep(1, "file_upload", { label: "Attachment" }),
     createRuntimeInputStep(2, "product_selection", { label: "Product" }),
@@ -619,6 +620,128 @@ test("behavioral flow test records unsupported live-object inputs", () => {
     stepsConsidered: 2,
     stepsTested: 0,
   });
+});
+
+const resourceProduct = {
+  currency: "USD",
+  description: "Automated product fixture",
+  id: 101,
+  imageUrl: "https://example.com/product.png",
+  name: "Test Product",
+  priceAmount: 2500,
+  productUrl: "https://example.com/product",
+  sku: "TEST-101",
+  whatsappRetailerId: "retailer-101",
+};
+
+test("resource-backed flow test exercises published file, product, media, template, and catalog contracts", () => {
+  const report = runResourceBackedHybridFlowTest([
+    createRuntimeInputStep(1, "file_upload", {
+      fieldKey: "attachment",
+      label: "Attachment",
+      settings: { validationAllowedFileTypes: "image/*,.pdf" },
+    }),
+    createRuntimeInputStep(2, "product_selection", {
+      fieldKey: "productId",
+      label: "Product",
+      settings: {
+        productCatalog: {
+          externalId: "catalog-1",
+          id: 1,
+          name: "Test Catalog",
+          providerType: "meta",
+        },
+        products: [resourceProduct],
+        productSelectionAllowMultiple: true,
+        productSelectionAllowQuantity: true,
+      },
+    }),
+    createRuntimeInputStep(3, "media", {
+      fieldKey: null,
+      isRequired: false,
+      label: "Media",
+      settings: {
+        mediaAsset: {
+          id: 1,
+          mediaType: "image",
+          mimeType: "image/png",
+          originalName: "test.png",
+          publicPath: "https://example.com/test.png",
+        },
+      },
+    }),
+    createRuntimeInputStep(4, "template_message", {
+      fieldKey: null,
+      isRequired: false,
+      label: "Template",
+      settings: {
+        whatsappTemplateBody: "Hello",
+        whatsappTemplateLanguage: "en",
+        whatsappTemplateName: "test_template",
+        whatsappTemplateStatus: "approved",
+        whatsappTemplateVariables: [],
+      },
+    }),
+    createRuntimeInputStep(5, "single_product", {
+      fieldKey: null,
+      isRequired: false,
+      label: "Single product",
+      settings: {
+        productCatalog: {
+          externalId: "catalog-1",
+          id: 1,
+          name: "Test Catalog",
+          providerType: "meta",
+        },
+        products: [resourceProduct],
+      },
+    }),
+  ]);
+
+  expect(report).toMatchObject({
+    checksFailed: 0,
+    errors: [],
+    status: "passed",
+    stepsConsidered: 5,
+    stepsTested: 5,
+  });
+  expect(report.checks).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ key: "1:file-match", status: "passed" }),
+      expect.objectContaining({
+        key: "2:product-answer",
+        status: "passed",
+      }),
+      expect.objectContaining({ key: "3:media-asset", status: "passed" }),
+      expect.objectContaining({ key: "4:template", status: "passed" }),
+      expect.objectContaining({
+        key: "5:catalog-products",
+        status: "passed",
+      }),
+    ]),
+  );
+});
+
+test("resource-backed flow test records invalid published resource contracts", () => {
+  const report = runResourceBackedHybridFlowTest([
+    createRuntimeInputStep(1, "file_upload", {
+      label: "Attachment",
+      settings: { validationAllowedFileTypes: "not-a-file-type" },
+    }),
+    createRuntimeInputStep(2, "product_selection", {
+      label: "Product",
+      settings: { products: [] },
+    }),
+  ]);
+
+  expect(report.status).toBe("failed");
+  expect(report.checksFailed).toBeGreaterThanOrEqual(2);
+  expect(report.errors).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining("Invalid allowed file types"),
+      expect.stringContaining("No published product options resolved"),
+    ]),
+  );
 });
 
 test("compiler accepts a terminal business-task channel wrapper", () => {
