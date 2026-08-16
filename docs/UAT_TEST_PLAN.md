@@ -3,8 +3,8 @@
 This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
-- Selected project: `Phase 14 Release UAT (#1)`
-- Minimum release-candidate commit: `8715f88`
+- Current selected project: `Phase 16 Lifecycle UAT (#94)`
+- Current staging milestone commit: `dcc37a8`
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -19,7 +19,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 1-13 | Complete | None. |
 | 14 - Beta release | Complete | Passed on staging under the single-tester scope. |
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
-| 16 - Lifecycle and forms | In progress | Configure the structured form. |
+| 16 - Lifecycle and forms | In progress | Verify the saved contact timeline. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -479,6 +479,37 @@ after a terminal confirmation. The current staging action was repaired by
 deleting Step 7. Commit `b9bff60` fixes all bundled templates and adds a
 regression check. Commit `f7cd5fc` changes the post-publication readiness label
 to `Flow checks passed` so it does not imply that another publish is required.
+
+### 16.2 Run And Review The Support Ticket
+
+1. [x] Open `Create Support Ticket` and click `Test Flow`. Start from
+   `Normal conversation` and continue from Step 1 through the terminal Step 6.
+2. [x] Open `Projects` > `Chat`, start `Create Support Ticket`, and submit:
+   - Issue category: `Technical issue`
+   - Priority: `High`
+   - Description: `Unable to access the staging support dashboard.`
+   - Name: `Phase Sixteen UAT Tester`
+   - Email: `phase16.uat@example.com`
+3. [x] Confirm the review shows only the relevant actions: `Confirm Request`,
+   `Edit Name`, `Edit Email`, and `Cancel`.
+4. [x] Click `Confirm Request` and confirm Lia replies
+   `Thanks. I saved this request.`
+5. [x] Open `Automation` > `Submissions` > submission `#75`. Confirm the five
+   submitted fields match the values above. No operation attempt is expected
+   because this template saves a structured request without calling an
+   operation.
+6. [x] Change the submission status from `Submitted` to `Under Review`, then
+   from `Under Review` to `Completed`.
+7. [x] Under `Events`, confirm the two `submission.status_changed` entries show
+   `submitted` to `under_review` and `under_review` to `completed`.
+
+Result: [x] Pass [ ] Fail
+
+Finding `P16-UAT-02`: confirmation initially showed spa-specific edit actions
+for the Support Ticket flow. Commit `dcc37a8` scopes edit actions to the
+collectible fields in the active flow. Staging then showed only `Edit Name` and
+`Edit Email`, and submission `#75` completed with the correct five fields and
+both lifecycle events.
 
 # Final Release Record
 

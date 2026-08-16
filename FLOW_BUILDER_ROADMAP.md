@@ -1084,6 +1084,15 @@ blocked only by sandboxed Google Fonts access; the separately network-enabled
 production build passed. Detailed manual sign-off is recorded in
 `docs/UAT_TEST_PLAN.md` and remains the release-owner checkpoint.
 
+Staging UAT milestone on 2026-08-16: the repaired `Support Ticket` template
+published as version 1 with six reachable steps, its published-flow simulation
+reached the terminal confirmation, and Project Chat submission `#75` preserved
+all five structured fields. The submission then moved from `submitted` to
+`under_review` to `completed`, with both transitions recorded in its event
+history. Commit `dcc37a8` fixed and staging-verified field-scoped confirmation
+edit actions. Contact timeline, handoff field preservation, and remaining
+structured-form channel checks are still pending.
+
 ## Phase 17: Reuse, Evaluations, Analytics, And Optimization
 
 Goal: help teams reuse and improve both conversational tasks and deterministic
