@@ -19,7 +19,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 1-13 | Complete | None. |
 | 14 - Beta release | Complete | Passed on staging under the single-tester scope. |
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
-| 16 - Lifecycle and forms | Pending | Begin the Phase 16 staging checklist. |
+| 16 - Lifecycle and forms | In progress | Configure the structured form. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -458,16 +458,33 @@ Result: [x] Pass [ ] Fail
 
 ## Phase 16 - Lifecycle And Structured Forms
 
-Status: `Pending`. Phase 15 has passed, so this is the next manual gate.
-Create a separate disposable staging project for its actions, forms, handoff
-lifecycle, contact changes, and cleanup checks. Do not run it in production or
-on the Phase 14 fixture.
+Status: `In progress`. Run only in the disposable staging project
+`Phase 16 Lifecycle UAT (#94)`.
+
+### 16.1 Create And Publish The Test Action
+
+1. [x] Create the staging project `Phase 16 Lifecycle UAT`.
+2. [x] Open `Automation` > `Templates` and apply `Support Ticket`.
+3. [x] Open `Create Support Ticket` > `Canvas`. Confirm `Flow checks` shows
+   `0 errors`. The warning that four options use WhatsApp text fallback is
+   expected.
+4. [x] Return to the action and click `Publish`.
+5. [x] Confirm `Published Version` is `v1`, `Flow Steps` is `6/6`, and
+   `Draft matches runtime` is shown.
+
+Result: [x] Pass [ ] Fail
+
+Finding `P16-UAT-01`: the bundled templates included a redundant submit step
+after a terminal confirmation. The current staging action was repaired by
+deleting Step 7. Commit `b9bff60` fixes all bundled templates and adds a
+regression check. Commit `f7cd5fc` changes the post-publication readiness label
+to `Flow checks passed` so it does not imply that another publish is required.
 
 # Final Release Record
 
 - Phase 14: [x] Pass [ ] Fail
 - Phase 15: [x] Pass [ ] Fail [ ] In progress
-- Phase 16: [ ] Pass [ ] Fail [x] Pending
+- Phase 16: [ ] Pass [ ] Fail [x] In progress
 - Critical defects open: `<count>`
 - High defects open: `<count>`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).

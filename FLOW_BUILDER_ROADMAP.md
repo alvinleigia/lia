@@ -102,7 +102,7 @@ Current target: complete Phase 16 manual staging UAT in the sequence defined by
 | 9-13 | Complete | Passed by 2026-08-05 | None. |
 | 14 | Complete | Passed on staging under the single-tester scope on 2026-08-15; the missing disposable restore environment is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
-| 16 | Complete | Staging UAT pending | Run the next checklist in `docs/UAT_TEST_PLAN.md`. |
+| 16 | Complete | Staging UAT in progress; action setup and publication passed | Continue the checklist in `docs/UAT_TEST_PLAN.md`. |
 | 17 | Foundation only; 12 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
 
