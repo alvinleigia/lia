@@ -2955,6 +2955,138 @@ test("channel action flow follows inline operation success and failure routes", 
   );
 });
 
+test("explicit human-help requests interrupt deterministic input without becoming field data", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-flow-handoff-${runId}@example.test`;
+  const projectName = `E2E Flow Handoff Project ${runId}`;
+  const triggerPhrase = `flow handoff ${runId}`;
+  const conversationId = `flow-handoff-conversation-${runId}`;
+  const issueDescription = `Cannot access the billing dashboard ${runId}.`;
+
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: `E2E Flow Handoff User ${runId}`,
+    password,
+  });
+  await signInWithEmail(page, email);
+  const projectId = await createProjectFromProjectsPage(page, projectName);
+  const user = await getUserByEmail(email);
+  if (!user) {
+    throw new Error("Expected the flow-handoff test user to exist.");
+  }
+
+  const action = await createChatbotAction({
+    description: "Verifies explicit handoff during deterministic collection.",
+    name: `E2E Flow Handoff Action ${runId}`,
+    projectId,
+    status: "active",
+    triggerPhrases: [triggerPhrase],
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "issueDescription",
+    inputType: "text",
+    isRequired: true,
+    label: "Issue Description",
+    projectId,
+    prompt: "Please describe the issue.",
+    sortOrder: 1,
+    stepType: "collect_input",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    fieldKey: "customerName",
+    inputType: "text",
+    isRequired: true,
+    label: "Customer Name",
+    projectId,
+    prompt: "What is your name?",
+    sortOrder: 2,
+    stepType: "collect_input",
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    isRequired: false,
+    label: "Submit Support Request",
+    projectId,
+    prompt: "Thanks. I saved this request.",
+    sortOrder: 3,
+    stepType: "submit",
+  });
+  await createPublishedActionFlowVersion({
+    actionId: action.id,
+    projectId,
+    publishedByUserId: user.id,
+  });
+
+  await processChannelFlowText({
+    activeSubmission: null,
+    conversationId,
+    projectId,
+    source: "widget_chat",
+    text: triggerPhrase,
+  });
+  const startedSubmission = await getActiveActionSubmissionForConversation({
+    conversationId,
+    projectId,
+    source: "widget_chat",
+  });
+  if (!startedSubmission) {
+    throw new Error("Expected an active deterministic flow submission.");
+  }
+
+  await processChannelFlowText({
+    activeSubmission: startedSubmission,
+    conversationId,
+    projectId,
+    source: "widget_chat",
+    text: issueDescription,
+  });
+  const awaitingNameSubmission = await getActiveActionSubmissionForConversation(
+    {
+      conversationId,
+      projectId,
+      source: "widget_chat",
+    },
+  );
+  if (!awaitingNameSubmission) {
+    throw new Error("Expected the flow to be waiting for a customer name.");
+  }
+
+  const result = await processChannelFlowText({
+    activeSubmission: awaitingNameSubmission,
+    conversationId,
+    projectId,
+    source: "widget_chat",
+    text: "I need a person to help with this support ticket.",
+  });
+  expect(
+    result.replies.map((reply) => reply.fallbackText).join("\n"),
+  ).toContain("details you already provided have been saved");
+
+  const submissions = await listActionSubmissions(projectId, action.id);
+  const submission = submissions.find(
+    (candidate) => candidate.id === awaitingNameSubmission.id,
+  );
+  expect(submission).toEqual(
+    expect.objectContaining({
+      fields: expect.objectContaining({ issueDescription }),
+      status: "under_review",
+    }),
+  );
+  expect(submission?.fields).not.toHaveProperty("customerName");
+
+  const events = await listActionSubmissionEvents(
+    projectId,
+    awaitingNameSubmission.id,
+  );
+  expect(events.map((event) => event.eventType)).toContain(
+    "flow.handoff_requested",
+  );
+});
+
 test("active flow stays pinned to the published version it started with", async ({
   page,
 }) => {

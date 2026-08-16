@@ -63,6 +63,7 @@ import {
 } from "@/lib/channels";
 import { executeContactMutationStep } from "@/lib/contact-flow-mutations";
 import { setContactAttribute } from "@/lib/contacts";
+import { isExplicitHumanHandoffRequest } from "@/lib/conversation-control-intents";
 import type { SelectActionSubmission } from "@/lib/db-schema";
 import {
   type FlowContentBlock,
@@ -1532,6 +1533,38 @@ async function continueChannelFlow(input: {
   submission: SelectActionSubmission;
 }) {
   const normalizedAnswer = normalizeActionText(input.answer);
+  const steps = getRunnableActionSteps(input.action);
+  const currentStep = steps.find(
+    (step) => step.id === input.submission.currentStepId,
+  );
+
+  if (currentStep && isExplicitHumanHandoffRequest(input.answer)) {
+    await requestHumanHandoff({
+      action: input.action,
+      projectId: input.projectId,
+      step: {
+        ...currentStep,
+        label: "Human handoff",
+        operationId: null,
+        prompt: "Visitor explicitly requested human help.",
+        settings: {
+          ...currentStep.settings,
+          handoffNotifyTeam: false,
+          handoffPriority: "normal",
+          handoffQueue: "",
+        },
+      },
+      submission: input.submission,
+    });
+
+    return {
+      replies: [
+        createTextReply(
+          "I will connect you with the team. The details you already provided have been saved.",
+        ),
+      ],
+    };
+  }
 
   if (
     input.submission.currentStepId === null ||
@@ -1571,7 +1604,6 @@ async function continueChannelFlow(input: {
     };
   }
 
-  const steps = getRunnableActionSteps(input.action);
   const stepIndex = findStepIndexById(
     input.action,
     input.submission.currentStepId,

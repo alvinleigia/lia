@@ -3,6 +3,7 @@ import type {
   ConversationProjectPolicyV1,
   TURN_MODEL_STAGES,
 } from "@/lib/conversation-contracts";
+import { isExplicitHumanHandoffRequest } from "@/lib/conversation-control-intents";
 import {
   compileStructuredTurn,
   type PublishedTaskOption,
@@ -101,12 +102,6 @@ const EXPLICIT_TASK_CANCELLATION_PHRASES = new Set([
   "stop this request",
 ]);
 
-const EXPLICIT_TASK_HANDOFF_PATTERNS = [
-  /\b(?:i\s+)?(?:need|want|would like)\s+(?:a\s+|an\s+)?(?:person|human|agent|representative|team member)\s+to\s+help\b/i,
-  /\b(?:talk|speak|chat)\s+(?:to|with)\s+(?:a\s+|an\s+)?(?:person|human|agent|representative|team member)\b/i,
-  /\b(?:human|live agent|team member)\s+(?:help|support)\b/i,
-];
-
 const TASK_INTENT_FILLER_WORDS = new Set([
   "a",
   "an",
@@ -177,15 +172,8 @@ function isExplicitTaskCancellation(input: ExecuteStructuredTurnInput) {
 }
 
 function isExplicitTaskHandoff(input: ExecuteStructuredTurnInput) {
-  if (!input.activeTask) return false;
-
-  const normalized = input.visitorMessage.trim().replace(/\s+/g, " ");
-  if (/\b(?:do not|don['’]?t|no need to)\b/i.test(normalized)) {
-    return false;
-  }
-
-  return EXPLICIT_TASK_HANDOFF_PATTERNS.some((pattern) =>
-    pattern.test(normalized),
+  return Boolean(
+    input.activeTask && isExplicitHumanHandoffRequest(input.visitorMessage),
   );
 }
 
