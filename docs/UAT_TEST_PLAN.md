@@ -19,7 +19,8 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 1-13 | Complete | None. |
 | 14 - Beta release | Complete | Passed on staging under the single-tester scope. |
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
-| 16 - Lifecycle and forms | In progress | Run the support-ticket flow in Widget Preview. |
+| 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
+| 17 - Reuse and optimization | Implementation pending | Complete the Phase 17 roadmap work before starting UAT. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -558,21 +559,30 @@ submission `#77`.
 
 ### 16.5 Run The Support Ticket In Widget Preview
 
-1. [ ] Open `Projects` > `Widget`, then click `Open Widget Preview`.
-2. [ ] Start `Create Support Ticket` and complete all five fields.
-3. [ ] Click `Confirm Request` and confirm Lia replies
+1. [x] Open `Projects` > `Widget`, then click `Open Widget Preview`.
+2. [x] Start `Create Support Ticket` and complete all five fields.
+3. [x] Click `Confirm Request` and confirm Lia replies
    `Thanks. I saved this request.`
-4. [ ] Open the new submission and confirm its source is `widget_chat`, all
+4. [x] Open submission `#78` and confirm its source is `widget_chat`, all
    five fields are correct, and its status is `Submitted`.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
+
+Phase 16 result: [x] Pass [ ] Fail
+
+- [x] Published-flow simulation reached the terminal step.
+- [x] Project Chat submission lifecycle and events passed.
+- [x] Contact transcript and linked submission passed.
+- [x] Human handoff preserved validated fields and completed cleanly.
+- [x] Widget Preview saved the same structured support request.
+- Tester/date: `Single tester / release owner - 2026-08-16`
 
 # Final Release Record
 
 - Phase 14: [x] Pass [ ] Fail
 - Phase 15: [x] Pass [ ] Fail [ ] In progress
-- Phase 16: [ ] Pass [ ] Fail [x] In progress
-- Critical defects open: `<count>`
-- High defects open: `<count>`
+- Phase 16: [x] Pass [ ] Fail [ ] In progress
+- Critical defects open: `0`
+- High defects open: `0`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
-- Final approver/date: `<name and timestamp>`
+- Phase 16 approver/date: `Single tester / release owner - 2026-08-16`

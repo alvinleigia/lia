@@ -86,12 +86,12 @@ database, backup, and provider readiness work.
 - [x] Phase 14 staging cross-channel UAT passed under the single-tester scope on 2026-08-15.
 - [x] Priority 2 release approval is complete for continued internal testing.
 
-Active manual gate: Priority 3, Phase 16 of 18. Engineering implementation is
-complete through Phase 16, and Phase 15 manual staging UAT passed under the
-single-tester scope on 2026-08-16.
+Active delivery gate: Priority 3, Phase 17 of 18. Engineering implementation
+and manual staging UAT are complete through Phase 16 under the single-tester
+scope as of 2026-08-16.
 
-Current target: complete Phase 16 manual staging UAT in the sequence defined by
-`docs/UAT_TEST_PLAN.md`, then continue Phase 17 implementation.
+Current target: complete the remaining Phase 17 implementation items before
+creating its manual staging UAT section in `docs/UAT_TEST_PLAN.md`.
 
 ### Phase Tracking Snapshot
 
@@ -102,7 +102,7 @@ Current target: complete Phase 16 manual staging UAT in the sequence defined by
 | 9-13 | Complete | Passed by 2026-08-05 | None. |
 | 14 | Complete | Passed on staging under the single-tester scope on 2026-08-15; the missing disposable restore environment is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
-| 16 | Complete | Staging UAT in progress; action setup and publication passed | Continue the checklist in `docs/UAT_TEST_PLAN.md`. |
+| 16 | Complete | Passed on staging under the single-tester scope on 2026-08-16 | None. |
 | 17 | Foundation only; 12 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
 
@@ -1095,7 +1095,9 @@ and linked completed submission. Human handoff submission `#77` preserved the
 three validated fields without storing the help request as a name, was claimed,
 and moved out of the open queue as completed. Commits `6058ca2` and `60c0c7b`
 fixed and staging-verified the deterministic handoff guard and assignment-action
-visibility. The Widget Preview structured-flow check is still pending.
+visibility. Widget Preview submission `#78` then preserved the same five-field
+support request with source `widget_chat` and no operation attempt. Phase 16
+manual staging UAT passed under the single-tester scope on 2026-08-16.
 
 ## Phase 17: Reuse, Evaluations, Analytics, And Optimization
 
