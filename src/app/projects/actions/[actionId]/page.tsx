@@ -550,7 +550,9 @@ export default async function ActionDetailPage({
             >
               <p className="font-medium">
                 {readinessIssues.length === 0
-                  ? "Ready to publish"
+                  ? currentPublishedVersion
+                    ? "Flow checks passed"
+                    : "Ready to publish"
                   : "Publish readiness"}
               </p>
               {readinessIssues.length === 0 ? (
