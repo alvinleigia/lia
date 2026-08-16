@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import { auditLogs, users } from "@/lib/db-schema";
 
@@ -93,6 +93,43 @@ export async function listCompanyAuditLogs(companyId: number, limit = 100) {
     .where(eq(auditLogs.companyId, companyId))
     .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
     .limit(limit);
+
+  return rows.map(({ actor, auditLog }) => ({
+    actor,
+    auditLog: {
+      ...auditLog,
+      metadata: redactAuditMetadata(auditLog.metadata),
+    },
+  }));
+}
+
+export async function listAuditLogsForTarget(input: {
+  action: string;
+  limit?: number;
+  projectId: number;
+  targetId: number | string;
+  targetType: string;
+}) {
+  const rows = await db
+    .select({
+      auditLog: auditLogs,
+      actor: {
+        email: users.email,
+        name: users.name,
+      },
+    })
+    .from(auditLogs)
+    .leftJoin(users, eq(users.id, auditLogs.actorUserId))
+    .where(
+      and(
+        eq(auditLogs.projectId, input.projectId),
+        eq(auditLogs.action, input.action),
+        eq(auditLogs.targetType, input.targetType),
+        eq(auditLogs.targetId, String(input.targetId)),
+      ),
+    )
+    .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
+    .limit(input.limit ?? 10);
 
   return rows.map(({ actor, auditLog }) => ({
     actor,

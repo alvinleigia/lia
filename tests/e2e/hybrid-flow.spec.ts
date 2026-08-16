@@ -22,6 +22,7 @@ import {
   type ToolDefinitionV1,
 } from "../../src/lib/conversation-contracts";
 import type { SelectActionSubmission } from "../../src/lib/db-schema";
+import { runAutomatedHybridFlowTest } from "../../src/lib/hybrid-flow-automated-test";
 import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
 import {
   compiledHybridFlowGraphV1Schema,
@@ -413,6 +414,117 @@ test("compiler publishes a reachable knowledge-task-deterministic graph", () => 
       }),
     ]),
   );
+});
+
+test("automated flow test covers every published node and route", () => {
+  const graph = compileHybridFlowGraph({ branchRules, steps }).graph;
+
+  expect(runAutomatedHybridFlowTest(graph)).toMatchObject({
+    entriesTested: 1,
+    errors: [],
+    nodesTested: graph.nodes.length,
+    routesTested: graph.transitions.length,
+    status: "passed",
+  });
+});
+
+test("automated flow test records invalid references and unreachable nodes", () => {
+  const graph = compiledHybridFlowGraphV1Schema.parse({
+    entryNodeId: "step:1",
+    entryPolicy: {
+      campaignRoutes: {},
+      channelRoutes: {},
+      deepLinkRoutes: {},
+      normalNodeId: "step:1",
+    },
+    maxTraversalDepth: 20,
+    nodes: [
+      {
+        id: "step:1",
+        kind: "deterministic",
+        label: "Opening",
+        responseOwner: "deterministic",
+        sourceStepId: 1,
+        stepType: "message",
+      },
+      {
+        id: "step:2",
+        kind: "deterministic",
+        label: "Save",
+        responseOwner: "deterministic",
+        sourceStepId: 2,
+        stepType: "submit",
+      },
+    ],
+    schemaVersion: 1,
+    transitions: [
+      {
+        id: "broken-route",
+        kind: "default",
+        priority: 0,
+        sourceNodeId: "step:1",
+        sourceRuleId: null,
+        targetNodeId: "step:404",
+        triggerKey: null,
+      },
+    ],
+  });
+  const report = runAutomatedHybridFlowTest(graph);
+
+  expect(report.status).toBe("failed");
+  expect(report.errors).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining("missing node step:404"),
+      expect.stringContaining("Save (step:2) is not reachable"),
+      expect.stringContaining("Opening (step:1) cannot reach a terminal path"),
+    ]),
+  );
+});
+
+test("automated flow test records reachable route cycles", () => {
+  const graph = compiledHybridFlowGraphV1Schema.parse({
+    entryNodeId: "step:1",
+    entryPolicy: {
+      campaignRoutes: {},
+      channelRoutes: {},
+      deepLinkRoutes: {},
+      normalNodeId: "step:1",
+    },
+    maxTraversalDepth: 20,
+    nodes: [1, 2].map((id) => ({
+      id: `step:${id}`,
+      kind: "deterministic" as const,
+      label: `Step ${id}`,
+      responseOwner: "deterministic" as const,
+      sourceStepId: id,
+      stepType: "message",
+    })),
+    schemaVersion: 1,
+    transitions: [
+      {
+        id: "step:1:default",
+        kind: "default",
+        priority: 0,
+        sourceNodeId: "step:1",
+        sourceRuleId: null,
+        targetNodeId: "step:2",
+        triggerKey: null,
+      },
+      {
+        id: "step:2:default",
+        kind: "default",
+        priority: 0,
+        sourceNodeId: "step:2",
+        sourceRuleId: null,
+        targetNodeId: "step:1",
+        triggerKey: null,
+      },
+    ],
+  });
+  const report = runAutomatedHybridFlowTest(graph);
+
+  expect(report.status).toBe("failed");
+  expect(report.errors).toContain("A reachable route cycle was detected.");
 });
 
 test("compiler accepts a terminal business-task channel wrapper", () => {
