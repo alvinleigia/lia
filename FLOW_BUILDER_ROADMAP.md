@@ -1090,8 +1090,12 @@ reached the terminal confirmation, and Project Chat submission `#75` preserved
 all five structured fields. The submission then moved from `submitted` to
 `under_review` to `completed`, with both transitions recorded in its event
 history. Commit `dcc37a8` fixed and staging-verified field-scoped confirmation
-edit actions. Contact timeline, handoff field preservation, and remaining
-structured-form channel checks are still pending.
+edit actions. The Project Chat contact timeline retained the ordered transcript
+and linked completed submission. Human handoff submission `#77` preserved the
+three validated fields without storing the help request as a name, was claimed,
+and moved out of the open queue as completed. Commits `6058ca2` and `60c0c7b`
+fixed and staging-verified the deterministic handoff guard and assignment-action
+visibility. The Widget Preview structured-flow check is still pending.
 
 ## Phase 17: Reuse, Evaluations, Analytics, And Optimization
 

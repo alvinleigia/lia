@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone commit: `dcc37a8`
+- Current staging milestone commit: `60c0c7b`
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -19,7 +19,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 1-13 | Complete | None. |
 | 14 - Beta release | Complete | Passed on staging under the single-tester scope. |
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
-| 16 - Lifecycle and forms | In progress | Verify the saved contact timeline. |
+| 16 - Lifecycle and forms | In progress | Run the support-ticket flow in Widget Preview. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -510,6 +510,62 @@ for the Support Ticket flow. Commit `dcc37a8` scopes edit actions to the
 collectible fields in the active flow. Staging then showed only `Edit Name` and
 `Edit Email`, and submission `#75` completed with the correct five fields and
 both lifecycle events.
+
+### 16.3 Verify The Contact Timeline
+
+1. [x] Open `Projects` > `Contacts` and select the Project Chat contact used by
+   submission `#75`.
+2. [x] Confirm `Channel Transcript` shows the support-ticket conversation in
+   order, including the validation retry and corrected name.
+3. [x] Confirm `Flow Submissions` links `#75 Create Support Ticket` and shows
+   it as `Completed`.
+
+Result: [x] Pass [ ] Fail
+
+The submitted name and email remain structured submission fields. They are not
+automatically promoted to the contact profile unless the flow contains an
+explicit contact-update step.
+
+### 16.4 Verify Human Handoff Field Preservation
+
+1. [x] Start a fresh `Create Support Ticket` in `Projects` > `Chat` and enter:
+   - Issue category: `Technical issue`
+   - Priority: `High`
+   - Description: `Unable to access the billing dashboard.`
+2. [x] At `What is your name?`, enter
+   `I need a person to help with this support ticket.`
+3. [x] Confirm Lia replies that the team will help and the details already
+   provided were saved. Confirm the flow does not ask for email.
+4. [x] Open `Automation` > `Handoff Queue`. Confirm handoff `#77` is
+   `Under Review`, `Unassigned`, and at step `Human handoff`.
+5. [x] Open submission `#77`. Confirm priority, category, and description are
+   preserved, while `customerName` is absent.
+6. [x] Click `Claim Handoff`. Confirm `Assigned To` becomes `Leigia`, only
+   `Release` remains after deployment `60c0c7b`, then change `Status` to
+   `Completed`.
+7. [x] Return to `Automation` > `Handoff Queue`. Confirm `Open` is `0` and
+   `Closed` is `1`.
+
+Result: [x] Pass [ ] Fail
+
+Finding `P16-UAT-03`: an explicit human-help request was initially validated as
+the current deterministic flow field. Commit `6058ca2` adds one shared handoff
+intent guard before field validation, preserves prior fields, and prevents the
+request from becoming field data. Commit `60c0c7b` makes the submission detail
+page use the same assignment-state rules as the Handoff Queue, hiding the
+redundant claim action after assignment. Both fixes passed staging retesting on
+submission `#77`.
+
+### 16.5 Run The Support Ticket In Widget Preview
+
+1. [ ] Open `Projects` > `Widget`, then click `Open Widget Preview`.
+2. [ ] Start `Create Support Ticket` and complete all five fields.
+3. [ ] Click `Confirm Request` and confirm Lia replies
+   `Thanks. I saved this request.`
+4. [ ] Open the new submission and confirm its source is `widget_chat`, all
+   five fields are correct, and its status is `Submitted`.
+
+Result: [ ] Pass [ ] Fail
 
 # Final Release Record
 
