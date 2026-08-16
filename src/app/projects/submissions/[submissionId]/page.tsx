@@ -40,6 +40,7 @@ import {
   type FlowMediaUploadValue,
   isFlowMediaUploadValue,
 } from "@/lib/flow-media-values";
+import { getHandoffAssignmentAvailability } from "@/lib/handoff-queue";
 import {
   listOperationAttemptsWithDetailsForSubmission,
   listOperationAttemptsWithDetailsForTaskRun,
@@ -338,6 +339,9 @@ export default async function SubmissionDetailPage({
   );
 
   const handoff = getHandoffDetails(submission.metadata);
+  const handoffAssignmentAvailability = handoff
+    ? getHandoffAssignmentAvailability(handoff.assignedUserId)
+    : null;
   const connectFlowRelationship = buildConnectFlowRelationship(
     projectSubmissions,
     submission.id,
@@ -480,24 +484,26 @@ export default async function SubmissionDetailPage({
                   </p>
                 )}
                 <div className="mt-4 flex flex-wrap gap-3">
-                  <form action={updateHandoffAssignmentAction}>
-                    <input
-                      type="hidden"
-                      name="submissionId"
-                      value={submission.id}
-                    />
-                    <input
-                      type="hidden"
-                      name="assignmentAction"
-                      value="claim"
-                    />
-                    <FormSubmitButton
-                      label="Claim Handoff"
-                      pendingLabel="Claiming..."
-                      icon={<UserCheck className="h-4 w-4" />}
-                    />
-                  </form>
-                  {handoff.assignedUserId && (
+                  {handoffAssignmentAvailability?.canClaim && (
+                    <form action={updateHandoffAssignmentAction}>
+                      <input
+                        type="hidden"
+                        name="submissionId"
+                        value={submission.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="assignmentAction"
+                        value="claim"
+                      />
+                      <FormSubmitButton
+                        label="Claim Handoff"
+                        pendingLabel="Claiming..."
+                        icon={<UserCheck className="h-4 w-4" />}
+                      />
+                    </form>
+                  )}
+                  {handoffAssignmentAvailability?.canRelease && (
                     <form action={updateHandoffAssignmentAction}>
                       <input
                         type="hidden"
