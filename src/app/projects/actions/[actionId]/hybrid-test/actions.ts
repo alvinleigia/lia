@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getActionFlowVersion, getProjectAction } from "@/lib/action-flows";
+import type { RuntimeActionStep } from "@/lib/action-runtime";
 import { writeAuditLog } from "@/lib/audit";
 import {
   AUTOMATED_FLOW_TEST_AUDIT_ACTION,
   AUTOMATED_FLOW_TEST_TARGET_TYPE,
   runAutomatedHybridFlowTest,
 } from "@/lib/hybrid-flow-automated-test";
+import { runBehavioralHybridFlowTest } from "@/lib/hybrid-flow-behavioral-test";
 import { compiledHybridFlowGraphV1Schema } from "@/lib/hybrid-flow-contracts";
 import { resolveStrictPageUserAndProject } from "@/lib/protected-page";
 
@@ -69,7 +71,20 @@ export async function runAutomatedFlowTestAction(formData: FormData) {
     );
   }
 
-  const report = runAutomatedHybridFlowTest(graph.data);
+  const structuralReport = runAutomatedHybridFlowTest(graph.data);
+  const snapshot = version.snapshot as { steps?: RuntimeActionStep[] };
+  const behavioralReport = runBehavioralHybridFlowTest(snapshot.steps ?? []);
+  const report = {
+    ...structuralReport,
+    behavioral: behavioralReport,
+    errors: [...structuralReport.errors, ...behavioralReport.errors],
+    status:
+      structuralReport.status === "passed" &&
+      behavioralReport.status === "passed"
+        ? ("passed" as const)
+        : ("failed" as const),
+    warnings: [...structuralReport.warnings, ...behavioralReport.warnings],
+  };
   await writeAuditLog({
     ...context,
     action: AUTOMATED_FLOW_TEST_AUDIT_ACTION,

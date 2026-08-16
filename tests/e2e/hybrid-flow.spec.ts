@@ -10,6 +10,7 @@ import {
   getActionStartControlText,
   isExactActionTrigger,
   type RuntimeAction,
+  type RuntimeActionStep,
 } from "../../src/lib/action-runtime";
 import { buildChannelFlowResumeReplies } from "../../src/lib/channel-flow-runtime";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../../src/lib/conversation-contracts";
 import type { SelectActionSubmission } from "../../src/lib/db-schema";
 import { runAutomatedHybridFlowTest } from "../../src/lib/hybrid-flow-automated-test";
+import { runBehavioralHybridFlowTest } from "../../src/lib/hybrid-flow-behavioral-test";
 import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
 import {
   compiledHybridFlowGraphV1Schema,
@@ -525,6 +527,98 @@ test("automated flow test records reachable route cycles", () => {
 
   expect(report.status).toBe("failed");
   expect(report.errors).toContain("A reachable route cycle was detected.");
+});
+
+function createRuntimeInputStep(
+  id: number,
+  stepType: string,
+  input: Partial<RuntimeActionStep> = {},
+): RuntimeActionStep {
+  return {
+    fieldKey: `field${id}`,
+    id,
+    inputType: null,
+    isEnabled: true,
+    isRequired: true,
+    label: `Input ${id}`,
+    nextStepId: null,
+    operationId: null,
+    options: [],
+    prompt: null,
+    settings: {},
+    sortOrder: id,
+    stepType,
+    ...input,
+  };
+}
+
+test("behavioral flow test exercises production validators for core inputs", () => {
+  const report = runBehavioralHybridFlowTest([
+    createRuntimeInputStep(1, "collect_input", {
+      fieldKey: "customerName",
+      inputType: "text",
+      label: "Full name",
+    }),
+    createRuntimeInputStep(2, "email", { label: "Email address" }),
+    createRuntimeInputStep(3, "phone", { label: "Phone number" }),
+    createRuntimeInputStep(4, "collect_input", {
+      inputType: "int",
+      label: "Number of guests",
+      settings: { validationMaxNumber: 8, validationMinNumber: 1 },
+    }),
+    createRuntimeInputStep(5, "date", { label: "Visit date" }),
+    createRuntimeInputStep(6, "time", { label: "Visit time" }),
+    createRuntimeInputStep(7, "boolean", { label: "Email updates" }),
+    createRuntimeInputStep(8, "date_range", { label: "Travel dates" }),
+    createRuntimeInputStep(9, "address", { label: "Contact address" }),
+    createRuntimeInputStep(10, "location", { label: "Location" }),
+  ]);
+
+  expect(report).toMatchObject({
+    casesFailed: 0,
+    errors: [],
+    skippedSteps: [],
+    status: "passed",
+    stepsConsidered: 10,
+    stepsTested: 10,
+  });
+  expect(report.cases).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        actualValid: false,
+        caseType: "invalid",
+        stepLabel: "Email address",
+      }),
+      expect.objectContaining({
+        actualValid: false,
+        input: "12345",
+        stepLabel: "Full name",
+      }),
+      expect.objectContaining({
+        actualValid: true,
+        caseType: "option",
+        stepLabel: "Email updates",
+      }),
+    ]),
+  );
+});
+
+test("behavioral flow test records unsupported live-object inputs", () => {
+  const report = runBehavioralHybridFlowTest([
+    createRuntimeInputStep(1, "file_upload", { label: "Attachment" }),
+    createRuntimeInputStep(2, "product_selection", { label: "Product" }),
+  ]);
+
+  expect(report).toMatchObject({
+    casesRun: 0,
+    skippedSteps: [
+      expect.objectContaining({ stepLabel: "Attachment" }),
+      expect.objectContaining({ stepLabel: "Product" }),
+    ],
+    status: "passed",
+    stepsConsidered: 2,
+    stepsTested: 0,
+  });
 });
 
 test("compiler accepts a terminal business-task channel wrapper", () => {

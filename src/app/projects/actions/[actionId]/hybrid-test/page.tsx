@@ -129,8 +129,9 @@ export default async function HybridFlowTestPage({
                   Automated Flow Test
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Check every published entry, node, route, and finish path
-                  without creating conversations, submissions, or tool attempts.
+                  Check every published entry, node, route, finish path, and
+                  supported core input without creating conversations,
+                  submissions, tool attempts, or model calls.
                 </p>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -151,8 +152,8 @@ export default async function HybridFlowTestPage({
                       Published version v{version.versionNumber}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Structural coverage runs against the immutable published
-                      graph.
+                      Structural and core input checks run against the immutable
+                      published version.
                     </p>
                   </div>
                   <form action={runAutomatedFlowTestAction}>
@@ -218,6 +219,9 @@ export default async function HybridFlowTestPage({
                                   {report.entriesTested} entries ·{" "}
                                   {report.nodesTested} nodes ·{" "}
                                   {report.routesTested} routes
+                                  {report.behavioral
+                                    ? ` · ${report.behavioral.casesRun} input cases`
+                                    : ""}
                                 </p>
                               </div>
 
@@ -247,6 +251,63 @@ export default async function HybridFlowTestPage({
                                   ))}
                                 </ul>
                               </details>
+
+                              {report.behavioral && (
+                                <details className="mt-3 text-sm">
+                                  <summary className="cursor-pointer font-medium">
+                                    View core input behavior
+                                  </summary>
+                                  <div className="mt-2 space-y-3 rounded-md border p-3">
+                                    <p>
+                                      <span className="font-medium">
+                                        {report.behavioral.casesPassed} passed
+                                      </span>
+                                      {" · "}
+                                      {report.behavioral.casesFailed} failed
+                                      {" · "}
+                                      {report.behavioral.stepsTested} of{" "}
+                                      {report.behavioral.stepsConsidered} input
+                                      blocks tested
+                                    </p>
+                                    {report.behavioral.skippedSteps.length >
+                                      0 && (
+                                      <div>
+                                        <p className="font-medium">
+                                          Needs a later test milestone
+                                        </p>
+                                        <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                                          {report.behavioral.skippedSteps.map(
+                                            (step) => (
+                                              <li key={step.stepId}>
+                                                {step.stepLabel}: {step.reason}
+                                              </li>
+                                            ),
+                                          )}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    <ul className="space-y-1">
+                                      {report.behavioral.cases.map(
+                                        (testCase, caseIndex) => (
+                                          <li
+                                            key={`${testCase.stepId}-${testCase.caseType}-${caseIndex}`}
+                                            className={
+                                              testCase.status === "passed"
+                                                ? "text-muted-foreground"
+                                                : "text-red-700"
+                                            }
+                                          >
+                                            <span className="font-medium text-foreground">
+                                              {testCase.stepLabel}
+                                            </span>
+                                            : {testCase.detail}
+                                          </li>
+                                        ),
+                                      )}
+                                    </ul>
+                                  </div>
+                                </details>
+                              )}
                             </li>
                           );
                         },

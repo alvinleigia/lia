@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { behavioralFlowTestReportV1Schema } from "@/lib/hybrid-flow-behavioral-test";
 import type {
   CompiledHybridFlowGraphV1,
   HybridFlowNodeV1,
@@ -16,6 +17,7 @@ const automatedFlowTestCheckV1Schema = z.object({
 });
 
 export const automatedFlowTestReportV1Schema = z.object({
+  behavioral: behavioralFlowTestReportV1Schema.optional(),
   checks: z.array(automatedFlowTestCheckV1Schema),
   entriesTested: z.number().int().nonnegative(),
   errors: z.array(z.string()),
