@@ -18,6 +18,7 @@ import {
   getActionStartControlText,
   getActionStepChoiceDisplayMode,
   getActionStepOptions,
+  getFlowEditSectionOptions,
   getRunnableActionSteps,
   isActionInputStep,
   type RuntimeAction,
@@ -104,6 +105,9 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
       ? getRunnableActionSteps(activeAction)[activeFlow.stepIndex]
       : null;
   const isConfirmingFlow = activeFlow?.mode === "confirming";
+  const flowEditSectionOptions = activeAction
+    ? getFlowEditSectionOptions(activeAction)
+    : [];
   const activeStepHasOptions = activeStep
     ? isActionInputStep(activeStep) &&
       getActionStepChoiceDisplayMode(activeStep) !== "text" &&
@@ -617,41 +621,16 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
               >
                 Confirm Request
               </button>
-              <button
-                type="button"
-                className="rounded-full border bg-white px-3 py-1.5 text-sm hover:bg-gray-100"
-                onClick={() => editActiveFlowSection("service")}
-              >
-                Edit Service
-              </button>
-              <button
-                type="button"
-                className="rounded-full border bg-white px-3 py-1.5 text-sm hover:bg-gray-100"
-                onClick={() => editActiveFlowSection("schedule")}
-              >
-                Edit Schedule
-              </button>
-              <button
-                type="button"
-                className="rounded-full border bg-white px-3 py-1.5 text-sm hover:bg-gray-100"
-                onClick={() => editActiveFlowSection("name")}
-              >
-                Edit Name
-              </button>
-              <button
-                type="button"
-                className="rounded-full border bg-white px-3 py-1.5 text-sm hover:bg-gray-100"
-                onClick={() => editActiveFlowSection("email")}
-              >
-                Edit Email
-              </button>
-              <button
-                type="button"
-                className="rounded-full border bg-white px-3 py-1.5 text-sm hover:bg-gray-100"
-                onClick={() => editActiveFlowSection("phone")}
-              >
-                Edit Phone
-              </button>
+              {flowEditSectionOptions.map((option) => (
+                <button
+                  type="button"
+                  className="rounded-full border bg-white px-3 py-1.5 text-sm hover:bg-gray-100"
+                  key={option.section}
+                  onClick={() => editActiveFlowSection(option.section)}
+                >
+                  {option.label}
+                </button>
+              ))}
               <button
                 type="button"
                 className="rounded-full border bg-white px-3 py-1.5 text-sm hover:bg-gray-100"

@@ -8,6 +8,7 @@ import {
 } from "../../src/lib/action-flow-compiler";
 import { buildStoredActionOptionRoute } from "../../src/lib/action-option-routing";
 import {
+  getFlowEditSectionOptions,
   getNextActionStepDecision,
   type RuntimeAction,
 } from "../../src/lib/action-runtime";
@@ -74,6 +75,68 @@ test("bundled templates do not place steps after a terminal confirmation", () =>
       template.name,
     ).toEqual([]);
   }
+});
+
+test("confirmation edit options only include fields collected by the action", () => {
+  const createAction = (fieldKeys: string[]): RuntimeAction => ({
+    branchRules: [],
+    description: null,
+    id: 1,
+    name: "Test action",
+    steps: fieldKeys.map((fieldKey, index) => ({
+      fieldKey,
+      id: index + 1,
+      inputType: "text",
+      isEnabled: true,
+      isRequired: true,
+      label: fieldKey,
+      nextStepId: null,
+      operationId: null,
+      options: [],
+      prompt: fieldKey,
+      settings: {},
+      sortOrder: index + 1,
+      stepType: "collect_input",
+    })),
+    triggerPhrases: [],
+    versionId: 1,
+    versionNumber: 1,
+  });
+
+  expect(
+    getFlowEditSectionOptions(
+      createAction([
+        "issueCategory",
+        "priority",
+        "issueDescription",
+        "customerName",
+        "customerEmail",
+      ]),
+    ),
+  ).toEqual([
+    { label: "Edit Name", section: "name" },
+    { label: "Edit Email", section: "email" },
+  ]);
+
+  expect(
+    getFlowEditSectionOptions(
+      createAction([
+        "serviceCategoryId",
+        "serviceItemId",
+        "preferredDate",
+        "preferredTime",
+        "guestName",
+        "guestEmail",
+        "guestPhone",
+      ]),
+    ),
+  ).toEqual([
+    { label: "Edit Service", section: "service" },
+    { label: "Edit Schedule", section: "schedule" },
+    { label: "Edit Name", section: "name" },
+    { label: "Edit Email", section: "email" },
+    { label: "Edit Phone", section: "phone" },
+  ]);
 });
 
 test("compiler mirrors ordered runtime flow and terminal boundaries", () => {

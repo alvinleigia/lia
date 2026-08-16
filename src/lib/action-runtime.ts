@@ -170,6 +170,45 @@ export type FlowEditSection =
   | "phone"
   | "all";
 
+const FLOW_EDIT_SECTION_OPTIONS: {
+  fieldKeys: string[];
+  label: string;
+  section: Exclude<FlowEditSection, "all">;
+}[] = [
+  {
+    fieldKeys: ["serviceCategoryId", "serviceItemId"],
+    label: "Edit Service",
+    section: "service",
+  },
+  {
+    fieldKeys: ["preferredDate", "preferredTime", "time"],
+    label: "Edit Schedule",
+    section: "schedule",
+  },
+  {
+    fieldKeys: ["guestName", "name", "customerName", "clientName"],
+    label: "Edit Name",
+    section: "name",
+  },
+  {
+    fieldKeys: ["guestEmail", "email", "customerEmail", "clientEmail"],
+    label: "Edit Email",
+    section: "email",
+  },
+  {
+    fieldKeys: ["guestPhone", "phone", "customerPhone", "clientPhone"],
+    label: "Edit Phone",
+    section: "phone",
+  },
+];
+
+function getFlowEditSectionFieldKeys(section: Exclude<FlowEditSection, "all">) {
+  return (
+    FLOW_EDIT_SECTION_OPTIONS.find((option) => option.section === section)
+      ?.fieldKeys ?? []
+  );
+}
+
 export function normalizeActionText(value: string) {
   return value.trim().toLowerCase();
 }
@@ -2069,6 +2108,18 @@ function getCollectibleActionSteps(action: RuntimeAction) {
   return action.steps.filter(isActionInputStep);
 }
 
+export function getFlowEditSectionOptions(action: RuntimeAction) {
+  const fieldKeys = new Set(
+    getCollectibleActionSteps(action)
+      .map((step) => step.fieldKey)
+      .filter((fieldKey): fieldKey is string => Boolean(fieldKey)),
+  );
+
+  return FLOW_EDIT_SECTION_OPTIONS.filter((option) =>
+    option.fieldKeys.some((fieldKey) => fieldKeys.has(fieldKey)),
+  ).map(({ label, section }) => ({ label, section }));
+}
+
 function clearFields(fields: Record<string, unknown>, keysToClear: string[]) {
   return Object.fromEntries(
     Object.entries(fields).filter(([key]) => !keysToClear.includes(key)),
@@ -2091,23 +2142,23 @@ export function prepareFlowSectionEdit(
       clearKeys: Object.keys(flow.fields),
     },
     email: {
-      fieldKeys: ["guestEmail", "email", "customerEmail", "clientEmail"],
-      clearKeys: ["guestEmail", "email", "customerEmail", "clientEmail"],
+      fieldKeys: getFlowEditSectionFieldKeys("email"),
+      clearKeys: getFlowEditSectionFieldKeys("email"),
     },
     name: {
-      fieldKeys: ["guestName", "name", "customerName", "clientName"],
-      clearKeys: ["guestName", "name", "customerName", "clientName"],
+      fieldKeys: getFlowEditSectionFieldKeys("name"),
+      clearKeys: getFlowEditSectionFieldKeys("name"),
     },
     phone: {
-      fieldKeys: ["guestPhone", "phone", "customerPhone", "clientPhone"],
-      clearKeys: ["guestPhone", "phone", "customerPhone", "clientPhone"],
+      fieldKeys: getFlowEditSectionFieldKeys("phone"),
+      clearKeys: getFlowEditSectionFieldKeys("phone"),
     },
     schedule: {
-      fieldKeys: ["preferredDate", "preferredTime", "time"],
-      clearKeys: ["preferredDate", "preferredTime", "time"],
+      fieldKeys: getFlowEditSectionFieldKeys("schedule"),
+      clearKeys: getFlowEditSectionFieldKeys("schedule"),
     },
     service: {
-      fieldKeys: ["serviceCategoryId", "serviceItemId"],
+      fieldKeys: getFlowEditSectionFieldKeys("service"),
       clearKeys: [
         "serviceCategoryId",
         "serviceCategoryName",
