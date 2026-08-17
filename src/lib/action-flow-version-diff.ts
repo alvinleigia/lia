@@ -142,6 +142,16 @@ function stableJson(value: unknown) {
   return JSON.stringify(sortJsonValue(value));
 }
 
+function normalizeStepSettingsForCompare(settings: unknown) {
+  if (!isRecord(settings)) {
+    return {};
+  }
+
+  const runtimeSettings = { ...settings };
+  delete runtimeSettings.canvasPosition;
+  return runtimeSettings;
+}
+
 function normalizeActionForCompare(action: ProjectAction) {
   return {
     description: action.description,
@@ -185,7 +195,7 @@ function normalizeStepsForCompare(steps: ActionFlowSteps) {
       operationId: step.operationId,
       options: step.options,
       prompt: step.prompt,
-      settings: step.settings,
+      settings: normalizeStepSettingsForCompare(step.settings),
       sortOrder: step.sortOrder,
       stepType: step.stepType,
     }))
@@ -211,7 +221,7 @@ function normalizeSnapshotStepsForCompare(snapshot: Record<string, unknown>) {
         typeof step.operationId === "number" ? step.operationId : null,
       options: Array.isArray(step.options) ? step.options : [],
       prompt: typeof step.prompt === "string" ? step.prompt : null,
-      settings: isRecord(step.settings) ? step.settings : {},
+      settings: normalizeStepSettingsForCompare(step.settings),
       sortOrder: typeof step.sortOrder === "number" ? step.sortOrder : 0,
       stepType: typeof step.stepType === "string" ? step.stepType : "",
     }))
