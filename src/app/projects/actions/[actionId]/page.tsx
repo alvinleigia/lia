@@ -209,6 +209,10 @@ export default async function ActionDetailPage({
     publishedSnapshot: currentPublishedVersion?.snapshot,
     steps,
   });
+  const hasUnpublishedChanges = Boolean(draftRuntimeChanges?.hasChanges);
+  const publishDisabled =
+    readinessIssues.length > 0 ||
+    Boolean(currentPublishedVersion && !hasUnpublishedChanges);
   const analytics = await getActionFlowAnalytics({
     actionId: action.id,
     projectId: project.id,
@@ -239,9 +243,13 @@ export default async function ActionDetailPage({
                 <form action={publishProjectActionVersionAction}>
                   <input type="hidden" name="actionId" value={action.id} />
                   <FormSubmitButton
-                    label="Publish"
+                    label={
+                      currentPublishedVersion && hasUnpublishedChanges
+                        ? "Publish changes"
+                        : "Publish"
+                    }
                     pendingLabel="Publishing..."
-                    disabled={readinessIssues.length > 0}
+                    disabled={publishDisabled}
                     icon={<Send className="h-4 w-4" />}
                   />
                 </form>
