@@ -5,6 +5,7 @@ import {
   needsExplicitPublishTerminalStep,
 } from "../../src/lib/action-flow-compiler";
 import { getProjectActionStatusAfterPublish } from "../../src/lib/action-flow-constants";
+import type { ActionFlowVersionSnapshot } from "../../src/lib/action-flows";
 import {
   findActionForTaskRecommendation,
   getActionStartControlText,
@@ -25,6 +26,7 @@ import {
 import type { SelectActionSubmission } from "../../src/lib/db-schema";
 import { runAutomatedHybridFlowTest } from "../../src/lib/hybrid-flow-automated-test";
 import { runBehavioralHybridFlowTest } from "../../src/lib/hybrid-flow-behavioral-test";
+import { runCombinationHybridFlowTest } from "../../src/lib/hybrid-flow-combination-test";
 import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
 import {
   compiledHybridFlowGraphV1Schema,
@@ -429,6 +431,166 @@ test("automated flow test covers every published node and route", () => {
     routesTested: graph.transitions.length,
     status: "passed",
   });
+});
+
+test("combination flow test covers published task outcomes without side effects", () => {
+  const graph = compileHybridFlowGraph({ branchRules, steps }).graph;
+  const snapshot: ActionFlowVersionSnapshot = {
+    action: {
+      description: "Combination test action",
+      id: 1,
+      name: "Combination test action",
+      settings: {},
+      status: "active",
+      triggerPhrases: ["test combinations"],
+    },
+    branchRules: [],
+    hybridGraph: graph,
+    publishedAt: "2030-06-15T00:00:00.000Z",
+    schemaVersion: 1,
+    steps: steps.map((step) => ({
+      ...step,
+      isRequired: false,
+      label: `Step ${step.id}`,
+      operationId: null,
+      options: [],
+      prompt: null,
+    })),
+  };
+
+  const report = runCombinationHybridFlowTest({
+    graph,
+    snapshot,
+    versionId: 1,
+    versionNumber: 1,
+  });
+
+  expect(report).toMatchObject({
+    branchesTested: 0,
+    casesFailed: 0,
+    routesTested: graph.transitions.length,
+    sideEffectsSuppressed: true,
+    status: "passed",
+  });
+  expect(report.cases).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        group: "route",
+        label: "Task outcome: cancelled",
+        status: "passed",
+      }),
+      expect.objectContaining({
+        group: "route",
+        label: "Task outcome: completed",
+        status: "passed",
+      }),
+      expect.objectContaining({ group: "submit", status: "passed" }),
+    ]),
+  );
+});
+
+test("combination flow test exercises branch, confirmation, and handoff contracts", () => {
+  const lifecycleSteps: ActionFlowVersionSnapshot["steps"] = [
+    {
+      fieldKey: "priority",
+      id: 101,
+      inputType: "text",
+      isEnabled: true,
+      isRequired: true,
+      label: "Priority",
+      nextStepId: 103,
+      operationId: null,
+      options: [],
+      prompt: "What is the priority?",
+      settings: {},
+      sortOrder: 1,
+      stepType: "collect_input",
+    },
+    {
+      fieldKey: null,
+      id: 102,
+      inputType: null,
+      isEnabled: true,
+      isRequired: false,
+      label: "Human handoff",
+      nextStepId: null,
+      operationId: null,
+      options: [],
+      prompt: "A person will help.",
+      settings: { handoff: { priority: "high", queue: "support" } },
+      sortOrder: 2,
+      stepType: "handoff",
+    },
+    {
+      fieldKey: null,
+      id: 103,
+      inputType: null,
+      isEnabled: true,
+      isRequired: false,
+      label: "Review request",
+      nextStepId: null,
+      operationId: null,
+      options: [],
+      prompt: "Review and confirm.",
+      settings: {},
+      sortOrder: 3,
+      stepType: "confirmation",
+    },
+  ];
+  const lifecycleBranchRules: ActionFlowVersionSnapshot["branchRules"] = [
+    {
+      comparisonValue: "urgent",
+      id: 201,
+      isEnabled: true,
+      operator: "equals",
+      settings: {},
+      sortOrder: 1,
+      sourceFieldKey: "priority",
+      sourceStepId: 101,
+      targetStepId: 102,
+    },
+  ];
+  const graph = compileHybridFlowGraph({
+    branchRules: lifecycleBranchRules,
+    steps: lifecycleSteps,
+  }).graph;
+  const snapshot: ActionFlowVersionSnapshot = {
+    action: {
+      description: "Lifecycle combination test",
+      id: 2,
+      name: "Lifecycle combination test",
+      settings: {},
+      status: "active",
+      triggerPhrases: ["test lifecycle"],
+    },
+    branchRules: lifecycleBranchRules,
+    hybridGraph: graph,
+    publishedAt: "2030-06-15T00:00:00.000Z",
+    schemaVersion: 1,
+    steps: lifecycleSteps,
+  };
+
+  const report = runCombinationHybridFlowTest({
+    graph,
+    snapshot,
+    versionId: 2,
+    versionNumber: 1,
+  });
+
+  expect(report).toMatchObject({
+    branchesTested: 1,
+    casesFailed: 0,
+    lifecycleStepsTested: 2,
+    sideEffectsSuppressed: true,
+    status: "passed",
+  });
+  expect(report.cases).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ group: "branch", status: "passed" }),
+      expect.objectContaining({ group: "confirmation", status: "passed" }),
+      expect.objectContaining({ group: "handoff", status: "passed" }),
+    ]),
+  );
 });
 
 test("automated flow test records invalid references and unreachable nodes", () => {

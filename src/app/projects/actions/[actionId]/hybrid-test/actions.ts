@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { getActionFlowVersion, getProjectAction } from "@/lib/action-flows";
-import type { RuntimeActionStep } from "@/lib/action-runtime";
+import {
+  type ActionFlowVersionSnapshot,
+  getActionFlowVersion,
+  getProjectAction,
+} from "@/lib/action-flows";
 import { writeAuditLog } from "@/lib/audit";
 import {
   AUTOMATED_FLOW_TEST_AUDIT_ACTION,
@@ -12,6 +15,7 @@ import {
   runAutomatedHybridFlowTest,
 } from "@/lib/hybrid-flow-automated-test";
 import { runBehavioralHybridFlowTest } from "@/lib/hybrid-flow-behavioral-test";
+import { runCombinationHybridFlowTest } from "@/lib/hybrid-flow-combination-test";
 import { compiledHybridFlowGraphV1Schema } from "@/lib/hybrid-flow-contracts";
 import { runResourceBackedHybridFlowTest } from "@/lib/hybrid-flow-resource-test";
 import { resolveStrictPageUserAndProject } from "@/lib/protected-page";
@@ -73,27 +77,37 @@ export async function runAutomatedFlowTestAction(formData: FormData) {
   }
 
   const structuralReport = runAutomatedHybridFlowTest(graph.data);
-  const snapshot = version.snapshot as { steps?: RuntimeActionStep[] };
+  const snapshot = version.snapshot as ActionFlowVersionSnapshot;
   const behavioralReport = runBehavioralHybridFlowTest(snapshot.steps ?? []);
+  const combinationReport = runCombinationHybridFlowTest({
+    graph: graph.data,
+    snapshot,
+    versionId: version.id,
+    versionNumber: version.versionNumber,
+  });
   const resourceReport = runResourceBackedHybridFlowTest(snapshot.steps ?? []);
   const report = {
     ...structuralReport,
     behavioral: behavioralReport,
+    combinations: combinationReport,
     errors: [
       ...structuralReport.errors,
       ...behavioralReport.errors,
+      ...combinationReport.errors,
       ...resourceReport.errors,
     ],
     resources: resourceReport,
     status:
       structuralReport.status === "passed" &&
       behavioralReport.status === "passed" &&
+      combinationReport.status === "passed" &&
       resourceReport.status === "passed"
         ? ("passed" as const)
         : ("failed" as const),
     warnings: [
       ...structuralReport.warnings,
       ...behavioralReport.warnings,
+      ...combinationReport.warnings,
       ...resourceReport.warnings,
     ],
   };

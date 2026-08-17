@@ -152,8 +152,9 @@ export default async function HybridFlowTestPage({
                       Published version v{version.versionNumber}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Structural, core input, and resource-backed checks run
-                      against the immutable published version.
+                      Structural, core input, route combination, lifecycle, and
+                      resource-backed checks run against the immutable published
+                      version.
                     </p>
                   </div>
                   <form action={runAutomatedFlowTestAction}>
@@ -221,6 +222,9 @@ export default async function HybridFlowTestPage({
                                   {report.routesTested} routes
                                   {report.behavioral
                                     ? ` · ${report.behavioral.casesRun} input cases`
+                                    : ""}
+                                  {report.combinations
+                                    ? ` · ${report.combinations.casesRun} combination cases`
                                     : ""}
                                   {report.resources
                                     ? ` · ${report.resources.checks.length} resource checks`
@@ -302,6 +306,55 @@ export default async function HybridFlowTestPage({
                                           >
                                             <span className="font-medium text-foreground">
                                               {testCase.stepLabel}
+                                            </span>
+                                            : {testCase.detail}
+                                          </li>
+                                        ),
+                                      )}
+                                    </ul>
+                                  </div>
+                                </details>
+                              )}
+
+                              {report.combinations && (
+                                <details className="mt-3 text-sm">
+                                  <summary className="cursor-pointer font-medium">
+                                    View route and lifecycle combinations
+                                  </summary>
+                                  <div className="mt-2 space-y-3 rounded-md border p-3">
+                                    <p>
+                                      <span className="font-medium">
+                                        {report.combinations.casesPassed} passed
+                                      </span>
+                                      {" · "}
+                                      {report.combinations.casesFailed} failed
+                                      {" · "}
+                                      {report.combinations.branchesTested}{" "}
+                                      branches
+                                      {" · "}
+                                      {report.combinations.routesTested} routes
+                                      {" · "}
+                                      {report.combinations.lifecycleStepsTested}{" "}
+                                      lifecycle steps
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                      Live conversations, submissions, handoffs,
+                                      connected flows, model calls, and provider
+                                      operations were suppressed.
+                                    </p>
+                                    <ul className="space-y-1">
+                                      {report.combinations.cases.map(
+                                        (testCase) => (
+                                          <li
+                                            key={testCase.key}
+                                            className={
+                                              testCase.status === "passed"
+                                                ? "text-muted-foreground"
+                                                : "text-red-700"
+                                            }
+                                          >
+                                            <span className="font-medium text-foreground">
+                                              {testCase.label}
                                             </span>
                                             : {testCase.detail}
                                           </li>
