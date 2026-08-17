@@ -115,7 +115,6 @@ export function ActionFlowCanvas({
   operations,
   productCatalogs,
   projectActions,
-  publishReadinessIssues,
   routeIssues,
   steps,
   taskOptions,
@@ -393,20 +392,37 @@ export function ActionFlowCanvas({
     [actionId, runDialogMutation],
   );
 
-  const saveLayout = useCallback(() => {
-    runMutation(
-      () =>
-        saveCanvasStepPositionsAction({
-          actionId,
-          positions: nodes.map((node) => ({
-            stepId: Number(node.id),
-            x: node.position.x,
-            y: node.position.y,
-          })),
-        }),
-      () => setHasUnsavedLayout(false),
-    );
-  }, [actionId, nodes, runMutation]);
+  const saveLayout = useCallback(
+    (onSuccess?: () => void) => {
+      runMutation(
+        () =>
+          saveCanvasStepPositionsAction({
+            actionId,
+            positions: nodes.map((node) => ({
+              stepId: Number(node.id),
+              x: node.position.x,
+              y: node.position.y,
+            })),
+          }),
+        () => {
+          setHasUnsavedLayout(false);
+          onSuccess?.();
+        },
+      );
+    },
+    [actionId, nodes, runMutation],
+  );
+
+  const saveLayoutAndGoBack = useCallback(() => {
+    const actionHref = `/projects/actions/${actionId}`;
+
+    if (!hasUnsavedLayout) {
+      router.push(actionHref);
+      return;
+    }
+
+    saveLayout(() => router.push(actionHref));
+  }, [actionId, hasUnsavedLayout, router, saveLayout]);
 
   const saveDefaultRoute = useCallback(
     (sourceStepId: number, targetStepId: number) => {
@@ -506,7 +522,6 @@ export function ActionFlowCanvas({
   return (
     <div className="space-y-3">
       <CanvasToolbar
-        actionId={actionId}
         branchRuleCount={activeBranchRuleCount}
         defaultRouteCount={defaultRouteCount}
         hasUnsavedLayout={hasUnsavedLayout}
@@ -516,7 +531,7 @@ export function ActionFlowCanvas({
           setIsEntryRulesDialogOpen(true);
         }}
         onSaveLayout={saveLayout}
-        publishReadinessIssues={publishReadinessIssues}
+        onSaveLayoutAndGoBack={saveLayoutAndGoBack}
         routeIssueCount={blockingRouteIssueCount}
         routeWarningCount={routeWarningCount}
         stepCount={steps.length}

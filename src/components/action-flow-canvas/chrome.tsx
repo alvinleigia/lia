@@ -1,30 +1,13 @@
 import {
   AlertTriangle,
   CheckCircle2,
-  FileDown,
-  FlaskConical,
   ListTodo,
-  Loader2,
   LogIn,
   Save,
-  Send,
   Wand2,
-  Workflow,
 } from "lucide-react";
 import Link from "next/link";
-import { publishProjectActionVersionAction } from "@/app/projects/actions/actions";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import type { ActionFlowRouteValidationIssue } from "@/lib/action-flows";
 import {
   type FlowComponentDefinition,
@@ -179,26 +162,24 @@ export function FlowComponentPalette({
 }
 
 export function CanvasToolbar({
-  actionId,
   branchRuleCount,
   defaultRouteCount,
   hasUnsavedLayout,
   isPending,
   onSaveLayout,
+  onSaveLayoutAndGoBack,
   onOpenEntryRules,
-  publishReadinessIssues,
   routeIssueCount,
   routeWarningCount,
   stepCount,
 }: {
-  actionId: number;
   branchRuleCount: number;
   defaultRouteCount: number;
   hasUnsavedLayout: boolean;
   isPending: boolean;
   onSaveLayout: () => void;
+  onSaveLayoutAndGoBack: () => void;
   onOpenEntryRules: () => void;
-  publishReadinessIssues: string[];
   routeIssueCount: number;
   routeWarningCount: number;
   stepCount: number;
@@ -251,68 +232,23 @@ export function CanvasToolbar({
             type="button"
             variant="outline"
             disabled={!hasUnsavedLayout || isPending}
-            onClick={onSaveLayout}
+            onClick={() => onSaveLayout()}
           >
-            {isPending && hasUnsavedLayout ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Save Layout
+            <Save className="h-4 w-4" />
+            Save
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={onSaveLayoutAndGoBack}
+          >
+            <Save className="h-4 w-4" />
+            Save &amp; go back
           </Button>
           <Button type="button" variant="outline" onClick={onOpenEntryRules}>
             <LogIn className="h-4 w-4" />
             Entry Rules
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                type="button"
-                disabled={publishReadinessIssues.length > 0}
-                title={publishReadinessIssues[0]}
-              >
-                <Send className="h-4 w-4" />
-                Publish
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Publish this action?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Publishing creates an immutable runtime version from the
-                  current saved flow.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Keep editing</AlertDialogCancel>
-                <form action={publishProjectActionVersionAction}>
-                  <input type="hidden" name="actionId" value={actionId} />
-                  <FormSubmitButton
-                    label="Publish Action"
-                    pendingLabel="Publishing..."
-                    icon={<Send className="h-4 w-4" />}
-                  />
-                </form>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          <Button asChild variant="outline">
-            <Link href={`/projects/actions/${actionId}/hybrid-test`}>
-              <FlaskConical className="h-4 w-4" />
-              Test Flow
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href={`/projects/actions/${actionId}`}>
-              <Workflow className="h-4 w-4" />
-              Overview
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <a download href={`/projects/actions/${actionId}/export`}>
-              <FileDown className="h-4 w-4" />
-              Export
-            </a>
           </Button>
         </div>
       </div>

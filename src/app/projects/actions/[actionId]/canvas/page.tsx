@@ -1,17 +1,14 @@
-import { ArrowLeft, Settings, Workflow } from "lucide-react";
+import { ArrowLeft, Workflow } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionFlowCanvas } from "@/components/action-flow-canvas";
-import { Button } from "@/components/ui/button";
 import {
-  countBlockingActionFlowIssues,
   getProjectAction,
   listActionFlowBranchRules,
   listActionFlowSteps,
   listActiveProjectActions,
   validateActionFlowRoutes,
 } from "@/lib/action-flows";
-import { getActionPublishReadinessIssues } from "@/lib/action-publish-readiness";
 import { listPublishedConversationalTaskOptions } from "@/lib/conversational-tasks";
 import { listProjectMediaAssets } from "@/lib/media-assets";
 import { getOperationOutcomeKeys } from "@/lib/operation-contracts";
@@ -97,11 +94,6 @@ export default async function ActionCanvasPage({
       id: projectAction.id,
       name: projectAction.name,
     }));
-  const publishReadinessIssues = getActionPublishReadinessIssues({
-    routeIssueCount: countBlockingActionFlowIssues(routeIssues),
-    steps,
-  });
-
   return (
     <div className="min-h-screen bg-gray-50 px-3 py-4">
       <div className="mx-auto max-w-none space-y-4">
@@ -113,22 +105,14 @@ export default async function ActionCanvasPage({
           Back to action
         </Link>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <h1 className="flex items-center gap-2 text-2xl font-semibold">
-              <Workflow className="h-6 w-6" />
-              {action.name} Canvas
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Visual flow builder for steps, routing, and validation.
-            </p>
-          </div>
-          <Button asChild variant="outline">
-            <Link href={`/projects/actions/${action.id}/settings`}>
-              <Settings className="h-4 w-4" />
-              Settings
-            </Link>
-          </Button>
+        <div className="space-y-1">
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <Workflow className="h-6 w-6" />
+            {action.name} Canvas
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Visual flow builder for steps, routing, and validation.
+          </p>
         </div>
 
         <ActionFlowCanvas
@@ -140,7 +124,6 @@ export default async function ActionCanvasPage({
           operations={operations}
           productCatalogs={productCatalogs}
           projectActions={projectActions}
-          publishReadinessIssues={publishReadinessIssues}
           routeIssues={routeIssues}
           steps={steps}
           taskOptions={taskOptions}
