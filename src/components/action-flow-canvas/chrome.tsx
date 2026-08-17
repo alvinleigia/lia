@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowLeft,
   CheckCircle2,
   ListTodo,
   LogIn,
@@ -243,8 +244,12 @@ export function CanvasToolbar({
             disabled={isPending}
             onClick={onSaveLayoutAndGoBack}
           >
-            <Save className="h-4 w-4" />
-            Save &amp; go back
+            {hasUnsavedLayout ? (
+              <Save className="h-4 w-4" />
+            ) : (
+              <ArrowLeft className="h-4 w-4" />
+            )}
+            {hasUnsavedLayout ? "Save & go back" : "Back to action"}
           </Button>
           <Button type="button" variant="outline" onClick={onOpenEntryRules}>
             <LogIn className="h-4 w-4" />
