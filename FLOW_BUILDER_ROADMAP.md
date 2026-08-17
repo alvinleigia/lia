@@ -103,7 +103,7 @@ creating its manual staging UAT section in `docs/UAT_TEST_PLAN.md`.
 | 14 | Complete | Passed on staging under the single-tester scope on 2026-08-15; the missing disposable restore environment is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope on 2026-08-16 | None. |
-| 17 | Foundation only; 12 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
+| 17 | Foundation plus deterministic operation fixtures; 11 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
 
 ## Product Direction
@@ -1108,7 +1108,7 @@ flows.
 - [ ] Add a typed reusable-field registry with ownership and compatibility checks.
 - [ ] Add reusable task, field-set, node, and composed-content templates.
 - [ ] Complete template approval, versioning, duplication, and upgrade guidance.
-- [ ] Add deterministic simulation fixtures for success, failure, retry, timeout, and provider responses.
+- [x] Add deterministic simulation fixtures for success, failure, retry, timeout, and provider responses.
 - [ ] Add conversational evaluation datasets for extraction, correction, clarification, safety, and completion.
 - [ ] Add regression thresholds before model or prompt changes are promoted.
 - [ ] Measure task starts, completion, abandonment, correction, validation failure, handoff, and operation success.
@@ -1117,6 +1117,13 @@ flows.
 - [ ] Add draft comparison, published-version diff, and rollback controls.
 - [ ] Add runtime traffic allocation for approved A/B variants.
 - [ ] Add flow and task cloning across projects with safe resource remapping.
+
+The published-flow automated test now synthesizes success, failure, retry,
+timeout, and provider-response operation attempts, classifies them with the
+production outcome contract, and verifies inline outcome routes against the
+immutable published graph. Provider calls, durable jobs, conversations, and
+submissions remain suppressed, and every run is retained in the existing audit
+history.
 
 Phase 17 exit gate: teams can safely reuse, compare, evaluate, measure, and
 optimize versioned conversational automations.

@@ -152,9 +152,9 @@ export default async function HybridFlowTestPage({
                       Published version v{version.versionNumber}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Structural, core input, route combination, lifecycle, and
-                      resource-backed checks run against the immutable published
-                      version.
+                      Structural, core input, route combination, lifecycle,
+                      resource-backed, and operation/provider fixture checks run
+                      against the immutable published version.
                     </p>
                   </div>
                   <form action={runAutomatedFlowTestAction}>
@@ -228,6 +228,9 @@ export default async function HybridFlowTestPage({
                                     : ""}
                                   {report.resources
                                     ? ` · ${report.resources.checks.length} resource checks`
+                                    : ""}
+                                  {report.operations
+                                    ? ` · ${report.operations.casesRun} operation fixtures`
                                     : ""}
                                 </p>
                               </div>
@@ -412,6 +415,66 @@ export default async function HybridFlowTestPage({
                                           : {check.detail}
                                         </li>
                                       ))}
+                                    </ul>
+                                  </div>
+                                </details>
+                              )}
+
+                              {report.operations && (
+                                <details className="mt-3 text-sm">
+                                  <summary className="cursor-pointer font-medium">
+                                    View operation and provider fixtures
+                                  </summary>
+                                  <div className="mt-2 space-y-3 rounded-md border p-3">
+                                    <p>
+                                      <span className="font-medium">
+                                        {report.operations.casesPassed} passed
+                                      </span>
+                                      {" · "}
+                                      {report.operations.casesFailed} failed
+                                      {" · "}
+                                      {report.operations.stepsTested} of{" "}
+                                      {report.operations.stepsConsidered}{" "}
+                                      operation blocks tested
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                      Success, failure, retry, timeout, and
+                                      provider-response attempts used production
+                                      outcome and route selection. Provider
+                                      calls, durable jobs, submissions, and
+                                      conversations were suppressed.
+                                    </p>
+                                    {report.operations.warnings.length > 0 && (
+                                      <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                                        {report.operations.warnings.map(
+                                          (warning) => (
+                                            <li key={warning}>{warning}</li>
+                                          ),
+                                        )}
+                                      </ul>
+                                    )}
+                                    <ul className="space-y-1">
+                                      {report.operations.cases.map(
+                                        (testCase) => (
+                                          <li
+                                            key={testCase.key}
+                                            className={
+                                              testCase.status === "passed"
+                                                ? "text-muted-foreground"
+                                                : "text-red-700"
+                                            }
+                                          >
+                                            <span className="font-medium text-foreground">
+                                              {testCase.stepLabel} ·{" "}
+                                              {testCase.fixture.replaceAll(
+                                                "_",
+                                                " ",
+                                              )}
+                                            </span>
+                                            : {testCase.detail}
+                                          </li>
+                                        ),
+                                      )}
                                     </ul>
                                   </div>
                                 </details>

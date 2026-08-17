@@ -5,6 +5,7 @@ import type {
   CompiledHybridFlowGraphV1,
   HybridFlowNodeV1,
 } from "@/lib/hybrid-flow-contracts";
+import { operationFlowTestReportV1Schema } from "@/lib/hybrid-flow-operation-test";
 import { resourceFlowTestReportV1Schema } from "@/lib/hybrid-flow-resource-test";
 
 export const AUTOMATED_FLOW_TEST_AUDIT_ACTION =
@@ -26,6 +27,7 @@ export const automatedFlowTestReportV1Schema = z.object({
   errors: z.array(z.string()),
   maximumDepth: z.number().int().nonnegative(),
   nodesTested: z.number().int().nonnegative(),
+  operations: operationFlowTestReportV1Schema.optional(),
   resources: resourceFlowTestReportV1Schema.optional(),
   routesTested: z.number().int().nonnegative(),
   schemaVersion: z.literal(1),

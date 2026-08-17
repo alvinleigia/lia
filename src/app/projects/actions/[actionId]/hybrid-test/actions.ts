@@ -17,6 +17,7 @@ import {
 import { runBehavioralHybridFlowTest } from "@/lib/hybrid-flow-behavioral-test";
 import { runCombinationHybridFlowTest } from "@/lib/hybrid-flow-combination-test";
 import { compiledHybridFlowGraphV1Schema } from "@/lib/hybrid-flow-contracts";
+import { runOperationHybridFlowTest } from "@/lib/hybrid-flow-operation-test";
 import { runResourceBackedHybridFlowTest } from "@/lib/hybrid-flow-resource-test";
 import { resolveStrictPageUserAndProject } from "@/lib/protected-page";
 
@@ -86,6 +87,12 @@ export async function runAutomatedFlowTestAction(formData: FormData) {
     versionNumber: version.versionNumber,
   });
   const resourceReport = runResourceBackedHybridFlowTest(snapshot.steps ?? []);
+  const operationReport = runOperationHybridFlowTest({
+    graph: graph.data,
+    snapshot,
+    versionId: version.id,
+    versionNumber: version.versionNumber,
+  });
   const report = {
     ...structuralReport,
     behavioral: behavioralReport,
@@ -95,13 +102,16 @@ export async function runAutomatedFlowTestAction(formData: FormData) {
       ...behavioralReport.errors,
       ...combinationReport.errors,
       ...resourceReport.errors,
+      ...operationReport.errors,
     ],
+    operations: operationReport,
     resources: resourceReport,
     status:
       structuralReport.status === "passed" &&
       behavioralReport.status === "passed" &&
       combinationReport.status === "passed" &&
-      resourceReport.status === "passed"
+      resourceReport.status === "passed" &&
+      operationReport.status === "passed"
         ? ("passed" as const)
         : ("failed" as const),
     warnings: [
@@ -109,6 +119,7 @@ export async function runAutomatedFlowTestAction(formData: FormData) {
       ...behavioralReport.warnings,
       ...combinationReport.warnings,
       ...resourceReport.warnings,
+      ...operationReport.warnings,
     ],
   };
   await writeAuditLog({

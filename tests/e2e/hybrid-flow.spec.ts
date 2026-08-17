@@ -35,6 +35,7 @@ import {
   parseHybridGraphTaskReturnTarget,
   taskSuspensionReturnTargetV1Schema,
 } from "../../src/lib/hybrid-flow-contracts";
+import { runOperationHybridFlowTest } from "../../src/lib/hybrid-flow-operation-test";
 import { runResourceBackedHybridFlowTest } from "../../src/lib/hybrid-flow-resource-test";
 import {
   bindRequestedTaskSelection,
@@ -954,6 +955,107 @@ test("compiler accepts a terminal business-task channel wrapper", () => {
       }),
     ),
   );
+});
+
+test("automated operation fixtures classify and route published provider outcomes", () => {
+  const operationSteps: ActionFlowVersionSnapshot["steps"] = [
+    {
+      fieldKey: "ticketStatus",
+      id: 101,
+      inputType: null,
+      isEnabled: true,
+      isRequired: false,
+      label: "Create external ticket",
+      nextStepId: 102,
+      operationId: 40,
+      options: [],
+      prompt: null,
+      settings: { operationExecutionMode: "inline" },
+      sortOrder: 1,
+      stepType: "operation",
+    },
+    ...[102, 103, 104, 105].map((id, index) => ({
+      fieldKey: null,
+      id,
+      inputType: null,
+      isEnabled: true,
+      isRequired: false,
+      label: `Finish ${index + 1}`,
+      nextStepId: null,
+      operationId: null,
+      options: [],
+      prompt: null,
+      settings: {},
+      sortOrder: index + 2,
+      stepType: "submit",
+    })),
+  ];
+  const outcomes = [
+    [201, "success", 102],
+    [202, "server_error", 103],
+    [203, "timeout", 104],
+    [204, "status_409", 105],
+  ] as const;
+  const operationRules: ActionFlowVersionSnapshot["branchRules"] = outcomes.map(
+    ([id, outcome, targetStepId], index) => ({
+      comparisonValue: outcome,
+      id,
+      isEnabled: true,
+      operator: "equals",
+      settings: { operationOutcomeRoute: outcome },
+      sortOrder: index + 1,
+      sourceFieldKey: "ticketStatus_outcome",
+      sourceStepId: 101,
+      targetStepId,
+    }),
+  );
+  const snapshot: ActionFlowVersionSnapshot = {
+    action: {
+      description: null,
+      id: 50,
+      name: "Provider fixture UAT",
+      settings: {},
+      status: "active",
+      triggerPhrases: ["provider fixture"],
+    },
+    branchRules: operationRules,
+    publishedAt: "2030-01-01T00:00:00.000Z",
+    schemaVersion: 1,
+    steps: operationSteps,
+  };
+  const graph = compileHybridFlowGraph({
+    actionSettings: snapshot.action.settings,
+    branchRules: operationRules,
+    steps: operationSteps,
+  }).graph;
+
+  const report = runOperationHybridFlowTest({
+    graph,
+    snapshot,
+    versionId: 70,
+    versionNumber: 3,
+  });
+
+  expect(report.status).toBe("passed");
+  expect(report.sideEffectsSuppressed).toBe(true);
+  expect(report.stepsConsidered).toBe(1);
+  expect(report.stepsTested).toBe(1);
+  expect(report.casesRun).toBe(5);
+  expect(report.casesFailed).toBe(0);
+  expect(report.cases.map((testCase) => testCase.outcome)).toEqual([
+    "success",
+    "server_error",
+    "success",
+    "timeout",
+    "status_409",
+  ]);
+  expect(report.cases.map((testCase) => testCase.fixture)).toEqual([
+    "success",
+    "failure",
+    "retry",
+    "timeout",
+    "provider_response",
+  ]);
 });
 
 test("resuming a hybrid boundary does not expose its internal prompt", () => {
