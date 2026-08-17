@@ -57,6 +57,7 @@ export type ActionFlowCanvasProps = {
   operations: OperationOption[];
   productCatalogs: ProductCatalogOption[];
   projectActions: ProjectActionOption[];
+  publishReadinessIssues: string[];
   routeIssues: ActionFlowRouteValidationIssue[];
   steps: FlowStep[];
   taskOptions: PublishedConversationalTaskOption[];

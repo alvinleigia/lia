@@ -6,6 +6,7 @@ import {
 } from "../../src/lib/action-flow-compiler";
 import { getProjectActionStatusAfterPublish } from "../../src/lib/action-flow-constants";
 import type { ActionFlowVersionSnapshot } from "../../src/lib/action-flows";
+import { getActionPublishReadinessIssues } from "../../src/lib/action-publish-readiness";
 import {
   findActionForTaskRecommendation,
   getActionStartControlText,
@@ -121,6 +122,39 @@ test("publishing activates drafts without reactivating archived actions", () => 
   expect(getProjectActionStatusAfterPublish("draft")).toBe("active");
   expect(getProjectActionStatusAfterPublish("active")).toBe("active");
   expect(getProjectActionStatusAfterPublish("archived")).toBe("archived");
+});
+
+test("action publish readiness is shared by overview and canvas", () => {
+  const step = {
+    fieldKey: null,
+    isEnabled: true,
+    label: "Opening message",
+    operationId: null,
+    options: [],
+    prompt: "Welcome",
+    settings: {},
+    sortOrder: 1,
+    stepType: "message",
+  };
+
+  expect(
+    getActionPublishReadinessIssues({ routeIssueCount: 0, steps: [step] }),
+  ).toEqual(["Add an enabled confirmation or submit step."]);
+  expect(
+    getActionPublishReadinessIssues({
+      routeIssueCount: 0,
+      steps: [
+        step,
+        {
+          ...step,
+          label: "Submit",
+          prompt: "Thanks",
+          sortOrder: 2,
+          stepType: "submit",
+        },
+      ],
+    }),
+  ).toEqual([]);
 });
 
 test("active hybrid execution owns the next channel boundary", () => {

@@ -4,12 +4,14 @@ import { notFound } from "next/navigation";
 import { ActionFlowCanvas } from "@/components/action-flow-canvas";
 import { Button } from "@/components/ui/button";
 import {
+  countBlockingActionFlowIssues,
   getProjectAction,
   listActionFlowBranchRules,
   listActionFlowSteps,
   listActiveProjectActions,
   validateActionFlowRoutes,
 } from "@/lib/action-flows";
+import { getActionPublishReadinessIssues } from "@/lib/action-publish-readiness";
 import { listPublishedConversationalTaskOptions } from "@/lib/conversational-tasks";
 import { listProjectMediaAssets } from "@/lib/media-assets";
 import { getOperationOutcomeKeys } from "@/lib/operation-contracts";
@@ -95,6 +97,10 @@ export default async function ActionCanvasPage({
       id: projectAction.id,
       name: projectAction.name,
     }));
+  const publishReadinessIssues = getActionPublishReadinessIssues({
+    routeIssueCount: countBlockingActionFlowIssues(routeIssues),
+    steps,
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 px-3 py-4">
@@ -134,6 +140,7 @@ export default async function ActionCanvasPage({
           operations={operations}
           productCatalogs={productCatalogs}
           projectActions={projectActions}
+          publishReadinessIssues={publishReadinessIssues}
           routeIssues={routeIssues}
           steps={steps}
           taskOptions={taskOptions}

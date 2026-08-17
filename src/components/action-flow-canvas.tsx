@@ -115,6 +115,7 @@ export function ActionFlowCanvas({
   operations,
   productCatalogs,
   projectActions,
+  publishReadinessIssues,
   routeIssues,
   steps,
   taskOptions,
@@ -515,6 +516,7 @@ export function ActionFlowCanvas({
           setIsEntryRulesDialogOpen(true);
         }}
         onSaveLayout={saveLayout}
+        publishReadinessIssues={publishReadinessIssues}
         routeIssueCount={blockingRouteIssueCount}
         routeWarningCount={routeWarningCount}
         stepCount={steps.length}

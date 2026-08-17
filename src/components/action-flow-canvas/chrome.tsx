@@ -7,11 +7,24 @@ import {
   Loader2,
   LogIn,
   Save,
+  Send,
   Wand2,
   Workflow,
 } from "lucide-react";
 import Link from "next/link";
+import { publishProjectActionVersionAction } from "@/app/projects/actions/actions";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import type { ActionFlowRouteValidationIssue } from "@/lib/action-flows";
 import {
   type FlowComponentDefinition,
@@ -173,6 +186,7 @@ export function CanvasToolbar({
   isPending,
   onSaveLayout,
   onOpenEntryRules,
+  publishReadinessIssues,
   routeIssueCount,
   routeWarningCount,
   stepCount,
@@ -184,6 +198,7 @@ export function CanvasToolbar({
   isPending: boolean;
   onSaveLayout: () => void;
   onOpenEntryRules: () => void;
+  publishReadinessIssues: string[];
   routeIssueCount: number;
   routeWarningCount: number;
   stepCount: number;
@@ -249,6 +264,38 @@ export function CanvasToolbar({
             <LogIn className="h-4 w-4" />
             Entry Rules
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                disabled={publishReadinessIssues.length > 0}
+                title={publishReadinessIssues[0]}
+              >
+                <Send className="h-4 w-4" />
+                Publish
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Publish this action?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Publishing creates an immutable runtime version from the
+                  current saved flow.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep editing</AlertDialogCancel>
+                <form action={publishProjectActionVersionAction}>
+                  <input type="hidden" name="actionId" value={actionId} />
+                  <FormSubmitButton
+                    label="Publish Action"
+                    pendingLabel="Publishing..."
+                    icon={<Send className="h-4 w-4" />}
+                  />
+                </form>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button asChild variant="outline">
             <Link href={`/projects/actions/${actionId}/hybrid-test`}>
               <FlaskConical className="h-4 w-4" />
