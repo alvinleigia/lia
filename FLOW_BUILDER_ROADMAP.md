@@ -89,13 +89,12 @@ database, backup, and provider readiness work.
 - [x] Priority 2 release approval is complete for continued internal testing.
 
 Active delivery gate: Priority 3, Phase 17 of 18. Engineering implementation
-and the original manual staging UAT are complete through Phase 16 under the
-single-tester scope as of 2026-08-16. The post-gate deterministic interruption
-regression in `docs/UAT_TEST_PLAN.md` must pass on staging before Phase 17 UAT.
+and manual staging UAT are complete through Phase 16 under the single-tester
+scope as of 2026-08-18, including the deterministic interruption regression in
+`docs/UAT_TEST_PLAN.md`.
 
-Current target: deploy and run the short post-Phase-16 interruption regression,
-then complete the remaining Phase 17 implementation items before creating its
-manual staging UAT section in `docs/UAT_TEST_PLAN.md`.
+Current target: complete the remaining Phase 17 implementation items before
+creating its manual staging UAT section in `docs/UAT_TEST_PLAN.md`.
 
 ### Phase Tracking Snapshot
 
@@ -106,7 +105,7 @@ manual staging UAT section in `docs/UAT_TEST_PLAN.md`.
 | 9-13 | Complete | Passed by 2026-08-05 | None. |
 | 14 | Complete | Passed on staging under the single-tester scope on 2026-08-15; the missing disposable restore environment is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
-| 16 | Complete | Original gate passed on staging on 2026-08-16; post-gate deterministic interruption regression pending | Deploy commit `0dbc3ea` and run UAT 16.6. |
+| 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Foundation plus deterministic operation fixtures; 11 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
 
