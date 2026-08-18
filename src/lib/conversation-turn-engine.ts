@@ -3,7 +3,10 @@ import type {
   ConversationProjectPolicyV1,
   TURN_MODEL_STAGES,
 } from "@/lib/conversation-contracts";
-import { isExplicitHumanHandoffRequest } from "@/lib/conversation-control-intents";
+import {
+  isExplicitCancellationRequest,
+  isExplicitHumanHandoffRequest,
+} from "@/lib/conversation-control-intents";
 import {
   compileStructuredTurn,
   type PublishedTaskOption,
@@ -83,25 +86,6 @@ type StructuredTurnEngineOptions = {
   retriever?: TurnKnowledgeRetriever | null;
 };
 
-const EXPLICIT_TASK_CANCELLATION_PHRASES = new Set([
-  "cancel",
-  "cancel booking",
-  "cancel my booking",
-  "cancel request",
-  "cancel the booking",
-  "cancel the request",
-  "cancel this",
-  "cancel this booking",
-  "cancel this request",
-  "never mind",
-  "nevermind",
-  "please cancel",
-  "stop",
-  "stop this",
-  "stop this booking",
-  "stop this request",
-]);
-
 const TASK_INTENT_FILLER_WORDS = new Set([
   "a",
   "an",
@@ -160,15 +144,9 @@ function findExplicitTaskIntent(input: ExecuteStructuredTurnInput) {
 }
 
 function isExplicitTaskCancellation(input: ExecuteStructuredTurnInput) {
-  if (!input.activeTask) return false;
-
-  const normalized = input.visitorMessage
-    .trim()
-    .toLowerCase()
-    .replace(/[.!?]+$/g, "")
-    .replace(/\s+/g, " ");
-
-  return EXPLICIT_TASK_CANCELLATION_PHRASES.has(normalized);
+  return Boolean(
+    input.activeTask && isExplicitCancellationRequest(input.visitorMessage),
+  );
 }
 
 function isExplicitTaskHandoff(input: ExecuteStructuredTurnInput) {

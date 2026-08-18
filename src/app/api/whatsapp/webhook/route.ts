@@ -183,8 +183,10 @@ export async function POST(req: Request) {
         })
       : await processChannelFlowText({
           activeSubmission,
+          channelConversationId: inboundRecord.conversation.id,
           contactId: inboundRecord.conversation.contactId,
           conversationId: change.message.from,
+          inboundMessageId: inboundRecord.message.id,
           projectId: channel.projectId,
           source: WHATSAPP_FLOW_SOURCE,
           text: runtimeText,

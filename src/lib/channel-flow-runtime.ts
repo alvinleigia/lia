@@ -59,11 +59,23 @@ import {
 } from "@/lib/action-runtime";
 import {
   getChannelTypeForFlowSource,
+  listRecentChannelMessages,
   markChannelConversationForReview,
 } from "@/lib/channels";
 import { executeContactMutationStep } from "@/lib/contact-flow-mutations";
 import { setContactAttribute } from "@/lib/contacts";
-import { isExplicitHumanHandoffRequest } from "@/lib/conversation-control-intents";
+import {
+  getProjectTurnContext,
+  toTurnHistory,
+} from "@/lib/conversation-channel-context";
+import {
+  isExplicitCancellationRequest,
+  isExplicitHumanHandoffRequest,
+  isPotentialKnowledgeSideQuestion,
+  shouldUseKnowledgeSideQuestion,
+} from "@/lib/conversation-control-intents";
+import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
+import { executeConfiguredStructuredTurn } from "@/lib/conversation-turn-service";
 import type { SelectActionSubmission } from "@/lib/db-schema";
 import {
   type FlowContentBlock,
@@ -78,6 +90,7 @@ import {
 import { getFlowWaitDurationMs } from "@/lib/flow-wait";
 import { buildHandoffMetadata, runHandoffNotification } from "@/lib/handoff";
 import { runOperationForSubmission } from "@/lib/operations";
+import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 import {
   getRuntimeProjectAction,
   getRuntimeProjectActionForSubmission,
@@ -94,8 +107,6 @@ import {
 } from "@/lib/runtime-replies";
 
 const CONFIRM_WORDS = new Set(["confirm", "yes", "y", "submit", "ok", "okay"]);
-const CANCEL_WORDS = new Set(["cancel", "stop", "no", "exit"]);
-const INPUT_CANCEL_WORDS = new Set(["cancel", "stop", "exit"]);
 const MAX_CONNECTED_FLOW_DEPTH = 5;
 const FLOW_EDIT_POSITION_KEY = "flowEditPosition";
 const FLOW_EDIT_STEP_IDS_KEY = "flowEditStepIds";
@@ -268,6 +279,84 @@ function formatStepPrompt(
   fields: Record<string, unknown>,
 ) {
   return buildActionStepTextFallbackMessage(step, fields);
+}
+
+async function tryAnswerDeterministicFlowQuestion(input: {
+  answerIsValid: boolean;
+  action: RuntimeAction;
+  channelConversationId?: number | null;
+  inboundMessageId?: number | null;
+  projectId: number;
+  resumePrompt: string;
+  stepId: number | null;
+  submissionId: number;
+  text: string;
+  source: string;
+}) {
+  if (!isPotentialKnowledgeSideQuestion(input.text)) return null;
+
+  const project = await getProjectTurnContext(input.projectId);
+  if (!project) return null;
+
+  try {
+    const [projectPolicy, history] = await Promise.all([
+      getConversationProjectPolicy(input.projectId),
+      input.channelConversationId
+        ? listRecentChannelMessages({
+            beforeMessageId: input.inboundMessageId,
+            conversationId: input.channelConversationId,
+            projectId: input.projectId,
+          }).then(toTurnHistory)
+        : Promise.resolve([]),
+    ]);
+    const execution = await executeConfiguredStructuredTurn({
+      activeTask: null,
+      assistantBehavior: normalizeProjectAiSettings(project.projectAiSettings),
+      assistantIntroduced: true,
+      channel: getChannelTypeForFlowSource(input.source),
+      companyName: project.companyName,
+      context: [],
+      fieldState: [],
+      history,
+      projectId: input.projectId,
+      projectName: project.projectName,
+      projectPolicy,
+      publishedTasks: [],
+      stage: "knowledge",
+      visitorMessage: input.text,
+    });
+    const proposal = execution.proposal;
+    const shouldInterrupt = shouldUseKnowledgeSideQuestion({
+      answerIsValid: input.answerIsValid,
+      groundingStatus: proposal.grounding.status,
+      safetyDecision: proposal.safety.decision,
+    });
+
+    if (!shouldInterrupt) return null;
+
+    await addActionSubmissionEvent({
+      eventType: "flow.side_question_answered",
+      message: "Answered a side question and preserved the pending flow step.",
+      payload: {
+        excerptIds: proposal.grounding.excerptIds,
+        groundingStatus: proposal.grounding.status,
+        pendingStepId: input.stepId,
+        turnKind: proposal.turnKind,
+      },
+      projectId: input.projectId,
+      submissionId: input.submissionId,
+    });
+
+    return {
+      replies: [
+        createTextReply(
+          `${proposal.reply}\n\nTo continue ${input.action.name}:\n${input.resumePrompt}`,
+        ),
+      ],
+    } satisfies ChannelRuntimeResult;
+  } catch {
+    return null;
+  }
 }
 
 function buildRuntimeReplyForStep(
@@ -1528,8 +1617,11 @@ async function routeResponsePolicyOutput(input: {
 async function continueChannelFlow(input: {
   action: RuntimeAction;
   answer: string;
+  channelConversationId?: number | null;
   contactId?: number | null;
+  inboundMessageId?: number | null;
   projectId: number;
+  source: string;
   submission: SelectActionSubmission;
 }) {
   const normalizedAnswer = normalizeActionText(input.answer);
@@ -1582,7 +1674,7 @@ async function continueChannelFlow(input: {
       });
     }
 
-    if (CANCEL_WORDS.has(normalizedAnswer)) {
+    if (isExplicitCancellationRequest(input.answer, { allowBareNo: true })) {
       await cancelActionFlowSubmission({
         projectId: input.projectId,
         submissionId: input.submission.id,
@@ -1596,6 +1688,20 @@ async function continueChannelFlow(input: {
         replies: [createTextReply("No problem. I cancelled this request.")],
       };
     }
+
+    const interruption = await tryAnswerDeterministicFlowQuestion({
+      answerIsValid: false,
+      action: input.action,
+      channelConversationId: input.channelConversationId,
+      inboundMessageId: input.inboundMessageId,
+      projectId: input.projectId,
+      resumePrompt: "Please reply Confirm to save, or Cancel to stop.",
+      source: input.source,
+      stepId: currentStep?.id ?? null,
+      submissionId: input.submission.id,
+      text: input.answer,
+    });
+    if (interruption) return interruption;
 
     return {
       replies: [
@@ -1629,7 +1735,7 @@ async function continueChannelFlow(input: {
   }
 
   const policy = getActionResponsePolicy(step.settings);
-  if (INPUT_CANCEL_WORDS.has(normalizedAnswer)) {
+  if (isExplicitCancellationRequest(input.answer)) {
     return routeResponsePolicyOutput({
       action: input.action,
       contactId: input.contactId,
@@ -1646,6 +1752,20 @@ async function continueChannelFlow(input: {
     input.answer,
     input.submission.fields,
   );
+
+  const interruption = await tryAnswerDeterministicFlowQuestion({
+    answerIsValid: parsedAnswer.isValid,
+    action: input.action,
+    channelConversationId: input.channelConversationId,
+    inboundMessageId: input.inboundMessageId,
+    projectId: input.projectId,
+    resumePrompt: formatStepPrompt(step, input.submission.fields),
+    source: input.source,
+    stepId: step.id,
+    submissionId: input.submission.id,
+    text: input.answer,
+  });
+  if (interruption) return interruption;
 
   if (!parsedAnswer.isValid) {
     const fieldKey = step.fieldKey ?? `step_${step.id}`;
@@ -1988,35 +2108,16 @@ async function continueChannelFlowMedia(input: {
 
 export async function processChannelFlowText(input: {
   activeSubmission: SelectActionSubmission | null;
+  channelConversationId?: number | null;
   contactId?: number | null;
   conversationId: string;
+  inboundMessageId?: number | null;
   projectId: number;
   source: string;
   text: string;
   traceId?: string | null;
 }): Promise<ChannelRuntimeResult> {
   if (input.activeSubmission) {
-    if (getFlowWaitMetadata(input.activeSubmission)) {
-      if (CANCEL_WORDS.has(normalizeActionText(input.text))) {
-        await cancelActionFlowSubmission({
-          expectedRevision: input.activeSubmission.revision,
-          projectId: input.projectId,
-          submissionId: input.activeSubmission.id,
-        });
-        return {
-          replies: [createTextReply("No problem. I cancelled this request.")],
-        };
-      }
-
-      return {
-        replies: [
-          createTextReply(
-            "This flow is paused and will continue automatically. Reply Cancel to stop it.",
-          ),
-        ],
-      };
-    }
-
     const action = await getRuntimeProjectActionForSubmission(
       input.projectId,
       input.activeSubmission,
@@ -2037,12 +2138,51 @@ export async function processChannelFlowText(input: {
       };
     }
 
+    if (getFlowWaitMetadata(input.activeSubmission)) {
+      if (isExplicitCancellationRequest(input.text)) {
+        await cancelActionFlowSubmission({
+          expectedRevision: input.activeSubmission.revision,
+          projectId: input.projectId,
+          submissionId: input.activeSubmission.id,
+        });
+        return {
+          replies: [createTextReply("No problem. I cancelled this request.")],
+        };
+      }
+
+      const interruption = await tryAnswerDeterministicFlowQuestion({
+        answerIsValid: false,
+        action,
+        channelConversationId: input.channelConversationId,
+        inboundMessageId: input.inboundMessageId,
+        projectId: input.projectId,
+        resumePrompt:
+          "This flow is paused and will continue automatically. Reply Cancel to stop it.",
+        source: input.source,
+        stepId: input.activeSubmission.currentStepId,
+        submissionId: input.activeSubmission.id,
+        text: input.text,
+      });
+      if (interruption) return interruption;
+
+      return {
+        replies: [
+          createTextReply(
+            "This flow is paused and will continue automatically. Reply Cancel to stop it.",
+          ),
+        ],
+      };
+    }
+
     return continueChannelFlow({
       action,
       answer: input.text,
+      channelConversationId: input.channelConversationId,
       contactId:
         input.contactId ?? getSubmissionContactId(input.activeSubmission),
+      inboundMessageId: input.inboundMessageId,
       projectId: input.projectId,
+      source: input.source,
       submission: input.activeSubmission,
     });
   }

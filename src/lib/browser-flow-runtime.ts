@@ -359,8 +359,11 @@ async function executeBrowserFlowText(
   const result = activeSubmission
     ? await processChannelFlowText({
         activeSubmission,
+        channelConversationId: inboundRecord.conversation.id,
         contactId: inboundRecord.conversation.contactId,
         conversationId: input.conversationId,
+        inboundMessageId:
+          "message" in inboundRecord ? inboundRecord.message.id : null,
         projectId: input.projectId,
         source: input.source,
         text,

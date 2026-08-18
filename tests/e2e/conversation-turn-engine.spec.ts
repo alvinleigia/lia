@@ -262,6 +262,22 @@ test("explicit task cancellation bypasses retrieval and model use", async () => 
   expect(retriever.calls).toBe(0);
 });
 
+test("natural explicit task cancellation bypasses retrieval and model use", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    visitorMessage: "I'd like to cancel.",
+  });
+
+  expect(result.source).toBe("deterministic");
+  expect(result.proposal.nextAction).toBe("cancel");
+  expect(provider.calls).toHaveLength(0);
+  expect(retriever.calls).toBe(0);
+});
+
 test("sentences mentioning cancellation still use normal language handling", async () => {
   const provider = new QueueProvider([baseTurn()]);
   const engine = new StructuredTurnEngine({ provider });

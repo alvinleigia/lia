@@ -9,6 +9,7 @@ export default defineConfig({
     "catalog-resource-dependencies.spec.ts",
     "channel-adapter.spec.ts",
     "channel-certification.spec.ts",
+    "conversation-control-intents.spec.ts",
     "conversation-turn-contracts.spec.ts",
     "conversation-turn-engine.spec.ts",
     "conversational-task-runtime.spec.ts",

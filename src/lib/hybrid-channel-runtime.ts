@@ -10,6 +10,11 @@ import {
 import type { ChannelInboundSelectionV1 } from "@/lib/channel-inbound-contract";
 import { type ChannelType, listRecentChannelMessages } from "@/lib/channels";
 import {
+  getProjectTurnContext,
+  type ProjectTurnContext,
+  toTurnHistory,
+} from "@/lib/conversation-channel-context";
+import {
   type ConversationalTaskSnapshotV1,
   conversationalTaskSnapshotV1Schema,
 } from "@/lib/conversation-contracts";
@@ -45,12 +50,9 @@ import {
 import { getConversationTaskRuntimeSession } from "@/lib/conversational-task-runtime-session";
 import { db } from "@/lib/db-config";
 import {
-  companies,
   conversationalTaskVersions,
   conversationExecutionStates,
-  projects,
   type SelectActionSubmission,
-  workspaces,
 } from "@/lib/db-schema";
 import type {
   CompiledHybridFlowGraphV1,
@@ -89,12 +91,6 @@ import {
   measureRuntimeStage,
   type RuntimeTimingRecorder,
 } from "@/lib/runtime-stage-timing";
-
-type ProjectTurnContext = {
-  companyName: string;
-  projectAiSettings: unknown;
-  projectName: string;
-};
 
 export type HybridChannelBoundaryResult = {
   replies: RuntimeReply[];
@@ -309,21 +305,6 @@ function toTurnValue(value: unknown) {
   return null;
 }
 
-function toHistory(
-  messages: Awaited<ReturnType<typeof listRecentChannelMessages>>,
-): TurnMessageV1[] {
-  return messages.flatMap((message) =>
-    message.text
-      ? [
-          {
-            content: message.text,
-            role: message.direction === "inbound" ? "user" : "assistant",
-          } satisfies TurnMessageV1,
-        ]
-      : [],
-  );
-}
-
 function toRuntimeFieldState(input: {
   runtime: NonNullable<
     Awaited<ReturnType<typeof getConversationTaskRuntimeSession>>["runtime"]
@@ -491,24 +472,6 @@ async function refreshTaskAvailability(input: {
       : null,
     session,
   };
-}
-
-async function getProjectTurnContext(
-  projectId: number,
-): Promise<ProjectTurnContext | null> {
-  const [project] = await db
-    .select({
-      companyName: companies.name,
-      projectAiSettings: projects.aiSettings,
-      projectName: projects.name,
-    })
-    .from(projects)
-    .innerJoin(workspaces, eq(workspaces.id, projects.workspaceId))
-    .innerJoin(companies, eq(companies.id, workspaces.companyId))
-    .where(eq(projects.id, projectId))
-    .limit(1);
-
-  return project ?? null;
 }
 
 async function listGraphTaskOptions(input: {
@@ -1468,7 +1431,7 @@ export async function runHybridChannelBoundary(
       };
     }
   }
-  const history = toHistory(
+  const history = toTurnHistory(
     await listRecentChannelMessages({
       beforeMessageId: input.inboundMessageId,
       conversationId: input.channelConversationId,
