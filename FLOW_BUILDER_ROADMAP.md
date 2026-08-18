@@ -93,8 +93,8 @@ and manual staging UAT are complete through Phase 16 under the single-tester
 scope as of 2026-08-18, including the deterministic interruption regression in
 `docs/UAT_TEST_PLAN.md`.
 
-Current target: complete the remaining Phase 17 implementation items before
-creating its manual staging UAT section in `docs/UAT_TEST_PLAN.md`.
+Current target: validate the Phase 17 conversation-diagnostics foundation on
+staging, then add tester annotations and reusable regression promotion.
 
 ### Phase Tracking Snapshot
 
@@ -106,7 +106,7 @@ creating its manual staging UAT section in `docs/UAT_TEST_PLAN.md`.
 | 14 | Complete | Passed on staging under the single-tester scope on 2026-08-15; the missing disposable restore environment is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
-| 17 | Foundation plus deterministic operation fixtures; 11 implementation items remain unchecked | Not started | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
+| 17 | Foundation, deterministic operation fixtures, and project-scoped conversation diagnostics; 11 implementation items remain unchecked | Milestone 17.1 ready for staging UAT | Tester annotations, regression promotion, reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
 
 ## Product Direction
@@ -1112,6 +1112,7 @@ flows.
 - [ ] Add reusable task, field-set, node, and composed-content templates.
 - [ ] Complete template approval, versioning, duplication, and upgrade guidance.
 - [x] Add deterministic simulation fixtures for success, failure, retry, timeout, and provider responses.
+- [x] Add a project-scoped conversation diagnostics view with a safe transcript, linked flow lifecycle, task/runtime status, and 24-hour request health.
 - [ ] Add conversational evaluation datasets for extraction, correction, clarification, safety, and completion.
 - [ ] Add regression thresholds before model or prompt changes are promoted.
 - [ ] Measure task starts, completion, abandonment, correction, validation failure, handoff, and operation success.
@@ -1127,6 +1128,11 @@ production outcome contract, and verifies inline outcome routes against the
 immutable published graph. Provider calls, durable jobs, conversations, and
 submissions remain suppressed, and every run is retained in the existing audit
 history.
+
+Conversation Diagnostics now correlates the project-scoped channel transcript,
+linked flow lifecycle events, conversational task runs, execution ownership,
+and aggregate 24-hour request health. The read model excludes provider
+payloads, hidden prompts, credentials, collected field values, and contact PII.
 
 Phase 17 exit gate: teams can safely reuse, compare, evaluate, measure, and
 optimize versioned conversational automations.

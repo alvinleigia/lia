@@ -20,7 +20,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 14 - Beta release | Complete | Passed on staging under the single-tester scope. |
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
-| 17 - Reuse and optimization | Implementation pending | Complete the Phase 17 roadmap work before starting UAT. |
+| 17 - Reuse and optimization | Milestone 17.1 ready for staging UAT | Deploy the diagnostics milestone, then run section 17.1. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -605,11 +605,39 @@ Phase 16 result: [x] Pass [ ] Fail
 - Tester/date: `Single tester / release owner - 2026-08-16`
 - Post-gate regression tester/date: `Single tester / release owner - 2026-08-18`
 
+# Phase 17 - Reuse And Optimization
+
+## 17.1 Verify Conversation Diagnostics
+
+Run this after the milestone commit is deployed to staging.
+
+1. [ ] Select a project that has recent Project Chat or Widget conversations.
+2. [ ] Open `Automation` > `Conversation Diagnostics`.
+3. [ ] Select a recent conversation. Confirm `Ordered Transcript` shows its
+   messages in time order.
+4. [ ] Confirm `Runtime Snapshot` shows the channel, message count, linked-flow
+   count, task-run count, and any current execution state.
+5. [ ] Confirm `Linked Flow Lifecycle` shows the linked submission and safe
+   event summaries. Open `View submission` and confirm it is the same flow.
+6. [ ] Confirm the 24-hour request cards show requests, average latency, error
+   rate, and model tokens.
+7. [ ] Confirm the page does not show provider payloads, hidden prompts,
+   credentials, collected field values, contact email, or contact phone.
+
+Result: [ ] Pass [ ] Fail
+
+Phase 17 implementation still pending after this milestone: tester annotations,
+promotion of findings into regression cases, evaluation datasets and gates,
+full analytics/attribution, version comparison and rollback, experiments, and
+safe cross-project cloning. These remain tracked in
+`FLOW_BUILDER_ROADMAP.md` and are not part of section 17.1.
+
 # Final Release Record
 
 - Phase 14: [x] Pass [ ] Fail
 - Phase 15: [x] Pass [ ] Fail [ ] In progress
 - Phase 16: [x] Pass [ ] Fail [ ] In progress
+- Phase 17: [ ] Pass [ ] Fail [x] In progress
 - Critical defects open: `0`
 - High defects open: `0`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).

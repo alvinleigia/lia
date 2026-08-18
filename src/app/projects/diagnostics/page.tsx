@@ -1,0 +1,468 @@
+import {
+  Activity,
+  Bot,
+  GitBranch,
+  MessageSquare,
+  ScanSearch,
+  Workflow,
+} from "lucide-react";
+import Link from "next/link";
+import { NoProjectState } from "@/components/no-project-state";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getProjectChatAnalytics } from "@/lib/chat-analytics";
+import {
+  getProjectConversationDiagnostics,
+  listProjectDiagnosticConversations,
+} from "@/lib/conversation-diagnostics";
+import {
+  getActiveProjectIdCookie,
+  resolveOptionalPageUserAndProject,
+} from "@/lib/protected-page";
+
+type DiagnosticsPageProps = {
+  searchParams: Promise<{
+    conversationId?: string;
+  }>;
+};
+
+function formatDate(value: Date | null) {
+  return value ? value.toLocaleString() : "Not recorded";
+}
+
+function formatLabel(value: string) {
+  return value.replaceAll("_", " ");
+}
+
+function conversationLabel(channelType: string, id: number) {
+  return `${formatLabel(channelType)} #${id}`;
+}
+
+export default async function DiagnosticsPage({
+  searchParams,
+}: DiagnosticsPageProps) {
+  const params = await searchParams;
+  const activeProjectId = await getActiveProjectIdCookie();
+  const context = await resolveOptionalPageUserAndProject(activeProjectId);
+
+  if (!context) {
+    return <NoProjectState title="Diagnostics need a project" />;
+  }
+
+  const { project } = context;
+  const [conversationRows, analytics] = await Promise.all([
+    listProjectDiagnosticConversations(project.id),
+    getProjectChatAnalytics(project.id),
+  ]);
+  const requestedConversationId = params.conversationId
+    ? Number.parseInt(params.conversationId, 10)
+    : null;
+  const defaultConversationId = conversationRows[0]?.conversation.id ?? null;
+  let diagnostics =
+    requestedConversationId && Number.isFinite(requestedConversationId)
+      ? await getProjectConversationDiagnostics(
+          project.id,
+          requestedConversationId,
+        )
+      : null;
+
+  if (!diagnostics && defaultConversationId) {
+    diagnostics = await getProjectConversationDiagnostics(
+      project.id,
+      defaultConversationId,
+    );
+  }
+
+  const health = analytics.last24Hours;
+
+  return (
+    <div className="min-h-screen bg-gray-50 px-4 py-12">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-2xl">
+              <ScanSearch className="size-6" />
+              Conversation Diagnostics: {project.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Inspect safe operational evidence for a conversation. Raw provider
+              payloads, hidden prompts, credentials, and collected field values
+              are not displayed here.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-md border bg-white p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Requests - 24h
+                </p>
+                <p className="text-xl font-semibold">{health.totalRequests}</p>
+              </div>
+              <div className="rounded-md border bg-white p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Average latency
+                </p>
+                <p className="text-xl font-semibold">
+                  {health.avgLatencyMs} ms
+                </p>
+              </div>
+              <div className="rounded-md border bg-white p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Error rate
+                </p>
+                <p className="text-xl font-semibold">{health.errorRate}%</p>
+              </div>
+              <div className="rounded-md border bg-white p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Model tokens
+                </p>
+                <p className="text-xl font-semibold">{health.totalTokens}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle className="text-lg">Recent Conversations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {conversationRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No channel conversations have been recorded yet.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {conversationRows.map(({ conversation }) => {
+                    const isSelected =
+                      conversation.id === diagnostics?.conversation.id;
+
+                    return (
+                      <Link
+                        className={`block rounded-md border bg-white px-4 py-3 hover:bg-accent/40 ${
+                          isSelected ? "border-foreground" : ""
+                        }`}
+                        href={`/projects/diagnostics?conversationId=${conversation.id}`}
+                        key={conversation.id}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 truncate font-medium">
+                            {conversationLabel(
+                              conversation.channelType,
+                              conversation.id,
+                            )}
+                          </p>
+                          <span className="rounded-md border px-2 py-1 text-xs capitalize">
+                            {formatLabel(conversation.status)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs capitalize text-muted-foreground">
+                          {formatLabel(conversation.channelType)}
+                        </p>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Last message: {formatDate(conversation.lastMessageAt)}
+                        </p>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {!diagnostics ? (
+            <Card>
+              <CardContent className="py-10 text-sm text-muted-foreground">
+                Select a conversation after one is recorded.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Activity className="size-5" />
+                    Runtime Snapshot
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-md border bg-white p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Channel
+                      </p>
+                      <p className="mt-1 font-medium capitalize">
+                        {formatLabel(diagnostics.conversation.channelType)}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-white p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Messages
+                      </p>
+                      <p className="mt-1 font-medium">
+                        {diagnostics.messages.length}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-white p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Linked flows
+                      </p>
+                      <p className="mt-1 font-medium">
+                        {diagnostics.submissions.length}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-white p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Task runs
+                      </p>
+                      <p className="mt-1 font-medium">
+                        {diagnostics.taskRuns.length}
+                      </p>
+                    </div>
+                  </div>
+
+                  {diagnostics.executionState && (
+                    <div className="rounded-md border bg-white p-4">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="font-medium">Execution:</span>
+                        <span className="rounded-md border px-2 py-1 capitalize">
+                          {formatLabel(
+                            diagnostics.executionState.executionMode,
+                          )}
+                        </span>
+                        <span className="rounded-md border px-2 py-1 capitalize">
+                          Owner:{" "}
+                          {formatLabel(
+                            diagnostics.executionState.responseOwner,
+                          )}
+                        </span>
+                        <span className="rounded-md border px-2 py-1 capitalize">
+                          {formatLabel(diagnostics.executionState.status)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Revision {diagnostics.executionState.revision} - Updated{" "}
+                        {formatDate(diagnostics.executionState.updatedAt)}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-md border bg-white p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Validation failures
+                      </p>
+                      <p className="text-lg font-semibold">
+                        {diagnostics.eventSummary.validationFailures}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-white p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Handoff events
+                      </p>
+                      <p className="text-lg font-semibold">
+                        {diagnostics.eventSummary.handoffs}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-white p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Cancellation events
+                      </p>
+                      <p className="text-lg font-semibold">
+                        {diagnostics.eventSummary.cancellations}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <MessageSquare className="size-5" />
+                    Ordered Transcript
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {diagnostics.messages.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No transcript messages were recorded.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {diagnostics.messages.map((message) => (
+                        <div
+                          className="rounded-md border bg-white p-4"
+                          key={message.id}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium capitalize">
+                                {message.direction}
+                              </span>
+                              <span className="rounded-md border px-2 py-1 text-xs capitalize">
+                                {formatLabel(message.messageType)}
+                              </span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(message.createdAt)}
+                            </span>
+                          </div>
+                          <p className="mt-3 whitespace-pre-wrap break-words text-sm">
+                            {message.text || "No text body recorded."}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Workflow className="size-5" />
+                    Linked Flow Lifecycle
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {diagnostics.submissions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No flow submission is linked to this conversation.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {diagnostics.submissions.map((submission) => {
+                        const events = diagnostics.submissionEvents.filter(
+                          (event) => event.submissionId === submission.id,
+                        );
+
+                        return (
+                          <div
+                            className="rounded-md border bg-white p-4"
+                            key={submission.id}
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <p className="font-semibold">
+                                  #{submission.id} {submission.actionName}
+                                </p>
+                                <p className="mt-1 text-sm capitalize text-muted-foreground">
+                                  {formatLabel(submission.status)} - Created{" "}
+                                  {formatDate(submission.createdAt)}
+                                </p>
+                                {submission.traceId && (
+                                  <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
+                                    Trace: {submission.traceId}
+                                  </p>
+                                )}
+                              </div>
+                              <Button asChild size="sm" variant="outline">
+                                <Link
+                                  href={`/projects/submissions/${submission.id}`}
+                                >
+                                  View submission
+                                </Link>
+                              </Button>
+                            </div>
+                            <div className="mt-4 space-y-2">
+                              {events.map((event) => (
+                                <div
+                                  className="rounded-md bg-muted/60 px-3 py-2 text-sm"
+                                  key={event.id}
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="font-medium">
+                                      {event.eventType}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatDate(event.createdAt)}
+                                    </span>
+                                  </div>
+                                  {event.message && (
+                                    <p className="mt-1 text-muted-foreground">
+                                      {event.message}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Bot className="size-5" />
+                    Conversational Task Runs
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {diagnostics.taskRuns.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No conversational task run is linked to this conversation.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {diagnostics.taskRuns.map((run) => (
+                        <div
+                          className="rounded-md border bg-white p-4"
+                          key={run.id}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold">
+                                Run #{run.id} - {run.taskName}
+                              </p>
+                              <p className="mt-1 text-sm capitalize text-muted-foreground">
+                                {formatLabel(run.status)} - Stage{" "}
+                                {formatLabel(run.currentStage)}
+                              </p>
+                            </div>
+                            {run.outcomeKey && (
+                              <span className="rounded-md border px-2 py-1 text-xs capitalize">
+                                {formatLabel(run.outcomeKey)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                            <span>Started {formatDate(run.startedAt)}</span>
+                            {run.lastRequestedFieldKey && (
+                              <span>
+                                Last requested: {run.lastRequestedFieldKey}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <GitBranch className="size-5" />
+                    Next Diagnostics Milestone
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  Add explicit tester annotations and promote selected failures
+                  into reusable regression cases after this correlated read
+                  model is validated in UAT.
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

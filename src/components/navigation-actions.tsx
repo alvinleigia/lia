@@ -19,6 +19,7 @@ import {
   MoreHorizontal,
   PlugZap,
   Plus,
+  ScanSearch,
   ShieldCheck,
   ShoppingBag,
   Smartphone,
@@ -112,6 +113,11 @@ const automationNavigationGroups: NavigationItem[][] = [
   [
     { href: "/projects/operations", icon: PlugZap, label: "Operations" },
     { href: "/projects/contacts", icon: ContactRound, label: "Contacts" },
+    {
+      href: "/projects/diagnostics",
+      icon: ScanSearch,
+      label: "Conversation Diagnostics",
+    },
     {
       href: "/projects/submissions",
       icon: ClipboardList,
