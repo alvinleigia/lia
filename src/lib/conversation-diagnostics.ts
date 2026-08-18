@@ -28,11 +28,31 @@ function diagnosticRedactionLabel(fieldKey: string) {
     return "[redacted phone]";
   }
 
-  if (normalizedKey.includes("name")) {
+  if (
+    /^(?:(?:customer|guest|contact|visitor|user|requester|person)(?:full)?|full|first|last)?name$/.test(
+      normalizedKey,
+    )
+  ) {
     return "[redacted name]";
   }
 
   return "[redacted collected value]";
+}
+
+export function redactDiagnosticMessage(
+  message: {
+    direction: string;
+    messageType: string;
+    text: string | null;
+  },
+  collectedFields: DiagnosticCollectedField[] = [],
+) {
+  const fieldsToRedact =
+    message.direction === "outbound" && message.messageType === "buttons"
+      ? []
+      : collectedFields;
+
+  return redactDiagnosticText(message.text, fieldsToRedact);
 }
 
 function collectPrimitiveValues(value: unknown): string[] {
@@ -297,7 +317,7 @@ export async function getProjectConversationDiagnostics(
   ];
   const messages = messageRows.map((message) => ({
     ...message,
-    text: redactDiagnosticText(message.text, collectedFields),
+    text: redactDiagnosticMessage(message, collectedFields),
   }));
   const submissions = submissionRows.map((submission) => ({
     id: submission.id,

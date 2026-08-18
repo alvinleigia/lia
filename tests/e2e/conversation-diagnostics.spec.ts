@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   getDiagnosticSubmissionSource,
+  redactDiagnosticMessage,
   redactDiagnosticText,
   summarizeDiagnosticEvents,
 } from "../../src/lib/conversation-diagnostics";
@@ -48,6 +49,38 @@ test("diagnostics redact email and phone patterns not present in collected field
   expect(
     redactDiagnosticText("Contact fallback@example.com or +1 (555) 192-3328."),
   ).toBe("Contact [redacted email] or [redacted phone].");
+});
+
+test("diagnostics preserve public option menus while redacting selected values", () => {
+  const collectedFields = [
+    { fieldKey: "issueCategory", value: "Billing" },
+    { fieldKey: "issueCategoryName", value: "Billing" },
+    { fieldKey: "priority", value: "Normal" },
+    { fieldKey: "priorityName", value: "Normal" },
+  ];
+  const optionMenu = [
+    "What kind of issue do you need help with?",
+    "1. Billing",
+    "2. Technical issue",
+    "3. Account access",
+    "4. Other",
+  ].join("\n");
+
+  expect(
+    redactDiagnosticMessage(
+      { direction: "outbound", messageType: "buttons", text: optionMenu },
+      collectedFields,
+    ),
+  ).toBe(optionMenu);
+  expect(
+    redactDiagnosticMessage(
+      { direction: "inbound", messageType: "selection", text: "Billing" },
+      collectedFields,
+    ),
+  ).toBe("[redacted collected value]");
+  expect(redactDiagnosticText("priority: Normal", collectedFields)).toBe(
+    "priority: [redacted collected value]",
+  );
 });
 
 test("diagnostics summarize validation, handoff, and cancellation events", () => {
