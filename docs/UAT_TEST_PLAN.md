@@ -459,8 +459,8 @@ Result: [x] Pass [ ] Fail
 
 ## Phase 16 - Lifecycle And Structured Forms
 
-Status: `In progress`. Run only in the disposable staging project
-`Phase 16 Lifecycle UAT (#94)`.
+Status: `Complete`; post-gate regression 16.6 is pending. Run only in the
+disposable staging project `Phase 16 Lifecycle UAT (#94)`.
 
 ### 16.1 Create And Publish The Test Action
 
@@ -567,6 +567,26 @@ submission `#77`.
    five fields are correct, and its status is `Submitted`.
 
 Result: [x] Pass [ ] Fail
+
+### 16.6 Verify Side Questions And Natural Cancellation
+
+Run this after commit `0dbc3ea` is deployed to staging.
+
+1. [ ] Open `Projects` > `Documents` and upload a plain-text file containing:
+   `Support hours are 09:00-17:00.`
+2. [ ] Open `Projects` > `Chat`, start `Create Support Ticket`, and stop at
+   `Please describe the issue.`
+3. [ ] Send `What are the support hours?` Confirm Lia answers from the uploaded
+   document and ends the same reply with:
+   `To continue Create Support Ticket:` followed by
+   `Please describe the issue.`
+4. [ ] Enter `Unable to access the staging support dashboard.` Confirm the flow
+   continues to `What is your name?`; then send `I'd like to cancel.`
+5. [ ] Confirm Lia replies `No problem. I cancelled this request.` and the
+   submission is `Cancelled`, with no submitted timestamp.
+6. [ ] Delete the temporary support-hours document.
+
+Result: [ ] Pass [ ] Fail [x] Pending deployment
 
 Phase 16 result: [x] Pass [ ] Fail
 
