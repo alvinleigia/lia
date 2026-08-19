@@ -111,7 +111,9 @@ function buildNumericSample(step: RuntimeActionStep, integer: boolean) {
   return String(value);
 }
 
-function buildValidCandidates(step: RuntimeActionStep): string[] {
+export function buildValidBehavioralCandidates(
+  step: RuntimeActionStep,
+): string[] {
   const inputType = getActionStepInputType(step);
 
   if (step.stepType === "date_range") {
@@ -357,7 +359,7 @@ export function runBehavioralHybridFlowTest(
       continue;
     }
 
-    const validCandidate = buildValidCandidates(step).find(
+    const validCandidate = buildValidBehavioralCandidates(step).find(
       (input) => validateStepAnswer(step, input, fields).isValid,
     );
     if (!validCandidate) {

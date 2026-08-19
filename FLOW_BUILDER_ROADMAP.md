@@ -1112,6 +1112,7 @@ flows.
 - [ ] Add reusable task, field-set, node, and composed-content templates.
 - [ ] Complete template approval, versioning, duplication, and upgrade guidance.
 - [x] Add deterministic simulation fixtures for success, failure, retry, timeout, and provider responses.
+- [x] Add generated conversation scenarios that replay published deterministic replies, valid synthetic answers, and exact next-node progression without live side effects or model calls.
 - [x] Add a project-scoped conversation diagnostics view with a safe transcript, linked flow lifecycle, task/runtime status, and 24-hour request health.
 - [ ] Add conversational evaluation datasets for extraction, correction, clarification, safety, and completion.
 - [ ] Add regression thresholds before model or prompt changes are promoted.
@@ -1128,6 +1129,12 @@ production outcome contract, and verifies inline outcome routes against the
 immutable published graph. Provider calls, durable jobs, conversations, and
 submissions remain suppressed, and every run is retained in the existing audit
 history.
+
+The same automated run now generates a scenario for every unique published
+deterministic entry route. It verifies non-empty replies, readable option text
+fallbacks, valid synthetic field collection, and runtime progression against
+the immutable graph. Model-owned, knowledge-owned, and resource-input segments
+remain clearly skipped or delegated to their existing focused checks.
 
 Conversation Diagnostics now correlates the project-scoped channel transcript,
 linked flow lifecycle events, conversational task runs, execution ownership,

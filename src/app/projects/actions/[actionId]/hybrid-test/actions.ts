@@ -17,6 +17,7 @@ import {
 import { runBehavioralHybridFlowTest } from "@/lib/hybrid-flow-behavioral-test";
 import { runCombinationHybridFlowTest } from "@/lib/hybrid-flow-combination-test";
 import { compiledHybridFlowGraphV1Schema } from "@/lib/hybrid-flow-contracts";
+import { runConversationScenarioTest } from "@/lib/hybrid-flow-conversation-scenario-test";
 import { runOperationHybridFlowTest } from "@/lib/hybrid-flow-operation-test";
 import { runResourceBackedHybridFlowTest } from "@/lib/hybrid-flow-resource-test";
 import { resolveStrictPageUserAndProject } from "@/lib/protected-page";
@@ -86,6 +87,12 @@ export async function runAutomatedFlowTestAction(formData: FormData) {
     versionId: version.id,
     versionNumber: version.versionNumber,
   });
+  const scenarioReport = runConversationScenarioTest({
+    graph: graph.data,
+    snapshot,
+    versionId: version.id,
+    versionNumber: version.versionNumber,
+  });
   const resourceReport = runResourceBackedHybridFlowTest(snapshot.steps ?? []);
   const operationReport = runOperationHybridFlowTest({
     graph: graph.data,
@@ -101,15 +108,18 @@ export async function runAutomatedFlowTestAction(formData: FormData) {
       ...structuralReport.errors,
       ...behavioralReport.errors,
       ...combinationReport.errors,
+      ...scenarioReport.errors,
       ...resourceReport.errors,
       ...operationReport.errors,
     ],
     operations: operationReport,
     resources: resourceReport,
+    scenarios: scenarioReport,
     status:
       structuralReport.status === "passed" &&
       behavioralReport.status === "passed" &&
       combinationReport.status === "passed" &&
+      scenarioReport.status === "passed" &&
       resourceReport.status === "passed" &&
       operationReport.status === "passed"
         ? ("passed" as const)
@@ -118,6 +128,7 @@ export async function runAutomatedFlowTestAction(formData: FormData) {
       ...structuralReport.warnings,
       ...behavioralReport.warnings,
       ...combinationReport.warnings,
+      ...scenarioReport.warnings,
       ...resourceReport.warnings,
       ...operationReport.warnings,
     ],

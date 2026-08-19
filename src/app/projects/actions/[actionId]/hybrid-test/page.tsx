@@ -152,9 +152,10 @@ export default async function HybridFlowTestPage({
                       Published version v{version.versionNumber}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Structural, core input, route combination, lifecycle,
-                      resource-backed, and operation/provider fixture checks run
-                      against the immutable published version.
+                      Structural, core input, route combination, deterministic
+                      conversation, lifecycle, resource-backed, and
+                      operation/provider fixture checks run against the
+                      immutable published version.
                     </p>
                   </div>
                   <form action={runAutomatedFlowTestAction}>
@@ -225,6 +226,9 @@ export default async function HybridFlowTestPage({
                                     : ""}
                                   {report.combinations
                                     ? ` · ${report.combinations.casesRun} combination cases`
+                                    : ""}
+                                  {report.scenarios
+                                    ? ` · ${report.scenarios.scenariosRun} conversation scenarios`
                                     : ""}
                                   {report.resources
                                     ? ` · ${report.resources.checks.length} resource checks`
@@ -360,6 +364,88 @@ export default async function HybridFlowTestPage({
                                               {testCase.label}
                                             </span>
                                             : {testCase.detail}
+                                          </li>
+                                        ),
+                                      )}
+                                    </ul>
+                                  </div>
+                                </details>
+                              )}
+
+                              {report.scenarios && (
+                                <details className="mt-3 text-sm">
+                                  <summary className="cursor-pointer font-medium">
+                                    View conversation scenarios
+                                  </summary>
+                                  <div className="mt-2 space-y-3 rounded-md border p-3">
+                                    <p>
+                                      <span className="font-medium">
+                                        {report.scenarios.scenariosPassed}{" "}
+                                        passed
+                                      </span>
+                                      {" · "}
+                                      {report.scenarios.scenariosFailed} failed
+                                      {" · "}
+                                      {report.scenarios.scenariosSkipped}{" "}
+                                      skipped
+                                      {" · "}
+                                      {report.scenarios.turnsChecked} turns
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                      Published replies, option fallbacks,
+                                      synthetic field answers, and exact
+                                      next-node progression were replayed
+                                      without model or provider calls, live
+                                      conversations, submissions, or jobs.
+                                    </p>
+                                    <ul className="space-y-3">
+                                      {report.scenarios.scenarios.map(
+                                        (scenario) => (
+                                          <li
+                                            key={scenario.key}
+                                            className="rounded-md bg-muted/40 px-3 py-2"
+                                          >
+                                            <p className="font-medium">
+                                              {scenario.label}:{" "}
+                                              {scenario.status}
+                                            </p>
+                                            {scenario.warnings.length > 0 && (
+                                              <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                                                {scenario.warnings.map(
+                                                  (warning) => (
+                                                    <li key={warning}>
+                                                      {warning}
+                                                    </li>
+                                                  ),
+                                                )}
+                                              </ul>
+                                            )}
+                                            <ol className="mt-2 space-y-2">
+                                              {scenario.turns.map((turn) => (
+                                                <li
+                                                  key={`${scenario.key}-${turn.nodeId}`}
+                                                  className={
+                                                    turn.status === "passed"
+                                                      ? "text-muted-foreground"
+                                                      : "text-red-700"
+                                                  }
+                                                >
+                                                  <span className="font-medium text-foreground">
+                                                    {turn.stepLabel}
+                                                  </span>
+                                                  : {turn.prompt}
+                                                  {turn.answer
+                                                    ? ` → synthetic answer: ${turn.answer}`
+                                                    : ""}
+                                                  {turn.nextNodeId
+                                                    ? ` → ${turn.nextNodeId}`
+                                                    : ""}
+                                                  {turn.status === "failed"
+                                                    ? ` — ${turn.detail}`
+                                                    : ""}
+                                                </li>
+                                              ))}
+                                            </ol>
                                           </li>
                                         ),
                                       )}

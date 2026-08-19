@@ -628,6 +628,21 @@ Run this after the milestone commit is deployed to staging.
 
 Result: [ ] Pass [ ] Fail
 
+## 17.2 Verify Automated Conversation Scenarios
+
+1. [ ] Open a published deterministic action, then select `Test Flow`.
+2. [ ] Select `Run Automated Test`.
+3. [ ] Confirm `Latest run` shows `Passed` and its summary includes
+   `conversation scenarios`.
+4. [ ] Expand `View conversation scenarios`.
+5. [ ] Confirm each listed scenario shows the published bot prompts, synthetic
+   visitor answers, and the next flow node in order.
+6. [ ] Confirm skipped model, knowledge, or resource-owned coverage is explained
+   and no live conversation, submission, job, provider call, or model call was
+   created.
+
+Result: [ ] Pass [ ] Fail
+
 Phase 17 implementation still pending after this milestone: tester annotations,
 promotion of findings into regression cases, evaluation datasets and gates,
 full analytics/attribution, version comparison and rollback, experiments, and
