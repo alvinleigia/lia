@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 import {
+  conversationDiagnosticFindingSchema,
+  conversationRegressionCaseSchema,
+} from "../../src/lib/conversation-diagnostic-contracts";
+import {
   collectDiagnosticPublicChoiceValues,
   getDiagnosticSubmissionSource,
   redactDiagnosticMessage,
@@ -136,4 +140,58 @@ test("diagnostics summarize validation, handoff, and cancellation events", () =>
     handoffs: 2,
     validationFailures: 1,
   });
+});
+
+test("tester findings require a supported category and useful note", () => {
+  expect(
+    conversationDiagnosticFindingSchema.parse({
+      projectId: "94",
+      conversationId: "12",
+      category: "routing",
+      note: "  The reply used the wrong branch after a valid choice.  ",
+    }),
+  ).toEqual({
+    projectId: 94,
+    conversationId: 12,
+    category: "routing",
+    note: "The reply used the wrong branch after a valid choice.",
+  });
+
+  expect(
+    conversationDiagnosticFindingSchema.safeParse({
+      projectId: 94,
+      conversationId: 12,
+      category: "unsupported",
+      note: "Too short",
+    }).success,
+  ).toBe(false);
+});
+
+test("regression promotion requires explicit synthetic input and expected behavior", () => {
+  expect(
+    conversationRegressionCaseSchema.parse({
+      projectId: "94",
+      conversationId: "12",
+      findingId: "7",
+      title: "Resume after side question",
+      syntheticInput: "My test dashboard will not load.",
+      expectedBehavior:
+        "Answer the side question, restate the pending prompt, and preserve collected values.",
+    }),
+  ).toMatchObject({
+    projectId: 94,
+    conversationId: 12,
+    findingId: 7,
+  });
+
+  expect(
+    conversationRegressionCaseSchema.safeParse({
+      projectId: 94,
+      conversationId: 12,
+      findingId: 7,
+      title: "Missing input",
+      syntheticInput: "",
+      expectedBehavior: "",
+    }).success,
+  ).toBe(false);
 });

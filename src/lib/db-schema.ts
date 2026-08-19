@@ -656,6 +656,63 @@ export const channelConversations = pgTable(
   ],
 );
 
+export const conversationDiagnosticFindings = pgTable(
+  "conversation_diagnostic_findings",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    conversationId: integer("conversation_id")
+      .notNull()
+      .references(() => channelConversations.id),
+    authorUserId: integer("author_user_id")
+      .notNull()
+      .references(() => users.id),
+    category: text("category").notNull(),
+    note: text("note").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversation_diagnostic_findings_project_idx").on(table.projectId),
+    index("conversation_diagnostic_findings_conversation_idx").on(
+      table.conversationId,
+    ),
+    index("conversation_diagnostic_findings_created_at_idx").on(
+      table.createdAt,
+    ),
+  ],
+);
+
+export const conversationRegressionCases = pgTable(
+  "conversation_regression_cases",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    sourceFindingId: integer("source_finding_id")
+      .notNull()
+      .references(() => conversationDiagnosticFindings.id),
+    createdByUserId: integer("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    title: text("title").notNull(),
+    syntheticInput: text("synthetic_input").notNull(),
+    expectedBehavior: text("expected_behavior").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversation_regression_cases_project_idx").on(table.projectId),
+    index("conversation_regression_cases_status_idx").on(table.status),
+    uniqueIndex("conversation_regression_cases_source_finding_unique").on(
+      table.sourceFindingId,
+    ),
+  ],
+);
+
 export const contacts = pgTable(
   "contacts",
   {
@@ -1652,6 +1709,14 @@ export type InsertChannelConversation =
   typeof channelConversations.$inferInsert;
 export type SelectChannelConversation =
   typeof channelConversations.$inferSelect;
+export type InsertConversationDiagnosticFinding =
+  typeof conversationDiagnosticFindings.$inferInsert;
+export type SelectConversationDiagnosticFinding =
+  typeof conversationDiagnosticFindings.$inferSelect;
+export type InsertConversationRegressionCase =
+  typeof conversationRegressionCases.$inferInsert;
+export type SelectConversationRegressionCase =
+  typeof conversationRegressionCases.$inferSelect;
 export type InsertChannelMessage = typeof channelMessages.$inferInsert;
 export type SelectChannelMessage = typeof channelMessages.$inferSelect;
 export type InsertMediaAsset = typeof mediaAssets.$inferInsert;

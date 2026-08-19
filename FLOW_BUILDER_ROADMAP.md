@@ -90,11 +90,12 @@ database, backup, and provider readiness work.
 
 Active delivery gate: Priority 3, Phase 17 of 18. Engineering implementation
 and manual staging UAT are complete through Phase 16 under the single-tester
-scope as of 2026-08-18, including the deterministic interruption regression in
-`docs/UAT_TEST_PLAN.md`.
+scope as of 2026-08-18. Phase 17 diagnostics and automated conversation
+scenarios have passed staging UAT.
 
-Current target: validate the Phase 17 conversation-diagnostics foundation on
-staging, then add tester annotations and reusable regression promotion.
+Current target: validate project-scoped tester findings and reusable regression
+promotion on staging, then continue the remaining Phase 17 evaluation and
+optimization milestones.
 
 ### Phase Tracking Snapshot
 
@@ -106,7 +107,7 @@ staging, then add tester annotations and reusable regression promotion.
 | 14 | Complete | Passed on staging under the single-tester scope on 2026-08-15; the missing disposable restore environment is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
-| 17 | Foundation, deterministic operation fixtures, and project-scoped conversation diagnostics; 11 implementation items remain unchecked | Milestone 17.1 ready for staging UAT | Tester annotations, regression promotion, reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
+| 17 | Foundation, deterministic operation fixtures, project-scoped conversation diagnostics, tester findings, and regression promotion | Milestones 17.1-17.2 passed; 17.3 ready for staging UAT | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
 
 ## Product Direction
@@ -1114,6 +1115,7 @@ flows.
 - [x] Add deterministic simulation fixtures for success, failure, retry, timeout, and provider responses.
 - [x] Add generated conversation scenarios that replay published deterministic replies, valid synthetic answers, and exact next-node progression without live side effects or model calls.
 - [x] Add a project-scoped conversation diagnostics view with a safe transcript, linked flow lifecycle, task/runtime status, and 24-hour request health.
+- [x] Add project-scoped tester findings and promote selected findings into synthetic regression cases without copying transcript values.
 - [ ] Add conversational evaluation datasets for extraction, correction, clarification, safety, and completion.
 - [ ] Add regression thresholds before model or prompt changes are promoted.
 - [ ] Measure task starts, completion, abandonment, correction, validation failure, handoff, and operation success.
@@ -1141,6 +1143,12 @@ linked flow lifecycle events, conversational task runs, execution ownership,
 and aggregate 24-hour request health. The read model preserves configured
 choice labels and selections while excluding provider payloads, hidden prompts,
 credentials, names, contact details, addresses, and free-text collected values.
+
+The same project-scoped diagnostics page now lets an authenticated tester record
+a categorized finding against the selected conversation and promote it into one
+reusable regression case. Promotion requires a tester-authored synthetic input
+and expected behavior; it never copies redacted transcript content into the
+regression record. Both mutations are tenant-scoped and auditable.
 
 Phase 17 exit gate: teams can safely reuse, compare, evaluate, measure, and
 optimize versioned conversational automations.

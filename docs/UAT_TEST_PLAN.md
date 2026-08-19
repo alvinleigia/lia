@@ -20,7 +20,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 14 - Beta release | Complete | Passed on staging under the single-tester scope. |
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
-| 17 - Reuse and optimization | Milestone 17.1 ready for staging UAT | Deploy the diagnostics milestone, then run section 17.1. |
+| 17 - Reuse and optimization | Milestones 17.1-17.2 passed; 17.3 ready for staging UAT | Deploy the findings milestone, then run section 17.3. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -611,43 +611,64 @@ Phase 16 result: [x] Pass [ ] Fail
 
 Run this after the milestone commit is deployed to staging.
 
-1. [ ] Select a project that has recent Project Chat or Widget conversations.
-2. [ ] Open `Automation` > `Conversation Diagnostics`.
-3. [ ] Select a recent conversation. Confirm `Ordered Transcript` shows its
+1. [x] Select a project that has recent Project Chat or Widget conversations.
+2. [x] Open `Automation` > `Conversation Diagnostics`.
+3. [x] Select a recent conversation. Confirm `Ordered Transcript` shows its
    messages in time order.
-4. [ ] Confirm `Runtime Snapshot` shows the channel, message count, linked-flow
+4. [x] Confirm `Runtime Snapshot` shows the channel, message count, linked-flow
    count, task-run count, and any current execution state.
-5. [ ] Confirm `Linked Flow Lifecycle` shows the linked submission and safe
+5. [x] Confirm `Linked Flow Lifecycle` shows the linked submission and safe
    event summaries. Open `View submission` and confirm it is the same flow.
-6. [ ] Confirm the 24-hour request cards show requests, average latency, error
+6. [x] Confirm the 24-hour request cards show requests, average latency, error
    rate, and model tokens.
-7. [ ] Confirm configured choice labels and selections remain readable, while
+7. [x] Confirm configured choice labels and selections remain readable, while
    the page does not show provider payloads, hidden prompts, credentials,
    names, email addresses, phone numbers, addresses, or free-text collected
    values.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
 ## 17.2 Verify Automated Conversation Scenarios
 
-1. [ ] Open a published deterministic action, then select `Test Flow`.
-2. [ ] Select `Run Automated Test`.
-3. [ ] Confirm `Latest run` shows `Passed` and its summary includes
+1. [x] Open a published deterministic action, then select `Test Flow`.
+2. [x] Select `Run Automated Test`.
+3. [x] Confirm `Latest run` shows `Passed` and its summary includes
    `conversation scenarios`.
-4. [ ] Expand `View conversation scenarios`.
-5. [ ] Confirm each listed scenario shows the published bot prompts, synthetic
+4. [x] Expand `View conversation scenarios`.
+5. [x] Confirm each listed scenario shows the published bot prompts, synthetic
    visitor answers, and the next flow node in order.
-6. [ ] Confirm skipped model, knowledge, or resource-owned coverage is explained
+6. [x] Confirm skipped model, knowledge, or resource-owned coverage is explained
    and no live conversation, submission, job, provider call, or model call was
    created.
 
+Result: [x] Pass [ ] Fail
+
+## 17.3 Record A Finding And Promote A Regression Case
+
+Run this on staging after selecting a conversation in `Automation` >
+`Conversation Diagnostics`.
+
+1. [ ] Scroll to `Tester Findings & Regression Cases`.
+2. [ ] Under `Record finding`, choose `Routing`, enter a short observation such
+   as `The flow should resume the pending field after a side question.`, then
+   select `Record finding`.
+3. [ ] Confirm a success message appears and the finding is listed with its
+   category, tester, and time.
+4. [ ] In that finding, enter a regression title, an invented visitor message,
+   and the expected behavior. Do not copy names, contact details, credentials,
+   or free-text values from the transcript.
+5. [ ] Select `Promote to regression case`.
+6. [ ] Confirm a success message appears and the finding now shows the promoted
+   regression case and its synthetic input.
+7. [ ] Refresh the page and confirm both records remain attached to the same
+   selected conversation.
+
 Result: [ ] Pass [ ] Fail
 
-Phase 17 implementation still pending after this milestone: tester annotations,
-promotion of findings into regression cases, evaluation datasets and gates,
-full analytics/attribution, version comparison and rollback, experiments, and
-safe cross-project cloning. These remain tracked in
-`FLOW_BUILDER_ROADMAP.md` and are not part of section 17.1.
+Phase 17 implementation still pending after this milestone: evaluation datasets
+and gates, full analytics/attribution, version comparison and rollback,
+experiments, and safe cross-project cloning. These remain tracked in
+`FLOW_BUILDER_ROADMAP.md`.
 
 # Final Release Record
 

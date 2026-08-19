@@ -267,6 +267,13 @@
       "when": 1785619800000,
       "tag": "0037_channel_message_idempotency",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1787135400000,
+      "tag": "0038_conversation_diagnostic_findings",
+      "breakpoints": true
     }
   ]
 }

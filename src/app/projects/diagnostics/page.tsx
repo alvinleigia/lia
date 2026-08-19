@@ -1,16 +1,35 @@
 import {
   Activity,
   Bot,
-  GitBranch,
+  Bug,
+  FlaskConical,
   MessageSquare,
   ScanSearch,
   Workflow,
 } from "lucide-react";
 import Link from "next/link";
+import {
+  promoteConversationRegressionCase,
+  recordConversationDiagnosticFinding,
+} from "@/app/projects/diagnostics/actions";
 import { NoProjectState } from "@/components/no-project-state";
+import {
+  ActionFormError,
+  ActionStateForm,
+} from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormSubmitButton } from "@/components/ui/form-submit-button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { getProjectChatAnalytics } from "@/lib/chat-analytics";
+import {
+  CONVERSATION_DIAGNOSTIC_CATEGORIES,
+  CONVERSATION_DIAGNOSTIC_CATEGORY_LABELS,
+  type ConversationDiagnosticCategory,
+} from "@/lib/conversation-diagnostic-contracts";
+import { listConversationDiagnosticFindings } from "@/lib/conversation-diagnostic-findings";
 import {
   getProjectConversationDiagnostics,
   listProjectDiagnosticConversations,
@@ -23,6 +42,8 @@ import {
 type DiagnosticsPageProps = {
   searchParams: Promise<{
     conversationId?: string;
+    findingRecorded?: string;
+    regressionPromoted?: string;
   }>;
 };
 
@@ -72,6 +93,13 @@ export default async function DiagnosticsPage({
       defaultConversationId,
     );
   }
+
+  const findings = diagnostics
+    ? await listConversationDiagnosticFindings(
+        project.id,
+        diagnostics.conversation.id,
+      )
+    : [];
 
   const health = analytics.last24Hours;
 
@@ -449,14 +477,223 @@ export default async function DiagnosticsPage({
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <GitBranch className="size-5" />
-                    Next Diagnostics Milestone
+                    <Bug className="size-5" />
+                    Tester Findings & Regression Cases
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Add explicit tester annotations and promote selected failures
-                  into reusable regression cases after this correlated read
-                  model is validated in UAT.
+                <CardContent className="space-y-6">
+                  {params.findingRecorded === "1" && (
+                    <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
+                      Tester finding recorded.
+                    </p>
+                  )}
+                  {params.regressionPromoted === "1" && (
+                    <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
+                      Regression case promoted with synthetic test data.
+                    </p>
+                  )}
+
+                  <div className="rounded-md border bg-white p-4">
+                    <h3 className="font-semibold">Record a tester finding</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Describe the observable problem. Do not enter secrets,
+                      credentials, or personal information.
+                    </p>
+                    <ActionStateForm
+                      action={recordConversationDiagnosticFinding}
+                      className="mt-4 space-y-4"
+                    >
+                      <input
+                        name="projectId"
+                        type="hidden"
+                        value={project.id}
+                      />
+                      <input
+                        name="conversationId"
+                        type="hidden"
+                        value={diagnostics.conversation.id}
+                      />
+                      <div className="space-y-2">
+                        <Label htmlFor="diagnostic-category">Category</Label>
+                        <select
+                          className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs"
+                          defaultValue="response_quality"
+                          id="diagnostic-category"
+                          name="category"
+                        >
+                          {CONVERSATION_DIAGNOSTIC_CATEGORIES.map(
+                            (category) => (
+                              <option key={category} value={category}>
+                                {
+                                  CONVERSATION_DIAGNOSTIC_CATEGORY_LABELS[
+                                    category
+                                  ]
+                                }
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="diagnostic-note">Finding</Label>
+                        <Textarea
+                          id="diagnostic-note"
+                          maxLength={2000}
+                          minLength={10}
+                          name="note"
+                          placeholder="Describe what happened and what should have happened."
+                          required
+                          rows={4}
+                        />
+                      </div>
+                      <ActionFormError />
+                      <FormSubmitButton
+                        icon={<Bug className="size-4" />}
+                        label="Record finding"
+                        pendingLabel="Recording..."
+                      />
+                    </ActionStateForm>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="font-semibold">Recorded findings</h3>
+                    {findings.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No tester findings have been recorded for this
+                        conversation.
+                      </p>
+                    ) : (
+                      findings.map(({ finding, author, regressionCase }) => (
+                        <div
+                          className="rounded-md border bg-white p-4"
+                          key={finding.id}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold">
+                                {CONVERSATION_DIAGNOSTIC_CATEGORY_LABELS[
+                                  finding.category as ConversationDiagnosticCategory
+                                ] ?? formatLabel(finding.category)}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {author.name ?? author.email} -{" "}
+                                {formatDate(finding.createdAt)}
+                              </p>
+                            </div>
+                            <span className="rounded-md border px-2 py-1 text-xs">
+                              Finding #{finding.id}
+                            </span>
+                          </div>
+                          <p className="mt-3 whitespace-pre-wrap text-sm">
+                            {finding.note}
+                          </p>
+
+                          {regressionCase ? (
+                            <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-4">
+                              <div className="flex items-center gap-2 font-semibold text-green-900">
+                                <FlaskConical className="size-4" />
+                                {regressionCase.title}
+                              </div>
+                              <p className="mt-2 text-xs font-medium uppercase tracking-wide text-green-800">
+                                Synthetic input
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-sm">
+                                {regressionCase.syntheticInput}
+                              </p>
+                              <p className="mt-3 text-xs font-medium uppercase tracking-wide text-green-800">
+                                Expected behavior
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-sm">
+                                {regressionCase.expectedBehavior}
+                              </p>
+                            </div>
+                          ) : (
+                            <ActionStateForm
+                              action={promoteConversationRegressionCase}
+                              className="mt-4 space-y-4 rounded-md border bg-muted/30 p-4"
+                            >
+                              <input
+                                name="projectId"
+                                type="hidden"
+                                value={project.id}
+                              />
+                              <input
+                                name="conversationId"
+                                type="hidden"
+                                value={diagnostics.conversation.id}
+                              />
+                              <input
+                                name="findingId"
+                                type="hidden"
+                                value={finding.id}
+                              />
+                              <div>
+                                <h4 className="font-semibold">
+                                  Promote to regression case
+                                </h4>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  Write a synthetic case. Transcript messages
+                                  are never copied automatically.
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label
+                                  htmlFor={`regression-title-${finding.id}`}
+                                >
+                                  Title
+                                </Label>
+                                <Input
+                                  id={`regression-title-${finding.id}`}
+                                  maxLength={120}
+                                  minLength={3}
+                                  name="title"
+                                  placeholder="Short regression name"
+                                  required
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label
+                                  htmlFor={`regression-input-${finding.id}`}
+                                >
+                                  Synthetic visitor input
+                                </Label>
+                                <Textarea
+                                  id={`regression-input-${finding.id}`}
+                                  maxLength={2000}
+                                  name="syntheticInput"
+                                  placeholder="Use invented, non-personal test input."
+                                  required
+                                  rows={3}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label
+                                  htmlFor={`regression-expected-${finding.id}`}
+                                >
+                                  Expected behavior
+                                </Label>
+                                <Textarea
+                                  id={`regression-expected-${finding.id}`}
+                                  maxLength={2000}
+                                  minLength={10}
+                                  name="expectedBehavior"
+                                  placeholder="Describe the response, route, or lifecycle result that should occur."
+                                  required
+                                  rows={3}
+                                />
+                              </div>
+                              <ActionFormError />
+                              <FormSubmitButton
+                                icon={<FlaskConical className="size-4" />}
+                                label="Promote regression case"
+                                pendingLabel="Promoting..."
+                              />
+                            </ActionStateForm>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
