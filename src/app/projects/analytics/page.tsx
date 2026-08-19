@@ -1,9 +1,16 @@
-import { BarChart3, Workflow } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  BrainCircuit,
+  Workflow,
+  Wrench,
+} from "lucide-react";
 import Link from "next/link";
 import { NoProjectState } from "@/components/no-project-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getProjectActionFlowAnalytics } from "@/lib/action-flow-analytics";
 import { getProjectChatAnalytics } from "@/lib/chat-analytics";
+import { getPhase17ProjectAnalytics } from "@/lib/phase17-analytics";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
@@ -23,6 +30,65 @@ function formatPercent(value: number) {
 
 function formatWholePercent(value: number) {
   return `${value}%`;
+}
+
+function Metric({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-md border bg-white p-3">
+      <p className="text-xs uppercase text-muted-foreground">{label}</p>
+      <p className="text-xl font-semibold">{value}</p>
+    </div>
+  );
+}
+
+type LifecycleRow = {
+  key: string;
+  label: string;
+  starts: number;
+  completed: number;
+  cancelled: number;
+};
+
+function LifecycleTable({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: LifecycleRow[];
+}) {
+  return (
+    <div className="overflow-x-auto rounded-md border bg-white">
+      <p className="border-b px-3 py-2 font-medium">{title}</p>
+      {rows.length === 0 ? (
+        <p className="p-3 text-sm text-muted-foreground">
+          No recorded activity.
+        </p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left">
+              <th className="px-3 py-2">Name</th>
+              <th className="py-2 pr-3">Starts</th>
+              <th className="py-2 pr-3">Completed</th>
+              <th className="py-2 pr-3">Cancelled</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className="border-b last:border-b-0">
+                <td className="px-3 py-2 font-medium capitalize">
+                  {row.label}
+                </td>
+                <td className="py-2 pr-3">{formatNumber(row.starts)}</td>
+                <td className="py-2 pr-3">{formatNumber(row.completed)}</td>
+                <td className="py-2 pr-3">{formatNumber(row.cancelled)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
 }
 
 type SummaryCardProps = {
@@ -64,9 +130,10 @@ export default async function ProjectAnalyticsPage() {
   }
 
   const { project: selectedProject } = context;
-  const [analytics, flowAnalytics] = await Promise.all([
+  const [analytics, flowAnalytics, phase17Analytics] = await Promise.all([
     getProjectChatAnalytics(selectedProject.id),
     getProjectActionFlowAnalytics(selectedProject.id),
+    getPhase17ProjectAnalytics(selectedProject.id),
   ]);
 
   return (
@@ -81,8 +148,256 @@ export default async function ProjectAnalyticsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Metrics are project-scoped and based on chat request logs.
+              Project-scoped lifecycle, conversation, model, tool, and request
+              telemetry from recorded runtime activity.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Lifecycle and Conversion
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <Metric
+                label="Starts"
+                value={formatNumber(phase17Analytics.lifecycle.starts)}
+              />
+              <Metric
+                label="Completed"
+                value={formatNumber(phase17Analytics.lifecycle.completed)}
+              />
+              <Metric
+                label="Completion"
+                value={formatPercent(phase17Analytics.lifecycle.completionRate)}
+              />
+              <Metric
+                label="Cancelled"
+                value={formatNumber(phase17Analytics.lifecycle.cancelled)}
+              />
+              <Metric
+                label="Cancellation"
+                value={formatPercent(
+                  phase17Analytics.lifecycle.cancellationRate,
+                )}
+              />
+              <Metric
+                label="Corrections"
+                value={formatNumber(phase17Analytics.lifecycle.corrections)}
+              />
+              <Metric
+                label="Retried fields"
+                value={formatNumber(phase17Analytics.lifecycle.retriedFields)}
+              />
+              <Metric
+                label="Validation failures"
+                value={formatNumber(
+                  phase17Analytics.lifecycle.validationFailures,
+                )}
+              />
+              <Metric
+                label="Handoffs"
+                value={formatNumber(phase17Analytics.lifecycle.handoffs)}
+              />
+              <Metric
+                label="Operations"
+                value={`${formatNumber(phase17Analytics.lifecycle.successfulOperations)} passed / ${formatNumber(phase17Analytics.lifecycle.failedOperations)} failed`}
+              />
+            </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <LifecycleTable
+                title="By action or task"
+                rows={phase17Analytics.byTask}
+              />
+              <LifecycleTable
+                title="By channel"
+                rows={phase17Analytics.byChannel}
+              />
+              <LifecycleTable
+                title="By published version"
+                rows={phase17Analytics.byVersion}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <BrainCircuit className="h-5 w-5" />
+              Model and Tool Runtime
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <Metric
+                label="Model turns"
+                value={formatNumber(phase17Analytics.model.modelTurns)}
+              />
+              <Metric
+                label="Deterministic turns"
+                value={formatNumber(phase17Analytics.model.deterministicTurns)}
+              />
+              <Metric
+                label="Model attempts"
+                value={formatNumber(phase17Analytics.model.modelAttempts)}
+              />
+              <Metric
+                label="Multi-attempt turns"
+                value={`${formatNumber(phase17Analytics.model.multiAttemptTurns)} (${formatPercent(phase17Analytics.model.multiAttemptRate)})`}
+              />
+              <Metric
+                label="Average model latency"
+                value={formatMs(phase17Analytics.model.averageLatencyMs)}
+              />
+              <Metric
+                label="Input tokens"
+                value={formatNumber(phase17Analytics.model.inputTokens)}
+              />
+              <Metric
+                label="Output tokens"
+                value={formatNumber(phase17Analytics.model.outputTokens)}
+              />
+              <Metric
+                label="Estimated cost units"
+                value={formatNumber(phase17Analytics.model.estimatedCostUnits)}
+              />
+              <Metric
+                label="Grounded turns"
+                value={formatNumber(phase17Analytics.model.groundedTurns)}
+              />
+              <Metric
+                label="Safety blocks"
+                value={formatNumber(phase17Analytics.model.safetyBlocks)}
+              />
+            </div>
+
+            <div className="overflow-x-auto rounded-md border bg-white">
+              <div className="flex items-center gap-2 border-b px-3 py-2 font-medium">
+                <Wrench className="h-4 w-4" /> Tool activity
+              </div>
+              {phase17Analytics.tools.length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">
+                  No recorded tool requests.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="px-3 py-2">Tool</th>
+                      <th className="py-2 pr-3">Requests</th>
+                      <th className="py-2 pr-3">Succeeded</th>
+                      <th className="py-2 pr-3">Failed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {phase17Analytics.tools.map((tool) => (
+                      <tr
+                        key={tool.toolId}
+                        className="border-b last:border-b-0"
+                      >
+                        <td className="px-3 py-2 font-medium">{tool.toolId}</td>
+                        <td className="py-2 pr-3">
+                          {formatNumber(tool.requested)}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {formatNumber(tool.succeeded)}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {formatNumber(tool.failed)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">
+              Field and Route Attribution
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-2">
+            <div className="overflow-x-auto rounded-md border bg-white">
+              <p className="border-b px-3 py-2 font-medium">Field activity</p>
+              {phase17Analytics.fields.length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">
+                  No recorded fields.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="px-3 py-2">Field</th>
+                      <th className="py-2 pr-3">Collected</th>
+                      <th className="py-2 pr-3">Validation fails</th>
+                      <th className="py-2 pr-3">Retried</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {phase17Analytics.fields.map((field) => (
+                      <tr
+                        key={field.fieldKey}
+                        className="border-b last:border-b-0"
+                      >
+                        <td className="px-3 py-2 font-medium">
+                          {field.fieldKey}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {formatNumber(field.collected)}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {formatNumber(field.validationFailures)}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {formatNumber(field.retried)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div className="overflow-x-auto rounded-md border bg-white">
+              <p className="border-b px-3 py-2 font-medium">
+                Recorded branch routes
+              </p>
+              {phase17Analytics.routes.length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">
+                  No recorded branch decisions.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="px-3 py-2">Route</th>
+                      <th className="py-2 pr-3">Selections</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {phase17Analytics.routes.map((route) => (
+                      <tr
+                        key={route.route}
+                        className="border-b last:border-b-0"
+                      >
+                        <td className="px-3 py-2 font-medium">{route.route}</td>
+                        <td className="py-2 pr-3">
+                          {formatNumber(route.count)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </CardContent>
         </Card>
 
