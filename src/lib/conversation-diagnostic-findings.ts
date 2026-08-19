@@ -75,6 +75,7 @@ export async function createConversationRegressionCase(input: {
   conversationId: number;
   createdByUserId: number;
   expectedBehavior: string;
+  evaluationCategory: string;
   findingId: number;
   projectId: number;
   syntheticInput: string;
@@ -115,6 +116,7 @@ export async function createConversationRegressionCase(input: {
       title: input.title,
       syntheticInput: input.syntheticInput,
       expectedBehavior: input.expectedBehavior,
+      evaluationCategory: input.evaluationCategory,
     })
     .returning();
 

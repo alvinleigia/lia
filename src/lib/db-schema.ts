@@ -700,6 +700,9 @@ export const conversationRegressionCases = pgTable(
     title: text("title").notNull(),
     syntheticInput: text("synthetic_input").notNull(),
     expectedBehavior: text("expected_behavior").notNull(),
+    evaluationCategory: text("evaluation_category")
+      .notNull()
+      .default("completion"),
     status: text("status").notNull().default("active"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -709,6 +712,70 @@ export const conversationRegressionCases = pgTable(
     index("conversation_regression_cases_status_idx").on(table.status),
     uniqueIndex("conversation_regression_cases_source_finding_unique").on(
       table.sourceFindingId,
+    ),
+  ],
+);
+
+export const conversationEvaluationPolicies = pgTable(
+  "conversation_evaluation_policies",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    minimumPassRate: integer("minimum_pass_rate").notNull().default(95),
+    maximumSafetyFailures: integer("maximum_safety_failures")
+      .notNull()
+      .default(0),
+    requiredCategories: jsonb("required_categories")
+      .$type<string[]>()
+      .notNull()
+      .default([
+        "extraction",
+        "correction",
+        "clarification",
+        "safety",
+        "completion",
+      ]),
+    updatedByUserId: integer("updated_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("conversation_evaluation_policies_project_unique").on(
+      table.projectId,
+    ),
+  ],
+);
+
+export const conversationEvaluationResults = pgTable(
+  "conversation_evaluation_results",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    regressionCaseId: integer("regression_case_id")
+      .notNull()
+      .references(() => conversationRegressionCases.id),
+    candidateLabel: text("candidate_label").notNull(),
+    passed: boolean("passed").notNull(),
+    observedBehavior: text("observed_behavior").notNull(),
+    evaluatedByUserId: integer("evaluated_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversation_evaluation_results_project_idx").on(table.projectId),
+    index("conversation_evaluation_results_case_idx").on(
+      table.regressionCaseId,
+    ),
+    index("conversation_evaluation_results_candidate_idx").on(
+      table.projectId,
+      table.candidateLabel,
     ),
   ],
 );
@@ -1806,6 +1873,14 @@ export type InsertConversationRegressionCase =
   typeof conversationRegressionCases.$inferInsert;
 export type SelectConversationRegressionCase =
   typeof conversationRegressionCases.$inferSelect;
+export type InsertConversationEvaluationPolicy =
+  typeof conversationEvaluationPolicies.$inferInsert;
+export type SelectConversationEvaluationPolicy =
+  typeof conversationEvaluationPolicies.$inferSelect;
+export type InsertConversationEvaluationResult =
+  typeof conversationEvaluationResults.$inferInsert;
+export type SelectConversationEvaluationResult =
+  typeof conversationEvaluationResults.$inferSelect;
 export type InsertChannelMessage = typeof channelMessages.$inferInsert;
 export type SelectChannelMessage = typeof channelMessages.$inferSelect;
 export type InsertMediaAsset = typeof mediaAssets.$inferInsert;

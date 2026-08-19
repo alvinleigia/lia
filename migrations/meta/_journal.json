@@ -281,6 +281,13 @@
       "when": 1787221800000,
       "tag": "0039_reusable_content_registry",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1787308200000,
+      "tag": "0040_conversation_evaluation_gates",
+      "breakpoints": true
     }
   ]
 }

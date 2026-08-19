@@ -213,6 +213,11 @@ export default async function DiagnosticsPage({
                     <Activity className="size-5" />
                     Runtime Snapshot
                   </CardTitle>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/projects/diagnostics/evaluations">
+                      Evaluation gate
+                    </Link>
+                  </Button>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -635,6 +640,27 @@ export default async function DiagnosticsPage({
                                   Write a synthetic case. Transcript messages
                                   are never copied automatically.
                                 </p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label
+                                  htmlFor={`regression-category-${finding.id}`}
+                                >
+                                  Evaluation dataset
+                                </Label>
+                                <select
+                                  className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs"
+                                  defaultValue="completion"
+                                  id={`regression-category-${finding.id}`}
+                                  name="evaluationCategory"
+                                >
+                                  <option value="extraction">Extraction</option>
+                                  <option value="correction">Correction</option>
+                                  <option value="clarification">
+                                    Clarification
+                                  </option>
+                                  <option value="safety">Safety</option>
+                                  <option value="completion">Completion</option>
+                                </select>
                               </div>
                               <div className="space-y-2">
                                 <Label

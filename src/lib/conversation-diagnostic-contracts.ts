@@ -40,4 +40,11 @@ export const conversationRegressionCaseSchema = z.object({
   title: z.string().trim().min(3).max(120),
   syntheticInput: z.string().trim().min(1).max(2000),
   expectedBehavior: z.string().trim().min(10).max(2000),
+  evaluationCategory: z.enum([
+    "extraction",
+    "correction",
+    "clarification",
+    "safety",
+    "completion",
+  ]),
 });
