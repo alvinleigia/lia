@@ -23,6 +23,7 @@ export default defineConfig({
     "hybrid-flow.spec.ts",
     "media-storage-contract.spec.ts",
     "phase17-analytics.spec.ts",
+    "runtime-action-experiments.spec.ts",
     "runtime-stage-timing.spec.ts",
     "whatsapp-template-contracts.spec.ts",
   ],

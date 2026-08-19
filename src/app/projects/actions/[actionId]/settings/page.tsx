@@ -412,9 +412,9 @@ export default async function ActionSettingsPage({
                   <div className="space-y-1">
                     <p className="font-medium">Experiment Metadata</p>
                     <p className="text-sm text-muted-foreground">
-                      Mark this flow as a variant now. Traffic allocation and
-                      comparison reporting can use this metadata in the next
-                      layer.
+                      Published variants sharing an experiment key receive a
+                      stable share of conversations based on their traffic
+                      weights.
                     </p>
                   </div>
                 </div>

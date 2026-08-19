@@ -2187,7 +2187,9 @@ export async function processChannelFlowText(input: {
     });
   }
 
-  const actions = await listRuntimeProjectActions(input.projectId);
+  const actions = await listRuntimeProjectActions(input.projectId, {
+    allocationKey: input.conversationId,
+  });
   const triggeredAction = findTriggeredAction(actions, input.text);
 
   if (!triggeredAction) {
