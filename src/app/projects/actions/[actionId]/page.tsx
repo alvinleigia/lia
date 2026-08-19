@@ -76,6 +76,7 @@ type ActionDetailPageProps = {
     versionActivated?: string;
     versionRestored?: string;
     templateSaved?: string;
+    cloned?: string;
   }>;
 };
 
@@ -259,6 +260,12 @@ export default async function ActionDetailPage({
                     Canvas
                   </Link>
                 </Button>
+                <Button asChild variant="outline">
+                  <Link href={`/projects/actions/${action.id}/clone`}>
+                    <Copy className="h-4 w-4" />
+                    Clone
+                  </Link>
+                </Button>
                 {currentPublishedVersion ? (
                   <Button asChild variant="outline">
                     <Link href={`/projects/actions/${action.id}/hybrid-test`}>
@@ -300,7 +307,8 @@ export default async function ActionDetailPage({
               query.published ||
               query.versionActivated ||
               query.versionRestored ||
-              query.templateSaved) && (
+              query.templateSaved ||
+              query.cloned) && (
               <p className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
                 <CheckCircle2 className="h-4 w-4 inline mr-2" />
                 {query.published
@@ -311,7 +319,9 @@ export default async function ActionDetailPage({
                       ? "Draft restored from version."
                       : query.templateSaved
                         ? "Template saved."
-                        : "Changes saved."}
+                        : query.cloned
+                          ? "Action cloned into this project."
+                          : "Changes saved."}
               </p>
             )}
 

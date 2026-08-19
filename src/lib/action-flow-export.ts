@@ -119,6 +119,44 @@ const actionFlowExportSchema = z.object({
 type ParsedActionFlowExport = z.infer<typeof actionFlowExportSchema>;
 type ParsedActionFlowExportStep = ParsedActionFlowExport["steps"][number];
 
+export type ActionFlowResourceKind =
+  | "catalog"
+  | "catalog_product"
+  | "connected_action"
+  | "conversational_task_version"
+  | "media_asset"
+  | "operation";
+
+export type ActionFlowResourceReference = {
+  kind: ActionFlowResourceKind;
+  sourceId: number;
+  stepId: number;
+  stepLabel: string;
+};
+
+export type ActionFlowMappedConversationalTask = {
+  contextKeys: string[];
+  fieldKeys: string[];
+  name: string;
+  objective: string;
+  outcomes: unknown[];
+  taskId: number;
+  taskVersionId: number;
+  versionNumber: number;
+};
+
+export type ActionFlowResourceMappings = {
+  catalogs?: Record<number, number | null>;
+  catalogProducts?: Record<number, number | null>;
+  connectedActions?: Record<number, number | null>;
+  conversationalTaskVersions?: Record<
+    number,
+    ActionFlowMappedConversationalTask | null
+  >;
+  mediaAssets?: Record<number, number | null>;
+  operations?: Record<number, number | null>;
+};
+
 export type ActionFlowImportResult = {
   actionId: number;
   branchRuleCount: number;
@@ -225,6 +263,7 @@ export async function importActionFlowExport(input: {
   exportData: z.infer<typeof actionFlowExportSchema>;
   nameOverride?: string;
   projectId: number;
+  resourceMappings?: ActionFlowResourceMappings;
 }): Promise<ActionFlowImportResult> {
   const actionName = normalizeImportedActionName(
     input.nameOverride || `${input.exportData.action.name} (Imported)`,
@@ -247,7 +286,11 @@ export async function importActionFlowExport(input: {
   );
 
   for (const step of orderedSteps) {
-    const settings = buildImportedStepSettings(step, stepIdMap);
+    const settings = buildImportedActionFlowStepSettings(
+      step,
+      stepIdMap,
+      input.resourceMappings,
+    );
     const importedStep = await createActionFlowStep({
       actionId: importedAction.id,
       fieldKey: step.fieldKey,
@@ -256,7 +299,7 @@ export async function importActionFlowExport(input: {
       isRequired: step.isRequired,
       label: step.label,
       nextStepId: null,
-      operationId: null,
+      operationId: getMappedOperationId(step, input.resourceMappings),
       options: step.options,
       projectId: input.projectId,
       prompt: step.prompt,
@@ -294,7 +337,11 @@ export async function importActionFlowExport(input: {
       step.nextStepId === null
         ? null
         : (stepIdMap.get(step.nextStepId) ?? null);
-    const settings = buildImportedStepSettings(step, stepIdMap);
+    const settings = buildImportedActionFlowStepSettings(
+      step,
+      stepIdMap,
+      input.resourceMappings,
+    );
     await updateActionFlowStep({
       actionId: importedAction.id,
       fieldKey: step.fieldKey,
@@ -303,7 +350,7 @@ export async function importActionFlowExport(input: {
       isRequired: step.isRequired,
       label: step.label,
       nextStepId,
-      operationId: null,
+      operationId: getMappedOperationId(step, input.resourceMappings),
       options: step.options,
       projectId: input.projectId,
       prompt: step.prompt,
@@ -349,6 +396,73 @@ export async function importActionFlowExport(input: {
   };
 }
 
+export function collectActionFlowResourceReferences(
+  exportData: Pick<ParsedActionFlowExport, "steps">,
+) {
+  const references = new Map<string, ActionFlowResourceReference>();
+
+  const addReference = (
+    kind: ActionFlowResourceKind,
+    sourceId: unknown,
+    step: ParsedActionFlowExportStep,
+  ) => {
+    const normalizedId = toPositiveNumber(sourceId);
+    if (normalizedId === null) return;
+    const key = `${kind}:${normalizedId}`;
+    if (references.has(key)) return;
+    references.set(key, {
+      kind,
+      sourceId: normalizedId,
+      stepId: step.id,
+      stepLabel: step.label?.trim() || `Step ${step.sortOrder}`,
+    });
+  };
+
+  const visitSettings = (
+    value: unknown,
+    step: ParsedActionFlowExportStep,
+  ): void => {
+    if (Array.isArray(value)) {
+      value.forEach((entry) => {
+        visitSettings(entry, step);
+      });
+      return;
+    }
+    if (!isRecord(value)) return;
+
+    for (const [key, entry] of Object.entries(value)) {
+      if (key === "mediaAssetId") addReference("media_asset", entry, step);
+      if (key === "productCatalogId" || key === "catalogId") {
+        addReference("catalog", entry, step);
+      }
+      if (key === "productId") addReference("catalog_product", entry, step);
+      if (key === "productIds" && Array.isArray(entry)) {
+        entry.forEach((id) => {
+          addReference("catalog_product", id, step);
+        });
+      }
+      if (
+        key === "connectedActionId" ||
+        key === "exportedConnectedActionId" ||
+        key === "importedConnectedActionId"
+      ) {
+        addReference("connected_action", entry, step);
+      }
+      if (key === "taskVersionId") {
+        addReference("conversational_task_version", entry, step);
+      }
+      visitSettings(entry, step);
+    }
+  };
+
+  for (const step of exportData.steps) {
+    addReference("operation", step.operationId, step);
+    visitSettings(step.settings, step);
+  }
+
+  return [...references.values()];
+}
+
 function buildPortableExportStepSettings(step: {
   settings: Record<string, unknown>;
   stepType: string;
@@ -388,15 +502,17 @@ function buildPortableExportStepSettings(step: {
   return sanitizeActionFlowExportValue(settings) as Record<string, unknown>;
 }
 
-function buildImportedStepSettings(
+export function buildImportedActionFlowStepSettings(
   step: ParsedActionFlowExportStep,
   stepIdMap: Map<number, number>,
+  resourceMappings?: ActionFlowResourceMappings,
 ) {
+  const mappedOperationId = getMappedOperationId(step, resourceMappings);
   const settings: Record<string, unknown> =
-    step.operationId === null
-      ? { ...step.settings }
+    step.operationId === null || mappedOperationId !== null
+      ? remapProjectResourceSettings(step.settings, resourceMappings)
       : {
-          ...step.settings,
+          ...remapProjectResourceSettings(step.settings, resourceMappings),
           importedOperationId: step.operationId,
           importedOperationNote:
             "Operation links are not restored automatically during import.",
@@ -408,13 +524,28 @@ function buildImportedStepSettings(
       : isRecord(step.settings.conversationalTask)
         ? step.settings.conversationalTask
         : null;
+    const sourceTaskVersionId = getConversationalTaskVersionId(exportedTask);
+    const mappedTask =
+      sourceTaskVersionId === null
+        ? undefined
+        : resourceMappings?.conversationalTaskVersions?.[sourceTaskVersionId];
     delete settings.conversationalTask;
     delete settings.exportedConversationalTask;
-    if (exportedTask) {
-      settings.importedConversationalTask = exportedTask;
+    delete settings.importedConversationalTask;
+    delete settings.conversationalTaskImportNote;
+    delete settings.conversationalTaskExportNote;
+    if (mappedTask) {
+      settings.conversationalTask = buildMappedConversationalTaskSettings(
+        exportedTask,
+        mappedTask,
+      );
+    } else {
+      if (exportedTask) {
+        settings.importedConversationalTask = exportedTask;
+      }
+      settings.conversationalTaskImportNote =
+        "Reconnect this node to a published task version in the current project.";
     }
-    settings.conversationalTaskImportNote =
-      "Reconnect this node to a published task version in the current project.";
   }
 
   if (step.stepType === "connect_flow") {
@@ -423,17 +554,140 @@ function buildImportedStepSettings(
       toPositiveNumber(step.settings.exportedConnectedActionId);
     delete settings.connectedActionId;
     delete settings.exportedConnectedActionId;
+    delete settings.importedConnectedActionId;
+    delete settings.connectedActionImportNote;
+    delete settings.connectedActionExportNote;
 
-    if (connectedActionId !== null) {
+    const mappedActionId =
+      connectedActionId === null
+        ? undefined
+        : resourceMappings?.connectedActions?.[connectedActionId];
+
+    if (mappedActionId) {
+      settings.connectedActionId = mappedActionId;
+    } else if (connectedActionId !== null) {
       settings.importedConnectedActionId = connectedActionId;
+      settings.connectedActionImportNote =
+        "Connected flow links are not restored automatically during import. Select an active action in this project before publishing.";
     }
 
     settings.connectFlowMode = "jump";
-    settings.connectedActionImportNote =
-      "Connected flow links are not restored automatically during import. Select an active action in this project before publishing.";
   }
 
   return remapHybridStepSettings(settings, stepIdMap);
+}
+
+function getMappedOperationId(
+  step: ParsedActionFlowExportStep,
+  resourceMappings?: ActionFlowResourceMappings,
+) {
+  if (step.operationId === null) return null;
+  return resourceMappings?.operations?.[step.operationId] ?? null;
+}
+
+function remapProjectResourceSettings(
+  value: Record<string, unknown>,
+  resourceMappings?: ActionFlowResourceMappings,
+) {
+  if (!resourceMappings) return { ...value };
+
+  const visit = (entry: unknown): unknown => {
+    if (Array.isArray(entry)) return entry.map(visit);
+    if (!isRecord(entry)) return entry;
+
+    const mapped: Record<string, unknown> = {};
+    for (const [key, nestedValue] of Object.entries(entry)) {
+      if (key === "mediaAssetId") {
+        const sourceId = toPositiveNumber(nestedValue);
+        if (sourceId === null) {
+          mapped[key] = visit(nestedValue);
+          continue;
+        }
+        const targetId = resourceMappings.mediaAssets?.[sourceId];
+        if (targetId) mapped[key] = targetId;
+        continue;
+      }
+      if (key === "productCatalogId" || key === "catalogId") {
+        const sourceId = toPositiveNumber(nestedValue);
+        if (sourceId === null) {
+          mapped[key] = visit(nestedValue);
+          continue;
+        }
+        const targetId = resourceMappings.catalogs?.[sourceId];
+        if (targetId) mapped[key] = targetId;
+        continue;
+      }
+      if (key === "productId") {
+        const sourceId = toPositiveNumber(nestedValue);
+        if (sourceId === null) {
+          mapped[key] = visit(nestedValue);
+          continue;
+        }
+        const targetId = resourceMappings.catalogProducts?.[sourceId];
+        if (targetId) mapped[key] = targetId;
+        continue;
+      }
+      if (key === "productIds" && Array.isArray(nestedValue)) {
+        mapped[key] = nestedValue.flatMap((sourceValue) => {
+          const sourceId = toPositiveNumber(sourceValue);
+          const targetId =
+            sourceId === null
+              ? undefined
+              : resourceMappings.catalogProducts?.[sourceId];
+          return targetId ? [targetId] : [];
+        });
+        continue;
+      }
+      mapped[key] = visit(nestedValue);
+    }
+    return mapped;
+  };
+
+  return visit(value) as Record<string, unknown>;
+}
+
+function getConversationalTaskVersionId(value: Record<string, unknown> | null) {
+  if (!value) return null;
+  if (isRecord(value.task)) return toPositiveNumber(value.task.taskVersionId);
+  return toPositiveNumber(value.taskVersionId);
+}
+
+function buildMappedConversationalTaskSettings(
+  exportedTask: Record<string, unknown> | null,
+  mappedTask: ActionFlowMappedConversationalTask,
+) {
+  const wrapper =
+    exportedTask && isRecord(exportedTask.task) ? exportedTask : {};
+  const allowedFieldKeys = new Set(mappedTask.fieldKeys);
+  const allowedContextKeys = new Set(mappedTask.contextKeys);
+  const transferFieldKeys = Array.isArray(wrapper.transferFieldKeys)
+    ? wrapper.transferFieldKeys.filter(
+        (key): key is string =>
+          typeof key === "string" && allowedFieldKeys.has(key),
+      )
+    : [];
+  const transferContextKeys = Array.isArray(wrapper.transferContextKeys)
+    ? wrapper.transferContextKeys.filter(
+        (key): key is string =>
+          typeof key === "string" && allowedContextKeys.has(key),
+      )
+    : [];
+
+  return {
+    ...wrapper,
+    outcomeRoutes: {},
+    schemaVersion: 1,
+    task: {
+      name: mappedTask.name,
+      outcomes: mappedTask.outcomes,
+      schemaVersion: 1,
+      taskId: mappedTask.taskId,
+      taskVersionId: mappedTask.taskVersionId,
+      versionNumber: mappedTask.versionNumber,
+    },
+    transferContextKeys,
+    transferFieldKeys,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
