@@ -621,8 +621,10 @@ Run this after the milestone commit is deployed to staging.
    event summaries. Open `View submission` and confirm it is the same flow.
 6. [ ] Confirm the 24-hour request cards show requests, average latency, error
    rate, and model tokens.
-7. [ ] Confirm the page does not show provider payloads, hidden prompts,
-   credentials, collected field values, contact email, or contact phone.
+7. [ ] Confirm configured choice labels and selections remain readable, while
+   the page does not show provider payloads, hidden prompts, credentials,
+   names, email addresses, phone numbers, addresses, or free-text collected
+   values.
 
 Result: [ ] Pass [ ] Fail
 

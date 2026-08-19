@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  collectDiagnosticPublicChoiceValues,
   getDiagnosticSubmissionSource,
   redactDiagnosticMessage,
   redactDiagnosticText,
@@ -17,6 +18,7 @@ test("diagnostics redact collected values without changing ordinary text", () =>
     { fieldKey: "customerName", value: "Phase Sixteen Widget Tester" },
     { fieldKey: "customerEmail", value: "phase16.widget@example.com" },
     { fieldKey: "guestPhone", value: "+919876543211" },
+    { fieldKey: "customerAddress", value: "12 Test Street" },
     {
       fieldKey: "issueDescription",
       value: "Unable to access the billing dashboard.",
@@ -43,6 +45,9 @@ test("diagnostics redact collected values without changing ordinary text", () =>
   expect(
     redactDiagnosticText("Please describe the issue.", collectedFields),
   ).toBe("Please describe the issue.");
+  expect(redactDiagnosticText("12 Test Street", collectedFields)).toBe(
+    "[redacted address]",
+  );
 });
 
 test("diagnostics redact email and phone patterns not present in collected fields", () => {
@@ -51,12 +56,16 @@ test("diagnostics redact email and phone patterns not present in collected field
   ).toBe("Contact [redacted email] or [redacted phone].");
 });
 
-test("diagnostics preserve public option menus while redacting selected values", () => {
+test("diagnostics preserve configured selections while redacting free text", () => {
   const collectedFields = [
     { fieldKey: "issueCategory", value: "Billing" },
     { fieldKey: "issueCategoryName", value: "Billing" },
     { fieldKey: "priority", value: "Normal" },
     { fieldKey: "priorityName", value: "Normal" },
+    {
+      fieldKey: "issueDescription",
+      value: "Unable to access the billing dashboard.",
+    },
   ];
   const optionMenu = [
     "What kind of issue do you need help with?",
@@ -65,22 +74,52 @@ test("diagnostics preserve public option menus while redacting selected values",
     "3. Account access",
     "4. Other",
   ].join("\n");
+  const priorityMenu = [
+    "How urgent is this?",
+    "1. Low",
+    "2. Normal",
+    "3. High",
+  ].join("\n");
+  const publicChoiceValues = collectDiagnosticPublicChoiceValues([
+    { direction: "outbound", messageType: "buttons", text: optionMenu },
+    { direction: "outbound", messageType: "buttons", text: priorityMenu },
+  ]);
 
   expect(
     redactDiagnosticMessage(
       { direction: "outbound", messageType: "buttons", text: optionMenu },
       collectedFields,
+      publicChoiceValues,
     ),
   ).toBe(optionMenu);
   expect(
     redactDiagnosticMessage(
       { direction: "inbound", messageType: "selection", text: "Billing" },
       collectedFields,
+      publicChoiceValues,
     ),
-  ).toBe("[redacted collected value]");
-  expect(redactDiagnosticText("priority: Normal", collectedFields)).toBe(
-    "priority: [redacted collected value]",
+  ).toBe("Billing");
+  expect(
+    redactDiagnosticText(
+      "priority: Normal; issueCategory: Billing; issueDescription: Unable to access the billing dashboard.",
+      collectedFields,
+      publicChoiceValues,
+    ),
+  ).toBe(
+    "priority: Normal; issueCategory: Billing; issueDescription: [redacted collected value]",
   );
+});
+
+test("diagnostics never expose a sensitive field that matches a public choice", () => {
+  const publicChoiceValues = new Set(["normal"]);
+
+  expect(
+    redactDiagnosticText(
+      "Normal",
+      [{ fieldKey: "customerName", value: "Normal" }],
+      publicChoiceValues,
+    ),
+  ).toBe("[redacted name]");
 });
 
 test("diagnostics summarize validation, handoff, and cancellation events", () => {

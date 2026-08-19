@@ -28,6 +28,10 @@ function diagnosticRedactionLabel(fieldKey: string) {
     return "[redacted phone]";
   }
 
+  if (normalizedKey.includes("address") || normalizedKey.includes("location")) {
+    return "[redacted address]";
+  }
+
   if (
     /^(?:(?:customer|guest|contact|visitor|user|requester|person)(?:full)?|full|first|last)?name$/.test(
       normalizedKey,
@@ -39,6 +43,39 @@ function diagnosticRedactionLabel(fieldKey: string) {
   return "[redacted collected value]";
 }
 
+function normalizeDiagnosticValue(value: string) {
+  return value.trim().toLowerCase();
+}
+
+export function collectDiagnosticPublicChoiceValues(
+  messages: Array<{
+    direction: string;
+    messageType: string;
+    text: string | null;
+  }>,
+) {
+  const values = new Set<string>();
+
+  for (const message of messages) {
+    if (
+      message.direction !== "outbound" ||
+      message.messageType !== "buttons" ||
+      !message.text
+    ) {
+      continue;
+    }
+
+    for (const line of message.text.split(/\r?\n/)) {
+      const option = line.match(/^\s*\d+[.)]\s+(.+?)\s*$/)?.[1];
+      if (option) {
+        values.add(normalizeDiagnosticValue(option));
+      }
+    }
+  }
+
+  return values;
+}
+
 export function redactDiagnosticMessage(
   message: {
     direction: string;
@@ -46,13 +83,14 @@ export function redactDiagnosticMessage(
     text: string | null;
   },
   collectedFields: DiagnosticCollectedField[] = [],
+  publicChoiceValues: ReadonlySet<string> = new Set(),
 ) {
   const fieldsToRedact =
     message.direction === "outbound" && message.messageType === "buttons"
       ? []
       : collectedFields;
 
-  return redactDiagnosticText(message.text, fieldsToRedact);
+  return redactDiagnosticText(message.text, fieldsToRedact, publicChoiceValues);
 }
 
 function collectPrimitiveValues(value: unknown): string[] {
@@ -83,6 +121,7 @@ function escapeRegExp(value: string) {
 export function redactDiagnosticText(
   text: string | null,
   collectedFields: DiagnosticCollectedField[] = [],
+  publicChoiceValues: ReadonlySet<string> = new Set(),
 ) {
   if (!text) {
     return text;
@@ -93,7 +132,13 @@ export function redactDiagnosticText(
   for (const field of collectedFields) {
     const label = diagnosticRedactionLabel(field.fieldKey);
     for (const value of collectPrimitiveValues(field.value)) {
-      const normalizedValue = value.toLowerCase();
+      const normalizedValue = normalizeDiagnosticValue(value);
+      if (
+        label === "[redacted collected value]" &&
+        publicChoiceValues.has(normalizedValue)
+      ) {
+        continue;
+      }
       const existing = redactions.get(normalizedValue);
       if (!existing || existing.label === "[redacted collected value]") {
         redactions.set(normalizedValue, { label, value });
@@ -315,9 +360,10 @@ export async function getProjectConversationDiagnostics(
       { fieldKey, value: canonicalValue },
     ]),
   ];
+  const publicChoiceValues = collectDiagnosticPublicChoiceValues(messageRows);
   const messages = messageRows.map((message) => ({
     ...message,
-    text: redactDiagnosticMessage(message, collectedFields),
+    text: redactDiagnosticMessage(message, collectedFields, publicChoiceValues),
   }));
   const submissions = submissionRows.map((submission) => ({
     id: submission.id,
@@ -353,7 +399,11 @@ export async function getProjectConversationDiagnostics(
           );
   const submissionEvents = submissionEventRows.map((event) => ({
     ...event,
-    message: redactDiagnosticText(event.message, collectedFields),
+    message: redactDiagnosticText(
+      event.message,
+      collectedFields,
+      publicChoiceValues,
+    ),
   }));
 
   return {

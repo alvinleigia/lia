@@ -1131,8 +1131,9 @@ history.
 
 Conversation Diagnostics now correlates the project-scoped channel transcript,
 linked flow lifecycle events, conversational task runs, execution ownership,
-and aggregate 24-hour request health. The read model excludes provider
-payloads, hidden prompts, credentials, collected field values, and contact PII.
+and aggregate 24-hour request health. The read model preserves configured
+choice labels and selections while excluding provider payloads, hidden prompts,
+credentials, names, contact details, addresses, and free-text collected values.
 
 Phase 17 exit gate: teams can safely reuse, compare, evaluate, measure, and
 optimize versioned conversational automations.
