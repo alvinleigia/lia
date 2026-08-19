@@ -93,9 +93,9 @@ and manual staging UAT are complete through Phase 16 under the single-tester
 scope as of 2026-08-18. Phase 17 diagnostics and automated conversation
 scenarios have passed staging UAT.
 
-Current target: validate project-scoped tester findings and reusable regression
-promotion on staging, then continue the remaining Phase 17 evaluation and
-optimization milestones.
+Current target: complete the consolidated Phase 17 staging UAT for reuse,
+evaluations, analytics, version controls, experiments, and safe cross-project
+flow cloning.
 
 ### Phase Tracking Snapshot
 
@@ -107,7 +107,7 @@ optimization milestones.
 | 14 | Complete | Passed on staging under the single-tester scope on 2026-08-15; the missing disposable restore environment is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
-| 17 | Foundation, deterministic operation fixtures, project-scoped conversation diagnostics, tester findings, and regression promotion | Milestones 17.1-17.2 passed; 17.3 ready for staging UAT | Reuse, evaluations, analytics, optimization, version comparison, experiments, and cloning. |
+| 17 | Complete | Milestones 17.1-17.2 passed; consolidated staging UAT for 17.3-17.9 is ready | Manual staging sign-off. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
 
 ## Product Direction
@@ -1109,21 +1109,21 @@ Goal: help teams reuse and improve both conversational tasks and deterministic
 flows.
 
 - [x] Reusable subflows, custom templates, reusable-field suggestions, flow analytics, and experiment metadata have working foundations.
-- [ ] Add a typed reusable-field registry with ownership and compatibility checks.
-- [ ] Add reusable task, field-set, node, and composed-content templates.
-- [ ] Complete template approval, versioning, duplication, and upgrade guidance.
+- [x] Add a typed reusable-field registry with ownership and compatibility checks.
+- [x] Add reusable task, field-set, node, and composed-content templates.
+- [x] Complete template approval, versioning, duplication, and upgrade guidance.
 - [x] Add deterministic simulation fixtures for success, failure, retry, timeout, and provider responses.
 - [x] Add generated conversation scenarios that replay published deterministic replies, valid synthetic answers, and exact next-node progression without live side effects or model calls.
 - [x] Add a project-scoped conversation diagnostics view with a safe transcript, linked flow lifecycle, task/runtime status, and 24-hour request health.
 - [x] Add project-scoped tester findings and promote selected findings into synthetic regression cases without copying transcript values.
-- [ ] Add conversational evaluation datasets for extraction, correction, clarification, safety, and completion.
-- [ ] Add regression thresholds before model or prompt changes are promoted.
-- [ ] Measure task starts, completion, abandonment, correction, validation failure, handoff, and operation success.
-- [ ] Measure token, latency, cost, tool usage, and model-fallback rates.
-- [ ] Add conversion attribution by task, field, option, route, channel, and published version.
-- [ ] Add draft comparison, published-version diff, and rollback controls.
-- [ ] Add runtime traffic allocation for approved A/B variants.
-- [ ] Add flow and task cloning across projects with safe resource remapping.
+- [x] Add conversational evaluation datasets for extraction, correction, clarification, safety, and completion.
+- [x] Add regression thresholds before model or prompt changes are promoted.
+- [x] Measure task starts, completion, abandonment, correction, validation failure, handoff, and operation success.
+- [x] Measure token, latency, cost, tool usage, and model-fallback rates.
+- [x] Add conversion attribution by task, field, option, route, channel, and published version.
+- [x] Add draft comparison, published-version diff, and rollback controls.
+- [x] Add runtime traffic allocation for approved A/B variants.
+- [x] Add cross-project flow cloning with safe remapping for referenced tasks and resources.
 
 The published-flow automated test now synthesizes success, failure, retry,
 timeout, and provider-response operation attempts, classifies them with the
@@ -1149,6 +1149,31 @@ a categorized finding against the selected conversation and promote it into one
 reusable regression case. Promotion requires a tester-authored synthetic input
 and expected behavior; it never copies redacted transcript content into the
 regression record. Both mutations are tenant-scoped and auditable.
+
+The project template registry now owns typed reusable fields and versioned task,
+field-set, node, and composed-content definitions. Project and company ownership,
+compatibility checks, approval, duplication, retirement, and upgrade guidance are
+enforced by the same server-owned registry.
+
+Conversation evaluation datasets now cover extraction, correction,
+clarification, safety, and completion. Candidate results are evaluated against
+project-scoped pass-rate and safety thresholds before a model or prompt change
+can be treated as ready for promotion.
+
+Project analytics now report lifecycle conversion, abandonment, correction,
+validation failure, handoff, operation outcomes, token usage, latency, cost,
+tool usage, fallback rates, and attribution across tasks, fields, routes,
+channels, and published versions.
+
+Published action versions can be compared and a prior immutable version can be
+made current through the audited `Use Version` control. Approved action variants
+can carry a stable experiment key, variant label, and traffic weight for
+deterministic runtime allocation.
+
+Published flows can be cloned into another active project as an editable draft.
+The guided clone requires every referenced catalog, product, action, task,
+media asset, and operation to be explicitly mapped or intentionally left
+disconnected; credentials and runtime records are never copied.
 
 Phase 17 exit gate: teams can safely reuse, compare, evaluate, measure, and
 optimize versioned conversational automations.

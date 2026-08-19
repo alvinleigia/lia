@@ -177,6 +177,7 @@ test("regression promotion requires explicit synthetic input and expected behavi
       syntheticInput: "My test dashboard will not load.",
       expectedBehavior:
         "Answer the side question, restate the pending prompt, and preserve collected values.",
+      evaluationCategory: "clarification",
     }),
   ).toMatchObject({
     projectId: 94,
@@ -192,6 +193,7 @@ test("regression promotion requires explicit synthetic input and expected behavi
       title: "Missing input",
       syntheticInput: "",
       expectedBehavior: "",
+      evaluationCategory: "clarification",
     }).success,
   ).toBe(false);
 });

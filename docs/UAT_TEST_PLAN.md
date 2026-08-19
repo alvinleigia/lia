@@ -665,10 +665,119 @@ Run this on staging after selecting a conversation in `Automation` >
 
 Result: [ ] Pass [ ] Fail
 
-Phase 17 implementation still pending after this milestone: evaluation datasets
-and gates, full analytics/attribution, version comparison and rollback,
-experiments, and safe cross-project cloning. These remain tracked in
-`FLOW_BUILDER_ROADMAP.md`.
+## 17.4 Verify Reusable Fields And Content
+
+1. [ ] Open `Automation` > `Templates`.
+2. [ ] In `Reusable Fields`, register a project-owned text field with an unused
+   key. Confirm it appears as `active` with the correct type and ownership.
+3. [ ] In `Reusable Content`, create a `field set` using the registered field in
+   the JSON definition.
+4. [ ] Confirm the template shows `Compatible`, then select
+   `Approve Current Version`.
+5. [ ] Expand `Add a new version`, save a compatible change, and confirm the
+   version list and upgrade guidance update.
+6. [ ] Select `Duplicate Into Project` and confirm a separate project-owned copy
+   appears.
+7. [ ] Retire the temporary reusable field and confirm its status changes without
+   deleting the recorded template versions.
+
+Result: [ ] Pass [ ] Fail
+
+## 17.5 Verify Evaluation Datasets And Promotion Gate
+
+1. [ ] Open `Automation` > `Conversation Diagnostics`, then select
+   `Evaluation gate` in `Runtime Snapshot`.
+2. [ ] Enter a clear value in `Candidate under review` and select
+   `Load candidate`.
+3. [ ] Confirm the page lists the extraction, correction, clarification, safety,
+   and completion datasets.
+4. [ ] Set `Minimum pass rate (%)` and `Maximum safety failures`, then select
+   `Save thresholds`.
+5. [ ] For an available regression case, enter `Observed behavior`, choose
+   `Pass` or `Fail`, and select `Record`.
+6. [ ] Confirm the case result, pass rate, safety failures, unevaluated count,
+   and `Model or prompt promotion gate` status update consistently.
+
+Result: [ ] Pass [ ] Fail
+
+## 17.6 Verify Lifecycle Analytics And Attribution
+
+1. [ ] Open `Automation` > `Analytics`.
+2. [ ] Confirm `Lifecycle and Conversion` reports task starts, completion,
+   abandonment, correction, validation failure, handoff, and operation success.
+3. [ ] Confirm `Model and Tool Runtime` reports tokens, latency, cost units, tool
+   usage, and model fallback.
+4. [ ] Confirm `Field and Route Attribution` can be read by task, field, option,
+   route, channel, and published version where recorded data exists.
+5. [ ] Confirm empty metrics show a clear zero or empty state rather than an
+   error.
+
+Result: [ ] Pass [ ] Fail
+
+## 17.7 Verify Version Comparison And Rollback
+
+Use a test action with at least two published versions.
+
+1. [ ] Open `Automation` > `Actions`, then open the test action.
+2. [ ] Under `Version History`, select `View Diff` for each version and confirm
+   the displayed draft/published changes match the expected steps, branches,
+   and triggers.
+3. [ ] On a version that is not marked `Current runtime`, select `Use Version`.
+4. [ ] Confirm that version becomes `Current runtime` and an audit event is
+   recorded.
+5. [ ] Open `Test Flow`, run the automated test, and confirm it tests the newly
+   selected immutable version and passes.
+
+Result: [ ] Pass [ ] Fail
+
+## 17.8 Verify Experiment Traffic Allocation
+
+1. [ ] Open `Automation` > `Actions`, open a test action, then select `Settings`.
+2. [ ] Under `Experiment Metadata`, enter an experiment key, variant label, and
+   traffic weight, then save.
+3. [ ] Return to the action and confirm `Experiment Variant` shows the saved
+   values.
+4. [ ] Configure another approved action with the same experiment key and a
+   different variant label and weight.
+5. [ ] Start repeated new test conversations and confirm each conversation keeps
+   one stable allocated variant instead of changing during the conversation.
+
+Result: [ ] Pass [ ] Fail
+
+## 17.9 Verify Cross-Project Flow Clone And Resource Remapping
+
+Use a published source action and a second active project owned by the same
+company.
+
+1. [ ] Open `Automation` > `Actions`, open the source action, then select
+   `Clone`.
+2. [ ] Under `Target project`, select the second project.
+3. [ ] Under `Resource mappings`, explicitly map each referenced catalog,
+   product, action, published conversational task, media asset, and operation.
+   Leave a reference disconnected only when that is the behavior being tested.
+4. [ ] Select `Clone action`.
+5. [ ] Confirm the target action opens as an editable draft and shows
+   `Action cloned into this project.`
+6. [ ] Open its `Canvas` and confirm steps, routes, content, and mapped resource
+   references match the choices made on the clone screen.
+7. [ ] Confirm credentials, conversations, submissions, jobs, audit history,
+   and runtime keys were not copied.
+8. [ ] Resolve any intentionally disconnected reference, publish the clone, and
+   run `Test Flow` > `Run Automated Test` successfully.
+
+Result: [ ] Pass [ ] Fail
+
+## 17.10 Consolidated Phase 17 Sign-Off
+
+1. [ ] Confirm sections 17.1 through 17.9 pass.
+2. [ ] Confirm the latest automated runs for the core-input, operation-fixture,
+   and support-ticket actions show `Passed`.
+3. [ ] Confirm no Critical or High Phase 17 defects remain open.
+4. [ ] Record the tester and date below.
+
+Result: [ ] Pass [ ] Fail
+
+- Tester/date: `Pending`
 
 # Final Release Record
 
