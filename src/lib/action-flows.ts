@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type {
   ActionFlowCompilerIssueCode,
   ActionFlowCompilerIssueSource,
@@ -22,6 +22,9 @@ import {
   conversationExecutionStates,
   operationAttempts,
   projectActions,
+  projects,
+  reusableFieldDefinitions,
+  workspaces,
 } from "@/lib/db-schema";
 import { resolveTraceId } from "@/lib/execution-trace";
 import { getFlowStepChannelCapabilityIssues } from "@/lib/flow-channel-capabilities";
@@ -42,6 +45,7 @@ import {
   getOperationCredentialIssues,
   getProjectOperation,
 } from "@/lib/operations";
+import { resolveReusableFields } from "@/lib/reuse-registry";
 
 export type {
   ActionBranchOperator,
@@ -663,24 +667,54 @@ export async function listActionFlowSteps(projectId: number, actionId: number) {
 }
 
 export async function listProjectReusableActionFields(projectId: number) {
-  const rows = await db
-    .select({
-      action: projectActions,
-      step: actionFlowSteps,
-    })
-    .from(actionFlowSteps)
-    .innerJoin(projectActions, eq(projectActions.id, actionFlowSteps.actionId))
-    .where(
-      and(
-        eq(actionFlowSteps.projectId, projectId),
-        eq(projectActions.projectId, projectId),
+  const [projectContext] = await db
+    .select({ companyId: workspaces.companyId })
+    .from(projects)
+    .innerJoin(workspaces, eq(workspaces.id, projects.workspaceId))
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  const [rows, registeredFields] = await Promise.all([
+    db
+      .select({
+        action: projectActions,
+        step: actionFlowSteps,
+      })
+      .from(actionFlowSteps)
+      .innerJoin(
+        projectActions,
+        eq(projectActions.id, actionFlowSteps.actionId),
+      )
+      .where(
+        and(
+          eq(actionFlowSteps.projectId, projectId),
+          eq(projectActions.projectId, projectId),
+        ),
+      )
+      .orderBy(
+        asc(actionFlowSteps.fieldKey),
+        asc(projectActions.name),
+        asc(actionFlowSteps.sortOrder),
       ),
-    )
-    .orderBy(
-      asc(actionFlowSteps.fieldKey),
-      asc(projectActions.name),
-      asc(actionFlowSteps.sortOrder),
-    );
+    projectContext
+      ? db
+          .select()
+          .from(reusableFieldDefinitions)
+          .where(
+            and(
+              eq(reusableFieldDefinitions.companyId, projectContext.companyId),
+              eq(reusableFieldDefinitions.status, "active"),
+              or(
+                isNull(reusableFieldDefinitions.projectId),
+                eq(reusableFieldDefinitions.projectId, projectId),
+              ),
+            ),
+          )
+          .orderBy(
+            asc(reusableFieldDefinitions.projectId),
+            asc(reusableFieldDefinitions.key),
+          )
+      : Promise.resolve([]),
+  ]);
   const fields = new Map<
     string,
     {
@@ -691,6 +725,20 @@ export async function listProjectReusableActionFields(projectId: number) {
       usageCount: number;
     }
   >();
+
+  for (const field of resolveReusableFields(registeredFields)) {
+    const entry = fields.get(field.key) ?? {
+      actions: new Map<number, { id: number; name: string }>(),
+      inputTypes: new Set<string>(),
+      labels: new Set<string>(),
+      stepTypes: new Set<string>(),
+      usageCount: 0,
+    };
+    entry.inputTypes.add(field.fieldType);
+    entry.labels.add(field.label);
+    entry.stepTypes.add("registry");
+    fields.set(field.key, entry);
+  }
 
   for (const { action, step } of rows) {
     const fieldKey = step.fieldKey?.trim();

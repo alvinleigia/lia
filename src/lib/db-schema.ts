@@ -713,6 +713,95 @@ export const conversationRegressionCases = pgTable(
   ],
 );
 
+export const reusableFieldDefinitions = pgTable(
+  "reusable_field_definitions",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id),
+    projectId: integer("project_id").references(() => projects.id),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    fieldType: text("field_type").notNull(),
+    definition: jsonb("definition")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    status: text("status").notNull().default("active"),
+    createdByUserId: integer("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("reusable_field_definitions_company_idx").on(table.companyId),
+    index("reusable_field_definitions_project_idx").on(table.projectId),
+    index("reusable_field_definitions_status_idx").on(table.status),
+  ],
+);
+
+export const reusableTemplates = pgTable(
+  "reusable_templates",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id),
+    projectId: integer("project_id").references(() => projects.id),
+    kind: text("kind").notNull(),
+    key: text("key").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    status: text("status").notNull().default("draft"),
+    currentVersion: integer("current_version").notNull().default(1),
+    createdByUserId: integer("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("reusable_templates_company_idx").on(table.companyId),
+    index("reusable_templates_project_idx").on(table.projectId),
+    index("reusable_templates_kind_idx").on(table.kind),
+    index("reusable_templates_status_idx").on(table.status),
+  ],
+);
+
+export const reusableTemplateVersions = pgTable(
+  "reusable_template_versions",
+  {
+    id: serial("id").primaryKey(),
+    templateId: integer("template_id")
+      .notNull()
+      .references(() => reusableTemplates.id),
+    versionNumber: integer("version_number").notNull(),
+    payload: jsonb("payload")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    compatibility: jsonb("compatibility")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    approvedAt: timestamp("approved_at"),
+    approvedByUserId: integer("approved_by_user_id").references(() => users.id),
+    createdByUserId: integer("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("reusable_template_versions_template_idx").on(table.templateId),
+    uniqueIndex("reusable_template_versions_template_number_unique").on(
+      table.templateId,
+      table.versionNumber,
+    ),
+  ],
+);
+
 export const contacts = pgTable(
   "contacts",
   {

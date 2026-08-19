@@ -25,7 +25,12 @@ import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
+import {
+  listReusableFields,
+  listReusableTemplates,
+} from "@/lib/reuse-registry";
 import { applyActionTemplateAction } from "../actions/actions";
+import { ReuseRegistrySections } from "./reuse-registry-sections";
 
 type TemplatesPageProps = {
   searchParams: Promise<{
@@ -139,17 +144,23 @@ export default async function TemplatesPage({
   const { project } = context;
   const query = params.q?.trim() ?? "";
   const selectedBusinessType = params.businessType?.trim() ?? "";
-  const [actions, projectTemplateCatalog, projectTemplates] = await Promise.all(
-    [
-      listProjectActions(project.id),
-      listProjectActionTemplates(project.id),
-      filterProjectActionTemplates({
-        businessType: selectedBusinessType,
-        projectId: project.id,
-        query,
-      }),
-    ],
-  );
+  const [
+    actions,
+    projectTemplateCatalog,
+    projectTemplates,
+    reusableFields,
+    reusableTemplates,
+  ] = await Promise.all([
+    listProjectActions(project.id),
+    listProjectActionTemplates(project.id),
+    filterProjectActionTemplates({
+      businessType: selectedBusinessType,
+      projectId: project.id,
+      query,
+    }),
+    listReusableFields(context.company.id, project.id),
+    listReusableTemplates(context.company.id, project.id),
+  ]);
   const templateAdoptionStats = getTemplateAdoptionStats(actions);
   const businessTypes = [
     ...listActionTemplateBusinessTypes(),
@@ -469,6 +480,11 @@ export default async function TemplatesPage({
             </div>
           </CardContent>
         </Card>
+        <ReuseRegistrySections
+          fields={reusableFields}
+          projectId={project.id}
+          templates={reusableTemplates}
+        />
       </div>
     </div>
   );
