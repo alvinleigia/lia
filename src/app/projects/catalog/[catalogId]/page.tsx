@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import { FormActionBar } from "@/components/ui/form-action-bar";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import {
@@ -165,14 +166,20 @@ export default async function CatalogDetailsPage({
                       />
                     }
                     secondaryActions={
-                      <Button
-                        type="submit"
+                      <ConfirmSubmitButton
                         form={archiveFormId}
                         variant="outline"
+                        confirmation={{
+                          title: "Archive this catalog?",
+                          description:
+                            "The catalog and its products will no longer be available to active flows until restored.",
+                          confirmLabel: "Archive Catalog",
+                          confirmVariant: "destructive",
+                        }}
                       >
                         <Archive className="h-4 w-4" />
                         Archive
-                      </Button>
+                      </ConfirmSubmitButton>
                     }
                   />
                 </ActionStateForm>
@@ -232,6 +239,13 @@ export default async function CatalogDetailsPage({
                     pendingLabel="Deleting..."
                     variant="destructive"
                     icon={<Trash2 className="h-4 w-4" />}
+                    confirmation={{
+                      title: "Permanently delete this catalog?",
+                      description:
+                        "This cannot be undone. The catalog must have no products or flow references.",
+                      confirmLabel: "Delete Catalog",
+                      confirmVariant: "destructive",
+                    }}
                   />
                 </ActionStateForm>
               </div>

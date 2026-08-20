@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import { FlashToast } from "@/components/ui/flash-toast";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -308,9 +309,28 @@ export default async function OperationsPage({
                               : "active"
                           }
                         />
-                        <Button type="submit" variant="outline" size="sm">
+                        <ConfirmSubmitButton
+                          variant="outline"
+                          size="sm"
+                          confirmation={
+                            operation.status === "active"
+                              ? {
+                                  title: "Disable this operation?",
+                                  description:
+                                    "New executions will be blocked until the operation is enabled again.",
+                                  confirmLabel: "Disable Operation",
+                                  confirmVariant: "destructive",
+                                }
+                              : {
+                                  title: "Enable this operation?",
+                                  description:
+                                    "This allows authorized flows to execute the operation.",
+                                  confirmLabel: "Enable Operation",
+                                }
+                          }
+                        >
                           {operation.status === "active" ? "Disable" : "Enable"}
-                        </Button>
+                        </ConfirmSubmitButton>
                       </form>
                     </div>
                   </div>
@@ -508,6 +528,12 @@ export default async function OperationsPage({
                   label="Process Retry Queue"
                   pendingLabel="Processing..."
                   icon={<Workflow className="h-4 w-4" />}
+                  confirmation={{
+                    title: "Process the retry queue?",
+                    description:
+                      "This may send authorized external requests for queued operation attempts.",
+                    confirmLabel: "Process Retry Queue",
+                  }}
                 />
               </form>
             </div>
@@ -659,6 +685,16 @@ export default async function OperationsPage({
                           pendingLabel="Running..."
                           className="w-full md:w-auto"
                           icon={<Workflow className="h-4 w-4" />}
+                          confirmation={{
+                            title:
+                              attempt.status === "failed"
+                                ? "Retry this operation?"
+                                : "Replay this operation?",
+                            description:
+                              "This sends another authorized request using the recorded operation input.",
+                            confirmLabel:
+                              attempt.status === "failed" ? "Retry" : "Replay",
+                          }}
                         />
                       </form>
                     </div>
@@ -867,11 +903,30 @@ export default async function OperationsPage({
                                 : "active"
                             }
                           />
-                          <Button type="submit" variant="outline" size="sm">
+                          <ConfirmSubmitButton
+                            variant="outline"
+                            size="sm"
+                            confirmation={
+                              provider.status === "active"
+                                ? {
+                                    title: "Disable this provider?",
+                                    description:
+                                      "Operations using this provider will be blocked until it is enabled again.",
+                                    confirmLabel: "Disable Provider",
+                                    confirmVariant: "destructive",
+                                  }
+                                : {
+                                    title: "Enable this provider?",
+                                    description:
+                                      "This allows configured operations to use the provider.",
+                                    confirmLabel: "Enable Provider",
+                                  }
+                            }
+                          >
                             {provider.status === "active"
                               ? "Disable"
                               : "Enable"}
-                          </Button>
+                          </ConfirmSubmitButton>
                         </form>
                       </div>
                     </div>

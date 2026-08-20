@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import { writeAuditLog } from "@/lib/audit";
 import {
   listTenantCompanies,
@@ -179,15 +180,30 @@ export default async function PlatformPage({
                                       : "active"
                                   }
                                 />
-                                <Button
-                                  type="submit"
+                                <ConfirmSubmitButton
                                   variant="outline"
                                   size="sm"
+                                  confirmation={
+                                    company.status === "active"
+                                      ? {
+                                          title: "Disable this company?",
+                                          description:
+                                            "Company members and projects will lose active access until it is enabled again.",
+                                          confirmLabel: "Disable Company",
+                                          confirmVariant: "destructive",
+                                        }
+                                      : {
+                                          title: "Enable this company?",
+                                          description:
+                                            "This restores active company access.",
+                                          confirmLabel: "Enable Company",
+                                        }
+                                  }
                                 >
                                   {company.status === "active"
                                     ? "Disable"
                                     : "Enable"}
-                                </Button>
+                                </ConfirmSubmitButton>
                               </form>
                             </div>
                           </td>

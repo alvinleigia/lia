@@ -525,6 +525,13 @@ export default async function ActionSettingsPage({
                 pendingLabel="Deleting..."
                 variant="destructive"
                 icon={<Trash2 className="h-4 w-4" />}
+                confirmation={{
+                  title: "Delete this action?",
+                  description:
+                    "This permanently deletes the action, its flow steps, saved submissions, and submission events.",
+                  confirmLabel: "Delete Action",
+                  confirmVariant: "destructive",
+                }}
               />
             </form>
           </CardContent>

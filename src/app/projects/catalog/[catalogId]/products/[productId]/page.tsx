@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import { FormActionBar } from "@/components/ui/form-action-bar";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import {
@@ -195,14 +196,20 @@ export default async function ProductDetailsPage({
                       />
                     }
                     secondaryActions={
-                      <Button
-                        type="submit"
+                      <ConfirmSubmitButton
                         form={archiveFormId}
                         variant="outline"
+                        confirmation={{
+                          title: "Archive this product?",
+                          description:
+                            "The product will no longer be available to active catalog flows until restored.",
+                          confirmLabel: "Archive Product",
+                          confirmVariant: "destructive",
+                        }}
                       >
                         <Archive className="h-4 w-4" />
                         Archive
-                      </Button>
+                      </ConfirmSubmitButton>
                     }
                   />
                 </ActionStateForm>
@@ -268,6 +275,13 @@ export default async function ProductDetailsPage({
                       pendingLabel="Archiving..."
                       variant="outline"
                       icon={<Archive className="h-4 w-4" />}
+                      confirmation={{
+                        title: "Archive this product?",
+                        description:
+                          "The product will no longer be available to active catalog flows until restored.",
+                        confirmLabel: "Archive Product",
+                        confirmVariant: "destructive",
+                      }}
                     />
                   </form>
                 )}
@@ -309,6 +323,13 @@ export default async function ProductDetailsPage({
                       pendingLabel="Deleting..."
                       variant="destructive"
                       icon={<Trash2 className="h-4 w-4" />}
+                      confirmation={{
+                        title: "Permanently delete this product?",
+                        description:
+                          "This cannot be undone and is blocked while a flow or task references the product.",
+                        confirmLabel: "Delete Product",
+                        confirmVariant: "destructive",
+                      }}
                     />
                   </ActionStateForm>
                 )}

@@ -129,6 +129,13 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
                         label="Cancel"
                         pendingLabel="Cancelling..."
                         variant="outline"
+                        confirmation={{
+                          title: "Cancel this invitation?",
+                          description:
+                            "The invitation link will no longer be accepted.",
+                          confirmLabel: "Cancel Invitation",
+                          confirmVariant: "destructive",
+                        }}
                       />
                     </form>
                   )}

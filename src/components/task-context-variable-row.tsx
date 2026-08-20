@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/action-state-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import {
   Dialog,
   DialogClose,
@@ -211,10 +212,20 @@ export function TaskContextVariableRow({
               <input type="hidden" name="projectId" value={projectId} />
               <input type="hidden" name="taskId" value={taskId} />
               <input type="hidden" name="contextKey" value={variable.key} />
-              <Button type="submit" size="icon" variant="ghost">
+              <ConfirmSubmitButton
+                size="icon"
+                variant="ghost"
+                confirmation={{
+                  title: `Remove ${variable.key}?`,
+                  description:
+                    "This removes the context variable from the editable task definition.",
+                  confirmLabel: "Remove Context",
+                  confirmVariant: "destructive",
+                }}
+              >
                 <Trash2 className="h-4 w-4" />
                 <span className="sr-only">Remove {variable.key}</span>
-              </Button>
+              </ConfirmSubmitButton>
             </form>
           ) : (
             <Button

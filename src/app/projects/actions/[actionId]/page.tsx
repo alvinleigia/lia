@@ -252,6 +252,12 @@ export default async function ActionDetailPage({
                     pendingLabel="Publishing..."
                     disabled={publishDisabled}
                     icon={<Send className="h-4 w-4" />}
+                    confirmation={{
+                      title: "Publish this action?",
+                      description:
+                        "This creates a live immutable version from the current draft.",
+                      confirmLabel: "Publish Action",
+                    }}
                   />
                 </form>
                 <Button asChild variant="outline">
@@ -559,6 +565,12 @@ export default async function ActionDetailPage({
                               pendingLabel="Updating..."
                               variant="outline"
                               icon={<RotateCcw className="h-4 w-4" />}
+                              confirmation={{
+                                title: "Activate this version?",
+                                description:
+                                  "New conversations will use this published action version.",
+                                confirmLabel: "Use Version",
+                              }}
                             />
                           </form>
                         )}
@@ -863,6 +875,17 @@ export default async function ActionDetailPage({
                               <Eye className="h-4 w-4" />
                             )
                           }
+                          confirmation={
+                            step.isEnabled
+                              ? {
+                                  title: "Disable this step?",
+                                  description:
+                                    "The step will be excluded from the next published action version.",
+                                  confirmLabel: "Disable Step",
+                                  confirmVariant: "destructive",
+                                }
+                              : undefined
+                          }
                         />
                       </form>
                       <Button asChild variant="outline">
@@ -885,6 +908,13 @@ export default async function ActionDetailPage({
                           pendingLabel="Deleting..."
                           variant="destructive"
                           icon={<Trash2 className="h-4 w-4" />}
+                          confirmation={{
+                            title: "Delete this step?",
+                            description:
+                              "This removes the step from the editable action draft.",
+                            confirmLabel: "Delete Step",
+                            confirmVariant: "destructive",
+                          }}
                         />
                       </form>
                     </div>

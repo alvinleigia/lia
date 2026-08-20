@@ -119,6 +119,12 @@ export default async function TeamMemberPage({ params }: TeamMemberPageProps) {
                       label="Update Role"
                       pendingLabel="Updating..."
                       variant="outline"
+                      confirmation={{
+                        title: "Update this member's role?",
+                        description:
+                          "This changes the member's permissions across the company.",
+                        confirmLabel: "Update Role",
+                      }}
                     />
                   </div>
                 </ActionStateForm>
@@ -138,6 +144,17 @@ export default async function TeamMemberPage({ params }: TeamMemberPageProps) {
                     }
                     pendingLabel="Updating..."
                     variant="outline"
+                    confirmation={
+                      memberAccess.status === "active"
+                        ? {
+                            title: "Disable this member?",
+                            description:
+                              "The member will lose access until they are enabled again.",
+                            confirmLabel: "Disable Member",
+                            confirmVariant: "destructive",
+                          }
+                        : undefined
+                    }
                   />
                 </form>
               </div>

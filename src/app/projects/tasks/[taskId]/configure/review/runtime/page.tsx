@@ -26,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -509,10 +510,19 @@ export default async function TaskRuntimeTestPage({
               {runtime && (
                 <form action={resetTaskRuntimeTestAction} data-preserve-scroll>
                   {hiddenContext(context.project.id, task.id)}
-                  <Button type="submit" variant="destructive">
+                  <ConfirmSubmitButton
+                    variant="destructive"
+                    confirmation={{
+                      title: "Reset all runtime test data?",
+                      description:
+                        "This permanently removes the current test session and its recorded runtime data.",
+                      confirmLabel: "Reset Test Data",
+                      confirmVariant: "destructive",
+                    }}
+                  >
                     <Trash2 className="h-4 w-4" />
                     Reset Test Data
-                  </Button>
+                  </ConfirmSubmitButton>
                 </form>
               )}
             </div>

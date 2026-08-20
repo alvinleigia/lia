@@ -22,6 +22,7 @@ import type {
   FlowStep,
 } from "@/components/action-flow-canvas/types";
 import { Button } from "@/components/ui/button";
+import { ConfirmActionButton } from "@/components/ui/confirm-action-button";
 import {
   getStoredActionFlowConditionGroup,
   type StoredActionFlowConditionGroup,
@@ -473,15 +474,21 @@ export function BranchRuleForm({
           {mode === "create" ? "Add route" : "Save route"}
         </Button>
         {mode === "edit" && onDelete && (
-          <Button
-            type="button"
+          <ConfirmActionButton
             variant="destructive"
             disabled={isPending}
-            onClick={onDelete}
+            onConfirm={onDelete}
+            confirmation={{
+              title: "Delete this route?",
+              description:
+                "This removes the branch route from the editable canvas draft.",
+              confirmLabel: "Delete Route",
+              confirmVariant: "destructive",
+            }}
           >
             <Trash2 className="h-4 w-4" />
             Delete
-          </Button>
+          </ConfirmActionButton>
         )}
       </div>
     </form>

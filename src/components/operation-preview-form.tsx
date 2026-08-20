@@ -158,6 +158,12 @@ export function OperationPreviewForm({
         label="Send Test Request"
         pendingLabel="Sending..."
         icon={<Workflow className="h-4 w-4" />}
+        confirmation={{
+          title: "Send this test request?",
+          description:
+            "This sends a real request to the configured endpoint and records an isolated attempt.",
+          confirmLabel: "Send Test Request",
+        }}
       />
     </ActionStateForm>
   );

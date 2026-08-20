@@ -20,7 +20,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 14 - Beta release | Complete | Passed on staging under the single-tester scope. |
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
-| 17 - Reuse and optimization | Milestones 17.1-17.2 passed; 17.3 ready for staging UAT | Deploy the findings milestone, then run section 17.3. |
+| 17 - Reuse and optimization | Milestones 17.1-17.4 passed; 17.5 ready for staging UAT | Run section 17.5 on staging. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -648,40 +648,40 @@ Result: [x] Pass [ ] Fail
 Run this on staging after selecting a conversation in `Automation` >
 `Conversation Diagnostics`.
 
-1. [ ] Scroll to `Tester Findings & Regression Cases`.
-2. [ ] Under `Record finding`, choose `Routing`, enter a short observation such
+1. [x] Scroll to `Tester Findings & Regression Cases`.
+2. [x] Under `Record finding`, choose `Routing`, enter a short observation such
    as `The flow should resume the pending field after a side question.`, then
    select `Record finding`.
-3. [ ] Confirm a success message appears and the finding is listed with its
+3. [x] Confirm a success message appears and the finding is listed with its
    category, tester, and time.
-4. [ ] In that finding, enter a regression title, an invented visitor message,
+4. [x] In that finding, enter a regression title, an invented visitor message,
    and the expected behavior. Do not copy names, contact details, credentials,
    or free-text values from the transcript.
-5. [ ] Select `Promote to regression case`.
-6. [ ] Confirm a success message appears and the finding now shows the promoted
+5. [x] Select `Promote to regression case`.
+6. [x] Confirm a success message appears and the finding now shows the promoted
    regression case and its synthetic input.
-7. [ ] Refresh the page and confirm both records remain attached to the same
+7. [x] Refresh the page and confirm both records remain attached to the same
    selected conversation.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
 ## 17.4 Verify Reusable Fields And Content
 
-1. [ ] Open `Automation` > `Templates`.
-2. [ ] In `Reusable Fields`, register a project-owned text field with an unused
+1. [x] Open `Automation` > `Templates`.
+2. [x] In `Reusable Fields`, register a project-owned text field with an unused
    key. Confirm it appears as `active` with the correct type and ownership.
-3. [ ] In `Reusable Content`, create a `field set` using the registered field in
+3. [x] In `Reusable Content`, create a `field set` using the registered field in
    the JSON definition.
-4. [ ] Confirm the template shows `Compatible`, then select
+4. [x] Confirm the template shows `Compatible`, then select
    `Approve Current Version`.
-5. [ ] Expand `Add a new version`, save a compatible change, and confirm the
+5. [x] Expand `Add a new version`, save a compatible change, and confirm the
    version list and upgrade guidance update.
-6. [ ] Select `Duplicate Into Project` and confirm a separate project-owned copy
+6. [x] Select `Duplicate Into Project` and confirm a separate project-owned copy
    appears.
-7. [ ] Retire the temporary reusable field and confirm its status changes without
+7. [x] Retire the temporary reusable field and confirm its status changes without
    deleting the recorded template versions.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
 ## 17.5 Verify Evaluation Datasets And Promotion Gate
 

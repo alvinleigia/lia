@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -152,9 +153,18 @@ export function ReuseRegistrySections({
                   {field.status === "active" && (
                     <form action={retireReusableFieldAction}>
                       <input type="hidden" name="fieldId" value={field.id} />
-                      <Button type="submit" variant="outline" size="sm">
+                      <ConfirmSubmitButton
+                        variant="outline"
+                        size="sm"
+                        confirmation={{
+                          title: "Retire reusable field?",
+                          description: `Templates referencing ${field.label} may require mapping. Existing template versions will not be deleted.`,
+                          confirmLabel: "Retire Field",
+                          confirmVariant: "destructive",
+                        }}
+                      >
                         Retire
-                      </Button>
+                      </ConfirmSubmitButton>
                     </form>
                   )}
                 </div>
@@ -341,9 +351,17 @@ export function ReuseRegistrySections({
                               name="templateId"
                               value={template.id}
                             />
-                            <Button type="submit" size="sm">
+                            <ConfirmSubmitButton
+                              size="sm"
+                              confirmation={{
+                                title: "Approve this reusable version?",
+                                description:
+                                  "This marks the current version as approved for project use.",
+                                confirmLabel: "Approve Version",
+                              }}
+                            >
                               Approve Current Version
-                            </Button>
+                            </ConfirmSubmitButton>
                           </form>
                         )}
                       <form action={duplicateReusableTemplateAction}>

@@ -519,6 +519,12 @@ export default async function SubmissionDetailPage({
                         label="Release"
                         pendingLabel="Releasing..."
                         icon={<UserX className="h-4 w-4" />}
+                        confirmation={{
+                          title: "Release this handoff?",
+                          description:
+                            "This removes the current assignee and returns the handoff to the queue.",
+                          confirmLabel: "Release Handoff",
+                        }}
                       />
                     </form>
                   )}
@@ -552,6 +558,12 @@ export default async function SubmissionDetailPage({
                 label="Update Status"
                 pendingLabel="Updating..."
                 icon={<Save className="h-4 w-4" />}
+                confirmation={{
+                  title: "Update this submission status?",
+                  description:
+                    "This changes the recorded lifecycle state for the submission.",
+                  confirmLabel: "Update Status",
+                }}
               />
             </form>
           </CardContent>

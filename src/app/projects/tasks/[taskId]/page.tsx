@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import { FormActionBar } from "@/components/ui/form-action-bar";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
@@ -177,14 +178,20 @@ export default async function TaskDetailsPage({
                           Configure Conversation
                         </Link>
                       </Button>
-                      <Button
-                        type="submit"
+                      <ConfirmSubmitButton
                         form="archive-task-form"
                         variant="outline"
+                        confirmation={{
+                          title: "Archive this task?",
+                          description:
+                            "The task will no longer be available for new runtime use until restored.",
+                          confirmLabel: "Archive Task",
+                          confirmVariant: "destructive",
+                        }}
                       >
                         <Archive className="h-4 w-4" />
                         Archive Task
-                      </Button>
+                      </ConfirmSubmitButton>
                     </>
                   }
                 />

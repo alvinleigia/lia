@@ -204,6 +204,13 @@ export default async function ProjectMediaPage({
                             pendingLabel="Archiving..."
                             variant="outline"
                             icon={<Archive className="h-4 w-4" />}
+                            confirmation={{
+                              title: "Archive this media asset?",
+                              description:
+                                "The asset will no longer be available for new project use.",
+                              confirmLabel: "Archive Asset",
+                              confirmVariant: "destructive",
+                            }}
                           />
                         </form>
                       </div>

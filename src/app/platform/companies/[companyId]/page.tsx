@@ -169,6 +169,17 @@ export default async function PlatformCompanyPage({
                       }
                       pendingLabel="Updating..."
                       variant="outline"
+                      confirmation={
+                        membership.status === "active"
+                          ? {
+                              title: "Disable this member?",
+                              description:
+                                "The member will lose company access until enabled again.",
+                              confirmLabel: "Disable Member",
+                              confirmVariant: "destructive",
+                            }
+                          : undefined
+                      }
                     />
                   </form>
                 </div>

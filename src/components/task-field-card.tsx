@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/action-state-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import {
   Dialog,
   DialogContent,
@@ -161,16 +162,22 @@ export function TaskFieldCard({
             <input type="hidden" name="projectId" value={projectId} />
             <input type="hidden" name="taskId" value={taskId} />
             <input type="hidden" name="fieldId" value={field.id} />
-            <Button
-              type="submit"
+            <ConfirmSubmitButton
               size="icon"
               variant="ghost"
               className="text-red-600 hover:text-red-700"
               title="Delete"
+              confirmation={{
+                title: `Delete ${field.label}?`,
+                description:
+                  "This removes the field from the editable task definition.",
+                confirmLabel: "Delete Field",
+                confirmVariant: "destructive",
+              }}
             >
               <Trash2 className="h-4 w-4" />
               <span className="sr-only">Remove {field.label}</span>
-            </Button>
+            </ConfirmSubmitButton>
           </form>
         </div>
       </div>

@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Label } from "@/components/ui/label";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
@@ -268,12 +269,22 @@ export default async function TaskToolsPage({
                           name="toolId"
                           value={binding.tool.id}
                         />
-                        <Button type="submit" size="icon" variant="ghost">
+                        <ConfirmSubmitButton
+                          size="icon"
+                          variant="ghost"
+                          confirmation={{
+                            title: "Remove this allowed tool?",
+                            description:
+                              "The task will no longer be able to use this tool in new published versions.",
+                            confirmLabel: "Remove Tool",
+                            confirmVariant: "destructive",
+                          }}
+                        >
                           <Trash2 className="h-4 w-4" />
                           <span className="sr-only">
                             Remove {binding.tool.id}
                           </span>
-                        </Button>
+                        </ConfirmSubmitButton>
                       </form>
                     </div>
                   ))}

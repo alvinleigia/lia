@@ -214,6 +214,13 @@ export function ActionBranchRulesForm({
                   pendingLabel="Deleting..."
                   variant="destructive"
                   icon={<Trash2 className="h-4 w-4" />}
+                  confirmation={{
+                    title: "Delete this branch rule?",
+                    description:
+                      "This removes the route from the editable action draft.",
+                    confirmLabel: "Delete Rule",
+                    confirmVariant: "destructive",
+                  }}
                 />
               </form>
             </div>

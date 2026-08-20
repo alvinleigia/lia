@@ -13,8 +13,8 @@ import {
   ActionStateForm,
 } from "@/components/ui/action-state-form";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-action-button";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -138,10 +138,20 @@ export default async function TaskOutcomesPage({
                     />
                     <input type="hidden" name="taskId" value={task.id} />
                     <input type="hidden" name="outcomeId" value={outcome.id} />
-                    <Button type="submit" size="icon" variant="ghost">
+                    <ConfirmSubmitButton
+                      size="icon"
+                      variant="ghost"
+                      confirmation={{
+                        title: `Remove ${outcome.label}?`,
+                        description:
+                          "This removes the outcome from the editable task definition.",
+                        confirmLabel: "Remove Outcome",
+                        confirmVariant: "destructive",
+                      }}
+                    >
                       <Trash2 className="h-4 w-4" />
                       <span className="sr-only">Remove {outcome.label}</span>
-                    </Button>
+                    </ConfirmSubmitButton>
                   </form>
                 </div>
               ))}

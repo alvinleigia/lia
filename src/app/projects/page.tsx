@@ -109,6 +109,12 @@ export default async function ProjectsPage({
                         pendingLabel="Archiving..."
                         variant="outline"
                         icon={<Archive className="h-4 w-4" />}
+                        confirmation={{
+                          title: "Archive this project?",
+                          description: `This hides ${project.name} from active project flows and disables its widget token.`,
+                          confirmLabel: "Archive Project",
+                          confirmVariant: "destructive",
+                        }}
                       />
                     </form>
                   </div>

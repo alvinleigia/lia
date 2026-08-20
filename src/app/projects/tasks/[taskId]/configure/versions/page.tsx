@@ -149,6 +149,12 @@ export default async function TaskVersionsPage({
                 pendingLabel="Publishing..."
                 disabled={!ready}
                 icon={<Send className="h-4 w-4" />}
+                confirmation={{
+                  title: "Publish this task version?",
+                  description:
+                    "This creates an immutable version for new task runs.",
+                  confirmLabel: "Publish Version",
+                }}
               />
             </form>
           </CardContent>

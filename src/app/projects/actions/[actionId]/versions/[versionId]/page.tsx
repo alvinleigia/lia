@@ -166,6 +166,13 @@ export default async function ActionVersionDiffPage({
                     pendingLabel="Restoring..."
                     variant="outline"
                     icon={<RotateCcw className="h-4 w-4" />}
+                    confirmation={{
+                      title: "Overwrite the current draft?",
+                      description:
+                        "This replaces the editable action, steps, and branch rules with the selected published snapshot.",
+                      confirmLabel: "Restore Draft",
+                      confirmVariant: "destructive",
+                    }}
                   />
                 </form>
               </div>

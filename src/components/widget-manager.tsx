@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmActionButton } from "@/components/ui/confirm-action-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -165,39 +166,76 @@ export function WidgetManager({
         third-party website.
       </p>
 
-      <Button onClick={generateToken} disabled={isGenerating}>
-        {isGenerating ? (
-          <RefreshCw className="h-4 w-4 animate-spin" />
-        ) : isTokenActive ? (
+      {isTokenActive ? (
+        <ConfirmActionButton
+          onConfirm={generateToken}
+          disabled={isGenerating}
+          pending={isGenerating}
+          confirmation={{
+            title: "Rotate the widget token?",
+            description:
+              "Existing widget embeds using the current token will stop working until they are updated.",
+            confirmLabel: "Rotate Token",
+            confirmVariant: "destructive",
+          }}
+          pendingContent={
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Generating...
+            </>
+          }
+        >
           <RefreshCw className="h-4 w-4" />
-        ) : (
-          <KeyRound className="h-4 w-4" />
-        )}
-        {isGenerating
-          ? "Generating..."
-          : isTokenActive
-            ? "Rotate Widget Token"
-            : "Generate Widget Token"}
-      </Button>
+          Rotate Widget Token
+        </ConfirmActionButton>
+      ) : (
+        <Button onClick={generateToken} disabled={isGenerating}>
+          {isGenerating ? (
+            <RefreshCw className="h-4 w-4 animate-spin" />
+          ) : (
+            <KeyRound className="h-4 w-4" />
+          )}
+          {isGenerating ? "Generating..." : "Generate Widget Token"}
+        </Button>
+      )}
 
-      <Button
-        variant="outline"
-        onClick={toggleTokenStatus}
-        disabled={(!hasWidgetConfig && !token) || isUpdatingStatus}
-      >
-        {isUpdatingStatus ? (
-          <RefreshCw className="h-4 w-4 animate-spin" />
-        ) : isTokenActive ? (
+      {isTokenActive ? (
+        <ConfirmActionButton
+          variant="outline"
+          onConfirm={toggleTokenStatus}
+          disabled={(!hasWidgetConfig && !token) || isUpdatingStatus}
+          pending={isUpdatingStatus}
+          confirmation={{
+            title: "Disable the widget token?",
+            description:
+              "All widget embeds using this token will become unavailable until it is enabled again.",
+            confirmLabel: "Disable Token",
+            confirmVariant: "destructive",
+          }}
+          pendingContent={
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Updating...
+            </>
+          }
+        >
           <PauseCircle className="h-4 w-4" />
-        ) : (
-          <PlayCircle className="h-4 w-4" />
-        )}
-        {isUpdatingStatus
-          ? "Updating..."
-          : isTokenActive
-            ? "Disable Widget Token"
-            : "Enable Widget Token"}
-      </Button>
+          Disable Widget Token
+        </ConfirmActionButton>
+      ) : (
+        <Button
+          variant="outline"
+          onClick={toggleTokenStatus}
+          disabled={(!hasWidgetConfig && !token) || isUpdatingStatus}
+        >
+          {isUpdatingStatus ? (
+            <RefreshCw className="h-4 w-4 animate-spin" />
+          ) : (
+            <PlayCircle className="h-4 w-4" />
+          )}
+          {isUpdatingStatus ? "Updating..." : "Enable Widget Token"}
+        </Button>
+      )}
 
       {error && (
         <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2">

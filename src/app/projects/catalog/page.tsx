@@ -138,6 +138,17 @@ function ProductList({
                     <Archive className="h-4 w-4" />
                   )
                 }
+                confirmation={
+                  archived
+                    ? undefined
+                    : {
+                        title: "Archive this product?",
+                        description:
+                          "The product will no longer be available to active catalog flows until restored.",
+                        confirmLabel: "Archive Product",
+                        confirmVariant: "destructive",
+                      }
+                }
               />
             </form>
           </div>
@@ -330,6 +341,13 @@ export default async function ProjectCatalogPage({
                           pendingLabel="Archiving..."
                           variant="outline"
                           icon={<Archive className="h-4 w-4" />}
+                          confirmation={{
+                            title: "Archive this catalog?",
+                            description:
+                              "The catalog and its products will no longer be available to active flows until restored.",
+                            confirmLabel: "Archive Catalog",
+                            confirmVariant: "destructive",
+                          }}
                         />
                       </form>
                     </div>
