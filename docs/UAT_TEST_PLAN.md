@@ -764,23 +764,34 @@ actions report `Draft matches runtime` with one trigger phrase.
 Use a published source action and a second active project owned by the same
 company.
 
-1. [ ] Open `Automation` > `Actions`, open the source action, then select
+1. [x] Open `Automation` > `Actions`, open the source action, then select
    `Clone`.
-2. [ ] Under `Target project`, select the second project.
-3. [ ] Under `Resource mappings`, explicitly map each referenced catalog,
+2. [x] Under `Target project`, select the second project.
+3. [x] Under `Resource mappings`, explicitly map each referenced catalog,
    product, action, published conversational task, media asset, and operation.
    Leave a reference disconnected only when that is the behavior being tested.
-4. [ ] Select `Clone action`.
-5. [ ] Confirm the target action opens as an editable draft and shows
+4. [x] Select `Clone action`.
+5. [x] Confirm the target action opens as an editable draft and shows
    `Action cloned into this project.`
-6. [ ] Open its `Canvas` and confirm steps, routes, content, and mapped resource
+6. [x] Open its `Canvas` and confirm steps, routes, content, and mapped resource
    references match the choices made on the clone screen.
-7. [ ] Confirm credentials, conversations, submissions, jobs, audit history,
+7. [x] Confirm credentials, conversations, submissions, jobs, audit history,
    and runtime keys were not copied.
-8. [ ] Resolve any intentionally disconnected reference, publish the clone, and
+8. [x] Resolve any intentionally disconnected reference, publish the clone, and
    run `Test Flow` > `Run Automated Test` successfully.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
+
+Evidence: published action `Canvas UAT 2 - Operations` was cloned from project
+`#94` into `Phase 14 Release UAT` (`#1`) as action `#59`. Source operation `#84`
+was explicitly mapped to `Manual Review (manual_review)`. The clone opened as a
+three-step editable draft with zero runtime analytics, no copied published
+version, and no blockers. Its canvas preserved all three connected steps, the
+mapped operation was visible in Step 2, and published version 1 passed the
+automated test with five operation/provider fixtures. An initial submission
+made during a staging deployment transition was rejected as a stale Server
+Action before execution; retrying after deployment succeeded without creating
+a duplicate clone.
 
 ## 17.10 Consolidated Phase 17 Sign-Off
 
