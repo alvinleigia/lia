@@ -685,20 +685,20 @@ Result: [x] Pass [ ] Fail
 
 ## 17.5 Verify Evaluation Datasets And Promotion Gate
 
-1. [ ] Open `Automation` > `Conversation Diagnostics`, then select
+1. [x] Open `Automation` > `Conversation Diagnostics`, then select
    `Evaluation gate` in `Runtime Snapshot`.
-2. [ ] Enter a clear value in `Candidate under review` and select
+2. [x] Enter a clear value in `Candidate under review` and select
    `Load candidate`.
-3. [ ] Confirm the page lists the extraction, correction, clarification, safety,
+3. [x] Confirm the page lists the extraction, correction, clarification, safety,
    and completion datasets.
-4. [ ] Set `Minimum pass rate (%)` and `Maximum safety failures`, then select
+4. [x] Set `Minimum pass rate (%)` and `Maximum safety failures`, then select
    `Save thresholds`.
-5. [ ] For an available regression case, enter `Observed behavior`, choose
+5. [x] For an available regression case, enter `Observed behavior`, choose
    `Pass` or `Fail`, and select `Record`.
-6. [ ] Confirm the case result, pass rate, safety failures, unevaluated count,
+6. [x] Confirm the case result, pass rate, safety failures, unevaluated count,
    and `Model or prompt promotion gate` status update consistently.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
 ## 17.6 Verify Lifecycle Analytics And Attribution
 
