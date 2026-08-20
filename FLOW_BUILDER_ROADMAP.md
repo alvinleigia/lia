@@ -88,14 +88,12 @@ database, backup, and provider readiness work.
 - [x] Phase 14 staging cross-channel UAT passed under the single-tester scope on 2026-08-15.
 - [x] Priority 2 release approval is complete for continued internal testing.
 
-Active delivery gate: Priority 3, Phase 17 of 18. Engineering implementation
-and manual staging UAT are complete through Phase 16 under the single-tester
-scope as of 2026-08-18. Phase 17 diagnostics and automated conversation
-scenarios have passed staging UAT.
+Active delivery gate: Priority 3, Phase 18 of 18. Engineering implementation
+and manual staging UAT are complete through Phase 17 under the single-tester
+scope as of 2026-08-20.
 
-Current target: complete the consolidated Phase 17 staging UAT for reuse,
-evaluations, analytics, version controls, experiments, and safe cross-project
-flow cloning.
+Current target: complete Phase 18 public extension contracts, conformance
+tests, plugin boundaries, and extension proofs.
 
 ### Phase Tracking Snapshot
 
@@ -107,7 +105,7 @@ flow cloning.
 | 14 | Complete | Passed on staging under the single-tester scope on 2026-08-15; the missing disposable restore environment is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
-| 17 | Complete | Milestones 17.1-17.2 passed; consolidated staging UAT for 17.3-17.9 is ready | Manual staging sign-off. |
+| 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
 
 ## Product Direction

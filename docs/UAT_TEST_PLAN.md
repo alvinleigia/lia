@@ -795,23 +795,29 @@ a duplicate clone.
 
 ## 17.10 Consolidated Phase 17 Sign-Off
 
-1. [ ] Confirm sections 17.1 through 17.9 pass.
-2. [ ] Confirm the latest automated runs for the core-input, operation-fixture,
+1. [x] Confirm sections 17.1 through 17.9 pass.
+2. [x] Confirm the latest automated runs for the core-input, operation-fixture,
    and support-ticket actions show `Passed`.
-3. [ ] Confirm no Critical or High Phase 17 defects remain open.
-4. [ ] Record the tester and date below.
+3. [x] Confirm no Critical or High Phase 17 defects remain open.
+4. [x] Record the tester and date below.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
-- Tester/date: `Pending`
+- Tester/date: `Single tester / release owner - 2026-08-20`
+
+Evidence: the latest staging automated runs passed against version 5 of
+`Canvas UAT 1 - Core Inputs`, version 4 of `Canvas UAT 2 - Operations`, and
+version 1 of `Create Support Ticket`. The tracked Critical and High defect
+counts were both zero at sign-off.
 
 # Final Release Record
 
 - Phase 14: [x] Pass [ ] Fail
 - Phase 15: [x] Pass [ ] Fail [ ] In progress
 - Phase 16: [x] Pass [ ] Fail [ ] In progress
-- Phase 17: [ ] Pass [ ] Fail [x] In progress
+- Phase 17: [x] Pass [ ] Fail [ ] In progress
 - Critical defects open: `0`
 - High defects open: `0`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 - Phase 16 approver/date: `Single tester / release owner - 2026-08-16`
+- Phase 17 approver/date: `Single tester / release owner - 2026-08-20`
