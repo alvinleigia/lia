@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
-import { isValidTimeZone } from "@/lib/action-availability";
 import {
   importActionFlowExport,
   parseActionFlowExportJson,
@@ -67,6 +66,7 @@ import {
   STRUCTURED_FORM_STATUSES,
   validateStructuredFormForPublication,
 } from "@/lib/structured-forms";
+import { isValidTimeZone } from "@/lib/time-zones";
 
 const actionIdSchema = z.coerce.number().int().positive();
 const templateKeySchema = z.string().trim().min(1).max(120);

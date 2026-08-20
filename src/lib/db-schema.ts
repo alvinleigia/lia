@@ -33,6 +33,7 @@ export const companies = pgTable(
       .notNull()
       .references(() => users.id),
     name: text("name").notNull(),
+    timeZone: text("time_zone").notNull().default("UTC"),
     status: text("status").notNull().default("active"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

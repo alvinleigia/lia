@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { assertPermission } from "@/lib/access-control";
 import { listCompanyAuditLogs } from "@/lib/audit";
 import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 
 function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
@@ -43,6 +44,9 @@ export default async function ProjectAuditPage() {
               Recent company-scoped audit events for sensitive configuration and
               account changes.
             </p>
+            <p className="text-sm text-muted-foreground">
+              Times shown in {context.company.timeZone}.
+            </p>
           </CardContent>
         </Card>
 
@@ -75,7 +79,10 @@ export default async function ProjectAuditPage() {
                         className="border-b align-top last:border-b-0"
                       >
                         <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground">
-                          {auditLog.createdAt.toLocaleString()}
+                          {formatDateTimeInTimeZone(
+                            auditLog.createdAt,
+                            context.company.timeZone,
+                          )}
                         </td>
                         <td className="py-2 pr-4 font-medium">
                           {auditLog.action}

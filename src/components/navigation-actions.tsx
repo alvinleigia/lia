@@ -5,6 +5,7 @@ import {
   Bot,
   ClipboardCheck,
   ClipboardList,
+  Clock3,
   ContactRound,
   FileImage,
   FolderKanban,
@@ -242,6 +243,13 @@ function MobileNavigation({
               {canManageMembers && (
                 <>
                   <MobileNavigationLink
+                    item={{
+                      href: "/company/settings",
+                      icon: Clock3,
+                      label: "Company Settings",
+                    }}
+                  />
+                  <MobileNavigationLink
                     item={{ href: "/team", icon: Users, label: "Team" }}
                   />
                   <MobileNavigationLink
@@ -375,6 +383,12 @@ export function NavigationActions({
                       <DropdownMenuLabel>Account Admin</DropdownMenuLabel>
                       {canManageMembers && (
                         <>
+                          <DropdownMenuItem asChild>
+                            <Link href="/company/settings">
+                              <Clock3 className="mr-2 size-4" />
+                              Company Settings
+                            </Link>
+                          </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <Link href="/team">
                               <Users className="mr-2 size-4" />

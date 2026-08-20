@@ -23,6 +23,7 @@ import {
   getActiveProjectIdCookie,
   resolvePageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 import { runAutomatedFlowTestAction } from "./actions";
 
 type HybridFlowTestPageProps = {
@@ -51,7 +52,7 @@ export default async function HybridFlowTestPage({
   }
 
   const activeProjectId = await getActiveProjectIdCookie();
-  const { project } = await resolvePageUserAndProject(activeProjectId);
+  const { company, project } = await resolvePageUserAndProject(activeProjectId);
   const action = await getProjectAction(project.id, actionId);
 
   if (!action) {
@@ -210,7 +211,11 @@ export default async function HybridFlowTestPage({
                                       </Badge>
                                     </div>
                                     <p className="text-sm text-muted-foreground">
-                                      {auditLog.createdAt.toLocaleString()} ·{" "}
+                                      {formatDateTimeInTimeZone(
+                                        auditLog.createdAt,
+                                        company.timeZone,
+                                      )}{" "}
+                                      ·{" "}
                                       {actor?.name ??
                                         actor?.email ??
                                         "Unknown user"}

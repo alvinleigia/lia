@@ -148,6 +148,22 @@ export async function updateCompanyName(input: {
   return company ?? null;
 }
 
+export async function updateCompanyTimeZone(input: {
+  companyId: number;
+  timeZone: string;
+}) {
+  const [company] = await db
+    .update(companies)
+    .set({
+      timeZone: input.timeZone,
+      updatedAt: new Date(),
+    })
+    .where(eq(companies.id, input.companyId))
+    .returning();
+
+  return company ?? null;
+}
+
 export async function getOrCreateDefaultCompanyForUser(user: {
   id: number;
   email: string;

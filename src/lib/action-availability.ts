@@ -1,3 +1,5 @@
+import { isValidTimeZone } from "@/lib/time-zones";
+
 export const BUSINESS_HOURS_FIELD_KEY = "system.business_hours_open";
 export const QUEUE_AVAILABILITY_FIELD_KEY = "system.handoff_queue_available";
 
@@ -33,15 +35,6 @@ function getRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-}
-
-export function isValidTimeZone(value: string) {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function getActionAvailabilitySettings(
