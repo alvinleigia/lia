@@ -12,6 +12,7 @@ import {
 import { NoProjectState } from "@/components/no-project-state";
 import {
   ActionFormError,
+  ActionFormSuccessToast,
   ActionStateForm,
 } from "@/components/ui/action-state-form";
 import { Button } from "@/components/ui/button";
@@ -129,6 +130,7 @@ export default async function ConversationEvaluationsPage({
             action={updateEvaluationPolicy}
             className="grid gap-4 rounded-md border p-4 md:grid-cols-3"
           >
+            <ActionFormSuccessToast />
             <input name="projectId" type="hidden" value={context.project.id} />
             <div className="space-y-2">
               <Label htmlFor="minimumPassRate">Minimum pass rate (%)</Label>
@@ -201,6 +203,7 @@ export default async function ConversationEvaluationsPage({
                         action={recordEvaluationResult}
                         className="mt-4 grid gap-3 md:grid-cols-4"
                       >
+                        <ActionFormSuccessToast />
                         <input
                           name="projectId"
                           type="hidden"

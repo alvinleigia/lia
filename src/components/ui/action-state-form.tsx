@@ -7,9 +7,11 @@ import {
   type ReactNode,
   useActionState,
   useContext,
+  useEffect,
   useLayoutEffect,
   useRef,
 } from "react";
+import { toast } from "sonner";
 import type { ActionFormState } from "@/lib/action-form-state";
 import { cn } from "@/lib/utils";
 import { FormPendingProvider } from "./form-pending-context";
@@ -183,6 +185,18 @@ export function ActionFormError({ className }: { className?: string }) {
   const { error } = useContext(FormStateContext);
 
   return <FormErrorMessage className={className} error={error} />;
+}
+
+export function ActionFormSuccessToast() {
+  const state = useContext(FormStateContext);
+
+  useEffect(() => {
+    if (state.success) {
+      toast.success(state.success);
+    }
+  }, [state]);
+
+  return null;
 }
 
 export function FormErrorMessage({

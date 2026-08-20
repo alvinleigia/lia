@@ -44,7 +44,7 @@ export async function recordEvaluationResult(
     metadata: { passed: result.passed, candidateLabel: result.candidateLabel },
   });
   revalidatePath("/projects/diagnostics/evaluations");
-  return {};
+  return { success: "Evaluation result recorded." };
 }
 
 export async function updateEvaluationPolicy(
@@ -70,5 +70,5 @@ export async function updateEvaluationPolicy(
     },
   });
   revalidatePath("/projects/diagnostics/evaluations");
-  return {};
+  return { success: "Evaluation thresholds saved." };
 }
