@@ -720,17 +720,23 @@ Result: [x] Pass [ ] Fail
 
 Use a test action with at least two published versions.
 
-1. [ ] Open `Automation` > `Actions`, then open the test action.
-2. [ ] Under `Version History`, select `View Diff` for each version and confirm
+1. [x] Open `Automation` > `Actions`, then open the test action.
+2. [x] Under `Version History`, select `View Diff` for each version and confirm
    the displayed draft/published changes match the expected steps, branches,
    and triggers.
-3. [ ] On a version that is not marked `Current runtime`, select `Use Version`.
-4. [ ] Confirm that version becomes `Current runtime` and an audit event is
+3. [x] On a version that is not marked `Current runtime`, select `Use Version`.
+4. [x] Confirm that version becomes `Current runtime` and an audit event is
    recorded.
-5. [ ] Open `Test Flow`, run the automated test, and confirm it tests the newly
+5. [x] Open `Test Flow`, run the automated test, and confirm it tests the newly
    selected immutable version and passes.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
+
+Evidence: `Canvas UAT 1 - Core Inputs` published and compared versions 1 and 2,
+restored version 1 as the current runtime, recorded
+`chatbot_action.version_activated`, and passed the automated test against
+published version 1. The temporary second trigger was removed afterward; the
+action now has one trigger and reports `Draft matches runtime`.
 
 ## 17.8 Verify Experiment Traffic Allocation
 
