@@ -702,17 +702,19 @@ Result: [x] Pass [ ] Fail
 
 ## 17.6 Verify Lifecycle Analytics And Attribution
 
-1. [ ] Open `Automation` > `Analytics`.
-2. [ ] Confirm `Lifecycle and Conversion` reports task starts, completion,
-   abandonment, correction, validation failure, handoff, and operation success.
-3. [ ] Confirm `Model and Tool Runtime` reports tokens, latency, cost units, tool
-   usage, and model fallback.
-4. [ ] Confirm `Field and Route Attribution` can be read by task, field, option,
-   route, channel, and published version where recorded data exists.
-5. [ ] Confirm empty metrics show a clear zero or empty state rather than an
+1. [x] Open `Automation` > `Analytics`.
+2. [x] Confirm `Lifecycle and Conversion` shows starts, completion,
+   cancellation, corrections, retried fields, validation failures, handoffs,
+   operations, and breakdowns by action or task, channel, and published version.
+3. [x] Confirm `Model and Tool Runtime` shows model and deterministic turns,
+   attempts, multi-attempt turns, latency, tokens, cost units, grounding, safety,
+   and `Tool activity`.
+4. [x] Confirm `Field and Route Attribution` shows `Field activity` and
+   `Recorded branch routes` with selection counts where data exists.
+5. [x] Confirm empty metrics show a clear zero or empty state rather than an
    error.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
 ## 17.7 Verify Version Comparison And Rollback
 
