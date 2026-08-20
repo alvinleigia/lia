@@ -740,17 +740,24 @@ action now has one trigger and reports `Draft matches runtime`.
 
 ## 17.8 Verify Experiment Traffic Allocation
 
-1. [ ] Open `Automation` > `Actions`, open a test action, then select `Settings`.
-2. [ ] Under `Experiment Metadata`, enter an experiment key, variant label, and
+1. [x] Open `Automation` > `Actions`, open a test action, then select `Settings`.
+2. [x] Under `Experiment Metadata`, enter an experiment key, variant label, and
    traffic weight, then save.
-3. [ ] Return to the action and confirm `Experiment Variant` shows the saved
+3. [x] Return to the action and confirm `Experiment Variant` shows the saved
    values.
-4. [ ] Configure another approved action with the same experiment key and a
+4. [x] Configure another approved action with the same experiment key and a
    different variant label and weight.
-5. [ ] Start repeated new test conversations and confirm each conversation keeps
+5. [x] Start repeated new test conversations and confirm each conversation keeps
    one stable allocated variant instead of changing during the conversation.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
+
+Evidence: `Canvas UAT 1 - Core Inputs` and `Canvas UAT 2 - Operations` used
+experiment key `uat-17-8` as 50% variants. Two fresh Project Chat conversations
+were each started twice; one stayed on Operations and the other stayed on Core
+Inputs. Experiment analytics recorded four starts, two per variant. Temporary
+experiment metadata and shared trigger phrases were then removed, and both
+actions report `Draft matches runtime` with one trigger phrase.
 
 ## 17.9 Verify Cross-Project Flow Clone And Resource Remapping
 
