@@ -93,7 +93,7 @@ and manual staging UAT are complete through Phase 17 under the single-tester
 scope as of 2026-08-20.
 
 Current target: complete Phase 18 public extension contracts, conformance
-tests, plugin boundaries, and extension proofs.
+tests, the Telnyx Voice AI adapter, plugin boundaries, and extension proofs.
 
 ### Phase Tracking Snapshot
 
@@ -106,7 +106,7 @@ tests, plugin boundaries, and extension proofs.
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
-| 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, a real external channel, plugin boundaries, and extension proofs. |
+| 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
 
@@ -1179,20 +1179,32 @@ optimize versioned conversational automations.
 ## Phase 18: Future Channels And Extension Model
 
 Goal: prove that channels, models, tools, and task families extend the same
-universal contracts.
+universal contracts, using Telnyx Voice AI as the first real external-channel
+implementation.
 
 - [x] The reference future adapter consumes the current universal runtime envelope.
 - [ ] Document the public conversational task, reply, tool, operation, and V2 adapter contracts.
 - [ ] Add conformance tests for third-party channel adapters.
 - [ ] Add conformance tests for model providers and business tools.
-- [ ] Certify at least one real non-WhatsApp external channel.
+- [ ] Implement and certify Telnyx Voice AI as the first real non-WhatsApp
+  external channel.
 - [ ] Define plugin boundaries for inbound normalization and outbound delivery.
 - [ ] Define plugin boundaries for capability declarations and readable fallbacks.
 - [ ] Define plugin boundaries for encrypted credentials and tool authorization.
-- [ ] Evaluate voice as a future adapter over the same task state.
+- [ ] Validate the Telnyx inbound-call lifecycle, speech turns, interruptions,
+  cancellation, handoff, call termination, and existing action/tool execution
+  over the same task state.
 - [ ] Confirm a new channel can be added without changing task or flow persistence.
 - [ ] Confirm a new model can be added without changing business task contracts.
 - [ ] Confirm a new business tool cannot bypass tenant, validation, confirmation, or audit boundaries.
+
+Initial Telnyx scope: inbound Voice AI conversations, verified webhooks and
+call lifecycle, real-time speech turns, interruption handling, existing Lia
+tasks and flows, cancellation, handoff, end-call behavior, authorized tools,
+and project-scoped diagnostics. Outbound campaigns, call recording,
+multilingual voice catalogs, advanced PSTN transfers, and production-volume
+certification remain outside this initial Phase 18 target unless scheduled
+separately.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
