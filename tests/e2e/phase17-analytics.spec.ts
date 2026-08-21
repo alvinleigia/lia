@@ -63,6 +63,7 @@ test("aggregates lifecycle, model, field, route, and tool telemetry", () => {
           schemaVersion: 2,
           source: "model",
           attempts: 2,
+          modelEscalationReason: "correction",
           latencyMs: 500,
           inputTokens: 100,
           outputTokens: 20,
@@ -90,6 +91,24 @@ test("aggregates lifecycle, model, field, route, and tool telemetry", () => {
           hasToolRequest: false,
         },
       },
+      {
+        action: "structured_turn.decided",
+        metadata: {
+          schemaVersion: 2,
+          source: "deterministic",
+          attempts: 2,
+          modelEscalationReason: "grounded_synthesis",
+          latencyMs: 300,
+          inputTokens: 50,
+          outputTokens: 10,
+          totalTokens: 60,
+          estimatedCostUnits: 100,
+          safetyDecision: "allow",
+          groundingStatus: "no_answer",
+          turnKind: "ordinary_question",
+          hasToolRequest: false,
+        },
+      },
     ],
     toolRequests: [
       { toolId: "lookup:availability", status: "success", errorCode: null },
@@ -114,23 +133,23 @@ test("aggregates lifecycle, model, field, route, and tool telemetry", () => {
   });
   expect(analytics.lifecycle.completionRate).toBeCloseTo(66.67, 1);
   expect(analytics.model).toMatchObject({
-    structuredTurns: 2,
-    modelTurns: 1,
+    structuredTurns: 3,
+    modelTurns: 2,
     deterministicTurns: 1,
-    modelAttempts: 2,
-    modelTurnRate: 50,
-    deterministicAvoidanceRate: 50,
+    modelAttempts: 4,
     attemptsPerModelTurn: 2,
-    attemptsPerCompletion: 1,
-    multiAttemptTurns: 1,
+    attemptsPerCompletion: 2,
+    multiAttemptTurns: 2,
     multiAttemptRate: 100,
-    averageLatencyMs: 500,
-    totalTokens: 120,
-    estimatedCostUnits: 180,
+    averageLatencyMs: 400,
+    totalTokens: 180,
+    estimatedCostUnits: 280,
     safetyBlocks: 1,
     groundedTurns: 1,
     toolRecommendations: 1,
   });
+  expect(analytics.model.modelTurnRate).toBeCloseTo(66.67, 1);
+  expect(analytics.model.deterministicAvoidanceRate).toBeCloseTo(33.33, 1);
   expect(analytics.byTask).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ label: "Support request", starts: 2 }),
@@ -156,4 +175,8 @@ test("aggregates lifecycle, model, field, route, and tool telemetry", () => {
     succeeded: 1,
     failed: 1,
   });
+  expect(analytics.modelEscalations).toEqual([
+    { reason: "correction", count: 1 },
+    { reason: "grounded_synthesis", count: 1 },
+  ]);
 });

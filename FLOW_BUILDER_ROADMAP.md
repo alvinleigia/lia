@@ -1197,7 +1197,7 @@ model cost or latency.
 - [x] 17A.3 Add deterministic knowledge fast paths for approved exact answers,
   structured project facts, and safe no-answer behavior before retrieval or
   generation escalation.
-- [ ] 17A.4 Define one bounded model-escalation policy for ambiguous intent,
+- [x] 17A.4 Define one bounded model-escalation policy for ambiguous intent,
   semantic extraction, grounded synthesis, correction, and clarification.
 - [ ] 17A.5 Reduce avoidable prompt and retrieval tokens through bounded
   context, reusable prompt fragments, retrieval thresholds, and safe caching
@@ -1230,6 +1230,15 @@ answer returns the configured project fallback and contact details with a
 unlisted or ambiguous questions continue through the existing grounded
 retrieval and structured model boundary. Published task snapshots retain the
 approved list so an active flow cannot silently change behavior mid-version.
+
+The Phase 17A.4 escalation policy uses one closed, server-owned reason list for
+ambiguous intent, semantic extraction, grounded synthesis, correction,
+clarification, and configured generation. These turns still pass through the
+existing budget gate, bounded retry limit, validation, grounding, and safe
+fallback path. Safe turn audits record only the reason label, and Project
+Analytics aggregates those labels without exposing visitor text. A turn with
+failed model attempts now counts as model-attempted rather than as deterministic
+avoidance, keeping the cost and latency baseline honest.
 
 Phase 17A exit gate: the optimized runtime demonstrably reduces model usage or
 latency against the recorded baseline without lowering completion, grounding,

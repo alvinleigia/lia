@@ -358,6 +358,36 @@ export default async function ProjectAnalyticsPage() {
 
             <div className="overflow-x-auto rounded-md border bg-white">
               <div className="flex items-center gap-2 border-b px-3 py-2 font-medium">
+                <BrainCircuit className="h-4 w-4" /> Model escalation reasons
+              </div>
+              {phase17Analytics.modelEscalations.length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">
+                  No bounded model escalations recorded.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="px-3 py-2">Reason</th>
+                      <th className="py-2 pr-3">Turns</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {phase17Analytics.modelEscalations.map((row) => (
+                      <tr key={row.reason} className="border-b last:border-b-0">
+                        <td className="px-3 py-2 font-medium capitalize">
+                          {row.reason.replaceAll("_", " ")}
+                        </td>
+                        <td className="py-2 pr-3">{formatNumber(row.count)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="overflow-x-auto rounded-md border bg-white">
+              <div className="flex items-center gap-2 border-b px-3 py-2 font-medium">
                 <Wrench className="h-4 w-4" /> Tool activity
               </div>
               {phase17Analytics.tools.length === 0 ? (

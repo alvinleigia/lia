@@ -81,10 +81,22 @@ export type OpenStructuredConversationInput = Omit<
 
 export type StructuredTurnExecution = {
   attempts: number;
+  modelEscalationReason: ModelEscalationReason | null;
   proposal: ValidatedTurnProposalV1;
   source: "model" | "deterministic";
   usage: StructuredTurnProviderResult["usage"];
 };
+
+export const MODEL_ESCALATION_REASONS = [
+  "ambiguous_intent",
+  "clarification",
+  "configured_generation",
+  "correction",
+  "grounded_synthesis",
+  "semantic_extraction",
+] as const;
+
+export type ModelEscalationReason = (typeof MODEL_ESCALATION_REASONS)[number];
 
 type StructuredTurnEngineOptions = {
   budgetGate?: TurnBudgetGate;
@@ -260,6 +272,34 @@ function approvedKnowledgeAnswerProposal(
     groundingStatus: "no_answer",
     turnKind: input.activeTask ? "side_question" : "ordinary_question",
   });
+}
+
+const CORRECTION_MARKERS =
+  /\b(?:actually|change|changed|correct|correction|instead|rather|update)\b/i;
+
+function resolveModelEscalationReason(
+  input: ExecuteStructuredTurnInput,
+): ModelEscalationReason {
+  if (input.openingTurn) return "configured_generation";
+  if (input.stage === "clarification") return "clarification";
+  if (input.stage === "knowledge") {
+    return !input.activeTask && input.publishedTasks.length > 0
+      ? "ambiguous_intent"
+      : "grounded_synthesis";
+  }
+  if (input.stage === "extraction") {
+    if (isPotentialKnowledgeSideQuestion(input.visitorMessage)) {
+      return "ambiguous_intent";
+    }
+    const hasExistingValue = input.fieldState.some((field) =>
+      ["confirmed", "valid"].includes(field.state),
+    );
+    return hasExistingValue && CORRECTION_MARKERS.test(input.visitorMessage)
+      ? "correction"
+      : "semantic_extraction";
+  }
+  if (input.stage === "lookup") return "grounded_synthesis";
+  return "ambiguous_intent";
 }
 
 function asValidatedDeterministic(
@@ -503,6 +543,7 @@ export class StructuredTurnEngine {
     if (opening.mode === "exact") {
       return {
         attempts: 0,
+        modelEscalationReason: null,
         proposal: asValidatedDeterministic(
           deterministicProposal({
             nextAction: "ask",
@@ -532,6 +573,7 @@ export class StructuredTurnEngine {
     if (isExplicitTaskCancellation(input)) {
       return {
         attempts: 0,
+        modelEscalationReason: null,
         proposal: asValidatedDeterministic(
           deterministicProposal({
             nextAction: "cancel",
@@ -549,6 +591,7 @@ export class StructuredTurnEngine {
     if (isExplicitTaskHandoff(input)) {
       return {
         attempts: 0,
+        modelEscalationReason: null,
         proposal: asValidatedDeterministic(
           deterministicProposal({
             nextAction: "handoff",
@@ -572,6 +615,7 @@ export class StructuredTurnEngine {
     if (!admission.allowed) {
       return {
         attempts: 0,
+        modelEscalationReason: null,
         proposal: asValidatedDeterministic(deterministicProposal(admission)),
         source: "deterministic",
         usage: { inputTokens: null, outputTokens: null, totalTokens: null },
@@ -582,6 +626,7 @@ export class StructuredTurnEngine {
     if (explicitTask) {
       return {
         attempts: 0,
+        modelEscalationReason: null,
         proposal: {
           ...asValidatedDeterministic(
             turnResultV1Schema.parse({
@@ -624,6 +669,7 @@ export class StructuredTurnEngine {
     if (directField) {
       return {
         attempts: 0,
+        modelEscalationReason: null,
         proposal: asValidatedDeterministic(directField),
         source: "deterministic",
         usage: { inputTokens: null, outputTokens: null, totalTokens: null },
@@ -634,12 +680,14 @@ export class StructuredTurnEngine {
     if (approvedKnowledgeAnswer) {
       return {
         attempts: 0,
+        modelEscalationReason: null,
         proposal: asValidatedDeterministic(approvedKnowledgeAnswer),
         source: "deterministic",
         usage: { inputTokens: null, outputTokens: null, totalTokens: null },
       };
     }
 
+    const modelEscalationReason = resolveModelEscalationReason(input);
     const modelIds = resolveModelIds(input.projectPolicy, input.stage);
     const budget = await this.budgetGate.admit({
       estimatedCostUnits: admission.estimatedCostUnits ?? 0,
@@ -652,6 +700,7 @@ export class StructuredTurnEngine {
     if (!budget.allowed) {
       return {
         attempts: 0,
+        modelEscalationReason,
         proposal: asValidatedDeterministic(
           deterministicProposal({
             nextAction: "fail",
@@ -675,6 +724,7 @@ export class StructuredTurnEngine {
       } catch {
         return {
           attempts: 0,
+          modelEscalationReason,
           proposal: asValidatedDeterministic(retrievalFailureProposal(input)),
           source: "deterministic",
           usage: { inputTokens: null, outputTokens: null, totalTokens: null },
@@ -735,6 +785,7 @@ export class StructuredTurnEngine {
 
           return {
             attempts,
+            modelEscalationReason,
             proposal: {
               ...proposal,
               validation: {
@@ -761,6 +812,7 @@ export class StructuredTurnEngine {
       modelFailureProposal(input);
     return {
       attempts,
+      modelEscalationReason,
       proposal: {
         ...asValidatedDeterministic(fallback),
         validation: {

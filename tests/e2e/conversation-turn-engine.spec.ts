@@ -337,6 +337,7 @@ test("task field extraction skips knowledge retrieval", async () => {
   const result = await engine.execute(engineInput());
 
   expect(result.source).toBe("model");
+  expect(result.modelEscalationReason).toBe("semantic_extraction");
   expect(provider.calls).toHaveLength(1);
   expect(retriever.calls).toBe(0);
 });
@@ -360,6 +361,7 @@ test("a side question during a task uses grounded knowledge retrieval", async ()
   });
 
   expect(result.source).toBe("model");
+  expect(result.modelEscalationReason).toBe("grounded_synthesis");
   expect(result.proposal).toMatchObject({
     grounding: { status: "grounded", excerptIds: ["document:12"] },
     reply: "The spa is open from 9 am to 6 pm.",
@@ -455,6 +457,7 @@ test("rate and cost admission can deny a turn before model use", async () => {
   const result = await engine.execute(engineInput());
 
   expect(result.source).toBe("deterministic");
+  expect(result.modelEscalationReason).toBe("semantic_extraction");
   expect(result.proposal.safety.reasonCode).toBe("project_turn_limit");
   expect(provider.calls).toHaveLength(0);
 });
@@ -570,6 +573,68 @@ test("a question at a requested text field still escalates to the model", async 
   });
 
   expect(result.source).toBe("model");
+  expect(result.modelEscalationReason).toBe("ambiguous_intent");
+  expect(provider.calls).toHaveLength(1);
+});
+
+test("visitor corrections use the bounded correction escalation", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      turnKind: "field_correction",
+      fieldCandidates: [
+        {
+          fieldKey: "guestEmail",
+          naturalValue: "updated@example.com",
+          confidence: 0.98,
+          source: "visitor",
+        },
+      ],
+    }),
+  ]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    fieldState: [
+      {
+        fieldKey: "guestEmail",
+        label: "Guest Email",
+        required: true,
+        sensitivity: "personal",
+        state: "valid",
+        value: "old@example.com",
+      },
+    ],
+    visitorMessage: "Actually, change my email to updated@example.com.",
+  });
+
+  expect(result.source).toBe("model");
+  expect(result.modelEscalationReason).toBe("correction");
+  expect(provider.calls).toHaveLength(1);
+});
+
+test("clarification stages use the bounded clarification escalation", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      fieldCandidates: [],
+      nextAction: "clarify",
+      reply: "Which service did you mean?",
+      ambiguity: {
+        requiresClarification: true,
+        question: "Which service did you mean?",
+      },
+    }),
+  ]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    stage: "clarification",
+    visitorMessage: "The usual one.",
+  });
+
+  expect(result.source).toBe("model");
+  expect(result.modelEscalationReason).toBe("clarification");
   expect(provider.calls).toHaveLength(1);
 });
 
@@ -770,6 +835,7 @@ test("generated opening greetings use the structured model boundary", async () =
   });
 
   expect(result?.source).toBe("model");
+  expect(result?.modelEscalationReason).toBe("configured_generation");
   expect(result?.proposal.turnKind).toBe("greeting");
   expect(provider.calls).toHaveLength(1);
   expect(provider.calls[0]?.system).toContain("Opening turn: true");

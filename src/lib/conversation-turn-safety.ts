@@ -114,6 +114,7 @@ export function hasUnsafeTurnOutput(reply: string) {
 export function buildSafeTurnDecisionSummary(
   input: {
     attempts: number;
+    modelEscalationReason: string | null;
     proposal: ValidatedTurnProposalV1;
     source: "model" | "deterministic";
   },
@@ -131,6 +132,7 @@ export function buildSafeTurnDecisionSummary(
     schemaVersion: 2,
     source: input.source,
     attempts: input.attempts,
+    modelEscalationReason: input.modelEscalationReason,
     providerModelId: input.proposal.validation.providerModelId,
     turnKind: input.proposal.turnKind,
     nextAction: input.proposal.nextAction,

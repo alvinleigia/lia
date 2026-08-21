@@ -287,13 +287,15 @@ export function aggregatePhase17Analytics(input: Phase17AnalyticsInput) {
   let groundedTurns = 0;
   let corrections = 0;
   let toolRecommendations = 0;
+  const modelEscalations = new Map<string, number>();
 
   for (const audit of input.turnAudits) {
     if (audit.action !== "structured_turn.decided") continue;
     const metadata = audit.metadata;
     const source = asString(metadata.source);
     const attempts = asNumber(metadata.attempts);
-    if (source === "model") {
+    const modelWasAttempted = source === "model" || attempts > 0;
+    if (modelWasAttempted) {
       modelTurns += 1;
       modelAttempts += attempts;
       latencyMs += asNumber(metadata.latencyMs);
@@ -302,6 +304,10 @@ export function aggregatePhase17Analytics(input: Phase17AnalyticsInput) {
       totalTokens += asNumber(metadata.totalTokens);
       estimatedCostUnits += asNumber(metadata.estimatedCostUnits);
       if (attempts > 1) multiAttemptTurns += 1;
+      increment(
+        modelEscalations,
+        asString(metadata.modelEscalationReason) || "legacy_unspecified",
+      );
     } else if (source === "deterministic") {
       deterministicTurns += 1;
     }
@@ -420,6 +426,9 @@ export function aggregatePhase17Analytics(input: Phase17AnalyticsInput) {
       .sort(
         (a, b) => b.requested - a.requested || a.toolId.localeCompare(b.toolId),
       ),
+    modelEscalations: [...modelEscalations.entries()]
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason)),
   };
 }
 
