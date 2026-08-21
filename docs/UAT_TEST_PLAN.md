@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A.1 passed; Phase 17A.2 cancellation retest pending
+- Current staging milestone: Phase 17A.1 and 17A.2 passed; Phase 17A.3 is next
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -21,7 +21,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
-| 17A - AI cost and latency | In progress | 17A.1 passed; deploy and retest the 17A.2 cancellation fix before 17A.3. |
+| 17A - AI cost and latency | In progress | 17A.1 and 17A.2 passed on staging on 2026-08-22; run 17A.3 next. |
 | 18 - Telnyx and extensions | Waiting | Start only after the Phase 17A exit gate. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
@@ -871,13 +871,13 @@ added.
 6. [x] Start the action again and reach the final review message. Type `No`.
    Confirm Lia replies `No problem. I cancelled this request.` and does not
    submit it.
-7. [ ] Start the action once more, type `cancel` before the final review, and
+7. [x] Start the action once more, type `cancel` before the final review, and
    confirm the active request is cancelled immediately.
 8. [x] At `Please provide Service`, type a date. Confirm Lia keeps the Service
    field active, shows `That does not match an available option`, and accepts
    `Classic Facial` before moving to Preferred Date.
 
-Result: [ ] Pass [ ] Fail [x] Retest pending
+Result: [x] Pass [ ] Fail
 
 - Typed continuation latency: `Generally under 2 seconds on the corrected deterministic path`
 - Confirmation result: `Submitted once`
@@ -887,8 +887,8 @@ Result: [ ] Pass [ ] Fail [x] Retest pending
 - Tester/date: `Single tester / release owner - 2026-08-22`
 - Defects closed: repeated wrong-field state contamination and its associated
   deterministic delay (`dbc7a6e`, `1c9d6b3`).
-- Retest pending: explicit cancellation must bypass project-resource field
-  validation while Service is pending.
+- Cancellation retest: `cancel` at the pending Service field immediately
+  cancelled the request after fix `8aa0360`.
 
 ## 17A.3 Verify Approved Exact Answers
 
