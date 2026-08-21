@@ -998,7 +998,7 @@ Result: [ ] Pass [ ] Fail
 - Phase 16: [x] Pass [ ] Fail [ ] In progress
 - Phase 17: [x] Pass [ ] Fail [ ] In progress
 - Phase 17A: [ ] Pass [ ] Fail [x] In progress
-- Phase 18: [ ] Pass [ ] Fail [ ] In progress [x] Not started
+- Phase 18: [ ] Pass [ ] Fail [x] In progress [ ] Not started
 - Critical defects open: `0`
 - High defects open: `0`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).

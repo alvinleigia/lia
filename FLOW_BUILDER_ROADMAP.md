@@ -88,13 +88,13 @@ database, backup, and provider readiness work.
 - [x] Phase 14 staging cross-channel UAT passed under the single-tester scope on 2026-08-15.
 - [x] Priority 2 release approval is complete for continued internal testing.
 
-Active delivery gate: Phase 17A, AI cost and latency optimization. Engineering
-implementation and manual staging UAT are complete through Phase 17 under the
-single-tester scope as of 2026-08-20.
+Active delivery gate: Phase 17A staging UAT remains deferred by the release
+owner. Phase 18 contract documentation may proceed, but this does not pass the
+Phase 17A release comparison or authorize the Telnyx runtime rollout.
 
-Current target: complete the Phase 17A measurement, deterministic-routing,
-knowledge fast-path, escalation, and rollout gates before starting Phase 18
-Telnyx Voice AI implementation.
+Current target: define and verify the Phase 18 public extension boundaries
+before starting the Telnyx Voice AI implementation, then run the deferred
+Phase 17A UAT before a release decision.
 
 ### Phase Tracking Snapshot
 
@@ -107,8 +107,8 @@ Telnyx Voice AI implementation.
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
-| 17A | Milestones 17A.1 through 17A.6 implemented | Combined staging UAT deferred by the release owner | Deploy the complete candidate, run sections 17A.1 through 17A.6, and record the audited release comparison before Phase 18. |
-| 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Waiting on Phase 17A | Public extension contracts, conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
+| 17A | Milestones 17A.1 through 17A.6 implemented | Combined staging UAT deferred by the release owner | Deploy the complete candidate, run sections 17A.1 through 17A.6, and record the audited release comparison before the Telnyx runtime rollout. |
+| 18 | Future-adapter foundation and public contract reference complete; 10 implementation items remain unchecked | Engineering in progress; release still waits on Phase 17A UAT | Conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
 
@@ -1273,7 +1273,7 @@ universal contracts, using Telnyx Voice AI as the first real external-channel
 implementation.
 
 - [x] The reference future adapter consumes the current universal runtime envelope.
-- [ ] Document the public conversational task, reply, tool, operation, and V2 adapter contracts.
+- [x] Document the public conversational task, reply, tool, operation, and Phase 12 / Flow Builder V2 adapter contracts in `docs/CHANNEL_CERTIFICATION.md`.
 - [ ] Add conformance tests for third-party channel adapters.
 - [ ] Add conformance tests for model providers and business tools.
 - [ ] Implement and certify Telnyx Voice AI as the first real non-WhatsApp
@@ -1287,6 +1287,13 @@ implementation.
 - [ ] Confirm a new channel can be added without changing task or flow persistence.
 - [ ] Confirm a new model can be added without changing business task contracts.
 - [ ] Confirm a new business tool cannot bypass tenant, validation, confirmation, or audit boundaries.
+
+Phase 18 contract-reference milestone completed on 2026-08-21. The existing
+channel-certification guide now identifies the supported task, reply, tool,
+operation, inbound, and adapter surfaces; distinguishes the Flow Builder V2
+adapter milestone from the current V1 wire schemas; and records the server-only
+security boundary. All 213 channel contract tests passed. Phase 17A staging UAT
+remains deferred, and no Telnyx runtime implementation has started.
 
 Initial Telnyx scope: inbound Voice AI conversations, verified webhooks and
 call lifecycle, real-time speech turns, interruption handling, existing Lia
