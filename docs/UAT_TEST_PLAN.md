@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17 signed off; Phase 17A.1 through 17A.6 deployment pending
+- Current staging milestone: Phase 17A.1 and 17A.2 passed; Phase 17A.3 is next
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -21,7 +21,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
-| 17A - AI cost and latency | 17A.1 through 17A.6 implemented | UAT is deferred by the release owner; deploy, then run sections 17A.1 through 17A.6 together later. |
+| 17A - AI cost and latency | In progress | 17A.1 and 17A.2 passed on staging on 2026-08-22; run 17A.3 next. |
 | 18 - Telnyx and extensions | Waiting | Start only after the Phase 17A exit gate. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
@@ -819,10 +819,10 @@ counts were both zero at sign-off.
 This check only measures existing behavior. Do not edit a prompt, model,
 action, task, or routing rule during this test.
 
-1. [ ] Confirm staging contains the Phase 17A.1 analytics deployment.
-2. [ ] Select project `Phase 16 Lifecycle UAT (#94)`.
-3. [ ] Open `Projects` > `Analytics`.
-4. [ ] Find `AI Usage Baseline` and confirm it shows:
+1. [x] Confirm staging contains the Phase 17A.1 analytics deployment.
+2. [x] Select project `Phase 16 Lifecycle UAT (#94)`.
+3. [x] Open `Projects` > `Analytics`.
+4. [x] Find `AI Usage Baseline` and confirm it shows:
    - `30-day runtime requests`, input tokens, output tokens, and total tokens.
    - `30-day average request latency` and `Tokens per direct AI chat`.
    - `Successful direct AI chats`.
@@ -830,54 +830,63 @@ action, task, or routing rule during this test.
      rate.
    - Structured model attempts, retry or fallback rate, attempts per model
      turn, and attempts per completion.
-5. [ ] If `Structured decisions` is greater than zero, confirm deterministic
+5. [x] If `Structured decisions` is greater than zero, confirm deterministic
    avoidance plus structured model rate equals `100%` apart from rounding.
-6. [ ] Record the displayed values below. Zero is valid when the selected
+6. [x] Record the displayed values below. Zero is valid when the selected
    project has no matching retained activity; a missing card or page error is
    not valid.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
-- 30-day runtime requests: `<value>`
-- 30-day total tokens: `<value>`
-- 30-day average request latency: `<value>`
-- Successful direct AI chats: `<value>`
-- Tokens per direct AI chat: `<value>`
-- Structured decisions: `<value>`
-- Deterministic avoidance: `<value>`
-- Structured model rate: `<value>`
-- Retry or fallback rate: `<value>`
-- Attempts per model turn: `<value>`
-- Attempts per completion: `<value>`
-- Tester/date: `<name> / <date>`
+- 30-day runtime requests: `0`
+- 30-day total tokens: `0`
+- 30-day average request latency: `0 ms`
+- Successful direct AI chats: `0`
+- Tokens per direct AI chat: `Unavailable`
+- Structured decisions: `0`
+- Deterministic avoidance: `0.00%`
+- Structured model rate: `0.00%`
+- Retry or fallback rate: `0.00%`
+- Attempts per model turn: `0.00`
+- Attempts per completion: `0.00`
+- Tester/date: `Single tester / release owner - 2026-08-22`
+- Note: The zero baseline is valid for this project's retained activity. The
+  release comparison in 17A.6 must use later recorded traffic or explicitly
+  report that no measurable reduction can be calculated.
 
 ## 17A.2 Verify The Deterministic Pre-Router
 
 Run this after 17A.1 so the baseline is recorded before new test traffic is
 added.
 
-1. [ ] Select project `Phase 14 Release UAT (#1)`.
-2. [ ] Open `Projects` > `Chat` and start `Book a Spa Service`.
-3. [ ] When Lia asks for a text field, type the requested value. Confirm Lia
+1. [x] Select project `Phase 14 Release UAT (#1)`.
+2. [x] Open `Projects` > `Chat` and start `Book a Spa Service`.
+3. [x] When Lia asks for a text field, type the requested value. Confirm Lia
    accepts it and asks for the next missing field without a long model delay.
-4. [ ] At another requested text field, ask `What time is check-in?`. Confirm
+4. [x] At another requested text field, ask `What time is check-in?`. Confirm
    Lia answers or safely says the information is unavailable, then returns to
    the same pending field.
-5. [ ] Complete the remaining required fields. At the final review message,
+5. [x] Complete the remaining required fields. At the final review message,
    type `Yes, confirm.` Confirm the request is submitted once.
-6. [ ] Start the action again and reach the final review message. Type `No`.
+6. [x] Start the action again and reach the final review message. Type `No`.
    Confirm Lia replies `No problem. I cancelled this request.` and does not
    submit it.
-7. [ ] Start the action once more, type `cancel` before the final review, and
+7. [x] Start the action once more, type `cancel` before the final review, and
    confirm the active request is cancelled immediately.
+8. [x] At `Please provide Service`, type a date. Confirm Lia keeps the Service
+   field active, shows `That does not match an available option`, and accepts
+   `Classic Facial` before moving to Preferred Date.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
-- Typed continuation latency: `<seconds>`
-- Confirmation result: `<submitted once / defect>`
-- Bare `No` result: `<cancelled / defect>`
-- Side-question return result: `<resumed same field / defect>`
-- Tester/date: `<name> / <date>`
+- Typed continuation latency: `Generally under 2 seconds on the corrected deterministic path`
+- Confirmation result: `Submitted once`
+- Bare `No` result: `Cancelled`
+- Side-question return result: `Safely reported unavailable information and resumed Guest Name; this model-backed turn took about 10 seconds`
+- Wrong-field result: `Stayed on Service with clear mismatch guidance, then continued correctly`
+- Tester/date: `Single tester / release owner - 2026-08-22`
+- Defects closed: repeated wrong-field state contamination and its associated
+  deterministic delay (`dbc7a6e`, `1c9d6b3`).
 
 ## 17A.3 Verify Approved Exact Answers
 
