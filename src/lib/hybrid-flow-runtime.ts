@@ -198,8 +198,14 @@ export function createRequestedTaskSelectionProposal(input: {
 }
 
 export function createMismatchedTaskSelectionProposal(input: {
+  reason?: "stale_selection" | "unmatched_value";
   requestedFieldPrompt: string | null;
 }): TurnResultV1 {
+  const prefix =
+    input.reason === "unmatched_value"
+      ? "That does not match an available option."
+      : "That option is no longer active.";
+
   return {
     ambiguity: { question: null, requiresClarification: false },
     decisionSummary:
@@ -209,8 +215,8 @@ export function createMismatchedTaskSelectionProposal(input: {
     nextAction: "ask",
     outcomeRecommendation: null,
     reply: input.requestedFieldPrompt
-      ? `That option is no longer active. ${input.requestedFieldPrompt}`
-      : "That option is no longer active. Please answer the current question.",
+      ? `${prefix} ${input.requestedFieldPrompt}`
+      : `${prefix} Please answer the current question.`,
     routeRecommendation: null,
     safety: { decision: "allow", reasonCode: null },
     schemaVersion: 1,

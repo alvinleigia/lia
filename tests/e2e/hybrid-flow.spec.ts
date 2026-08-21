@@ -1396,6 +1396,13 @@ test("stale task selections re-prompt without proposing a field mutation", () =>
     safety: { decision: "allow", reasonCode: null },
     turnKind: "field_correction",
   });
+
+  expect(
+    createMismatchedTaskSelectionProposal({
+      reason: "unmatched_value",
+      requestedFieldPrompt: "Please provide Service.",
+    }).reply,
+  ).toBe("That does not match an available option. Please provide Service.");
 });
 
 test("task turns ask for the next unresolved field before confirmation", () => {

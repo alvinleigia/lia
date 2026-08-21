@@ -898,6 +898,9 @@ async function executeTaskBoundary(input: {
       snapshot,
     }),
     output: createMismatchedTaskSelectionProposal({
+      reason: input.runtimeInput.selection
+        ? "stale_selection"
+        : "unmatched_value",
       requestedFieldPrompt:
         requestedField?.prompt ??
         (requestedField ? `Please provide ${requestedField.label}.` : null),
