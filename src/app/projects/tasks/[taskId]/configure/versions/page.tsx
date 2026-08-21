@@ -15,14 +15,20 @@ import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
 import { resolveProjectTaskToolDefinitions } from "@/lib/conversational-task-tools";
 import { validateConversationalTaskForPublish } from "@/lib/conversational-task-validation";
 import {
+  buildConversationalTaskSnapshot,
+  conversationalTaskSnapshotsMatch,
+} from "@/lib/conversational-task-versioning";
+import {
   getProjectConversationalTask,
   listConversationalTaskVersions,
   readConversationalTaskDefinition,
 } from "@/lib/conversational-tasks";
+import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 import { publishConversationalTaskAction } from "../../../actions";
 
 type PageProps = {
@@ -56,9 +62,12 @@ export default async function TaskVersionsPage({
     definition,
     projectPolicy,
   });
+  let toolDefinitions: Awaited<
+    ReturnType<typeof resolveProjectTaskToolDefinitions>
+  > = [];
   let toolIssue: string | null = null;
   try {
-    await resolveProjectTaskToolDefinitions({
+    toolDefinitions = await resolveProjectTaskToolDefinitions({
       definition,
       projectId: context.project.id,
     });
@@ -70,6 +79,30 @@ export default async function TaskVersionsPage({
   const issues = toolIssue
     ? [...validation.issues, toolIssue]
     : validation.issues;
+  const latestVersion = versions[0];
+  const currentSnapshot = toolIssue
+    ? null
+    : buildConversationalTaskSnapshot({
+        assistantBehavior: normalizeProjectAiSettings(
+          context.project.aiSettings,
+        ),
+        conversationPolicy: projectPolicy,
+        task: {
+          definition,
+          description: task.description,
+          id: task.id,
+          name: task.name,
+          objective: task.objective,
+          schemaVersion: task.schemaVersion,
+        },
+        toolDefinitions,
+      });
+  const draftMatchesCurrent = Boolean(
+    latestVersion &&
+      currentSnapshot &&
+      conversationalTaskSnapshotsMatch(currentSnapshot, latestVersion.snapshot),
+  );
+  const canPublish = ready && !draftMatchesCurrent;
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10">
@@ -122,7 +155,12 @@ export default async function TaskVersionsPage({
                 </div>
               ))}
             </div>
-            {ready ? (
+            {draftMatchesCurrent ? (
+              <p className="rounded-md bg-green-50 px-3 py-3 text-sm text-green-800">
+                Draft matches the current published version. Make a change
+                before publishing again.
+              </p>
+            ) : ready ? (
               <p className="rounded-md bg-green-50 px-3 py-3 text-sm text-green-800">
                 Ready to publish. Fields, dependencies, tools, and outcomes are
                 valid.
@@ -145,9 +183,13 @@ export default async function TaskVersionsPage({
               />
               <input type="hidden" name="taskId" value={task.id} />
               <FormSubmitButton
-                label="Publish New Version"
+                label={
+                  draftMatchesCurrent
+                    ? "Draft Already Published"
+                    : "Publish New Version"
+                }
                 pendingLabel="Publishing..."
-                disabled={!ready}
+                disabled={!canPublish}
                 icon={<Send className="h-4 w-4" />}
                 confirmation={{
                   title: "Publish this task version?",
@@ -166,6 +208,9 @@ export default async function TaskVersionsPage({
               <History className="h-5 w-5" />
               Version History
             </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Times shown in {context.company.timeZone}.
+            </p>
           </CardHeader>
           <CardContent>
             {versions.length === 0 ? (
@@ -184,7 +229,10 @@ export default async function TaskVersionsPage({
                         Version {version.versionNumber}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {version.publishedAt.toLocaleString()}
+                        {formatDateTimeInTimeZone(
+                          version.publishedAt,
+                          context.company.timeZone,
+                        )}
                       </p>
                     </div>
                     {index === 0 && (

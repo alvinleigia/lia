@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, max } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { ConversationProjectPolicyV1 } from "@/lib/conversation-contracts";
 import {
   type ConversationalTaskDefinitionV1,
@@ -8,6 +8,10 @@ import {
 } from "@/lib/conversation-contracts";
 import type { ConversationalTaskDetails } from "@/lib/conversational-task-schema";
 import { resolveProjectTaskToolDefinitions } from "@/lib/conversational-task-tools";
+import {
+  buildConversationalTaskSnapshot,
+  conversationalTaskSnapshotsMatch,
+} from "@/lib/conversational-task-versioning";
 import { db } from "@/lib/db-config";
 import {
   conversationalTasks,
@@ -233,25 +237,28 @@ export async function publishConversationalTask(input: {
     }
 
     const [latest] = await transaction
-      .select({ value: max(conversationalTaskVersions.versionNumber) })
+      .select({
+        snapshot: conversationalTaskVersions.snapshot,
+        versionNumber: conversationalTaskVersions.versionNumber,
+      })
       .from(conversationalTaskVersions)
       .where(
         and(
           eq(conversationalTaskVersions.projectId, input.projectId),
           eq(conversationalTaskVersions.taskId, input.taskId),
         ),
-      );
+      )
+      .orderBy(desc(conversationalTaskVersions.versionNumber))
+      .limit(1);
 
-    const versionNumber = (latest?.value ?? 0) + 1;
+    const versionNumber = (latest?.versionNumber ?? 0) + 1;
     const definition = normalizeConversationalTaskDefinition(task.definition);
     const toolDefinitions = await resolveProjectTaskToolDefinitions({
       definition,
       projectId: input.projectId,
     });
-    const snapshot = conversationalTaskSnapshotV1Schema.parse({
-      schemaVersion: 1,
+    const snapshot = buildConversationalTaskSnapshot({
       assistantBehavior: input.assistantBehavior,
-      assistantPolicy: input.projectPolicy.assistant,
       conversationPolicy: input.projectPolicy,
       toolDefinitions,
       task: {
@@ -263,6 +270,11 @@ export async function publishConversationalTask(input: {
         definition,
       },
     });
+    if (latest && conversationalTaskSnapshotsMatch(snapshot, latest.snapshot)) {
+      throw new Error(
+        "The draft matches the current published version. Make a change before publishing again.",
+      );
+    }
     const [version] = await transaction
       .insert(conversationalTaskVersions)
       .values({
