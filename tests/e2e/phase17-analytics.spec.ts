@@ -78,6 +78,18 @@ test("aggregates lifecycle, model, field, route, and tool telemetry", () => {
         action: "unrelated.audit",
         metadata: { source: "model", attempts: 99 },
       },
+      {
+        action: "structured_turn.decided",
+        metadata: {
+          schemaVersion: 2,
+          source: "deterministic",
+          attempts: 0,
+          safetyDecision: "allow",
+          groundingStatus: "not_required",
+          turnKind: "field_value",
+          hasToolRequest: false,
+        },
+      },
     ],
     toolRequests: [
       { toolId: "lookup:availability", status: "success", errorCode: null },
@@ -102,9 +114,16 @@ test("aggregates lifecycle, model, field, route, and tool telemetry", () => {
   });
   expect(analytics.lifecycle.completionRate).toBeCloseTo(66.67, 1);
   expect(analytics.model).toMatchObject({
+    structuredTurns: 2,
     modelTurns: 1,
+    deterministicTurns: 1,
     modelAttempts: 2,
+    modelTurnRate: 50,
+    deterministicAvoidanceRate: 50,
+    attemptsPerModelTurn: 2,
+    attemptsPerCompletion: 1,
     multiAttemptTurns: 1,
+    multiAttemptRate: 100,
     averageLatencyMs: 500,
     totalTokens: 120,
     estimatedCostUnits: 180,

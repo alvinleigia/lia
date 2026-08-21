@@ -1,6 +1,6 @@
 # Lia Conversational Flow Roadmap
 
-Status date: 2026-08-18
+Status date: 2026-08-21
 
 ## Document Authority
 
@@ -88,12 +88,13 @@ database, backup, and provider readiness work.
 - [x] Phase 14 staging cross-channel UAT passed under the single-tester scope on 2026-08-15.
 - [x] Priority 2 release approval is complete for continued internal testing.
 
-Active delivery gate: Priority 3, Phase 18 of 18. Engineering implementation
-and manual staging UAT are complete through Phase 17 under the single-tester
-scope as of 2026-08-20.
+Active delivery gate: Phase 17A, AI cost and latency optimization. Engineering
+implementation and manual staging UAT are complete through Phase 17 under the
+single-tester scope as of 2026-08-20.
 
-Current target: complete Phase 18 public extension contracts, conformance
-tests, the Telnyx Voice AI adapter, plugin boundaries, and extension proofs.
+Current target: complete the Phase 17A measurement, deterministic-routing,
+knowledge fast-path, escalation, and rollout gates before starting Phase 18
+Telnyx Voice AI implementation.
 
 ### Phase Tracking Snapshot
 
@@ -106,7 +107,8 @@ tests, the Telnyx Voice AI adapter, plugin boundaries, and extension proofs.
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
-| 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Not started | Public extension contracts, conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
+| 17A | Milestone 17A.1 baseline implementation complete | Staging UAT pending | Verify the baseline, then implement deterministic routing, knowledge fast paths, bounded model escalation, and staged rollout. |
+| 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Waiting on Phase 17A | Public extension contracts, conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
 
@@ -1175,6 +1177,46 @@ disconnected; credentials and runtime records are never copied.
 
 Phase 17 exit gate: teams can safely reuse, compare, evaluate, measure, and
 optimize versioned conversational automations.
+
+## Phase 17A: AI Cost And Latency Optimization
+
+Goal: reserve model calls for turns that need language understanding or
+generation while keeping validation, routing, side effects, and safety under
+the existing deterministic server runtime. This phase must finish before the
+Telnyx Voice AI adapter is implemented so voice does not multiply avoidable
+model cost or latency.
+
+- [x] 17A.1 Add an honest project baseline for 30-day requests and tokens,
+  structured model versus deterministic decisions, retry or fallback rate,
+  model attempts per model turn, and model attempts per completed request.
+- [ ] Complete 17A.1 staging UAT and record the observed baseline without
+  changing routing, prompts, models, or user-facing replies.
+- [ ] 17A.2 Add a deterministic pre-router for exact triggers, active-flow
+  continuation, cancellation, confirmations, typed values, and other bounded
+  intents that do not require a model.
+- [ ] 17A.3 Add deterministic knowledge fast paths for approved exact answers,
+  structured project facts, and safe no-answer behavior before retrieval or
+  generation escalation.
+- [ ] 17A.4 Define one bounded model-escalation policy for ambiguous intent,
+  semantic extraction, grounded synthesis, correction, and clarification.
+- [ ] 17A.5 Reduce avoidable prompt and retrieval tokens through bounded
+  context, reusable prompt fragments, retrieval thresholds, and safe caching
+  that preserves tenant and project scope.
+- [ ] 17A.6 Compare the optimized candidate against the Phase 17A.1 baseline,
+  pass the Phase 17 evaluation datasets and safety gates, then roll out on
+  staging with an auditable rollback path.
+
+The Phase 17A.1 analytics baseline intentionally distinguishes two evidence
+windows. Request and token totals come from the retained 30-day request log;
+structured decision ratios come from retained version-2 turn audits. A
+successful direct Project Chat or Widget request counts as one direct AI chat.
+Provider-internal steps are included in token usage but are not presented as
+separate calls until exact per-step telemetry is persisted. This avoids a
+misleading precision claim while preserving a useful optimization baseline.
+
+Phase 17A exit gate: the optimized runtime demonstrably reduces model usage or
+latency against the recorded baseline without lowering completion, grounding,
+safety, validation, or routing quality.
 
 ## Phase 18: Future Channels And Extension Model
 

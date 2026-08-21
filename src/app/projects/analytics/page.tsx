@@ -135,6 +135,12 @@ export default async function ProjectAnalyticsPage() {
     getProjectActionFlowAnalytics(selectedProject.id),
     getPhase17ProjectAnalytics(selectedProject.id),
   ]);
+  const successfulDirectAiChats = analytics.routeBreakdown
+    .filter((row) => row.route === "chat" || row.route === "widget")
+    .reduce(
+      (total, row) => total + Math.max(0, row.totalRequests - row.errorCount),
+      0,
+    );
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -150,6 +156,80 @@ export default async function ProjectAnalyticsPage() {
             <p className="text-sm text-muted-foreground">
               Project-scoped lifecycle, conversation, model, tool, and request
               telemetry from recorded runtime activity.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <BrainCircuit className="h-5 w-5" />
+              AI Usage Baseline
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Phase 17A.1 baseline for deciding which turns can avoid a model
+              call without changing current runtime behavior.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric
+                label="30-day runtime requests"
+                value={formatNumber(analytics.last30Days.totalRequests)}
+              />
+              <Metric
+                label="Successful direct AI chats"
+                value={formatNumber(successfulDirectAiChats)}
+              />
+              <Metric
+                label="30-day input tokens"
+                value={formatNumber(analytics.last30Days.promptTokens)}
+              />
+              <Metric
+                label="30-day output tokens"
+                value={formatNumber(analytics.last30Days.completionTokens)}
+              />
+              <Metric
+                label="30-day total tokens"
+                value={formatNumber(analytics.last30Days.totalTokens)}
+              />
+              <Metric
+                label="Structured decisions"
+                value={formatNumber(phase17Analytics.model.structuredTurns)}
+              />
+              <Metric
+                label="Deterministic avoidance"
+                value={formatPercent(
+                  phase17Analytics.model.deterministicAvoidanceRate,
+                )}
+              />
+              <Metric
+                label="Structured model rate"
+                value={formatPercent(phase17Analytics.model.modelTurnRate)}
+              />
+              <Metric
+                label="Structured model attempts"
+                value={formatNumber(phase17Analytics.model.modelAttempts)}
+              />
+              <Metric
+                label="Retry / fallback rate"
+                value={formatPercent(phase17Analytics.model.multiAttemptRate)}
+              />
+              <Metric
+                label="Attempts per model turn"
+                value={phase17Analytics.model.attemptsPerModelTurn.toFixed(2)}
+              />
+              <Metric
+                label="Attempts per completion"
+                value={phase17Analytics.model.attemptsPerCompletion.toFixed(2)}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Request and token totals use the retained 30-day request log.
+              Structured decision ratios use retained version-2 turn audits. A
+              direct AI chat is one successful Project Chat or Widget request;
+              any provider-internal steps within that request are reflected in
+              token usage but are not counted as separate requests.
             </p>
           </CardContent>
         </Card>

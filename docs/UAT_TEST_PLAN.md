@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone commit: `60c0c7b`
+- Current staging milestone: Phase 17 signed off; Phase 17A.1 deployment pending
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -20,7 +20,9 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 14 - Beta release | Complete | Passed on staging under the single-tester scope. |
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
-| 17 - Reuse and optimization | Milestones 17.1-17.4 passed; 17.5 ready for staging UAT | Run section 17.5 on staging. |
+| 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
+| 17A - AI cost and latency | 17A.1 implementation complete | Deploy, then run section 17A.1 on staging. |
+| 18 - Telnyx and extensions | Waiting | Start only after the Phase 17A exit gate. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -810,12 +812,50 @@ Evidence: the latest staging automated runs passed against version 5 of
 version 1 of `Create Support Ticket`. The tracked Critical and High defect
 counts were both zero at sign-off.
 
+# Phase 17A - AI Cost And Latency Optimization
+
+## 17A.1 Record The Current AI Usage Baseline
+
+This check only measures existing behavior. Do not edit a prompt, model,
+action, task, or routing rule during this test.
+
+1. [ ] Confirm staging contains the Phase 17A.1 analytics deployment.
+2. [ ] Select project `Phase 16 Lifecycle UAT (#94)`.
+3. [ ] Open `Projects` > `Analytics`.
+4. [ ] Find `AI Usage Baseline` and confirm it shows:
+   - `30-day runtime requests`, input tokens, output tokens, and total tokens.
+   - `Successful direct AI chats`.
+   - `Structured decisions`, deterministic avoidance, and structured model
+     rate.
+   - Structured model attempts, retry or fallback rate, attempts per model
+     turn, and attempts per completion.
+5. [ ] If `Structured decisions` is greater than zero, confirm deterministic
+   avoidance plus structured model rate equals `100%` apart from rounding.
+6. [ ] Record the displayed values below. Zero is valid when the selected
+   project has no matching retained activity; a missing card or page error is
+   not valid.
+
+Result: [ ] Pass [ ] Fail
+
+- 30-day runtime requests: `<value>`
+- 30-day total tokens: `<value>`
+- Successful direct AI chats: `<value>`
+- Structured decisions: `<value>`
+- Deterministic avoidance: `<value>`
+- Structured model rate: `<value>`
+- Retry or fallback rate: `<value>`
+- Attempts per model turn: `<value>`
+- Attempts per completion: `<value>`
+- Tester/date: `<name> / <date>`
+
 # Final Release Record
 
 - Phase 14: [x] Pass [ ] Fail
 - Phase 15: [x] Pass [ ] Fail [ ] In progress
 - Phase 16: [x] Pass [ ] Fail [ ] In progress
 - Phase 17: [x] Pass [ ] Fail [ ] In progress
+- Phase 17A: [ ] Pass [ ] Fail [x] In progress
+- Phase 18: [ ] Pass [ ] Fail [ ] In progress [x] Not started
 - Critical defects open: `0`
 - High defects open: `0`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).

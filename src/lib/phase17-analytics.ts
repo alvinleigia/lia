@@ -350,6 +350,7 @@ export function aggregatePhase17Analytics(input: Phase17AnalyticsInput) {
     input.submissions.filter((row) => cancelledStatuses.has(row.status))
       .length +
     input.taskRuns.filter((row) => cancelledStatuses.has(row.status)).length;
+  const structuredTurns = modelTurns + deterministicTurns;
 
   return {
     lifecycle: {
@@ -366,9 +367,18 @@ export function aggregatePhase17Analytics(input: Phase17AnalyticsInput) {
       failedOperations,
     },
     model: {
+      structuredTurns,
       modelTurns,
       deterministicTurns,
       modelAttempts,
+      modelTurnRate:
+        structuredTurns === 0 ? 0 : (modelTurns / structuredTurns) * 100,
+      deterministicAvoidanceRate:
+        structuredTurns === 0
+          ? 0
+          : (deterministicTurns / structuredTurns) * 100,
+      attemptsPerModelTurn: modelTurns === 0 ? 0 : modelAttempts / modelTurns,
+      attemptsPerCompletion: completed === 0 ? 0 : modelAttempts / completed,
       multiAttemptTurns,
       multiAttemptRate:
         modelTurns === 0 ? 0 : (multiAttemptTurns / modelTurns) * 100,
