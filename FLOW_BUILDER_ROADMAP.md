@@ -1199,7 +1199,7 @@ model cost or latency.
   generation escalation.
 - [x] 17A.4 Define one bounded model-escalation policy for ambiguous intent,
   semantic extraction, grounded synthesis, correction, and clarification.
-- [ ] 17A.5 Reduce avoidable prompt and retrieval tokens through bounded
+- [x] 17A.5 Reduce avoidable prompt and retrieval tokens through bounded
   context, reusable prompt fragments, retrieval thresholds, and safe caching
   that preserves tenant and project scope.
 - [ ] 17A.6 Compare the optimized candidate against the Phase 17A.1 baseline,
@@ -1239,6 +1239,16 @@ fallback path. Safe turn audits record only the reason label, and Project
 Analytics aggregates those labels without exposing visitor text. A turn with
 failed model attempts now counts as model-attempted rather than as deterministic
 avoidance, keeping the cost and latency baseline honest.
+
+The Phase 17A.5 compiler now uses one stable protocol prefix before dynamic
+project content, caps recent model-visible history and context, and sends at
+most four bounded retrieval excerpts. Document retrieval runs only when the
+published source policy allows project documents, and below-threshold matches
+now return no excerpts instead of injecting weak fallback chunks. The bounded
+in-memory embedding cache remains short-lived and is keyed by project plus
+normalized query, so one project cannot reuse another project's cache entry.
+Model identifiers, retry limits, timeouts, and internal cost controls are no
+longer repeated inside the model-visible project-policy block.
 
 Phase 17A exit gate: the optimized runtime demonstrably reduces model usage or
 latency against the recorded baseline without lowering completion, grounding,

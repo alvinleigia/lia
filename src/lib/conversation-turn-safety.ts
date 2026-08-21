@@ -38,6 +38,29 @@ function estimateTokens(text: string) {
   return Math.ceil(text.length / 4);
 }
 
+export const MAX_MODEL_HISTORY_CHARACTERS = 8_000;
+
+export function selectBoundedTurnHistory(
+  history: TurnMessageV1[],
+  maxMessages: number,
+) {
+  const candidates = history.slice(-maxMessages);
+  const selected: TurnMessageV1[] = [];
+  let characters = 0;
+
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const message = candidates[index];
+    if (!message) continue;
+    if (characters + message.content.length > MAX_MODEL_HISTORY_CHARACTERS) {
+      break;
+    }
+    selected.unshift(message);
+    characters += message.content.length;
+  }
+
+  return selected;
+}
+
 const PROMPT_EXTRACTION_PATTERNS = [
   /\bignore (?:all |the |your )?(?:previous|system|developer) instructions?\b/i,
   /\breveal (?:the )?(?:system prompt|hidden instructions?|developer message)\b/i,
@@ -83,7 +106,10 @@ export function evaluateTurnAdmission(input: {
     };
   }
 
-  const boundedHistory = input.history.slice(-modelPolicy.maxHistoryMessages);
+  const boundedHistory = selectBoundedTurnHistory(
+    input.history,
+    modelPolicy.maxHistoryMessages,
+  );
   const estimatedInputTokens = estimateTokens(
     [...boundedHistory.map(({ content }) => content), visitorMessage].join(
       "\n",

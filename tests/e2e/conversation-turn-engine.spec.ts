@@ -84,9 +84,11 @@ class QueueProvider implements StructuredTurnProvider {
 
 class FixtureRetriever implements TurnKnowledgeRetriever {
   calls = 0;
+  lastInput: { limit: number; projectId: number; query: string } | null = null;
 
-  async retrieve() {
+  async retrieve(input: { limit: number; projectId: number; query: string }) {
     this.calls += 1;
+    this.lastInput = input;
     return [
       {
         id: "document:12",
@@ -369,6 +371,41 @@ test("a side question during a task uses grounded knowledge retrieval", async ()
   });
   expect(provider.calls).toHaveLength(1);
   expect(retriever.calls).toBe(1);
+  expect(retriever.lastInput?.limit).toBe(4);
+});
+
+test("knowledge retrieval respects the published allowed source policy", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      fieldCandidates: [],
+      grounding: { status: "not_needed", excerptIds: [] },
+      reply: "I do not have verified hours in the allowed sources.",
+      turnKind: "side_question",
+    }),
+  ]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+  const input = engineInput();
+
+  const result = await engine.execute({
+    ...input,
+    projectPolicy: {
+      ...input.projectPolicy,
+      knowledge: {
+        ...input.projectPolicy.knowledge,
+        sourceSelection: {
+          ...input.projectPolicy.knowledge.sourceSelection,
+          allowedSources: ["project_catalog"],
+        },
+      },
+    },
+    stage: "knowledge",
+    visitorMessage: "When are you open?",
+  });
+
+  expect(result.source).toBe("model");
+  expect(retriever.calls).toBe(0);
+  expect(provider.calls).toHaveLength(1);
 });
 
 test("an approved exact answer bypasses retrieval and model use", async () => {

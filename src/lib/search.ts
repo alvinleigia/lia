@@ -18,8 +18,15 @@ function normalizeQueryForCache(query: string) {
   return query.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-async function getCachedQueryEmbedding(query: string) {
-  const cacheKey = normalizeQueryForCache(query);
+export function createProjectEmbeddingCacheKey(
+  projectId: number,
+  query: string,
+) {
+  return `${projectId}:${normalizeQueryForCache(query)}`;
+}
+
+async function getCachedQueryEmbedding(projectId: number, query: string) {
+  const cacheKey = createProjectEmbeddingCacheKey(projectId, query);
   const now = Date.now();
   const cached = embeddingCache.get(cacheKey);
 
@@ -54,7 +61,7 @@ export async function searchDocuments(
   threshold: number = DEFAULT_SIMILARITY_THRESHOLD,
 ) {
   // Generate embedding for the search query
-  const embedding = await getCachedQueryEmbedding(query);
+  const embedding = await getCachedQueryEmbedding(projectId, query);
 
   // Calculate similarity using Drizzle's cosineDistance function
   // This creates a SQL expression for similarity calculation
@@ -75,20 +82,5 @@ export async function searchDocuments(
     .orderBy(desc(similarity))
     .limit(limit);
 
-  if (similarDocuments.length > 0) {
-    return similarDocuments;
-  }
-
-  // Fallback recall path: if threshold is too strict for this query,
-  // return top project matches rather than empty context.
-  return db
-    .select({
-      id: documents.id,
-      content: documents.content,
-      similarity,
-    })
-    .from(documents)
-    .where(eq(documents.projectId, projectId))
-    .orderBy(desc(similarity))
-    .limit(limit);
+  return similarDocuments;
 }

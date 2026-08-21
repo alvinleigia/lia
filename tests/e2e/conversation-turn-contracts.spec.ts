@@ -25,6 +25,7 @@ import {
   validateStructuredTurnProposal,
 } from "../../src/lib/conversation-turn-validator";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
+import { createProjectEmbeddingCacheKey } from "../../src/lib/search";
 
 const snapshot = conversationalTaskSnapshotV1Schema.parse({
   schemaVersion: 1,
@@ -307,6 +308,65 @@ test("compiler exposes only allowed task contracts and model-visible context", (
   ).toBe(true);
   expect(compiled.validation.allowedExcerptIds).toEqual(
     new Set(["document:12"]),
+  );
+});
+
+test("compiler bounds model context and keeps the reusable protocol first", () => {
+  const compiled = compileStructuredTurn({
+    activeTask: snapshot,
+    assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
+    assistantIntroduced: true,
+    channel: "project_chat",
+    companyName: "Ewissen Infra",
+    context: Array.from({ length: 30 }, (_, index) => ({
+      key: `context${index}`,
+      modelVisible: true,
+      sensitivity: "standard" as const,
+      value: `${index}:${"c".repeat(300)}`,
+    })),
+    fieldState: [],
+    history: Array.from({ length: 10 }, (_, index) => ({
+      role: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
+      content: `history-${index}:${"h".repeat(1_180)}`,
+    })),
+    projectPolicy: REFERENCE_BOOKING_PROJECT_POLICY,
+    projectName: "Ewissen Infra",
+    publishedTasks: [],
+    retrieval: Array.from({ length: 6 }, (_, index) => ({
+      id: `document:${index + 1}`,
+      content: `excerpt-${index + 1}:${"r".repeat(1_780)}`,
+    })),
+    stage: "knowledge",
+    visitorMessage: "What are the current hours?",
+  });
+
+  expect(compiled.system).toMatch(
+    /^You are a structured conversation decision engine\./,
+  );
+  expect(compiled.system).toContain(
+    REFERENCE_BOOKING_PROJECT_POLICY.assistant.baseInstructions,
+  );
+  expect(compiled.system).not.toContain("maxCostUnitsPerTurn");
+  expect(compiled.system).not.toContain("gpt-5-mini");
+  expect(compiled.system).toContain("document:4");
+  expect(compiled.system).not.toContain("document:5");
+  expect(compiled.system).toContain("context0");
+  expect(compiled.system).not.toContain("context29");
+  expect(compiled.messages.at(-2)?.content).toContain("history-9");
+  expect(
+    compiled.messages.some(({ content }) => content.includes("history-0")),
+  ).toBe(false);
+  expect(compiled.validation.allowedExcerptIds).toEqual(
+    new Set(["document:1", "document:2", "document:3", "document:4"]),
+  );
+});
+
+test("embedding cache keys remain project scoped", () => {
+  expect(createProjectEmbeddingCacheKey(94, "  What  time is CHECK-IN? ")).toBe(
+    "94:what time is check-in?",
+  );
+  expect(createProjectEmbeddingCacheKey(94, "Same query")).not.toBe(
+    createProjectEmbeddingCacheKey(1, "Same query"),
   );
 });
 

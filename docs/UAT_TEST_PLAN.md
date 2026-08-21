@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17 signed off; Phase 17A.1 through 17A.4 deployment pending
+- Current staging milestone: Phase 17 signed off; Phase 17A.1 through 17A.5 deployment pending
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -21,7 +21,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
-| 17A - AI cost and latency | 17A.1 through 17A.4 implemented | Deploy, then run sections 17A.1 through 17A.4 together on staging. |
+| 17A - AI cost and latency | 17A.1 through 17A.5 implemented | UAT is deferred by the release owner; deploy, then run sections 17A.1 through 17A.5 together later. |
 | 18 - Telnyx and extensions | Waiting | Start only after the Phase 17A exit gate. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
@@ -927,6 +927,33 @@ Result: [ ] Pass [ ] Fail
 - Conversation-test result: `<validated proposal / safe fallback / defect>`
 - Escalation table result: `<reason labels / no retained escalations / defect>`
 - Private data visible: `<no / defect>`
+- Tester/date: `<name> / <date>`
+
+## 17A.5 Verify Bounded Context And Retrieval
+
+Run this later with the other Phase 17A checks. Use only test content.
+
+1. [ ] Select project `Phase 16 Lifecycle UAT (#94)`.
+2. [ ] Open `Projects` > `Chat` and ask one question that is clearly answered
+   by this project's indexed knowledge. Confirm Lia gives the relevant answer
+   without unrelated passages.
+3. [ ] Ask one clearly unrelated question. Confirm Lia uses the configured
+   no-answer behavior instead of presenting a weak document match as fact.
+4. [ ] Continue the same conversation for at least ten short turns, then ask a
+   follow-up referring to the most recent answer. Confirm the page does not
+   fail and Lia follows the recent context.
+5. [ ] Select `Phase 14 Release UAT (#1)`, ask the project-#94 knowledge
+   question again, and confirm no project-#94 answer or excerpt appears.
+6. [ ] Return to project `#94`, open `Projects` > `Analytics`, and record the
+   current 30-day input-token total for the Phase 17A.6 comparison.
+
+Result: [ ] Pass [ ] Fail
+
+- Relevant-answer result: `<grounded answer / defect>`
+- Unrelated-question result: `<safe no-answer / defect>`
+- Recent-context result: `<preserved / defect>`
+- Cross-project result: `<isolated / defect>`
+- 30-day input tokens: `<value>`
 - Tester/date: `<name> / <date>`
 
 # Final Release Record

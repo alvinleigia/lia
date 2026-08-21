@@ -3,12 +3,16 @@ import { projectHasIndexedDocuments } from "@/lib/documents";
 import { searchDocuments } from "@/lib/search";
 
 export class ProjectDocumentTurnRetriever implements TurnKnowledgeRetriever {
-  async retrieve(input: { projectId: number; query: string }) {
+  async retrieve(input: { limit: number; projectId: number; query: string }) {
     if (!(await projectHasIndexedDocuments(input.projectId))) {
       return [];
     }
 
-    const results = await searchDocuments(input.projectId, input.query);
+    const results = await searchDocuments(
+      input.projectId,
+      input.query,
+      input.limit,
+    );
     return results.map((result) => ({
       id: `document:${result.id}`,
       content: result.content,

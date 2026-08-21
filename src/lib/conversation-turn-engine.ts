@@ -50,6 +50,7 @@ import {
 
 export interface TurnKnowledgeRetriever {
   retrieve(input: {
+    limit: number;
     projectId: number;
     query: string;
   }): Promise<TurnRetrievalExcerptV1[]>;
@@ -715,9 +716,20 @@ export class StructuredTurnEngine {
     }
 
     let retrieval: TurnRetrievalExcerptV1[] = [];
-    if (this.retriever && input.stage === "knowledge" && !input.openingTurn) {
+    if (
+      this.retriever &&
+      input.stage === "knowledge" &&
+      !input.openingTurn &&
+      input.projectPolicy.knowledge.sourceSelection.allowedSources.includes(
+        "project_documents",
+      )
+    ) {
       try {
         retrieval = await this.retriever.retrieve({
+          limit: Math.min(
+            input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
+            4,
+          ),
           projectId: input.projectId,
           query: input.visitorMessage,
         });
