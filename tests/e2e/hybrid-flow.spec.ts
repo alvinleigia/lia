@@ -43,6 +43,7 @@ import {
   bindRequestedTaskTextAnswer,
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
+  classifyRequestedTaskAnswer,
   createMismatchedTaskSelectionProposal,
   createRequestedTaskSelectionProposal,
   dispatchHybridFlowBoundary,
@@ -1382,6 +1383,23 @@ test("requested project-resource selections can skip the model", () => {
       selectionValue: "product:71",
     }),
   ).toBeNull();
+});
+
+test("explicit cancellation bypasses requested resource validation", () => {
+  expect(
+    classifyRequestedTaskAnswer({
+      answer: "cancel",
+      hasSelection: false,
+      requestedFieldIsProjectResource: true,
+    }),
+  ).toBe("unstructured");
+  expect(
+    classifyRequestedTaskAnswer({
+      answer: "2026-08-26",
+      hasSelection: false,
+      requestedFieldIsProjectResource: true,
+    }),
+  ).toBe("project_resource");
 });
 
 test("stale task selections re-prompt without proposing a field mutation", () => {

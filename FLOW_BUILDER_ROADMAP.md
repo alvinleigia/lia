@@ -88,12 +88,13 @@ database, backup, and provider readiness work.
 - [x] Phase 14 staging cross-channel UAT passed under the single-tester scope on 2026-08-15.
 - [x] Priority 2 release approval is complete for continued internal testing.
 
-Active delivery gate: Phase 17A staging UAT is in progress. Sections 17A.1 and
-17A.2 passed on 2026-08-22; sections 17A.3 through 17A.6 and the release
-comparison remain before the Telnyx runtime rollout.
+Active delivery gate: Phase 17A staging UAT is in progress. Section 17A.1
+passed on 2026-08-22; the 17A.2 cancellation fix requires a staging retest
+before sections 17A.3 through 17A.6 and the release comparison.
 
-Current target: finish Phase 17A staging UAT, starting with 17A.3, before the
-Telnyx Voice AI runtime implementation or release decision.
+Current target: retest the Phase 17A.2 cancellation fix, then finish Phase 17A
+staging UAT before the Telnyx Voice AI runtime implementation or release
+decision.
 
 ### Phase Tracking Snapshot
 
@@ -106,7 +107,7 @@ Telnyx Voice AI runtime implementation or release decision.
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
-| 17A | Milestones 17A.1 through 17A.6 implemented | 17A.1 and 17A.2 passed on staging on 2026-08-22 | Run sections 17A.3 through 17A.6 and record the audited release comparison before the Telnyx runtime rollout. |
+| 17A | Milestones 17A.1 through 17A.6 implemented | 17A.1 passed; 17A.2 cancellation retest pending | Deploy and retest the 17A.2 cancellation fix, then run sections 17A.3 through 17A.6 and record the audited release comparison. |
 | 18 | Future-adapter foundation and public contract reference complete; 10 implementation items remain unchecked | Engineering in progress; release still waits on Phase 17A UAT | Conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
@@ -1193,7 +1194,7 @@ model cost or latency.
 - [x] 17A.2 Add a deterministic pre-router for exact triggers, active-flow
   continuation, cancellation, confirmations, typed values, and other bounded
   intents that do not require a model.
-- [x] Complete 17A.2 staging UAT for exact triggers, typed continuation,
+- [ ] Complete 17A.2 staging UAT for exact triggers, typed continuation,
   side-question resume, confirmation, cancellation, and wrong-field guards.
 - [x] 17A.3 Add deterministic knowledge fast paths for approved exact answers,
   structured project facts, and safe no-answer behavior before retrieval or

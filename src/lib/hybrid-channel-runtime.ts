@@ -67,6 +67,7 @@ import {
   bindRequestedTaskTextAnswer,
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
+  classifyRequestedTaskAnswer,
   createMismatchedTaskSelectionProposal,
   createRequestedTaskSelectionProposal,
   dispatchHybridFlowBoundary,
@@ -886,6 +887,13 @@ async function executeTaskBoundary(input: {
   const requestedFieldIsProjectResource =
     requestedField?.type === "project_resource" ||
     requestedField?.optionSource?.kind === "project_resource";
+  const requestedAnswer =
+    input.runtimeInput.selection?.value ?? input.runtimeInput.text;
+  const requestedAnswerKind = classifyRequestedTaskAnswer({
+    answer: requestedAnswer,
+    hasSelection: Boolean(input.runtimeInput.selection),
+    requestedFieldIsProjectResource,
+  });
   const rejectMismatchedSelection = async () => ({
     inputRequest: await hydrateProjectResourceInputRequest({
       fields: runtime.fields,
@@ -908,11 +916,7 @@ async function executeTaskBoundary(input: {
     signals: [],
   });
   let selectionValue: string | null = null;
-  if (
-    requestedFieldIsProjectResource &&
-    requestedField &&
-    (input.runtimeInput.selection || input.runtimeInput.text.trim())
-  ) {
+  if (requestedAnswerKind === "project_resource" && requestedField) {
     const fieldValues = new Map<string, unknown>();
     for (const field of session.runtime.fields) {
       if (field.state !== "valid" && field.state !== "confirmed") continue;
@@ -925,14 +929,17 @@ async function executeTaskBoundary(input: {
       field: requestedField,
       fieldValues,
       projectId: input.runtimeInput.projectId,
-      value: input.runtimeInput.selection?.value ?? input.runtimeInput.text,
+      value: requestedAnswer,
     });
     if (resolvedSelection.status === "resolved") {
       selectionValue = resolvedSelection.id;
     } else {
       return rejectMismatchedSelection();
     }
-  } else if (input.runtimeInput.selection) {
+  } else if (
+    requestedAnswerKind === "static_selection" &&
+    input.runtimeInput.selection
+  ) {
     const selectedOption =
       requestedField?.optionSource?.kind === "static"
         ? requestedField.optionSource.options.find(
@@ -972,7 +979,7 @@ async function executeTaskBoundary(input: {
             publishedTasks: [],
             requestedFieldKey: requestedField?.key ?? null,
             stage: "extraction",
-            visitorMessage: input.runtimeInput.text,
+            visitorMessage: requestedAnswer,
           })
         ).proposal,
         requestedFieldKey: selectionValue

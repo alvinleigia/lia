@@ -3,6 +3,7 @@ import type {
   TaskOutcomeV1,
   ToolDefinitionV1,
 } from "@/lib/conversation-contracts";
+import { isExplicitCancellationRequest } from "@/lib/conversation-control-intents";
 import type { TurnResultV1 } from "@/lib/conversation-turn-contracts";
 import type { FieldCandidateV1 } from "@/lib/conversational-task-runtime-contracts";
 import type {
@@ -224,6 +225,22 @@ export function createMismatchedTaskSelectionProposal(input: {
     toolRequest: null,
     turnKind: "field_correction",
   };
+}
+
+export function classifyRequestedTaskAnswer(input: {
+  answer: string;
+  hasSelection: boolean;
+  requestedFieldIsProjectResource: boolean;
+}) {
+  if (isExplicitCancellationRequest(input.answer)) {
+    return "unstructured" as const;
+  }
+  if (input.requestedFieldIsProjectResource && input.answer.trim()) {
+    return "project_resource" as const;
+  }
+  return input.hasSelection
+    ? ("static_selection" as const)
+    : ("unstructured" as const);
 }
 
 function findUnresolvedTaskField(input: TaskRuntimeReconciliationInput) {
