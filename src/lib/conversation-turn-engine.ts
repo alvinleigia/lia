@@ -43,7 +43,10 @@ import {
   type StructuredTurnProvider,
   type StructuredTurnProviderResult,
 } from "@/lib/model-provider";
-import type { ProjectAiSettings } from "@/lib/project-ai-settings";
+import {
+  type ProjectAiSettings,
+  resolveApprovedKnowledgeAnswer,
+} from "@/lib/project-ai-settings";
 
 export interface TurnKnowledgeRetriever {
   retrieve(input: {
@@ -192,6 +195,7 @@ function deterministicProposal(input: {
   nextAction: "ask" | "cancel" | "clarify" | "handoff" | "fail";
   reasonCode: string;
   reply: string;
+  groundingExcerptIds?: string[];
   groundingStatus?: TurnResultV1["grounding"]["status"];
   turnKind?: TurnResultV1["turnKind"];
 }): TurnResultV1 {
@@ -201,7 +205,7 @@ function deterministicProposal(input: {
     reply: input.reply,
     grounding: {
       status: input.groundingStatus ?? "no_answer",
-      excerptIds: [],
+      excerptIds: input.groundingExcerptIds ?? [],
     },
     fieldCandidates: [],
     taskRecommendation: null,
@@ -225,6 +229,36 @@ function deterministicProposal(input: {
       reasonCode: input.reasonCode,
     },
     decisionSummary: `Deterministic response: ${input.reasonCode}.`,
+  });
+}
+
+function approvedKnowledgeAnswerProposal(
+  input: ExecuteStructuredTurnInput,
+): TurnResultV1 | null {
+  if (input.stage !== "knowledge" || input.openingTurn) return null;
+
+  const match = resolveApprovedKnowledgeAnswer(
+    input.assistantBehavior,
+    input.visitorMessage,
+  );
+  if (!match) return null;
+  if (match.kind === "answer") {
+    return deterministicProposal({
+      nextAction: "ask",
+      reasonCode: "approved_exact_answer",
+      reply: match.reply,
+      groundingExcerptIds: [match.excerptId],
+      groundingStatus: "grounded",
+      turnKind: input.activeTask ? "side_question" : "ordinary_question",
+    });
+  }
+
+  return deterministicProposal({
+    nextAction: "ask",
+    reasonCode: "approved_no_answer",
+    reply: match.reply,
+    groundingStatus: "no_answer",
+    turnKind: input.activeTask ? "side_question" : "ordinary_question",
   });
 }
 
@@ -591,6 +625,16 @@ export class StructuredTurnEngine {
       return {
         attempts: 0,
         proposal: asValidatedDeterministic(directField),
+        source: "deterministic",
+        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+      };
+    }
+
+    const approvedKnowledgeAnswer = approvedKnowledgeAnswerProposal(input);
+    if (approvedKnowledgeAnswer) {
+      return {
+        attempts: 0,
+        proposal: asValidatedDeterministic(approvedKnowledgeAnswer),
         source: "deterministic",
         usage: { inputTokens: null, outputTokens: null, totalTokens: null },
       };

@@ -8,8 +8,13 @@ import {
 import { z } from "zod";
 import { buildKnowledgeChatSystemPrompt } from "@/lib/ai-guardrails";
 import { logChatRequest } from "@/lib/chat-logs";
+import {
+  createDeterministicChatResponse,
+  getLatestUserText,
+} from "@/lib/deterministic-chat-response";
 import { projectHasIndexedDocuments } from "@/lib/documents";
 import { getPlatformLanguageModel } from "@/lib/model-provider";
+import { resolveApprovedKnowledgeAnswer } from "@/lib/project-ai-settings";
 import { searchDocuments } from "@/lib/search";
 import {
   extractRequestOrigin,
@@ -141,6 +146,25 @@ export async function POST(req: Request) {
     }
 
     const messages = limitContextMessages(body.messages ?? []);
+    const visitorQuestion = getLatestUserText(messages);
+    const approvedAnswer = visitorQuestion
+      ? resolveApprovedKnowledgeAnswer(
+          widgetAccess.projectAiSettings,
+          visitorQuestion,
+        )
+      : null;
+    if (approvedAnswer) {
+      await logChatRequest({
+        route: "widget",
+        projectId: widgetAccess.projectId,
+        statusCode: 200,
+        latencyMs: Date.now() - startMs,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      });
+      return createDeterministicChatResponse(messages, approvedAnswer.reply);
+    }
     const hasDocuments = await projectHasIndexedDocuments(
       widgetAccess.projectId,
     );

@@ -107,7 +107,7 @@ Telnyx Voice AI implementation.
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
-| 17A | Milestones 17A.1 and 17A.2 implemented | Combined staging UAT pending | Verify the baseline and deterministic pre-router, then implement knowledge fast paths, bounded model escalation, and staged rollout. |
+| 17A | Milestones 17A.1 through 17A.3 implemented | Combined staging UAT deferred until the next milestone is deployed | Implement bounded model escalation, then verify the baseline, pre-router, and knowledge fast paths together on staging. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Waiting on Phase 17A | Public extension contracts, conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
@@ -1194,7 +1194,7 @@ model cost or latency.
 - [x] 17A.2 Add a deterministic pre-router for exact triggers, active-flow
   continuation, cancellation, confirmations, typed values, and other bounded
   intents that do not require a model.
-- [ ] 17A.3 Add deterministic knowledge fast paths for approved exact answers,
+- [x] 17A.3 Add deterministic knowledge fast paths for approved exact answers,
   structured project facts, and safe no-answer behavior before retrieval or
   generation escalation.
 - [ ] 17A.4 Define one bounded model-escalation policy for ambiguous intent,
@@ -1221,6 +1221,15 @@ requested validated field are handled without a model call. Confirmation and
 bare `No` cancellation are accepted only while an operation confirmation is
 pending. Question-shaped interruptions and ambiguous language continue to the
 structured model boundary.
+
+The Phase 17A.3 knowledge fast path adds a project-scoped approved answer and
+fact list to AI Behavior. A normalized exact question returns the approved
+answer without retrieval or a model call. An intentionally blank approved
+answer returns the configured project fallback and contact details with a
+`no_answer` grounding status. Duplicate normalized questions are rejected;
+unlisted or ambiguous questions continue through the existing grounded
+retrieval and structured model boundary. Published task snapshots retain the
+approved list so an active flow cannot silently change behavior mid-version.
 
 Phase 17A exit gate: the optimized runtime demonstrably reduces model usage or
 latency against the recorded baseline without lowering completion, grounding,

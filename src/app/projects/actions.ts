@@ -25,6 +25,7 @@ import {
   AI_TONES,
   compactProjectAiSettings,
   normalizeProjectAiSettings,
+  parseApprovedKnowledgeAnswersText,
 } from "@/lib/project-ai-settings";
 import {
   createProjectForWorkspace,
@@ -45,6 +46,7 @@ const renameProjectSchema = z.object({
   name: z.string().trim().min(1).max(120),
 });
 const updateProjectAiSettingsSchema = z.object({
+  approvedKnowledgeAnswersText: z.string().max(65_000),
   answerGuidance: z.string().trim().max(800),
   projectId: z.coerce.number().int().positive(),
   assistantName: z.string().trim().max(80),
@@ -176,6 +178,7 @@ export async function updateProjectAiSettingsAction(
   formData: FormData,
 ): Promise<ActionFormState> {
   const parsed = updateProjectAiSettingsSchema.safeParse({
+    approvedKnowledgeAnswersText: formData.get("approvedKnowledgeAnswersText"),
     answerGuidance: formData.get("answerGuidance"),
     projectId: formData.get("projectId"),
     assistantName: formData.get("assistantName"),
@@ -195,6 +198,13 @@ export async function updateProjectAiSettingsAction(
     return { error: "Please check the AI settings." };
   }
 
+  const approvedKnowledgeAnswers = parseApprovedKnowledgeAnswersText(
+    parsed.data.approvedKnowledgeAnswersText,
+  );
+  if (!approvedKnowledgeAnswers.ok) {
+    return { error: approvedKnowledgeAnswers.error };
+  }
+
   const context = await resolveUserAndWorkspace();
   assertPermission(context.membership, "company.project.manage");
 
@@ -203,6 +213,7 @@ export async function updateProjectAiSettingsAction(
     context.workspace.id,
     compactProjectAiSettings(
       normalizeProjectAiSettings({
+        approvedKnowledgeAnswers: approvedKnowledgeAnswers.answers,
         answerLength: parsed.data.answerLength,
         answerGuidance: parsed.data.answerGuidance,
         assistantName: parsed.data.assistantName,

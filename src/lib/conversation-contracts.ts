@@ -634,6 +634,15 @@ export const DEFAULT_CONVERSATIONAL_TASK_DEFINITION: ConversationalTaskDefinitio
   };
 
 export const projectAiBehaviorSnapshotV1Schema = z.object({
+  approvedKnowledgeAnswers: z
+    .array(
+      z.object({
+        question: z.string().trim().min(1).max(240),
+        answer: z.string().trim().min(1).max(1_000).nullable(),
+      }),
+    )
+    .max(50)
+    .default([]),
   answerLength: z.enum(AI_ANSWER_LENGTHS),
   answerGuidance: z.string().trim().max(800).nullable(),
   assistantName: z.string().trim().max(80).nullable(),

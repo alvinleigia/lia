@@ -2,6 +2,7 @@ import {
   Archive,
   ArrowLeft,
   Bot,
+  CheckCircle2,
   RotateCcw,
   Save,
   Settings,
@@ -26,6 +27,7 @@ import {
   AI_RESPONSE_PRESET_LABELS,
   AI_RESPONSE_PRESETS,
   AI_TONES,
+  formatApprovedKnowledgeAnswers,
   normalizeProjectAiSettings,
 } from "@/lib/project-ai-settings";
 import { getProjectForWorkspaceById } from "@/lib/projects";
@@ -133,6 +135,12 @@ export default async function ProjectSettingsPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {query.aiSettings && (
+              <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
+                <CheckCircle2 className="mr-2 inline h-4 w-4" />
+                AI behavior saved.
+              </p>
+            )}
             <ActionStateForm
               action={updateProjectAiSettingsAction}
               className="space-y-4"
@@ -288,6 +296,28 @@ export default async function ProjectSettingsPage({
                   defaultValue={aiSettings.fallbackMessage ?? ""}
                   placeholder="Please contact our team for the latest details."
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="approvedKnowledgeAnswersText">
+                  Approved Exact Answers And Facts
+                </Label>
+                <Textarea
+                  id="approvedKnowledgeAnswersText"
+                  name="approvedKnowledgeAnswersText"
+                  defaultValue={formatApprovedKnowledgeAnswers(
+                    aiSettings.approvedKnowledgeAnswers,
+                  )}
+                  placeholder={
+                    "What time is check-in? => Check-in begins at 15:00.\nIs late checkout guaranteed? =>"
+                  }
+                  rows={6}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Use one Question =&gt; Answer per line. Matching ignores case
+                  and punctuation. Leave the answer blank after =&gt; to use the
+                  configured fallback without retrieval or an AI model.
+                </p>
               </div>
 
               <div className="space-y-2">

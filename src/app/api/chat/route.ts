@@ -14,8 +14,13 @@ import {
   resolveUserAndProject,
 } from "@/lib/auth-project";
 import { logChatRequest } from "@/lib/chat-logs";
+import {
+  createDeterministicChatResponse,
+  getLatestUserText,
+} from "@/lib/deterministic-chat-response";
 import { projectHasIndexedDocuments } from "@/lib/documents";
 import { getPlatformLanguageModel } from "@/lib/model-provider";
+import { resolveApprovedKnowledgeAnswer } from "@/lib/project-ai-settings";
 import { searchDocuments } from "@/lib/search";
 
 export type ChatMessage = UIMessage;
@@ -39,6 +44,25 @@ export async function POST(req: Request) {
     }: { messages: ChatMessage[]; projectId?: number } = await req.json();
     const { company, project } = await resolveUserAndProject(projectId);
     const contextMessages = limitContextMessages(messages);
+    const visitorQuestion = getLatestUserText(contextMessages);
+    const approvedAnswer = visitorQuestion
+      ? resolveApprovedKnowledgeAnswer(project.aiSettings, visitorQuestion)
+      : null;
+    if (approvedAnswer) {
+      await logChatRequest({
+        route: "chat",
+        projectId: project.id,
+        statusCode: 200,
+        latencyMs: Date.now() - startMs,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      });
+      return createDeterministicChatResponse(
+        contextMessages,
+        approvedAnswer.reply,
+      );
+    }
     const hasDocuments = await projectHasIndexedDocuments(project.id);
 
     const result = streamText({

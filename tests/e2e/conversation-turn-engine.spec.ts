@@ -369,6 +369,78 @@ test("a side question during a task uses grounded knowledge retrieval", async ()
   expect(retriever.calls).toBe(1);
 });
 
+test("an approved exact answer bypasses retrieval and model use", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    assistantBehavior: {
+      ...DEFAULT_PROJECT_AI_SETTINGS,
+      approvedKnowledgeAnswers: [
+        {
+          question: "What time is check-in?",
+          answer: "Check-in begins at 15:00.",
+        },
+      ],
+    },
+    stage: "knowledge",
+    visitorMessage: "WHAT TIME IS CHECK-IN!!!",
+  });
+
+  expect(result).toMatchObject({
+    attempts: 0,
+    source: "deterministic",
+    proposal: {
+      grounding: {
+        status: "grounded",
+        excerptIds: ["project_approved_answer:1"],
+      },
+      reply: "Check-in begins at 15:00.",
+      safety: { reasonCode: "approved_exact_answer" },
+      turnKind: "side_question",
+    },
+  });
+  expect(provider.calls).toHaveLength(0);
+  expect(retriever.calls).toBe(0);
+});
+
+test("an approved no-answer uses the configured fallback without model use", async () => {
+  const provider = new QueueProvider([baseTurn()]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    activeTask: null,
+    assistantBehavior: {
+      ...DEFAULT_PROJECT_AI_SETTINGS,
+      approvedKnowledgeAnswers: [
+        { question: "Is late checkout guaranteed?", answer: null },
+      ],
+      fallbackEmail: "frontdesk@example.com",
+      fallbackMessage: "Late checkout is not currently verified.",
+    },
+    stage: "knowledge",
+    visitorMessage: "Is late checkout guaranteed?",
+  });
+
+  expect(result).toMatchObject({
+    attempts: 0,
+    source: "deterministic",
+    proposal: {
+      grounding: { status: "no_answer", excerptIds: [] },
+      reply:
+        "Late checkout is not currently verified. For current details, contact frontdesk@example.com.",
+      safety: { reasonCode: "approved_no_answer" },
+      turnKind: "ordinary_question",
+    },
+  });
+  expect(provider.calls).toHaveLength(0);
+  expect(retriever.calls).toBe(0);
+});
+
 test("rate and cost admission can deny a turn before model use", async () => {
   const provider = new QueueProvider([baseTurn()]);
   const engine = new StructuredTurnEngine({
