@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17 signed off; Phase 17A.1 deployment pending
+- Current staging milestone: Phase 17 signed off; Phase 17A.1 and 17A.2 deployment pending
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -21,7 +21,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
-| 17A - AI cost and latency | 17A.1 implementation complete | Deploy, then run section 17A.1 on staging. |
+| 17A - AI cost and latency | 17A.1 and 17A.2 implemented | Deploy, then run sections 17A.1 and 17A.2 together on staging. |
 | 18 - Telnyx and extensions | Waiting | Start only after the Phase 17A exit gate. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
@@ -846,6 +846,34 @@ Result: [ ] Pass [ ] Fail
 - Retry or fallback rate: `<value>`
 - Attempts per model turn: `<value>`
 - Attempts per completion: `<value>`
+- Tester/date: `<name> / <date>`
+
+## 17A.2 Verify The Deterministic Pre-Router
+
+Run this after 17A.1 so the baseline is recorded before new test traffic is
+added.
+
+1. [ ] Select project `Phase 14 Release UAT (#1)`.
+2. [ ] Open `Projects` > `Chat` and start `Book a Spa Service`.
+3. [ ] When Lia asks for a text field, type the requested value. Confirm Lia
+   accepts it and asks for the next missing field without a long model delay.
+4. [ ] At another requested text field, ask `What time is check-in?`. Confirm
+   Lia answers or safely says the information is unavailable, then returns to
+   the same pending field.
+5. [ ] Complete the remaining required fields. At the final review message,
+   type `Yes, confirm.` Confirm the request is submitted once.
+6. [ ] Start the action again and reach the final review message. Type `No`.
+   Confirm Lia replies `No problem. I cancelled this request.` and does not
+   submit it.
+7. [ ] Start the action once more, type `cancel` before the final review, and
+   confirm the active request is cancelled immediately.
+
+Result: [ ] Pass [ ] Fail
+
+- Typed continuation latency: `<seconds>`
+- Confirmation result: `<submitted once / defect>`
+- Bare `No` result: `<cancelled / defect>`
+- Side-question return result: `<resumed same field / defect>`
 - Tester/date: `<name> / <date>`
 
 # Final Release Record

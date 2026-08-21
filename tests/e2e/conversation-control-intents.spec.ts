@@ -1,9 +1,25 @@
 import { expect, test } from "@playwright/test";
 import {
   isExplicitCancellationRequest,
+  isExplicitConfirmationRequest,
   isPotentialKnowledgeSideQuestion,
   shouldUseKnowledgeSideQuestion,
 } from "../../src/lib/conversation-control-intents";
+
+test.describe("explicit confirmation", () => {
+  test("accepts bounded confirmation phrases", () => {
+    expect(isExplicitConfirmationRequest("Confirm")).toBe(true);
+    expect(isExplicitConfirmationRequest("Yes, confirm.")).toBe(true);
+    expect(isExplicitConfirmationRequest("Go ahead")).toBe(true);
+  });
+
+  test("does not infer confirmation from unrelated sentences", () => {
+    expect(isExplicitConfirmationRequest("Can you confirm the price?")).toBe(
+      false,
+    );
+    expect(isExplicitConfirmationRequest("I am not sure yet")).toBe(false);
+  });
+});
 
 test.describe("explicit conversation cancellation", () => {
   test("accepts bounded natural cancellation phrases", () => {

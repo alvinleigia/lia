@@ -6,6 +6,7 @@ import type {
 import {
   isExplicitCancellationRequest,
   isExplicitHumanHandoffRequest,
+  isPotentialKnowledgeSideQuestion,
 } from "@/lib/conversation-control-intents";
 import {
   compileStructuredTurn,
@@ -32,6 +33,7 @@ import {
   TurnProposalValidationError,
   validateStructuredTurnProposal,
 } from "@/lib/conversation-turn-validator";
+import { validateTaskFieldValue } from "@/lib/conversational-task-field-validation";
 import {
   AiSdkStructuredTurnProvider,
   PLATFORM_DEFAULT_MODEL_ID,
@@ -64,6 +66,7 @@ export type ExecuteStructuredTurnInput = {
   projectPolicy: ConversationProjectPolicyV1;
   projectName: string;
   publishedTasks: PublishedTaskOption[];
+  requestedFieldKey?: string | null;
   stage: (typeof TURN_MODEL_STAGES)[number];
   visitorMessage: string;
 };
@@ -277,10 +280,48 @@ function directFieldProposal(
   const fieldStates = new Map(
     input.fieldState.map((field) => [field.fieldKey, field.state]),
   );
-  const matches = input.activeTask.task.definition.fields.filter((field) => {
-    const state = fieldStates.get(field.key) ?? "missing";
-    if (!["cleared", "invalid", "missing"].includes(state)) return false;
+  const unresolvedFields = input.activeTask.task.definition.fields.filter(
+    (field) => {
+      const state = fieldStates.get(field.key) ?? "missing";
+      return ["cleared", "invalid", "missing"].includes(state);
+    },
+  );
+  const requestedField = input.requestedFieldKey
+    ? unresolvedFields.find((field) => field.key === input.requestedFieldKey)
+    : null;
 
+  if (
+    requestedField &&
+    requestedField.cardinality === "single" &&
+    requestedField.type !== "media" &&
+    requestedField.type !== "project_resource" &&
+    requestedField.optionSource?.kind !== "project_resource" &&
+    !(
+      ["address", "text"].includes(requestedField.type) &&
+      isPotentialKnowledgeSideQuestion(value)
+    )
+  ) {
+    const contextValues = new Map(
+      input.context.map((contextValue) => [
+        contextValue.key,
+        contextValue.value,
+      ]),
+    );
+    const validation = validateTaskFieldValue({
+      contextValues,
+      field: requestedField,
+      value,
+    });
+    if (validation.ok) {
+      return buildDirectFieldProposal({
+        field: requestedField,
+        reasonCode,
+        value,
+      });
+    }
+  }
+
+  const matches = unresolvedFields.filter((field) => {
     if (field.type === "email") {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
     }
@@ -297,19 +338,30 @@ function directFieldProposal(
   });
   if (matches.length !== 1) return null;
 
-  const [field] = matches;
+  return buildDirectFieldProposal({
+    field: matches[0],
+    reasonCode,
+    value,
+  });
+}
+
+function buildDirectFieldProposal(input: {
+  field: ConversationalTaskSnapshotV1["task"]["definition"]["fields"][number];
+  reasonCode: "model_unavailable" | null;
+  value: string;
+}): TurnResultV1 {
   return turnResultV1Schema.parse({
     schemaVersion: 1,
     turnKind: "field_answer",
-    reply: `Thanks. I received your ${field.label}. Please continue with the remaining required details.`,
+    reply: `Thanks. I received your ${input.field.label}. Please continue with the remaining required details.`,
     grounding: {
       status: "not_needed",
       excerptIds: [],
     },
     fieldCandidates: [
       {
-        fieldKey: field.key,
-        naturalValue: value,
+        fieldKey: input.field.key,
+        naturalValue: input.value,
         confidence: 1,
         source: "visitor",
       },
@@ -325,10 +377,10 @@ function directFieldProposal(
     },
     safety: {
       decision: "allow",
-      reasonCode,
+      reasonCode: input.reasonCode,
     },
     decisionSummary:
-      reasonCode === "model_unavailable"
+      input.reasonCode === "model_unavailable"
         ? "Recovered one unambiguous visitor field after model failure."
         : "Accepted one unambiguous typed visitor field without model inference.",
   });

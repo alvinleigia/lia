@@ -18,6 +18,10 @@ import {
   type ConversationalTaskSnapshotV1,
   conversationalTaskSnapshotV1Schema,
 } from "@/lib/conversation-contracts";
+import {
+  isExplicitCancellationRequest,
+  isExplicitConfirmationRequest,
+} from "@/lib/conversation-control-intents";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import type {
   TurnContextValueV1,
@@ -614,13 +618,21 @@ async function executeTaskConfirmation(input: {
   runtimeInput: HybridChannelRuntimeInput;
   session: Awaited<ReturnType<typeof getConversationTaskRuntimeSession>>;
 }): Promise<HybridBoundaryExecution<TurnResultV1> | null> {
-  if (!input.session.runtime || !input.session.snapshot) return null;
+  if (
+    !input.session.execution ||
+    !input.session.runtime ||
+    !input.session.snapshot
+  ) {
+    return null;
+  }
   const answer = (
     input.runtimeInput.selection?.value ?? input.runtimeInput.text
-  )
-    .trim()
-    .toLowerCase();
-  if (answer !== "confirm") return null;
+  ).trim();
+  const confirms = isExplicitConfirmationRequest(answer);
+  const cancels = isExplicitCancellationRequest(answer, {
+    allowBareNo: true,
+  });
+  if (!confirms && !cancels) return null;
 
   const confirmations = await listTaskOperationConfirmations({
     projectId: input.runtimeInput.projectId,
@@ -632,6 +644,45 @@ async function executeTaskConfirmation(input: {
     ),
   );
   if (!active) return null;
+
+  if (cancels && active.status === "pending") {
+    const outcome = input.session.snapshot.task.definition.outcomes.find(
+      (candidate) => candidate.type === "cancelled",
+    );
+    const now = new Date().toISOString();
+    const cancelled = await applyConversationalTaskEvent({
+      authentication: null,
+      channelIdentity: {
+        externalConversationId: input.runtimeInput.externalConversationId,
+        externalUserId: input.runtimeInput.externalUserId ?? null,
+      },
+      channelType: input.runtimeInput.channelType,
+      conversationId: input.session.runtime.run.conversationId,
+      eventId: `channel-message:${input.runtimeInput.inboundMessageId}:confirmation-cancel`,
+      expectedRevision: input.session.execution.revision,
+      occurredAt: now,
+      outcomeKey: outcome?.key ?? null,
+      projectId: input.runtimeInput.projectId,
+      providerSequence: null,
+      receivedAt: now,
+      schemaVersion: 1,
+      taskRunId: input.session.runtime.run.id,
+      type: "task.cancel",
+    });
+    return {
+      output: operationTurn({
+        nextAction: "cancel",
+        outcomeKey: outcome?.key,
+        reply: "No problem. I cancelled this request.",
+      }),
+      signals:
+        cancelled.disposition === "applied" && outcome
+          ? [{ kind: "task_outcome", triggerKey: outcome.outputPort }]
+          : [],
+    };
+  }
+
+  if (!confirms) return null;
 
   const principal = channelTaskPrincipal(input.runtimeInput);
   if (active.status === "pending") {
@@ -916,6 +967,7 @@ async function executeTaskBoundary(input: {
             projectName: input.project.projectName,
             projectPolicy: session.snapshot.conversationPolicy,
             publishedTasks: [],
+            requestedFieldKey: requestedField?.key ?? null,
             stage: "extraction",
             visitorMessage: input.runtimeInput.text,
           })

@@ -438,6 +438,69 @@ test("unambiguous typed field answers bypass the model", async () => {
   expect(result.proposal.safety.reasonCode).toBeNull();
 });
 
+test("the specifically requested text field bypasses the model", async () => {
+  const provider = new QueueProvider([]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    fieldState: [
+      {
+        fieldKey: "guestName",
+        label: "Guest Name",
+        required: true,
+        sensitivity: "personal",
+        state: "missing",
+        value: null,
+      },
+    ],
+    requestedFieldKey: "guestName",
+    visitorMessage: "Phase 17A Tester",
+  });
+
+  expect(result.source).toBe("deterministic");
+  expect(result.attempts).toBe(0);
+  expect(provider.calls).toHaveLength(0);
+  expect(result.proposal.fieldCandidates).toEqual([
+    {
+      fieldKey: "guestName",
+      naturalValue: "Phase 17A Tester",
+      confidence: 1,
+      source: "visitor",
+    },
+  ]);
+});
+
+test("a question at a requested text field still escalates to the model", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      fieldCandidates: [],
+      reply: "Check-in begins at 15:00.",
+      turnKind: "side_question",
+    }),
+  ]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    fieldState: [
+      {
+        fieldKey: "guestName",
+        label: "Guest Name",
+        required: true,
+        sensitivity: "personal",
+        state: "missing",
+        value: null,
+      },
+    ],
+    requestedFieldKey: "guestName",
+    visitorMessage: "What time is check-in?",
+  });
+
+  expect(result.source).toBe("model");
+  expect(provider.calls).toHaveLength(1);
+});
+
 test("low-confidence task recommendations require focused clarification", async () => {
   const provider = new QueueProvider([
     baseTurn({

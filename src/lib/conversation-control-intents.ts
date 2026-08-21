@@ -41,6 +41,18 @@ const EXPLICIT_CANCELLATION_PHRASES = new Set([
   "stop this request",
 ]);
 
+const EXPLICIT_CONFIRMATION_PHRASES = new Set([
+  "confirm",
+  "confirmed",
+  "go ahead",
+  "please confirm",
+  "proceed",
+  "submit",
+  "yes",
+  "yes, confirm",
+  "yes confirm",
+]);
+
 function normalizeExplicitIntent(value: string) {
   return value
     .trim()
@@ -84,6 +96,10 @@ export function isExplicitCancellationRequest(
     (options.allowBareNo === true && normalized === "no") ||
     EXPLICIT_CANCELLATION_PHRASES.has(normalized)
   );
+}
+
+export function isExplicitConfirmationRequest(value: string) {
+  return EXPLICIT_CONFIRMATION_PHRASES.has(normalizeExplicitIntent(value));
 }
 
 export function isExplicitHumanHandoffRequest(value: string) {
