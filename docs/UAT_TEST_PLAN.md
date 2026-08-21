@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A.1 and 17A.2 passed; Phase 17A.3 is next
+- Current staging milestone: Phase 17A.1 through 17A.3 passed; Phase 17A.4 is next
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -21,7 +21,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
-| 17A - AI cost and latency | In progress | 17A.1 and 17A.2 passed on staging on 2026-08-22; run 17A.3 next. |
+| 17A - AI cost and latency | In progress | 17A.1 through 17A.3 passed on staging on 2026-08-22; run 17A.4 next. |
 | 18 - Telnyx and extensions | Waiting | Start only after the Phase 17A exit gate. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
@@ -894,25 +894,25 @@ Result: [x] Pass [ ] Fail
 
 Run this with 17A.1 and 17A.2 after Phase 17A.4 is deployed.
 
-1. [ ] Select project `Phase 16 Lifecycle UAT (#94)`.
-2. [ ] Open `Projects` > project settings > `AI Behavior`.
-3. [ ] Under `Approved Exact Answers And Facts`, add these two lines:
+1. [x] Select project `Phase 16 Lifecycle UAT (#94)`.
+2. [x] Open `Projects` > project settings > `AI Behavior`.
+3. [x] Under `Approved Exact Answers And Facts`, add these two lines:
    - `What time is check-in? => Check-in begins at 15:00.`
    - `Is late checkout guaranteed? =>`
-4. [ ] Confirm a success message appears after `Save AI Behavior`.
-5. [ ] Open `Projects` > `Chat` and ask `WHAT TIME IS CHECK-IN!!!`. Confirm the
+4. [x] Confirm a success message appears after `Save AI Behavior`.
+5. [x] Open `Projects` > `Chat` and ask `WHAT TIME IS CHECK-IN!!!`. Confirm the
    exact approved answer appears without a long model delay.
-6. [ ] Ask `Is late checkout guaranteed?`. Confirm the configured fallback is
+6. [x] Ask `Is late checkout guaranteed?`. Confirm the configured fallback is
    returned without an invented answer.
-7. [ ] Ask a different knowledge question. Confirm it still follows normal
+7. [x] Ask a different knowledge question. Confirm it still follows normal
    project knowledge handling instead of matching either approved answer.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
-- Exact-answer result: `<approved answer / defect>`
-- No-answer result: `<configured fallback / defect>`
-- Unlisted-question result: `<normal knowledge handling / defect>`
-- Tester/date: `<name> / <date>`
+- Exact-answer result: `Check-in begins at 15:00.`
+- No-answer result: `I don't have verified information for that.`
+- Unlisted-question result: `Normal knowledge handling returned a safe no-answer in about 3-4 seconds.`
+- Tester/date: `Single tester / release owner - 2026-08-22`
 
 ## 17A.4 Verify Bounded Model Escalation
 

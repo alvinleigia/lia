@@ -88,11 +88,11 @@ database, backup, and provider readiness work.
 - [x] Phase 14 staging cross-channel UAT passed under the single-tester scope on 2026-08-15.
 - [x] Priority 2 release approval is complete for continued internal testing.
 
-Active delivery gate: Phase 17A staging UAT is in progress. Sections 17A.1 and
-17A.2 passed on 2026-08-22; sections 17A.3 through 17A.6 and the release
+Active delivery gate: Phase 17A staging UAT is in progress. Sections 17A.1
+through 17A.3 passed on 2026-08-22; sections 17A.4 through 17A.6 and the release
 comparison remain before the Telnyx runtime rollout.
 
-Current target: finish Phase 17A staging UAT, starting with 17A.3, before the
+Current target: finish Phase 17A staging UAT, starting with 17A.4, before the
 Telnyx Voice AI runtime implementation or release decision.
 
 ### Phase Tracking Snapshot
@@ -106,7 +106,7 @@ Telnyx Voice AI runtime implementation or release decision.
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
-| 17A | Milestones 17A.1 through 17A.6 implemented | 17A.1 and 17A.2 passed on staging on 2026-08-22 | Run sections 17A.3 through 17A.6 and record the audited release comparison before the Telnyx runtime rollout. |
+| 17A | Milestones 17A.1 through 17A.6 implemented | 17A.1 through 17A.3 passed on staging on 2026-08-22 | Run sections 17A.4 through 17A.6 and record the audited release comparison before the Telnyx runtime rollout. |
 | 18 | Future-adapter foundation and public contract reference complete; 10 implementation items remain unchecked | Engineering in progress; release still waits on Phase 17A UAT | Conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
@@ -1198,6 +1198,8 @@ model cost or latency.
 - [x] 17A.3 Add deterministic knowledge fast paths for approved exact answers,
   structured project facts, and safe no-answer behavior before retrieval or
   generation escalation.
+- [x] Complete 17A.3 staging UAT for approved exact answers, configured safe
+  no-answer behavior, and normal unlisted-question handling.
 - [x] 17A.4 Define one bounded model-escalation policy for ambiguous intent,
   semantic extraction, grounded synthesis, correction, and clarification.
 - [x] 17A.5 Reduce avoidable prompt and retrieval tokens through bounded
