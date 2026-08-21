@@ -61,6 +61,7 @@ import {
   resolveHybridTaskOutcomeResume,
 } from "@/lib/hybrid-flow-runtime";
 import { enqueueDefaultPostConversationJobs } from "@/lib/post-conversation-jobs";
+import { isValidTimeZone } from "@/lib/time-zones";
 
 export {
   cleanupExpiredConversationRuntime,
@@ -905,6 +906,28 @@ export async function startConversationalTaskRun(
         ];
       },
     );
+    const hasDeclaredTimeZone = snapshot.task.definition.contextVariables.some(
+      (variable) => variable.key === "lia_timezone",
+    );
+    const suppliedTimeZone = parsed.initializationContext.lia_timezone;
+    if (
+      !hasDeclaredTimeZone &&
+      typeof suppliedTimeZone === "string" &&
+      isValidTimeZone(suppliedTimeZone)
+    ) {
+      contextRows.push({
+        expiresAt,
+        key: "lia_timezone",
+        modelVisible: false,
+        projectId: parsed.projectId,
+        sensitivity: "standard",
+        source: "system",
+        taskRunId: run.id,
+        toolVisible: false,
+        type: "text",
+        value: suppliedTimeZone,
+      });
+    }
     if (contextRows.length > 0) {
       await tx.insert(conversationalTaskContextValues).values(contextRows);
     }

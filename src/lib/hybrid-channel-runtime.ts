@@ -797,6 +797,7 @@ async function recordTaskFieldRequest(input: {
 
 async function ensureDirectTaskEntry(input: {
   node: Extract<HybridFlowNodeV1, { kind: "conversational_task" }>;
+  project: ProjectTurnContext;
   runtimeInput: HybridChannelRuntimeInput;
 }) {
   const existing = await measureRuntimeStage(
@@ -835,7 +836,9 @@ async function ensureDirectTaskEntry(input: {
           input.runtimeInput.channelConversationId,
         ),
         activeNodeId: input.node.id,
-        initializationContext: {},
+        initializationContext: {
+          lia_timezone: input.project.companyTimeZone,
+        },
         returnTarget,
         taskId: input.node.settings.task.taskId,
         taskVersionId: input.node.settings.task.taskVersionId,
@@ -862,6 +865,7 @@ async function executeTaskBoundary(input: {
 }): Promise<HybridBoundaryExecution<TurnResultV1>> {
   const session = await ensureDirectTaskEntry({
     node: input.node,
+    project: input.project,
     runtimeInput: input.runtimeInput,
   });
   if (
@@ -1442,6 +1446,7 @@ export async function runHybridChannelBoundary(
   ) {
     const taskSession = await ensureDirectTaskEntry({
       node: sourceNode,
+      project,
       runtimeInput: input,
     });
     if (
@@ -1538,7 +1543,7 @@ export async function runHybridChannelBoundary(
     await startHybridTaskEntry({
       actionVersionId: input.action.versionId,
       candidateEventId: `channel-message:${input.inboundMessageId}:task-fields`,
-      contextValues: {},
+      contextValues: { lia_timezone: project.companyTimeZone },
       dispatch,
       graph,
       start: startEnvelope(input, input.channelConversationId),

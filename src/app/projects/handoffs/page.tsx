@@ -26,6 +26,7 @@ import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 import { cn } from "@/lib/utils";
 import { updateHandoffQueueAction } from "../submissions/actions";
 
@@ -84,7 +85,7 @@ function getHandoffSummary(
   };
 }
 
-function formatDate(value: Date | string | null) {
+function formatDate(value: Date | string | null, timeZone: string) {
   if (!value) {
     return "Not recorded";
   }
@@ -95,7 +96,7 @@ function formatDate(value: Date | string | null) {
     return "Not recorded";
   }
 
-  return date.toLocaleString();
+  return formatDateTimeInTimeZone(date, timeZone);
 }
 
 function formatStatus(status: string) {
@@ -412,19 +413,28 @@ export default async function HandoffsPage({
                                 <p>
                                   Requested:{" "}
                                   <span className="text-foreground">
-                                    {formatDate(handoff.requestedAt)}
+                                    {formatDate(
+                                      handoff.requestedAt,
+                                      context.company.timeZone,
+                                    )}
                                   </span>
                                 </p>
                                 <p>
                                   Assigned At:{" "}
                                   <span className="text-foreground">
-                                    {formatDate(handoff.assignedAt)}
+                                    {formatDate(
+                                      handoff.assignedAt,
+                                      context.company.timeZone,
+                                    )}
                                   </span>
                                 </p>
                                 <p>
                                   Created:{" "}
                                   <span className="text-foreground">
-                                    {formatDate(submission.createdAt)}
+                                    {formatDate(
+                                      submission.createdAt,
+                                      context.company.timeZone,
+                                    )}
                                   </span>
                                 </p>
                               </div>

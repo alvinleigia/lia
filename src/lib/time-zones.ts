@@ -36,6 +36,25 @@ export function isSupportedCompanyTimeZone(value: string) {
   return COMPANY_TIME_ZONE_OPTIONS.some((option) => option.value === value);
 }
 
+function normalizeFormattedDate(value: string) {
+  return value.replace(/\s+/g, " ");
+}
+
+function resolveTimeZone(timeZone: string) {
+  return isValidTimeZone(timeZone) ? timeZone : "UTC";
+}
+
+export function formatDateInTimeZone(value: Date, timeZone: string) {
+  return normalizeFormattedDate(
+    new Intl.DateTimeFormat("en-IN", {
+      day: "2-digit",
+      month: "short",
+      timeZone: resolveTimeZone(timeZone),
+      year: "numeric",
+    }).format(value),
+  );
+}
+
 export function formatDateTimeInTimeZone(value: Date, timeZone: string) {
   const formatter = new Intl.DateTimeFormat("en-IN", {
     day: "2-digit",
@@ -43,16 +62,17 @@ export function formatDateTimeInTimeZone(value: Date, timeZone: string) {
     minute: "2-digit",
     month: "short",
     second: "2-digit",
-    timeZone: isValidTimeZone(timeZone) ? timeZone : "UTC",
+    timeZone: resolveTimeZone(timeZone),
     timeZoneName: "short",
     year: "numeric",
   });
 
-  return formatter
-    .formatToParts(value)
-    .map((part) =>
-      part.type === "dayPeriod" ? part.value.toUpperCase() : part.value,
-    )
-    .join("")
-    .replace(/\s+/g, " ");
+  return normalizeFormattedDate(
+    formatter
+      .formatToParts(value)
+      .map((part) =>
+        part.type === "dayPeriod" ? part.value.toUpperCase() : part.value,
+      )
+      .join(""),
+  );
 }

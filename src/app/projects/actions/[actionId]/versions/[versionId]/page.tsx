@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import {
   formatDiffValue,
-  formatVersionDate,
   getActionFlowVersionDiff,
   getVersionSnapshotSummary,
 } from "@/lib/action-flow-version-diff";
@@ -20,6 +19,7 @@ import {
   getActiveProjectIdCookie,
   resolvePageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 import { restoreProjectActionVersionDraftAction } from "../../../actions";
 
 type ActionVersionDiffPageProps = {
@@ -51,7 +51,7 @@ export default async function ActionVersionDiffPage({
   }
 
   const activeProjectId = await getActiveProjectIdCookie();
-  const { project } = await resolvePageUserAndProject(activeProjectId);
+  const { company, project } = await resolvePageUserAndProject(activeProjectId);
   const action = await getProjectAction(project.id, actionId);
 
   if (!action) {
@@ -125,7 +125,10 @@ export default async function ActionVersionDiffPage({
                   Published
                 </p>
                 <p className="font-medium">
-                  {formatVersionDate(version.publishedAt)}
+                  {formatDateTimeInTimeZone(
+                    version.publishedAt,
+                    company.timeZone,
+                  )}
                 </p>
               </div>
               <div className="rounded-md border bg-white p-4">

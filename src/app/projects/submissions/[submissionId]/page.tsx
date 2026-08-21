@@ -49,6 +49,7 @@ import {
   getActiveProjectIdCookie,
   resolvePageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 import {
   importSubmissionMediaAction,
   updateActionSubmissionStatusAction,
@@ -233,7 +234,7 @@ export default async function SubmissionDetailPage({
   }
 
   const activeProjectId = await getActiveProjectIdCookie();
-  const { project } = await resolvePageUserAndProject(activeProjectId);
+  const { company, project } = await resolvePageUserAndProject(activeProjectId);
   const submission = await getActionSubmission(project.id, submissionId);
 
   if (!submission) {
@@ -405,7 +406,10 @@ export default async function SubmissionDetailPage({
                   Created
                 </p>
                 <p className="font-medium">
-                  {submission.createdAt.toLocaleString()}
+                  {formatDateTimeInTimeZone(
+                    submission.createdAt,
+                    company.timeZone,
+                  )}
                 </p>
               </div>
             </div>
@@ -416,7 +420,10 @@ export default async function SubmissionDetailPage({
               </p>
               <p className="font-medium">
                 {submission.submittedAt
-                  ? submission.submittedAt.toLocaleString()
+                  ? formatDateTimeInTimeZone(
+                      submission.submittedAt,
+                      company.timeZone,
+                    )
                   : "Not submitted"}
               </p>
             </div>
@@ -445,7 +452,10 @@ export default async function SubmissionDetailPage({
                     </p>
                     <p className="font-medium">
                       {handoff.requestedAt
-                        ? new Date(handoff.requestedAt).toLocaleString()
+                        ? formatDateTimeInTimeZone(
+                            new Date(handoff.requestedAt),
+                            company.timeZone,
+                          )
                         : "Not recorded"}
                     </p>
                   </div>
@@ -473,7 +483,10 @@ export default async function SubmissionDetailPage({
                     </p>
                     <p className="font-medium">
                       {handoff.assignedAt
-                        ? new Date(handoff.assignedAt).toLocaleString()
+                        ? formatDateTimeInTimeZone(
+                            new Date(handoff.assignedAt),
+                            company.timeZone,
+                          )
                         : "Not assigned"}
                     </p>
                   </div>
@@ -624,7 +637,10 @@ export default async function SubmissionDetailPage({
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Created:{" "}
-                            {child.submission.createdAt.toLocaleString()}
+                            {formatDateTimeInTimeZone(
+                              child.submission.createdAt,
+                              company.timeZone,
+                            )}
                           </p>
                         </div>
                         <span className="rounded-md border px-2 py-1 text-xs capitalize">
@@ -770,7 +786,10 @@ export default async function SubmissionDetailPage({
                       </p>
                       <p className="text-sm">
                         {attempt.startedAt
-                          ? attempt.startedAt.toLocaleString()
+                          ? formatDateTimeInTimeZone(
+                              attempt.startedAt,
+                              company.timeZone,
+                            )
                           : "Not started"}
                       </p>
                     </div>
@@ -780,7 +799,10 @@ export default async function SubmissionDetailPage({
                       </p>
                       <p className="text-sm">
                         {attempt.finishedAt
-                          ? attempt.finishedAt.toLocaleString()
+                          ? formatDateTimeInTimeZone(
+                              attempt.finishedAt,
+                              company.timeZone,
+                            )
                           : "Not finished"}
                       </p>
                     </div>
@@ -827,7 +849,10 @@ export default async function SubmissionDetailPage({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-medium">{event.eventType}</p>
                     <p className="text-xs text-muted-foreground">
-                      {event.createdAt.toLocaleString()}
+                      {formatDateTimeInTimeZone(
+                        event.createdAt,
+                        company.timeZone,
+                      )}
                     </p>
                   </div>
                   {event.message && (

@@ -12,6 +12,7 @@ import {
   listTenantProjectsForCompany,
   resolvePlatformAdmin,
 } from "@/lib/platform-admin";
+import { formatDateInTimeZone } from "@/lib/time-zones";
 import { updatePlatformCompanyMemberStatusAction } from "../../company-actions";
 
 type PlatformCompanyPageProps = {
@@ -115,7 +116,10 @@ export default async function PlatformCompanyPage({
                 Created
               </p>
               <p className="mt-1 font-medium">
-                {tenant.company.createdAt.toLocaleDateString()}
+                {formatDateInTimeZone(
+                  tenant.company.createdAt,
+                  tenant.company.timeZone,
+                )}
               </p>
             </div>
           </CardContent>
@@ -251,7 +255,10 @@ export default async function PlatformCompanyPage({
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {formatCompanyRole(invitation.role)} - Expires{" "}
-                    {invitation.expiresAt.toLocaleDateString()}
+                    {formatDateInTimeZone(
+                      invitation.expiresAt,
+                      tenant.company.timeZone,
+                    )}
                   </p>
                 </div>
               ))

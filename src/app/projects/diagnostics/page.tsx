@@ -38,6 +38,7 @@ import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 
 type DiagnosticsPageProps = {
   searchParams: Promise<{
@@ -47,8 +48,8 @@ type DiagnosticsPageProps = {
   }>;
 };
 
-function formatDate(value: Date | null) {
-  return value ? value.toLocaleString() : "Not recorded";
+function formatDate(value: Date | null, timeZone: string) {
+  return value ? formatDateTimeInTimeZone(value, timeZone) : "Not recorded";
 }
 
 function formatLabel(value: string) {
@@ -189,7 +190,11 @@ export default async function DiagnosticsPage({
                           {formatLabel(conversation.channelType)}
                         </p>
                         <p className="mt-2 text-xs text-muted-foreground">
-                          Last message: {formatDate(conversation.lastMessageAt)}
+                          Last message:{" "}
+                          {formatDate(
+                            conversation.lastMessageAt,
+                            context.company.timeZone,
+                          )}
                         </p>
                       </Link>
                     );
@@ -276,7 +281,10 @@ export default async function DiagnosticsPage({
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground">
                         Revision {diagnostics.executionState.revision} - Updated{" "}
-                        {formatDate(diagnostics.executionState.updatedAt)}
+                        {formatDate(
+                          diagnostics.executionState.updatedAt,
+                          context.company.timeZone,
+                        )}
                       </p>
                     </div>
                   )}
@@ -339,7 +347,10 @@ export default async function DiagnosticsPage({
                               </span>
                             </div>
                             <span className="text-xs text-muted-foreground">
-                              {formatDate(message.createdAt)}
+                              {formatDate(
+                                message.createdAt,
+                                context.company.timeZone,
+                              )}
                             </span>
                           </div>
                           <p className="mt-3 whitespace-pre-wrap break-words text-sm">
@@ -383,7 +394,10 @@ export default async function DiagnosticsPage({
                                 </p>
                                 <p className="mt-1 text-sm capitalize text-muted-foreground">
                                   {formatLabel(submission.status)} - Created{" "}
-                                  {formatDate(submission.createdAt)}
+                                  {formatDate(
+                                    submission.createdAt,
+                                    context.company.timeZone,
+                                  )}
                                 </p>
                                 {submission.traceId && (
                                   <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
@@ -410,7 +424,10 @@ export default async function DiagnosticsPage({
                                       {event.eventType}
                                     </span>
                                     <span className="text-xs text-muted-foreground">
-                                      {formatDate(event.createdAt)}
+                                      {formatDate(
+                                        event.createdAt,
+                                        context.company.timeZone,
+                                      )}
                                     </span>
                                   </div>
                                   {event.message && (
@@ -465,7 +482,13 @@ export default async function DiagnosticsPage({
                             )}
                           </div>
                           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                            <span>Started {formatDate(run.startedAt)}</span>
+                            <span>
+                              Started{" "}
+                              {formatDate(
+                                run.startedAt,
+                                context.company.timeZone,
+                              )}
+                            </span>
                             {run.lastRequestedFieldKey && (
                               <span>
                                 Last requested: {run.lastRequestedFieldKey}
@@ -582,7 +605,10 @@ export default async function DiagnosticsPage({
                               </p>
                               <p className="mt-1 text-xs text-muted-foreground">
                                 {author.name ?? author.email} -{" "}
-                                {formatDate(finding.createdAt)}
+                                {formatDate(
+                                  finding.createdAt,
+                                  context.company.timeZone,
+                                )}
                               </p>
                             </div>
                             <span className="rounded-md border px-2 py-1 text-xs">

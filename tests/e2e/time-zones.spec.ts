@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  formatDateInTimeZone,
   formatDateTimeInTimeZone,
   isSupportedCompanyTimeZone,
   isValidTimeZone,
@@ -19,6 +20,12 @@ test("formats timestamps in the configured company timezone", () => {
   expect(formatted).toContain("20 Aug 2026");
   expect(formatted).toContain("9:28:55 PM");
   expect(formatted).toMatch(/IST|GMT\+5:30/);
+});
+
+test("formats dates in the configured company timezone", () => {
+  expect(formatDateInTimeZone(TEST_INSTANT, "Asia/Kolkata")).toBe(
+    "20 Aug 2026",
+  );
 });
 
 test("falls back to UTC for an invalid stored timezone", () => {

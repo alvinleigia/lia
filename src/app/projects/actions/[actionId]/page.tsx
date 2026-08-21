@@ -32,7 +32,6 @@ import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { getActionFlowAnalytics } from "@/lib/action-flow-analytics";
 import { getStoredActionFlowConditionGroup } from "@/lib/action-flow-compiler";
 import {
-  formatVersionDate,
   getDraftRuntimeChangeSummary,
   getVersionSnapshotSummary,
 } from "@/lib/action-flow-version-diff";
@@ -50,6 +49,7 @@ import {
   resolvePageUserAndProject,
 } from "@/lib/protected-page";
 import { toRuntimeAction } from "@/lib/runtime-actions";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 import { createTestActionSubmissionAction } from "../../submissions/actions";
 import {
   activateProjectActionVersionAction,
@@ -150,7 +150,7 @@ export default async function ActionDetailPage({
   }
 
   const activeProjectId = await getActiveProjectIdCookie();
-  const { project } = await resolvePageUserAndProject(activeProjectId);
+  const { company, project } = await resolvePageUserAndProject(activeProjectId);
   const action = await getProjectAction(project.id, actionId);
 
   if (!action) {
@@ -513,7 +513,11 @@ export default async function ActionDetailPage({
                         )}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Published {formatVersionDate(version.publishedAt)}
+                        Published{" "}
+                        {formatDateTimeInTimeZone(
+                          version.publishedAt,
+                          company.timeZone,
+                        )}
                       </p>
                     </div>
                     <div className="flex flex-col gap-3 md:items-end">

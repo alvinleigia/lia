@@ -15,6 +15,7 @@ import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 
 type SubmissionsPageProps = {
   searchParams: Promise<{
@@ -278,7 +279,11 @@ export default async function SubmissionsPage({
                           </div>
                         )}
                         <p className="text-xs text-muted-foreground">
-                          Created: {submission.createdAt.toLocaleString()}
+                          Created:{" "}
+                          {formatDateTimeInTimeZone(
+                            submission.createdAt,
+                            context.company.timeZone,
+                          )}
                         </p>
                       </div>
                       <span className="rounded-md border px-2 py-1 text-xs capitalize">

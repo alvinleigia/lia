@@ -218,7 +218,7 @@ export async function startTaskRuntimeTestAction(formData: FormData) {
     eventId: crypto.randomUUID(),
     identityKind: "authenticated_user",
     initializationContext: {
-      lia_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      lia_timezone: test.company.timeZone,
     },
     occurredAt: now.toISOString(),
     projectId: test.project.id,
@@ -679,7 +679,7 @@ export async function switchTaskRuntimeTestAction(
       currentTaskRunId: active.runtime.run.id,
       eventId: crypto.randomUUID(),
       initializationContext: {
-        lia_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        lia_timezone: test.company.timeZone,
       },
       occurredAt: now,
       projectId: test.project.id,

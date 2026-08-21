@@ -74,6 +74,7 @@ const runtimeTaskDefinition = {
 };
 const terminalRuntimeTaskDefinition = {
   ...runtimeTaskDefinition,
+  contextVariables: [],
   returnPolicy: {
     ...runtimeTaskDefinition.returnPolicy,
     completed: "end" as const,
@@ -568,6 +569,17 @@ test("certifies identical booking fields and outcomes across live channel types"
         verifiedContactId: null,
       });
       expect(started.disposition).toBe("applied");
+      const startedRuntime = await getConversationalTaskRuntime({
+        projectId: fixture?.projectId as number,
+        taskRunId: started.taskRunId as number,
+      });
+      expect(startedRuntime?.context).toContainEqual(
+        expect.objectContaining({
+          key: "lia_timezone",
+          source: "system",
+          value: "Asia/Kolkata",
+        }),
+      );
 
       const categoryValue = getNormalizedChannelInboundRuntimeValue(
         normalizeChannelInboundV1({

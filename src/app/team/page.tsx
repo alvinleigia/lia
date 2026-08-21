@@ -7,6 +7,7 @@ import { canAccess } from "@/lib/access-control";
 import { formatCompanyRole } from "@/lib/company-roles";
 import { listCompanyInvitations, listCompanyMembers } from "@/lib/invitations";
 import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
+import { formatDateInTimeZone } from "@/lib/time-zones";
 import { cancelTeamInvitationAction } from "./actions";
 
 type TeamPageProps = {
@@ -115,7 +116,10 @@ export default async function TeamPage({ searchParams }: TeamPageProps) {
                     <p className="font-medium">{invitation.email}</p>
                     <p className="text-xs text-muted-foreground">
                       {formatCompanyRole(invitation.role)} - Expires{" "}
-                      {invitation.expiresAt.toLocaleDateString()}
+                      {formatDateInTimeZone(
+                        invitation.expiresAt,
+                        company.timeZone,
+                      )}
                     </p>
                   </div>
                   {canManageMembers && (

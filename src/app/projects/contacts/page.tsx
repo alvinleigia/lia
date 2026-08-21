@@ -24,6 +24,7 @@ import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 
 type ContactsPageProps = {
   searchParams: Promise<{
@@ -31,8 +32,8 @@ type ContactsPageProps = {
   }>;
 };
 
-function formatDate(value: Date | null) {
-  return value ? value.toLocaleString() : "Not recorded";
+function formatDate(value: Date | null, timeZone: string) {
+  return value ? formatDateTimeInTimeZone(value, timeZone) : "Not recorded";
 }
 
 function formatValue(value: unknown) {
@@ -159,7 +160,11 @@ export default async function ContactsPage({
                           </span>
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground">
-                          Last seen: {formatDate(contact.lastSeenAt)}
+                          Last seen:{" "}
+                          {formatDate(
+                            contact.lastSeenAt,
+                            context.company.timeZone,
+                          )}
                         </p>
                       </Link>
                     );
@@ -219,7 +224,10 @@ export default async function ContactsPage({
                           First Seen
                         </p>
                         <p className="mt-1 text-sm font-medium">
-                          {formatDate(selectedContact.firstSeenAt)}
+                          {formatDate(
+                            selectedContact.firstSeenAt,
+                            context.company.timeZone,
+                          )}
                         </p>
                       </div>
                       <div className="rounded-md border bg-white p-3">
@@ -227,7 +235,10 @@ export default async function ContactsPage({
                           Last Seen
                         </p>
                         <p className="mt-1 text-sm font-medium">
-                          {formatDate(selectedContact.lastSeenAt)}
+                          {formatDate(
+                            selectedContact.lastSeenAt,
+                            context.company.timeZone,
+                          )}
                         </p>
                       </div>
                     </div>
@@ -330,7 +341,11 @@ export default async function ContactsPage({
                           </span>
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground">
-                          Last message: {formatDate(conversation.lastMessageAt)}
+                          Last message:{" "}
+                          {formatDate(
+                            conversation.lastMessageAt,
+                            context.company.timeZone,
+                          )}
                         </p>
                       </div>
                     ))}
@@ -368,7 +383,10 @@ export default async function ContactsPage({
                             </p>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {message.createdAt.toLocaleString()}
+                            {formatDateTimeInTimeZone(
+                              message.createdAt,
+                              context.company.timeZone,
+                            )}
                           </p>
                         </div>
 
@@ -430,7 +448,11 @@ export default async function ContactsPage({
                           </span>
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground">
-                          Created: {submission.createdAt.toLocaleString()}
+                          Created:{" "}
+                          {formatDateTimeInTimeZone(
+                            submission.createdAt,
+                            context.company.timeZone,
+                          )}
                         </p>
                       </Link>
                     ))}

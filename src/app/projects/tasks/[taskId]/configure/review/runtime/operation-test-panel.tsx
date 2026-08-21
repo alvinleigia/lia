@@ -27,6 +27,7 @@ import type {
   SelectConversationalTaskConfirmation,
   SelectOperationAttempt,
 } from "@/lib/db-schema";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 import { cn } from "@/lib/utils";
 import {
   confirmTaskRuntimeOperationAction,
@@ -59,6 +60,7 @@ type OperationTestPanelProps = {
   };
   projectId: number;
   taskId: number;
+  timeZone: string;
   writeOperations: WriteOperation[];
 };
 
@@ -162,6 +164,7 @@ export function OperationTestPanel({
   operationFeedback,
   projectId,
   taskId,
+  timeZone,
   writeOperations,
 }: OperationTestPanelProps) {
   if (writeOperations.length === 0 && !confirmation) return null;
@@ -240,7 +243,7 @@ export function OperationTestPanel({
                 <h3 className="font-medium">Confirmation Summary</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   This immutable summary expires at{" "}
-                  {confirmation.expiresAt.toLocaleString()}.
+                  {formatDateTimeInTimeZone(confirmation.expiresAt, timeZone)}.
                 </p>
               </div>
               <Badge
@@ -392,7 +395,9 @@ export function OperationTestPanel({
             <div>
               <p className="text-xs text-muted-foreground">Finished</p>
               <p className="mt-1 font-medium">
-                {attempt.finishedAt?.toLocaleString() ?? "Not yet"}
+                {attempt.finishedAt
+                  ? formatDateTimeInTimeZone(attempt.finishedAt, timeZone)
+                  : "Not yet"}
               </p>
             </div>
             {attempt.errorMessage && (

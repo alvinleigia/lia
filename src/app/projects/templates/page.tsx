@@ -29,6 +29,7 @@ import {
   listReusableFields,
   listReusableTemplates,
 } from "@/lib/reuse-registry";
+import { formatDateInTimeZone } from "@/lib/time-zones";
 import { applyActionTemplateAction } from "../actions/actions";
 import { ReuseRegistrySections } from "./reuse-registry-sections";
 
@@ -48,18 +49,14 @@ function formatChannel(channel: string) {
   return channel.replaceAll("_", " ");
 }
 
-function formatDate(value: string) {
+function formatDate(value: string, timeZone: string) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return formatDateInTimeZone(date, timeZone);
 }
 
 function getAppliedTemplateMetadata(settings: Record<string, unknown>) {
@@ -313,7 +310,10 @@ export default async function TemplatesPage({
                               <p className="text-xs">
                                 Last applied{" "}
                                 {adoption.lastAppliedAt
-                                  ? formatDate(adoption.lastAppliedAt)
+                                  ? formatDate(
+                                      adoption.lastAppliedAt,
+                                      context.company.timeZone,
+                                    )
                                   : "date unavailable"}
                                 {appliedVersions.length > 0
                                   ? ` / versions used: ${appliedVersions

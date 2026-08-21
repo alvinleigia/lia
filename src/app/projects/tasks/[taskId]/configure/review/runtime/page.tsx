@@ -51,6 +51,7 @@ import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 import {
   applyTaskRuntimeTestLifecycleAction,
   clearTaskRuntimeTestFieldAction,
@@ -840,6 +841,7 @@ export default async function TaskRuntimeTestPage({
             operationFeedback={operationFeedback}
             projectId={context.project.id}
             taskId={task.id}
+            timeZone={context.company.timeZone}
             writeOperations={writeOperations}
           />
         )}
@@ -961,7 +963,10 @@ export default async function TaskRuntimeTestPage({
                     >
                       <p className="font-medium">{event.eventType}</p>
                       <p className="text-sm text-muted-foreground">
-                        {event.createdAt.toLocaleString()}
+                        {formatDateTimeInTimeZone(
+                          event.createdAt,
+                          context.company.timeZone,
+                        )}
                       </p>
                     </div>
                   ))}

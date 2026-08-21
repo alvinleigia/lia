@@ -82,7 +82,12 @@ export async function startHybridTaskEntry(input: {
   const start = await startConversationalTaskRun({
     ...input.start,
     activeNodeId: entry.activeNodeId,
-    initializationContext: entry.initializationContext,
+    initializationContext: {
+      ...entry.initializationContext,
+      ...(typeof input.contextValues.lia_timezone === "string"
+        ? { lia_timezone: input.contextValues.lia_timezone }
+        : {}),
+    },
     returnTarget: entry.returnTarget,
     taskId: entry.taskId,
     taskVersionId: entry.taskVersionId,

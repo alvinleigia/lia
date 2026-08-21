@@ -31,6 +31,7 @@ import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 import {
   createIntegrationProviderAction,
   createMetaConversionOperationAction,
@@ -392,13 +393,21 @@ export default async function OperationsPage({
                           {item.status}
                         </span>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Updated {item.updatedAt.toLocaleString()}
+                          Updated{" "}
+                          {formatDateTimeInTimeZone(
+                            item.updatedAt,
+                            context.company.timeZone,
+                          )}
                         </p>
                       </div>
                     </div>
                     {item.status === "queued" && item.attempts > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Next retry {item.availableAt.toLocaleString()}
+                        Next retry{" "}
+                        {formatDateTimeInTimeZone(
+                          item.availableAt,
+                          context.company.timeZone,
+                        )}
                       </p>
                     )}
                     {item.lastError && (
@@ -668,8 +677,14 @@ export default async function OperationsPage({
                         <p>Started</p>
                         <p>
                           {attempt.startedAt
-                            ? attempt.startedAt.toLocaleString()
-                            : attempt.createdAt.toLocaleString()}
+                            ? formatDateTimeInTimeZone(
+                                attempt.startedAt,
+                                context.company.timeZone,
+                              )
+                            : formatDateTimeInTimeZone(
+                                attempt.createdAt,
+                                context.company.timeZone,
+                              )}
                         </p>
                       </div>
                       <form action={replayOperationAttemptAction}>

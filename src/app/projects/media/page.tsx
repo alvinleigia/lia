@@ -22,6 +22,7 @@ import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
+import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 
 type MediaPageProps = {
   searchParams: Promise<{
@@ -41,10 +42,6 @@ function formatBytes(value: number) {
   }
 
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDate(value: Date) {
-  return value.toLocaleString();
 }
 
 export default async function ProjectMediaPage({
@@ -176,7 +173,11 @@ export default async function ProjectMediaPage({
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {asset.mimeType} · {formatBytes(asset.sizeBytes)} ·
-                          Uploaded {formatDate(asset.createdAt)}
+                          Uploaded{" "}
+                          {formatDateTimeInTimeZone(
+                            asset.createdAt,
+                            context.company.timeZone,
+                          )}
                         </p>
                         <p className="break-all text-xs text-muted-foreground">
                           {asset.publicPath}

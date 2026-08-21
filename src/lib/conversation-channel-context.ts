@@ -6,6 +6,7 @@ import { companies, projects, workspaces } from "@/lib/db-schema";
 
 export type ProjectTurnContext = {
   companyName: string;
+  companyTimeZone: string;
   projectAiSettings: unknown;
   projectName: string;
 };
@@ -16,6 +17,7 @@ export async function getProjectTurnContext(
   const [project] = await db
     .select({
       companyName: companies.name,
+      companyTimeZone: companies.timeZone,
       projectAiSettings: projects.aiSettings,
       projectName: projects.name,
     })

@@ -31,10 +31,6 @@ export function getVersionSnapshotSummary(snapshot: Record<string, unknown>) {
   return { branchRules, steps, triggerPhrases };
 }
 
-export function formatVersionDate(date: Date) {
-  return date.toISOString().replace("T", " ").slice(0, 16);
-}
-
 export function getDraftRuntimeChangeSummary(input: {
   action: ProjectAction;
   branchRules: ActionFlowBranchRules;

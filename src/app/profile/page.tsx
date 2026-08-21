@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { canAccess } from "@/lib/access-control";
 import { formatCompanyRole } from "@/lib/company-roles";
 import { resolvePageUserAndWorkspace } from "@/lib/protected-page";
+import { formatDateInTimeZone } from "@/lib/time-zones";
 import { updateProfileAction } from "./actions";
 
 export default async function ProfilePage() {
@@ -121,7 +122,7 @@ export default async function ProfilePage() {
                     Joined
                   </p>
                   <p className="mt-1 font-medium">
-                    {user.createdAt.toLocaleDateString()}
+                    {formatDateInTimeZone(user.createdAt, company.timeZone)}
                   </p>
                 </div>
               </div>
