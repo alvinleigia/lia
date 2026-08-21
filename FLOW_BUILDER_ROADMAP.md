@@ -107,7 +107,7 @@ Telnyx Voice AI implementation.
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
-| 17A | Milestones 17A.1 through 17A.3 implemented | Combined staging UAT deferred until the next milestone is deployed | Implement bounded model escalation, then verify the baseline, pre-router, and knowledge fast paths together on staging. |
+| 17A | Milestones 17A.1 through 17A.6 implemented | Combined staging UAT deferred by the release owner | Deploy the complete candidate, run sections 17A.1 through 17A.6, and record the audited release comparison before Phase 18. |
 | 18 | Future-adapter foundation only; 11 implementation items remain unchecked | Waiting on Phase 17A | Public extension contracts, conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
@@ -1202,9 +1202,11 @@ model cost or latency.
 - [x] 17A.5 Reduce avoidable prompt and retrieval tokens through bounded
   context, reusable prompt fragments, retrieval thresholds, and safe caching
   that preserves tenant and project scope.
-- [ ] 17A.6 Compare the optimized candidate against the Phase 17A.1 baseline,
-  pass the Phase 17 evaluation datasets and safety gates, then roll out on
-  staging with an auditable rollback path.
+- [x] 17A.6 Add an audited release comparison that requires a measurable
+  efficiency reduction, a passing Phase 17 evaluation gate, and explicit
+  candidate and rollback deployment or commit references.
+- [ ] Complete the combined Phase 17A staging UAT, record the optimized
+  candidate comparison, and confirm the staging rollout before Phase 18.
 
 The Phase 17A.1 analytics baseline intentionally distinguishes two evidence
 windows. Request and token totals come from the retained 30-day request log;
@@ -1249,6 +1251,16 @@ in-memory embedding cache remains short-lived and is keyed by project plus
 normalized query, so one project cannot reuse another project's cache entry.
 Model identifiers, retry limits, timeouts, and internal cost controls are no
 longer repeated inside the model-visible project-policy block.
+
+The Phase 17A.6 release gate reuses the Phase 17 evaluation datasets and
+project-scoped audit log. It derives candidate request and token metrics from
+the retained 30-day window and structured-decision metrics from retained turn
+audits, compares them with the manually recorded Phase 17A.1 baseline, and
+becomes ready only when the evaluation gate passes and at least one comparable
+model usage or latency metric decreases. Every comparison records the
+candidate and known-good rollback deployment or commit references. Recording
+evidence does not claim to deploy or roll back code; those actions remain in
+the staging deployment history referenced by the audit event.
 
 Phase 17A exit gate: the optimized runtime demonstrably reduces model usage or
 latency against the recorded baseline without lowering completion, grounding,

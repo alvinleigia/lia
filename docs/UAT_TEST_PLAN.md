@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17 signed off; Phase 17A.1 through 17A.5 deployment pending
+- Current staging milestone: Phase 17 signed off; Phase 17A.1 through 17A.6 deployment pending
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -21,7 +21,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
-| 17A - AI cost and latency | 17A.1 through 17A.5 implemented | UAT is deferred by the release owner; deploy, then run sections 17A.1 through 17A.5 together later. |
+| 17A - AI cost and latency | 17A.1 through 17A.6 implemented | UAT is deferred by the release owner; deploy, then run sections 17A.1 through 17A.6 together later. |
 | 18 - Telnyx and extensions | Waiting | Start only after the Phase 17A exit gate. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
@@ -824,6 +824,7 @@ action, task, or routing rule during this test.
 3. [ ] Open `Projects` > `Analytics`.
 4. [ ] Find `AI Usage Baseline` and confirm it shows:
    - `30-day runtime requests`, input tokens, output tokens, and total tokens.
+   - `30-day average request latency` and `Tokens per direct AI chat`.
    - `Successful direct AI chats`.
    - `Structured decisions`, deterministic avoidance, and structured model
      rate.
@@ -839,7 +840,9 @@ Result: [ ] Pass [ ] Fail
 
 - 30-day runtime requests: `<value>`
 - 30-day total tokens: `<value>`
+- 30-day average request latency: `<value>`
 - Successful direct AI chats: `<value>`
+- Tokens per direct AI chat: `<value>`
 - Structured decisions: `<value>`
 - Deterministic avoidance: `<value>`
 - Structured model rate: `<value>`
@@ -954,6 +957,38 @@ Result: [ ] Pass [ ] Fail
 - Recent-context result: `<preserved / defect>`
 - Cross-project result: `<isolated / defect>`
 - 30-day input tokens: `<value>`
+- Tester/date: `<name> / <date>`
+
+## 17A.6 Record The Optimization Release Gate
+
+Run this only after sections 17A.1 through 17A.5. Use the same candidate label
+for every evaluation result and for the release comparison.
+
+1. [ ] Select project `Phase 16 Lifecycle UAT (#94)`.
+2. [ ] Open `Automation` > `Conversation Diagnostics` > `Evaluation gate`.
+3. [ ] Load the optimized candidate label and complete the extraction,
+   correction, clarification, safety, and completion datasets. Confirm
+   `Promotion` shows `Ready`.
+4. [ ] In `Phase 17A Optimization Release Gate`, confirm the five current
+   candidate metrics load. `Unavailable` means the project needs matching test
+   traffic before this gate can pass.
+5. [ ] Enter the five Phase 17A.1 baseline values, the current staging
+   deployment ID or Git commit, and known-good rollback commit `67482dc`.
+6. [ ] Select `Record release comparison`. Confirm a success notification
+   appears.
+7. [ ] Confirm `Latest comparison` shows `Ready`. If it shows `Blocked`, use
+   the reason displayed there and do not start Phase 18.
+8. [ ] Open `Audit logs` and confirm
+   `phase17a.optimization_release_evaluated` records the candidate, rollback
+   reference, gate result, and metric names without visitor text or secrets.
+
+Result: [ ] Pass [ ] Fail
+
+- Candidate label/reference: `<value>`
+- Rollback reference: `<value>`
+- Reduced metric(s): `<value>`
+- Evaluation gate: `<ready / blocked>`
+- Release comparison: `<ready / blocked>`
 - Tester/date: `<name> / <date>`
 
 # Final Release Record

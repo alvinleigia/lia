@@ -135,12 +135,17 @@ export default async function ProjectAnalyticsPage() {
     getProjectActionFlowAnalytics(selectedProject.id),
     getPhase17ProjectAnalytics(selectedProject.id),
   ]);
-  const successfulDirectAiChats = analytics.routeBreakdown
-    .filter((row) => row.route === "chat" || row.route === "widget")
-    .reduce(
-      (total, row) => total + Math.max(0, row.totalRequests - row.errorCount),
-      0,
-    );
+  const directAiRoutes = analytics.routeBreakdown.filter(
+    (row) => row.route === "chat" || row.route === "widget",
+  );
+  const successfulDirectAiChats = directAiRoutes.reduce(
+    (total, row) => total + Math.max(0, row.totalRequests - row.errorCount),
+    0,
+  );
+  const directAiTokens = directAiRoutes.reduce(
+    (total, row) => total + row.totalTokens,
+    0,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -192,6 +197,18 @@ export default async function ProjectAnalyticsPage() {
               <Metric
                 label="30-day total tokens"
                 value={formatNumber(analytics.last30Days.totalTokens)}
+              />
+              <Metric
+                label="30-day average request latency"
+                value={formatMs(analytics.last30Days.avgLatencyMs)}
+              />
+              <Metric
+                label="Tokens per direct AI chat"
+                value={
+                  successfulDirectAiChats > 0
+                    ? (directAiTokens / successfulDirectAiChats).toFixed(2)
+                    : "Unavailable"
+                }
               />
               <Metric
                 label="Structured decisions"
