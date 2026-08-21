@@ -14,6 +14,12 @@ import {
   getChannelConversation,
   listRecentChannelMessages,
 } from "@/lib/channels";
+import { resolveTraceId } from "@/lib/execution-trace";
+import {
+  formatRuntimeServerTiming,
+  measureRuntimeStage,
+  type RuntimeStageTiming,
+} from "@/lib/runtime-stage-timing";
 
 const requestSchema = z
   .object({
@@ -64,6 +70,10 @@ async function loadProjectChatHistory(input: {
 }
 
 export async function POST(req: Request) {
+  const requestStartedAt = performance.now();
+  const timings: RuntimeStageTiming[] = [];
+  const traceId = resolveTraceId(req.headers.get("x-lia-trace-id"));
+
   try {
     const json = await readJsonBody(req);
     const parsed = requestSchema.safeParse(json.body);
@@ -89,7 +99,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const { project } = await resolveUserAndProject(parsed.data.projectId);
+    const { project } = await measureRuntimeStage(
+      "project_access",
+      (timing) => timings.push(timing),
+      () => resolveUserAndProject(parsed.data.projectId),
+    );
     const result = await runBrowserFlowText({
       actionId: parsed.data.actionId,
       announceStart: parsed.data.announceStart,
@@ -99,16 +113,23 @@ export async function POST(req: Request) {
       editSection: parsed.data.editSection,
       expectedRevision: parsed.data.expectedRevision,
       projectId: project.id,
+      recordTiming: (timing) => timings.push(timing),
       resume: parsed.data.resume,
       selection: parsed.data.selection,
       source: "project_chat",
       text: parsed.data.text,
+      traceId,
     });
     const history = parsed.data.resume
-      ? await loadProjectChatHistory({
-          conversationId: parsed.data.conversationId,
-          projectId: project.id,
-        })
+      ? await measureRuntimeStage(
+          "project_history",
+          (timing) => timings.push(timing),
+          () =>
+            loadProjectChatHistory({
+              conversationId: parsed.data.conversationId,
+              projectId: project.id,
+            }),
+        )
       : undefined;
 
     if (parsed.data.actionId && !result.handled) {
@@ -129,8 +150,28 @@ export async function POST(req: Request) {
       );
     }
 
+    timings.push({
+      durationMs: Math.round((performance.now() - requestStartedAt) * 10) / 10,
+      stage: "request_total",
+    });
+    console.info(
+      JSON.stringify({
+        actionId: parsed.data.actionId ?? null,
+        event: "project_runtime_timing",
+        projectId: project.id,
+        timings,
+        traceId,
+      }),
+    );
+
     return NextResponse.json(
       history === undefined ? result : { ...result, history },
+      {
+        headers: {
+          "Server-Timing": formatRuntimeServerTiming(timings),
+          "X-Lia-Trace-Id": traceId,
+        },
+      },
     );
   } catch (error) {
     if (error instanceof BrowserFlowCommandError) {

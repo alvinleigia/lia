@@ -550,6 +550,44 @@ test("unambiguous typed field answers bypass the model", async () => {
   expect(result.proposal.safety.reasonCode).toBeNull();
 });
 
+test("a requested date remains deterministic when the same text appeared earlier", async () => {
+  const provider = new QueueProvider([]);
+  const engine = new StructuredTurnEngine({ provider });
+
+  const result = await engine.execute({
+    ...engineInput(),
+    fieldState: [
+      {
+        fieldKey: "preferredDate",
+        label: "Preferred Date",
+        required: true,
+        sensitivity: "standard",
+        state: "missing",
+        value: null,
+      },
+    ],
+    history: [
+      { content: "Please provide Service.", role: "assistant" },
+      { content: "2026-08-25", role: "user" },
+      { content: "Please provide Service.", role: "assistant" },
+    ],
+    requestedFieldKey: "preferredDate",
+    visitorMessage: "2026-08-25",
+  });
+
+  expect(result.source).toBe("deterministic");
+  expect(result.attempts).toBe(0);
+  expect(provider.calls).toHaveLength(0);
+  expect(result.proposal.fieldCandidates).toEqual([
+    {
+      fieldKey: "preferredDate",
+      naturalValue: "2026-08-25",
+      confidence: 1,
+      source: "visitor",
+    },
+  ]);
+});
+
 test("the specifically requested text field bypasses the model", async () => {
   const provider = new QueueProvider([]);
   const engine = new StructuredTurnEngine({ provider });

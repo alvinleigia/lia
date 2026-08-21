@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Bot, MessageSquare } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ActionFlowContentMedia } from "@/components/action-flow-content-media";
 import { ActionFlowProductCards } from "@/components/action-flow-product-cards";
 import {
@@ -93,6 +93,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
   const [serverActiveAction, setServerActiveAction] =
     useState<RuntimeAction | null>(null);
   const [isSavingSubmission, setIsSavingSubmission] = useState(false);
+  const flowRequestInFlight = useRef(false);
 
   useEffect(() => {
     const restoredConversationId = getOrCreateSessionConversationId({
@@ -232,9 +233,11 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     selection?: { id: string; label: string; value: string };
     text?: string;
   }) => {
-    if (!conversationId) {
+    if (!conversationId || flowRequestInFlight.current) {
       return true;
     }
+
+    flowRequestInFlight.current = true;
 
     const optimisticUserMessage =
       input.displayUserText && input.text
@@ -309,6 +312,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       ]);
       return true;
     } finally {
+      flowRequestInFlight.current = false;
       setIsSavingSubmission(false);
     }
   };
@@ -380,6 +384,10 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
   };
 
   const handleFlowFileUpload = async (file: File, flow: ActiveActionFlow) => {
+    if (flowRequestInFlight.current) {
+      return;
+    }
+
     const action = actions.find((item) => item.id === flow.actionId);
 
     if (!action) {
@@ -405,6 +413,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       return;
     }
 
+    flowRequestInFlight.current = true;
     setIsSavingSubmission(true);
 
     try {
@@ -457,6 +466,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
         ),
       ]);
     } finally {
+      flowRequestInFlight.current = false;
       setIsSavingSubmission(false);
       setInput("");
     }
@@ -464,7 +474,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
 
   const handleSubmit = async (message: PromptInputMessage) => {
     const text = message.text?.trim();
-    if (!text || isSavingSubmission) {
+    if (!text || isSavingSubmission || flowRequestInFlight.current) {
       return;
     }
 

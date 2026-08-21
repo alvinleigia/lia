@@ -926,7 +926,7 @@ async function executeTaskBoundary(input: {
     });
     if (resolvedSelection.status === "resolved") {
       selectionValue = resolvedSelection.id;
-    } else if (input.runtimeInput.selection) {
+    } else {
       return rejectMismatchedSelection();
     }
   } else if (input.runtimeInput.selection) {
