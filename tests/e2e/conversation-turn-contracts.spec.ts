@@ -289,6 +289,9 @@ test("compiler exposes only allowed task contracts and model-visible context", (
   expect(compiled.system).toContain(
     "Missing details for a clear task match are not ambiguity",
   );
+  expect(compiled.system).toContain(
+    "When clarifying a date field, ask for a specific calendar date in YYYY-MM-DD format.",
+  );
   expect(compiled.system).toContain("do not ask whether they want to proceed");
   expect(compiled.system).toContain(
     'use turnKind "side_question" with no field candidates',
