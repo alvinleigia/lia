@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A.2 through 17A.5 passed; corrected Phase 17A.1 baseline capture is next
+- Current staging milestone: Phase 17A passed; Phase 18 is next and not started
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -21,8 +21,8 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
-| 17A - AI cost and latency | In progress | 17A.2 through 17A.5 passed by 2026-08-23; capture the corrected immutable 17A.1 baseline, then run 17A.6. |
-| 18 - Telnyx and extensions | Waiting | Start only after the Phase 17A exit gate. |
+| 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
+| 18 - Telnyx and extensions | Not started | Start after Phase 17A; the Phase 17A exit gate passed on 2026-08-23. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -819,23 +819,27 @@ counts were both zero at sign-off.
 This check creates the release comparison boundary. Capture the baseline once
 before generating any new candidate traffic.
 
-1. [ ] Confirm staging contains the corrected Phase 17A baseline deployment.
-2. [ ] Select project `Phase 16 Lifecycle UAT (#94)`.
-3. [ ] Open `Projects` > `Analytics`.
-4. [ ] Find `Current AI Usage (30 days)` and confirm the rolling request,
+1. [x] Confirm staging contains the corrected Phase 17A baseline deployment.
+2. [x] Select project `Phase 16 Lifecycle UAT (#94)`.
+3. [x] Open `Projects` > `Analytics`.
+4. [x] Find `Current AI Usage (30 days)` and confirm the rolling request,
    token, latency, model-rate, retry-rate, and attempt metrics load.
-5. [ ] Open `Automation` > `Conversation Diagnostics` > `Evaluation gate`.
-6. [ ] In `Phase 17A Optimization Release Gate`, select
+5. [x] Open `Automation` > `Conversation Diagnostics` > `Evaluation gate`.
+6. [x] In `Phase 17A Optimization Release Gate`, select
    `Record immutable baseline`.
-7. [ ] Confirm a success notification and an `Immutable baseline` card appear.
+7. [x] Confirm a success notification and an `Immutable baseline` card appear.
    The capture button must no longer be available and there must be no manual
    baseline metric fields.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
-- Captured at: `<timestamp>`
-- Baseline window: `<start> to <end>`
-- Tester/date: `<name> / <date>`
+- Captured at: `2026-08-23 01:59:56 AM IST`
+- Baseline window: Exact preceding 30-day window ending at capture time.
+- Baseline metrics: `93.10%` structured model rate; `14.81%` retry/fallback
+  rate; `6.20` attempts per completion. Tokens per direct chat and request
+  latency were unavailable because no matching direct-chat samples existed at
+  capture.
+- Tester/date: `Single tester / release owner / 2026-08-23`
 - Note: The earlier rolling zero-value observation was operational telemetry,
   not immutable release evidence, and is superseded by this capture.
 
@@ -965,30 +969,33 @@ Run this only after sections 17A.1 through 17A.5. Use candidate label
 3. [x] Load candidate `current staging` and complete the extraction,
    correction, clarification, safety, and completion datasets. Confirm
    `Promotion` shows `Ready`.
-4. [ ] Confirm the immutable baseline card from 17A.1 exists. If not, select
+4. [x] Confirm the immutable baseline card from 17A.1 exists. If not, select
    `Record immutable baseline` before generating further candidate traffic.
-5. [ ] Generate fresh candidate traffic after baseline capture, then return and
+5. [x] Generate fresh candidate traffic after baseline capture, then return and
    confirm `Post-baseline candidate` metrics load. `Unavailable` means matching
    traffic is still needed.
-6. [ ] Enter only the current staging deployment ID or Git commit and rollback
+6. [x] Enter only the current staging deployment ID or Git commit and rollback
    reference `67482dc`.
-7. [ ] Select `Record release comparison`. Confirm a success notification
+7. [x] Select `Record release comparison`. Confirm a success notification
    appears.
-8. [ ] Confirm `Latest comparison` shows `Ready` and identifies at least one
+8. [x] Confirm `Latest comparison` shows `Ready` and identifies at least one
    measured efficiency reduction. If it shows `Blocked`, use the reason
    displayed there and do not start Phase 18.
-9. [ ] Open `Admin` > `Audit Logs` and confirm the baseline and release audit
+9. [x] Open `Admin` > `Audit Logs` and confirm the baseline and release audit
    rows include their baseline and candidate window boundaries for project
    `#94`, without visitor text or secrets.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
-- Candidate label/reference: `current staging / <deployment or commit>`
+- Candidate label/reference: `current staging / a5383c2`
 - Rollback reference: `67482dc`
-- Reduced metric(s): `<value>`
+- Reduced metric(s): `Structured model rate: 93.10% to 50.00%; retry/fallback rate: 14.81% to 0.00%.`
 - Evaluation gate: `Ready: 5/5 passed, 0 safety failures`
-- Release comparison: `<ready / blocked>`
-- Tester/date: `<name> / <date>`
+- Release comparison: `Ready; recorded 2026-08-23 02:10:04 AM IST`
+- Audit evidence: Verified `phase17a.optimization_baseline_recorded` and
+  `phase17a.optimization_release_evaluated` for project `#94`; no visitor text
+  or secrets were visible.
+- Tester/date: `Single tester / release owner / 2026-08-23`
 
 # Final Release Record
 
@@ -996,8 +1003,8 @@ Result: [ ] Pass [ ] Fail
 - Phase 15: [x] Pass [ ] Fail [ ] In progress
 - Phase 16: [x] Pass [ ] Fail [ ] In progress
 - Phase 17: [x] Pass [ ] Fail [ ] In progress
-- Phase 17A: [ ] Pass [ ] Fail [x] In progress
-- Phase 18: [ ] Pass [ ] Fail [x] In progress [ ] Not started
+- Phase 17A: [x] Pass [ ] Fail [ ] In progress
+- Phase 18: [ ] Pass [ ] Fail [ ] In progress [x] Not started
 - Critical defects open: `0`
 - High defects open: `0`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).

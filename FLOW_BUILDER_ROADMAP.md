@@ -1,6 +1,6 @@
 # Lia Conversational Flow Roadmap
 
-Status date: 2026-08-21
+Status date: 2026-08-23
 
 ## Document Authority
 
@@ -88,12 +88,13 @@ database, backup, and provider readiness work.
 - [x] Phase 14 staging cross-channel UAT passed under the single-tester scope on 2026-08-15.
 - [x] Priority 2 release approval is complete for continued internal testing.
 
-Active delivery gate: Phase 17A staging UAT is in progress. Sections 17A.2
-through 17A.5 passed by 2026-08-23. The corrected immutable 17A.1 baseline
-capture and audited 17A.6 post-baseline comparison remain before Telnyx.
+Active delivery gate: Phase 17A staging UAT passed on 2026-08-23. The
+immutable baseline and audited post-baseline comparison are complete: model
+rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
+0.00%, and the evaluation gate passed 5/5 cases with zero safety failures.
 
-Current target: deploy the immutable-baseline correction, capture the baseline
-once, generate fresh candidate traffic, and record the release comparison.
+Current target: begin Phase 18 Telnyx Voice AI and extension implementation
+against the completed Phase 17A efficiency and safety gate.
 
 ### Phase Tracking Snapshot
 
@@ -106,8 +107,8 @@ once, generate fresh candidate traffic, and record the release comparison.
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
-| 17A | Milestones 17A.1 through 17A.6 implemented | 17A.2 through 17A.5 passed on staging by 2026-08-23 | Deploy and verify the corrected immutable baseline, generate post-baseline candidate evidence, and record the audited comparison. |
-| 18 | Future-adapter foundation and public contract reference complete; 10 implementation items remain unchecked | Engineering in progress; release still waits on Phase 17A UAT | Conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
+| 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
+| 18 | Future-adapter foundation and public contract reference complete; 10 implementation items remain unchecked | Not started; Phase 17A release gate passed on 2026-08-23 | Conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
 
@@ -1188,7 +1189,7 @@ model cost or latency.
 - [x] 17A.1 Add an honest project baseline for 30-day requests and tokens,
   structured model versus deterministic decisions, retry or fallback rate,
   model attempts per model turn, and model attempts per completed request.
-- [ ] Complete corrected Phase 17A.1 staging UAT by recording the immutable
+- [x] Complete corrected Phase 17A.1 staging UAT by recording the immutable
   baseline before new candidate traffic.
 - [x] 17A.2 Add a deterministic pre-router for exact triggers, active-flow
   continuation, cancellation, confirmations, typed values, and other bounded
@@ -1212,7 +1213,7 @@ model cost or latency.
 - [x] 17A.6 Add an audited release comparison that requires a measurable
   efficiency reduction, a passing Phase 17 evaluation gate, and explicit
   candidate and rollback deployment or commit references.
-- [ ] Complete the combined Phase 17A staging UAT, record the optimized
+- [x] Complete the combined Phase 17A staging UAT, record the optimized
   candidate comparison, and confirm the staging rollout before Phase 18.
 
 The Phase 17A.1 analytics card is an explicitly labeled rolling 30-day
@@ -1266,6 +1267,14 @@ decision. No manual baseline values are accepted. Recording evidence does not
 claim to deploy or roll back code; those actions remain in the staging
 deployment history referenced by the audit event.
 
+Phase 17A staging UAT passed on 2026-08-23. The immutable baseline captured a
+93.10% structured model rate, 14.81% retry/fallback rate, and 6.20 attempts per
+completion. Post-baseline candidate traffic reduced the model rate to 50.00%
+and retry/fallback to 0.00%. The evaluation gate passed 5/5 cases with zero
+safety failures. The audited comparison was Ready for candidate `a5383c2`
+with rollback `67482dc`; the baseline and release audit rows were verified for
+project `#94` without visitor text or secrets.
+
 Phase 17A exit gate: the optimized runtime demonstrably reduces model usage or
 latency against the recorded baseline without lowering completion, grounding,
 safety, validation, or routing quality.
@@ -1297,7 +1306,7 @@ channel-certification guide now identifies the supported task, reply, tool,
 operation, inbound, and adapter surfaces; distinguishes the Flow Builder V2
 adapter milestone from the current V1 wire schemas; and records the server-only
 security boundary. All 213 channel contract tests passed. Phase 17A staging UAT
-remains deferred, and no Telnyx runtime implementation has started.
+passed on 2026-08-23, and no Telnyx runtime implementation has started.
 
 Initial Telnyx scope: inbound Voice AI conversations, verified webhooks and
 call lifecycle, real-time speech turns, interruption handling, existing Lia
