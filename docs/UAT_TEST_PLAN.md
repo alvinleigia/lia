@@ -918,30 +918,30 @@ Result: [x] Pass [ ] Fail
 
 Run this after 17A.3. It checks the escalation record, not model wording.
 
-1. [ ] Select project `Phase 16 Lifecycle UAT (#94)`.
-2. [ ] Open `Automation` > `Tasks`, open one published task, then open
+1. [x] Select project `Phase 16 Lifecycle UAT (#94)`.
+2. [x] Open `Automation` > `Tasks`, open one published task, then open
    `Configure Conversation` > `Review` > `Open Conversation Test`.
-3. [ ] Set the stage to `Collect details`, select the published task, enter an
+3. [x] Set the stage to `Collect details`, select the published task, enter an
    unambiguous value for its requested field, and click `Send`. Confirm the
    test returns a validated proposal without a page error.
-4. [ ] Change the stage to `Clarify`, enter `The usual one.`, and click `Send`.
+4. [x] Change the stage to `Clarify`, enter `The usual one.`, and click `Send`.
    Confirm the test returns a clarification proposal or a safe fallback.
-5. [ ] Open `Projects` > `Analytics` and find `Model and Tool Runtime` >
+5. [x] Open `Projects` > `Analytics` and find `Model and Tool Runtime` >
    `Model escalation reasons`.
-6. [ ] Confirm the table loads and contains only readable reason labels such
+6. [x] Confirm the table loads and contains only readable reason labels such
    as `semantic extraction`, `clarification`, `correction`,
    `grounded synthesis`, `ambiguous intent`, or `configured generation`.
    `No bounded model escalations recorded` is valid when no retained audited
    turn used the model; a missing table or page error is not valid.
-7. [ ] Confirm no visitor message, collected field value, prompt, or credential
+7. [x] Confirm no visitor message, collected field value, prompt, or credential
    appears in this table.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
-- Conversation-test result: `<validated proposal / safe fallback / defect>`
-- Escalation table result: `<reason labels / no retained escalations / defect>`
-- Private data visible: `<no / defect>`
-- Tester/date: `<name> / <date>`
+- Conversation-test result: `Validated collection proposal and clarification proposal`
+- Escalation table result: `Clarification, Grounded Synthesis, Semantic Extraction`
+- Private data visible: `No`
+- Tester/date: `Single tester / release owner / 2026-08-22`
 
 ## 17A.5 Verify Bounded Context And Retrieval
 
