@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   buildPhase17aCandidateMetrics,
+  parsePhase17aBaselineAuditRecord,
   parsePhase17aReleaseAuditRecord,
   summarizePhase17aReleaseGate,
 } from "../../src/lib/phase17a-release-gate";
@@ -114,5 +115,77 @@ test("phase 17a audit metadata parser rejects incomplete records", () => {
     candidateLabel: "phase-17a",
     ready: true,
     rollbackReference: "commit-baseline",
+  });
+});
+
+test("phase 17a baseline parser requires an immutable metric window", () => {
+  expect(
+    parsePhase17aBaselineAuditRecord({
+      schemaVersion: 1,
+      capturedAt: "2026-08-23T06:30:00.000Z",
+    }),
+  ).toBeNull();
+
+  expect(
+    parsePhase17aBaselineAuditRecord({
+      schemaVersion: 1,
+      windowStartedAt: "2026-07-24T06:30:00.000Z",
+      windowEndedAt: "2026-08-23T06:30:00.000Z",
+      capturedAt: "2026-08-23T06:30:00.000Z",
+      metrics: {
+        averageRequestLatencyMs: 5930,
+        attemptsPerCompletion: 6.2,
+        modelTurnRate: 93.1,
+        retryFallbackRate: 14.81,
+        tokensPerDirectChat: null,
+      },
+    }),
+  ).toEqual({
+    windowStartedAt: "2026-07-24T06:30:00.000Z",
+    windowEndedAt: "2026-08-23T06:30:00.000Z",
+    capturedAt: "2026-08-23T06:30:00.000Z",
+    metrics: {
+      averageRequestLatencyMs: 5930,
+      attemptsPerCompletion: 6.2,
+      modelTurnRate: 93.1,
+      retryFallbackRate: 14.81,
+      tokensPerDirectChat: null,
+    },
+  });
+});
+
+test("phase 17a release parser preserves exact comparison windows", () => {
+  expect(
+    parsePhase17aReleaseAuditRecord({
+      schemaVersion: 2,
+      candidateLabel: "current staging",
+      candidateReference: "candidate-commit",
+      rollbackReference: "known-good-commit",
+      baselineCapturedAt: "2026-08-23T06:30:00.000Z",
+      candidateWindowStartedAt: "2026-08-23T06:30:00.000Z",
+      candidateWindowEndedAt: "2026-08-23T07:30:00.000Z",
+      baseline: {
+        averageRequestLatencyMs: 5930,
+        attemptsPerCompletion: 6.2,
+        modelTurnRate: 93.1,
+        retryFallbackRate: 14.81,
+        tokensPerDirectChat: null,
+      },
+      candidate: {
+        averageRequestLatencyMs: 3000,
+        attemptsPerCompletion: 2,
+        modelTurnRate: 70,
+        retryFallbackRate: 5,
+        tokensPerDirectChat: null,
+      },
+      evaluationReady: true,
+      improvedMetricLabels: ["Average request latency"],
+      ready: true,
+    }),
+  ).toMatchObject({
+    baselineCapturedAt: "2026-08-23T06:30:00.000Z",
+    candidateWindowStartedAt: "2026-08-23T06:30:00.000Z",
+    candidateWindowEndedAt: "2026-08-23T07:30:00.000Z",
+    ready: true,
   });
 });

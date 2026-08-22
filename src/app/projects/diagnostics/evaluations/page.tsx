@@ -8,6 +8,7 @@ import {
 import Link from "next/link";
 import {
   recordEvaluationResult,
+  recordPhase17aOptimizationBaseline,
   recordPhase17aOptimizationRelease,
   updateEvaluationPolicy,
 } from "@/app/projects/diagnostics/evaluations/actions";
@@ -30,8 +31,11 @@ import {
 } from "@/lib/conversation-evaluations";
 import { getPhase17aCandidateSnapshot } from "@/lib/phase17a-release-data";
 import {
+  PHASE17A_BASELINE_AUDIT_ACTION,
+  PHASE17A_BASELINE_TARGET_TYPE,
   PHASE17A_RELEASE_AUDIT_ACTION,
   PHASE17A_RELEASE_TARGET_TYPE,
+  parsePhase17aBaselineAuditRecord,
   parsePhase17aReleaseAuditRecord,
 } from "@/lib/phase17a-release-gate";
 import {
@@ -63,34 +67,6 @@ function CandidateMetric({
   );
 }
 
-function BaselineMetricInput({
-  defaultValue,
-  id,
-  label,
-  max,
-}: {
-  defaultValue?: number;
-  id: string;
-  label: string;
-  max?: number;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        defaultValue={defaultValue}
-        id={id}
-        max={max}
-        min="0"
-        name={id}
-        required
-        step="0.01"
-        type="number"
-      />
-    </div>
-  );
-}
-
 export default async function ConversationEvaluationsPage({
   searchParams,
 }: {
@@ -101,18 +77,34 @@ export default async function ConversationEvaluationsPage({
   if (!context) return <NoProjectState title="Evaluations need a project" />;
   const params = await searchParams;
   const candidateLabel = params.candidate?.trim() || "current staging";
-  const [dashboard, optimizationSnapshot, optimizationAudits] =
-    await Promise.all([
-      getConversationEvaluationDashboard(context.project.id, candidateLabel),
-      getPhase17aCandidateSnapshot(context.project.id),
-      listAuditLogsForTarget({
-        action: PHASE17A_RELEASE_AUDIT_ACTION,
-        projectId: context.project.id,
-        targetId: context.project.id,
-        targetType: PHASE17A_RELEASE_TARGET_TYPE,
-        limit: 1,
-      }),
-    ]);
+  const [dashboard, baselineAudits, optimizationAudits] = await Promise.all([
+    getConversationEvaluationDashboard(context.project.id, candidateLabel),
+    listAuditLogsForTarget({
+      action: PHASE17A_BASELINE_AUDIT_ACTION,
+      projectId: context.project.id,
+      targetId: context.project.id,
+      targetType: PHASE17A_BASELINE_TARGET_TYPE,
+      limit: 1,
+    }),
+    listAuditLogsForTarget({
+      action: PHASE17A_RELEASE_AUDIT_ACTION,
+      projectId: context.project.id,
+      targetId: context.project.id,
+      targetType: PHASE17A_RELEASE_TARGET_TYPE,
+      limit: 1,
+    }),
+  ]);
+  const baselineAudit = baselineAudits[0];
+  const baseline = baselineAudit
+    ? parsePhase17aBaselineAuditRecord(baselineAudit.auditLog.metadata)
+    : null;
+  const candidateWindowEndedAt = new Date();
+  const optimizationSnapshot = baseline
+    ? await getPhase17aCandidateSnapshot(context.project.id, {
+        since: new Date(baseline.capturedAt),
+        until: candidateWindowEndedAt,
+      })
+    : null;
   const latestOptimizationAudit = optimizationAudits[0];
   const latestOptimizationRelease = latestOptimizationAudit
     ? parsePhase17aReleaseAuditRecord(latestOptimizationAudit.auditLog.metadata)
@@ -244,36 +236,125 @@ export default async function ConversationEvaluationsPage({
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-sm text-muted-foreground">
-            Compare the current retained candidate telemetry with the baseline
-            recorded in Phase 17A.1. The request and token metrics use the
-            retained 30-day window. The gate requires at least one measurable
-            efficiency reduction and a passing conversation evaluation gate.
+            Record the Phase 17A baseline once. Candidate telemetry then
+            includes only activity after that capture. The gate requires at
+            least one measurable efficiency reduction and a passing conversation
+            evaluation gate.
           </p>
-          <div className="grid gap-3 md:grid-cols-5">
-            <CandidateMetric
-              label="Tokens / direct chat"
-              value={optimizationSnapshot.metrics.tokensPerDirectChat}
-            />
-            <CandidateMetric
-              label="Request latency"
-              suffix=" ms"
-              value={optimizationSnapshot.metrics.averageRequestLatencyMs}
-            />
-            <CandidateMetric
-              label="Model rate"
-              suffix="%"
-              value={optimizationSnapshot.metrics.modelTurnRate}
-            />
-            <CandidateMetric
-              label="Retry rate"
-              suffix="%"
-              value={optimizationSnapshot.metrics.retryFallbackRate}
-            />
-            <CandidateMetric
-              label="Attempts / completion"
-              value={optimizationSnapshot.metrics.attemptsPerCompletion}
-            />
-          </div>
+
+          {baseline ? (
+            <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
+              <div>
+                <p className="font-semibold">Immutable baseline</p>
+                <p className="text-xs text-muted-foreground">
+                  Captured{" "}
+                  {formatDateTimeInTimeZone(
+                    new Date(baseline.capturedAt),
+                    context.company.timeZone,
+                  )}
+                  . This snapshot cannot be replaced from this screen.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-5">
+                <CandidateMetric
+                  label="Tokens / direct chat"
+                  value={baseline.metrics.tokensPerDirectChat}
+                />
+                <CandidateMetric
+                  label="Request latency"
+                  suffix=" ms"
+                  value={baseline.metrics.averageRequestLatencyMs}
+                />
+                <CandidateMetric
+                  label="Model rate"
+                  suffix="%"
+                  value={baseline.metrics.modelTurnRate}
+                />
+                <CandidateMetric
+                  label="Retry rate"
+                  suffix="%"
+                  value={baseline.metrics.retryFallbackRate}
+                />
+                <CandidateMetric
+                  label="Attempts / completion"
+                  value={baseline.metrics.attemptsPerCompletion}
+                />
+              </div>
+            </div>
+          ) : (
+            <ActionStateForm
+              action={recordPhase17aOptimizationBaseline}
+              className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4"
+            >
+              <ActionFormSuccessToast />
+              <input
+                name="projectId"
+                type="hidden"
+                value={context.project.id}
+              />
+              <div>
+                <p className="font-semibold">No immutable baseline recorded</p>
+                <p className="text-sm text-muted-foreground">
+                  Capture the current 30-day telemetry before generating
+                  candidate traffic. A project can record this baseline only
+                  once.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <ActionFormError />
+                <FormSubmitButton
+                  label="Record immutable baseline"
+                  pendingLabel="Recording..."
+                />
+              </div>
+            </ActionStateForm>
+          )}
+
+          {baseline && optimizationSnapshot ? (
+            <div className="space-y-3 rounded-md border p-4">
+              <div>
+                <p className="font-semibold">Post-baseline candidate</p>
+                <p className="text-xs text-muted-foreground">
+                  Activity from{" "}
+                  {formatDateTimeInTimeZone(
+                    new Date(baseline.capturedAt),
+                    context.company.timeZone,
+                  )}{" "}
+                  through{" "}
+                  {formatDateTimeInTimeZone(
+                    candidateWindowEndedAt,
+                    context.company.timeZone,
+                  )}
+                  .
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-5">
+                <CandidateMetric
+                  label="Tokens / direct chat"
+                  value={optimizationSnapshot.metrics.tokensPerDirectChat}
+                />
+                <CandidateMetric
+                  label="Request latency"
+                  suffix=" ms"
+                  value={optimizationSnapshot.metrics.averageRequestLatencyMs}
+                />
+                <CandidateMetric
+                  label="Model rate"
+                  suffix="%"
+                  value={optimizationSnapshot.metrics.modelTurnRate}
+                />
+                <CandidateMetric
+                  label="Retry rate"
+                  suffix="%"
+                  value={optimizationSnapshot.metrics.retryFallbackRate}
+                />
+                <CandidateMetric
+                  label="Attempts / completion"
+                  value={optimizationSnapshot.metrics.attemptsPerCompletion}
+                />
+              </div>
+            </div>
+          ) : null}
 
           {latestOptimizationRelease && latestOptimizationAudit ? (
             <div
@@ -325,109 +406,81 @@ export default async function ConversationEvaluationsPage({
             </div>
           )}
 
-          <ActionStateForm
-            action={recordPhase17aOptimizationRelease}
-            className="space-y-4 rounded-md border p-4"
-          >
-            <ActionFormSuccessToast />
-            <input name="projectId" type="hidden" value={context.project.id} />
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="optimizationCandidateLabel">
-                  Candidate label
-                </Label>
-                <Input
-                  defaultValue={candidateLabel}
-                  id="optimizationCandidateLabel"
-                  name="candidateLabel"
-                  required
+          {baseline ? (
+            <ActionStateForm
+              action={recordPhase17aOptimizationRelease}
+              className="space-y-4 rounded-md border p-4"
+            >
+              <ActionFormSuccessToast />
+              <input
+                name="projectId"
+                type="hidden"
+                value={context.project.id}
+              />
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="optimizationCandidateLabel">
+                    Candidate label
+                  </Label>
+                  <Input
+                    defaultValue={candidateLabel}
+                    id="optimizationCandidateLabel"
+                    name="candidateLabel"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="candidateReference">
+                    Candidate deployment or commit
+                  </Label>
+                  <Input
+                    defaultValue={
+                      latestOptimizationRelease?.candidateReference ?? ""
+                    }
+                    id="candidateReference"
+                    name="candidateReference"
+                    placeholder="Deployment ID or Git commit"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rollbackReference">
+                    Rollback deployment or commit
+                  </Label>
+                  <Input
+                    defaultValue={
+                      latestOptimizationRelease?.rollbackReference ?? ""
+                    }
+                    id="rollbackReference"
+                    name="rollbackReference"
+                    placeholder="Known-good deployment or Git commit"
+                    required
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The server compares the immutable baseline with activity after
+                its capture. Recording creates project-scoped audit evidence; it
+                does not deploy or roll back code.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <ActionFormError />
+                <FormSubmitButton
+                  label="Record release comparison"
+                  pendingLabel="Recording..."
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="candidateReference">
-                  Candidate deployment or commit
-                </Label>
-                <Input
-                  defaultValue={
-                    latestOptimizationRelease?.candidateReference ?? ""
-                  }
-                  id="candidateReference"
-                  name="candidateReference"
-                  placeholder="Deployment ID or Git commit"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="rollbackReference">
-                  Rollback deployment or commit
-                </Label>
-                <Input
-                  defaultValue={
-                    latestOptimizationRelease?.rollbackReference ?? ""
-                  }
-                  id="rollbackReference"
-                  name="rollbackReference"
-                  placeholder="Known-good deployment or Git commit"
-                  required
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-5">
-              <BaselineMetricInput
-                defaultValue={
-                  latestOptimizationRelease?.baseline.tokensPerDirectChat
-                }
-                id="baselineTokensPerDirectChat"
-                label="Baseline tokens / direct chat"
-              />
-              <BaselineMetricInput
-                defaultValue={
-                  latestOptimizationRelease?.baseline.averageRequestLatencyMs
-                }
-                id="baselineAverageRequestLatencyMs"
-                label="Baseline request latency (ms)"
-              />
-              <BaselineMetricInput
-                defaultValue={latestOptimizationRelease?.baseline.modelTurnRate}
-                id="baselineModelTurnRate"
-                label="Baseline model rate (%)"
-                max={100}
-              />
-              <BaselineMetricInput
-                defaultValue={
-                  latestOptimizationRelease?.baseline.retryFallbackRate
-                }
-                id="baselineRetryFallbackRate"
-                label="Baseline retry rate (%)"
-                max={100}
-              />
-              <BaselineMetricInput
-                defaultValue={
-                  latestOptimizationRelease?.baseline.attemptsPerCompletion
-                }
-                id="baselineAttemptsPerCompletion"
-                label="Baseline attempts / completion"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Recording this comparison creates project-scoped audit evidence;
-              it does not deploy or roll back code. Use the recorded references
-              in the staging deployment history if either action is required.
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <ActionFormError />
-              <FormSubmitButton
-                label="Record release comparison"
-                pendingLabel="Recording..."
-              />
-              <Button asChild variant="outline">
-                <Link href="/projects/analytics">Open analytics</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/projects/audit">Open audit logs</Link>
-              </Button>
-            </div>
-          </ActionStateForm>
+            </ActionStateForm>
+          ) : null}
+
+          <div className="flex flex-wrap gap-3">
+            <Button asChild variant="outline">
+              <Link href="/projects/analytics">Open analytics</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/projects/audit">Open audit logs</Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

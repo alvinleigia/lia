@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A.1 through 17A.3 passed; Phase 17A.4 is next
+- Current staging milestone: Phase 17A.2 through 17A.5 passed; corrected Phase 17A.1 baseline capture is next
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -21,7 +21,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 15 - Knowledge and memory | Complete | Passed on staging under the single-tester scope. |
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
-| 17A - AI cost and latency | In progress | 17A.1 through 17A.3 passed on staging on 2026-08-22; run 17A.4 next. |
+| 17A - AI cost and latency | In progress | 17A.2 through 17A.5 passed by 2026-08-23; capture the corrected immutable 17A.1 baseline, then run 17A.6. |
 | 18 - Telnyx and extensions | Waiting | Start only after the Phase 17A exit gate. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
@@ -814,50 +814,34 @@ counts were both zero at sign-off.
 
 # Phase 17A - AI Cost And Latency Optimization
 
-## 17A.1 Record The Current AI Usage Baseline
+## 17A.1 Verify Rolling Analytics And Record The Immutable Baseline
 
-This check only measures existing behavior. Do not edit a prompt, model,
-action, task, or routing rule during this test.
+This check creates the release comparison boundary. Capture the baseline once
+before generating any new candidate traffic.
 
-1. [x] Confirm staging contains the Phase 17A.1 analytics deployment.
-2. [x] Select project `Phase 16 Lifecycle UAT (#94)`.
-3. [x] Open `Projects` > `Analytics`.
-4. [x] Find `AI Usage Baseline` and confirm it shows:
-   - `30-day runtime requests`, input tokens, output tokens, and total tokens.
-   - `30-day average request latency` and `Tokens per direct AI chat`.
-   - `Successful direct AI chats`.
-   - `Structured decisions`, deterministic avoidance, and structured model
-     rate.
-   - Structured model attempts, retry or fallback rate, attempts per model
-     turn, and attempts per completion.
-5. [x] If `Structured decisions` is greater than zero, confirm deterministic
-   avoidance plus structured model rate equals `100%` apart from rounding.
-6. [x] Record the displayed values below. Zero is valid when the selected
-   project has no matching retained activity; a missing card or page error is
-   not valid.
+1. [ ] Confirm staging contains the corrected Phase 17A baseline deployment.
+2. [ ] Select project `Phase 16 Lifecycle UAT (#94)`.
+3. [ ] Open `Projects` > `Analytics`.
+4. [ ] Find `Current AI Usage (30 days)` and confirm the rolling request,
+   token, latency, model-rate, retry-rate, and attempt metrics load.
+5. [ ] Open `Automation` > `Conversation Diagnostics` > `Evaluation gate`.
+6. [ ] In `Phase 17A Optimization Release Gate`, select
+   `Record immutable baseline`.
+7. [ ] Confirm a success notification and an `Immutable baseline` card appear.
+   The capture button must no longer be available and there must be no manual
+   baseline metric fields.
 
-Result: [x] Pass [ ] Fail
+Result: [ ] Pass [ ] Fail
 
-- 30-day runtime requests: `0`
-- 30-day total tokens: `0`
-- 30-day average request latency: `0 ms`
-- Successful direct AI chats: `0`
-- Tokens per direct AI chat: `Unavailable`
-- Structured decisions: `0`
-- Deterministic avoidance: `0.00%`
-- Structured model rate: `0.00%`
-- Retry or fallback rate: `0.00%`
-- Attempts per model turn: `0.00`
-- Attempts per completion: `0.00`
-- Tester/date: `Single tester / release owner - 2026-08-22`
-- Note: The zero baseline is valid for this project's retained activity. The
-  release comparison in 17A.6 must use later recorded traffic or explicitly
-  report that no measurable reduction can be calculated.
+- Captured at: `<timestamp>`
+- Baseline window: `<start> to <end>`
+- Tester/date: `<name> / <date>`
+- Note: The earlier rolling zero-value observation was operational telemetry,
+  not immutable release evidence, and is superseded by this capture.
 
 ## 17A.2 Verify The Deterministic Pre-Router
 
-Run this after 17A.1 so the baseline is recorded before new test traffic is
-added.
+The deterministic pre-router check passed on the corrected staging runtime.
 
 1. [x] Select project `Phase 14 Release UAT (#1)`.
 2. [x] Open `Projects` > `Chat` and start `Book a Spa Service`.
@@ -892,7 +876,7 @@ Result: [x] Pass [ ] Fail
 
 ## 17A.3 Verify Approved Exact Answers
 
-Run this with 17A.1 and 17A.2 after Phase 17A.4 is deployed.
+The approved exact-answer check passed on the corrected staging runtime.
 
 1. [x] Select project `Phase 16 Lifecycle UAT (#94)`.
 2. [x] Open `Projects` > project settings > `AI Behavior`.
@@ -945,60 +929,64 @@ Result: [x] Pass [ ] Fail
 
 ## 17A.5 Verify Bounded Context And Retrieval
 
-Run this later with the other Phase 17A checks. Use only test content.
+Use only test content.
 
-1. [ ] Select project `Phase 16 Lifecycle UAT (#94)`.
-2. [ ] Open `Projects` > `Chat` and ask one question that is clearly answered
+1. [x] Select project `Phase 16 Lifecycle UAT (#94)`.
+2. [x] Open `Projects` > `Chat` and ask one question that is clearly answered
    by this project's indexed knowledge. Confirm Lia gives the relevant answer
    without unrelated passages.
-3. [ ] Ask one clearly unrelated question. Confirm Lia uses the configured
+3. [x] Ask one clearly unrelated question. Confirm Lia uses the configured
    no-answer behavior instead of presenting a weak document match as fact.
-4. [ ] Continue the same conversation for at least ten short turns, then ask a
+4. [x] Continue the same conversation for at least ten short turns, then ask a
    follow-up referring to the most recent answer. Confirm the page does not
    fail and Lia follows the recent context.
-5. [ ] Select `Phase 14 Release UAT (#1)`, ask the project-#94 knowledge
+5. [x] Select `Phase 14 Release UAT (#1)`, ask the project-#94 knowledge
    question again, and confirm no project-#94 answer or excerpt appears.
-6. [ ] Return to project `#94`, open `Projects` > `Analytics`, and record the
-   current 30-day input-token total for the Phase 17A.6 comparison.
+6. [x] Return to project `#94`, open `Projects` > `Analytics`, and record
+   current rolling 30-day analytics as operational evidence.
 
-Result: [ ] Pass [ ] Fail
+Result: [x] Pass [ ] Fail
 
-- Relevant-answer result: `<grounded answer / defect>`
-- Unrelated-question result: `<safe no-answer / defect>`
-- Recent-context result: `<preserved / defect>`
-- Cross-project result: `<isolated / defect>`
-- 30-day input tokens: `<value>`
-- Tester/date: `<name> / <date>`
+- Relevant-answer result: `Indexed Ewissen Infra facts were retrieved without unrelated passages.`
+- Unrelated-question result: `The unrelated laptop-warranty question returned a safe no-answer.`
+- Recent-context result: `Preserved across more than ten short turns, including a postal-code follow-up.`
+- Cross-project result: `Project #1 did not expose project #94 knowledge and used its own configured fallback.`
+- Retrieval defect retest: `The indexed contact email was retrieved after the retrieval-ranking fix.`
+- Rolling 30-day analytics: `29 requests; 80,701 input tokens; 8,761 output tokens; 89,462 total tokens; 5,930 ms average latency; 29 structured decisions; 6.90% deterministic avoidance; 93.10% model rate; 31 model attempts; 14.81% retry/fallback; 1.15 attempts/model turn; 6.20 attempts/completion.`
+- Tester/date: `Single tester / release owner / 2026-08-23`
 
 ## 17A.6 Record The Optimization Release Gate
 
-Run this only after sections 17A.1 through 17A.5. Use the same candidate label
-for every evaluation result and for the release comparison.
+Run this only after sections 17A.1 through 17A.5. Use candidate label
+`current staging` for every evaluation result and the release comparison.
 
-1. [ ] Select project `Phase 16 Lifecycle UAT (#94)`.
-2. [ ] Open `Automation` > `Conversation Diagnostics` > `Evaluation gate`.
-3. [ ] Load the optimized candidate label and complete the extraction,
+1. [x] Select project `Phase 16 Lifecycle UAT (#94)`.
+2. [x] Open `Automation` > `Conversation Diagnostics` > `Evaluation gate`.
+3. [x] Load candidate `current staging` and complete the extraction,
    correction, clarification, safety, and completion datasets. Confirm
    `Promotion` shows `Ready`.
-4. [ ] In `Phase 17A Optimization Release Gate`, confirm the five current
-   candidate metrics load. `Unavailable` means the project needs matching test
-   traffic before this gate can pass.
-5. [ ] Enter the five Phase 17A.1 baseline values, the current staging
-   deployment ID or Git commit, and known-good rollback commit `67482dc`.
-6. [ ] Select `Record release comparison`. Confirm a success notification
+4. [ ] Confirm the immutable baseline card from 17A.1 exists. If not, select
+   `Record immutable baseline` before generating further candidate traffic.
+5. [ ] Generate fresh candidate traffic after baseline capture, then return and
+   confirm `Post-baseline candidate` metrics load. `Unavailable` means matching
+   traffic is still needed.
+6. [ ] Enter only the current staging deployment ID or Git commit and rollback
+   reference `67482dc`.
+7. [ ] Select `Record release comparison`. Confirm a success notification
    appears.
-7. [ ] Confirm `Latest comparison` shows `Ready`. If it shows `Blocked`, use
-   the reason displayed there and do not start Phase 18.
-8. [ ] Open `Audit logs` and confirm
-   `phase17a.optimization_release_evaluated` records the candidate, rollback
-   reference, gate result, and metric names without visitor text or secrets.
+8. [ ] Confirm `Latest comparison` shows `Ready` and identifies at least one
+   measured efficiency reduction. If it shows `Blocked`, use the reason
+   displayed there and do not start Phase 18.
+9. [ ] Open `Admin` > `Audit Logs` and confirm the baseline and release audit
+   rows include their baseline and candidate window boundaries for project
+   `#94`, without visitor text or secrets.
 
 Result: [ ] Pass [ ] Fail
 
-- Candidate label/reference: `<value>`
-- Rollback reference: `<value>`
+- Candidate label/reference: `current staging / <deployment or commit>`
+- Rollback reference: `67482dc`
 - Reduced metric(s): `<value>`
-- Evaluation gate: `<ready / blocked>`
+- Evaluation gate: `Ready: 5/5 passed, 0 safety failures`
 - Release comparison: `<ready / blocked>`
 - Tester/date: `<name> / <date>`
 

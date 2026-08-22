@@ -169,13 +169,14 @@ export default async function ProjectAnalyticsPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
               <BrainCircuit className="h-5 w-5" />
-              AI Usage Baseline
+              Current AI Usage (30 days)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Phase 17A.1 baseline for deciding which turns can avoid a model
-              call without changing current runtime behavior.
+              Rolling project telemetry for the last 30 days. Capture the
+              immutable Phase 17A comparison baseline from Automation &gt;
+              Conversation Diagnostics &gt; Evaluation gate.
             </p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Metric

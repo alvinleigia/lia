@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import {
   actionFlowVersions,
@@ -21,6 +21,11 @@ type CountRow = {
   starts: number;
   completed: number;
   cancelled: number;
+};
+
+export type Phase17AnalyticsWindow = {
+  since: Date;
+  until?: Date;
 };
 
 export type Phase17AnalyticsInput = {
@@ -432,7 +437,10 @@ export function aggregatePhase17Analytics(input: Phase17AnalyticsInput) {
   };
 }
 
-export async function getPhase17ProjectAnalytics(projectId: number) {
+export async function getPhase17ProjectAnalytics(
+  projectId: number,
+  window?: Phase17AnalyticsWindow,
+) {
   const [
     actions,
     actionVersions,
@@ -468,7 +476,15 @@ export async function getPhase17ProjectAnalytics(projectId: number) {
         status: actionSubmissions.status,
       })
       .from(actionSubmissions)
-      .where(eq(actionSubmissions.projectId, projectId)),
+      .where(
+        and(
+          eq(actionSubmissions.projectId, projectId),
+          window ? gte(actionSubmissions.createdAt, window.since) : undefined,
+          window?.until
+            ? lte(actionSubmissions.createdAt, window.until)
+            : undefined,
+        ),
+      ),
     db
       .select({
         submissionId: actionSubmissionEvents.submissionId,
@@ -476,7 +492,17 @@ export async function getPhase17ProjectAnalytics(projectId: number) {
         payload: actionSubmissionEvents.payload,
       })
       .from(actionSubmissionEvents)
-      .where(eq(actionSubmissionEvents.projectId, projectId)),
+      .where(
+        and(
+          eq(actionSubmissionEvents.projectId, projectId),
+          window
+            ? gte(actionSubmissionEvents.createdAt, window.since)
+            : undefined,
+          window?.until
+            ? lte(actionSubmissionEvents.createdAt, window.until)
+            : undefined,
+        ),
+      ),
     db
       .select({ id: conversationalTasks.id, name: conversationalTasks.name })
       .from(conversationalTasks)
@@ -498,7 +524,17 @@ export async function getPhase17ProjectAnalytics(projectId: number) {
         status: conversationalTaskRuns.status,
       })
       .from(conversationalTaskRuns)
-      .where(eq(conversationalTaskRuns.projectId, projectId)),
+      .where(
+        and(
+          eq(conversationalTaskRuns.projectId, projectId),
+          window
+            ? gte(conversationalTaskRuns.startedAt, window.since)
+            : undefined,
+          window?.until
+            ? lte(conversationalTaskRuns.startedAt, window.until)
+            : undefined,
+        ),
+      ),
     db
       .select({
         fieldKey: conversationalTaskFieldValues.fieldKey,
@@ -506,7 +542,17 @@ export async function getPhase17ProjectAnalytics(projectId: number) {
         attemptCount: conversationalTaskFieldValues.attemptCount,
       })
       .from(conversationalTaskFieldValues)
-      .where(eq(conversationalTaskFieldValues.projectId, projectId)),
+      .where(
+        and(
+          eq(conversationalTaskFieldValues.projectId, projectId),
+          window
+            ? gte(conversationalTaskFieldValues.updatedAt, window.since)
+            : undefined,
+          window?.until
+            ? lte(conversationalTaskFieldValues.updatedAt, window.until)
+            : undefined,
+        ),
+      ),
     db
       .select({
         id: channelConversations.id,
@@ -517,7 +563,13 @@ export async function getPhase17ProjectAnalytics(projectId: number) {
     db
       .select({ action: auditLogs.action, metadata: auditLogs.metadata })
       .from(auditLogs)
-      .where(eq(auditLogs.projectId, projectId)),
+      .where(
+        and(
+          eq(auditLogs.projectId, projectId),
+          window ? gte(auditLogs.createdAt, window.since) : undefined,
+          window?.until ? lte(auditLogs.createdAt, window.until) : undefined,
+        ),
+      ),
     db
       .select({
         toolId: conversationalTaskToolRequests.toolId,
@@ -525,14 +577,32 @@ export async function getPhase17ProjectAnalytics(projectId: number) {
         errorCode: conversationalTaskToolRequests.errorCode,
       })
       .from(conversationalTaskToolRequests)
-      .where(eq(conversationalTaskToolRequests.projectId, projectId)),
+      .where(
+        and(
+          eq(conversationalTaskToolRequests.projectId, projectId),
+          window
+            ? gte(conversationalTaskToolRequests.requestedAt, window.since)
+            : undefined,
+          window?.until
+            ? lte(conversationalTaskToolRequests.requestedAt, window.until)
+            : undefined,
+        ),
+      ),
     db
       .select({
         status: operationAttempts.status,
         operationId: operationAttempts.operationId,
       })
       .from(operationAttempts)
-      .where(eq(operationAttempts.projectId, projectId)),
+      .where(
+        and(
+          eq(operationAttempts.projectId, projectId),
+          window ? gte(operationAttempts.createdAt, window.since) : undefined,
+          window?.until
+            ? lte(operationAttempts.createdAt, window.until)
+            : undefined,
+        ),
+      ),
   ]);
 
   return aggregatePhase17Analytics({

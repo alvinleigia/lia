@@ -88,12 +88,12 @@ database, backup, and provider readiness work.
 - [x] Phase 14 staging cross-channel UAT passed under the single-tester scope on 2026-08-15.
 - [x] Priority 2 release approval is complete for continued internal testing.
 
-Active delivery gate: Phase 17A staging UAT is in progress. Sections 17A.1
-through 17A.3 passed on 2026-08-22; sections 17A.4 through 17A.6 and the release
-comparison remain before the Telnyx runtime rollout.
+Active delivery gate: Phase 17A staging UAT is in progress. Sections 17A.2
+through 17A.5 passed by 2026-08-23. The corrected immutable 17A.1 baseline
+capture and audited 17A.6 post-baseline comparison remain before Telnyx.
 
-Current target: finish Phase 17A staging UAT, starting with 17A.4, before the
-Telnyx Voice AI runtime implementation or release decision.
+Current target: deploy the immutable-baseline correction, capture the baseline
+once, generate fresh candidate traffic, and record the release comparison.
 
 ### Phase Tracking Snapshot
 
@@ -106,7 +106,7 @@ Telnyx Voice AI runtime implementation or release decision.
 | 15 | Complete | Passed on staging under the single-tester scope on 2026-08-16; automatic durable-worker scheduling is tracked in `docs/UAT_DEFERRED_ITEMS.md` | None for this gate. |
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
-| 17A | Milestones 17A.1 through 17A.6 implemented | 17A.1 through 17A.3 passed on staging on 2026-08-22 | Run sections 17A.4 through 17A.6 and record the audited release comparison before the Telnyx runtime rollout. |
+| 17A | Milestones 17A.1 through 17A.6 implemented | 17A.2 through 17A.5 passed on staging by 2026-08-23 | Deploy and verify the corrected immutable baseline, generate post-baseline candidate evidence, and record the audited comparison. |
 | 18 | Future-adapter foundation and public contract reference complete; 10 implementation items remain unchecked | Engineering in progress; release still waits on Phase 17A UAT | Conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
@@ -1188,8 +1188,8 @@ model cost or latency.
 - [x] 17A.1 Add an honest project baseline for 30-day requests and tokens,
   structured model versus deterministic decisions, retry or fallback rate,
   model attempts per model turn, and model attempts per completed request.
-- [x] Complete 17A.1 staging UAT and record the observed baseline without
-  changing routing, prompts, models, or user-facing replies.
+- [ ] Complete corrected Phase 17A.1 staging UAT by recording the immutable
+  baseline before new candidate traffic.
 - [x] 17A.2 Add a deterministic pre-router for exact triggers, active-flow
   continuation, cancellation, confirmations, typed values, and other bounded
   intents that do not require a model.
@@ -1202,22 +1202,25 @@ model cost or latency.
   no-answer behavior, and normal unlisted-question handling.
 - [x] 17A.4 Define one bounded model-escalation policy for ambiguous intent,
   semantic extraction, grounded synthesis, correction, and clarification.
+- [x] Complete Phase 17A.4 staging UAT for bounded model escalation and
+  server-validated recommendations.
 - [x] 17A.5 Reduce avoidable prompt and retrieval tokens through bounded
   context, reusable prompt fragments, retrieval thresholds, and safe caching
   that preserves tenant and project scope.
+- [x] Complete Phase 17A.5 staging UAT for bounded retrieval, recent context,
+  and project isolation.
 - [x] 17A.6 Add an audited release comparison that requires a measurable
   efficiency reduction, a passing Phase 17 evaluation gate, and explicit
   candidate and rollback deployment or commit references.
 - [ ] Complete the combined Phase 17A staging UAT, record the optimized
   candidate comparison, and confirm the staging rollout before Phase 18.
 
-The Phase 17A.1 analytics baseline intentionally distinguishes two evidence
-windows. Request and token totals come from the retained 30-day request log;
-structured decision ratios come from retained version-2 turn audits. A
-successful direct Project Chat or Widget request counts as one direct AI chat.
-Provider-internal steps are included in token usage but are not presented as
-separate calls until exact per-step telemetry is persisted. This avoids a
-misleading precision claim while preserving a useful optimization baseline.
+The Phase 17A.1 analytics card is an explicitly labeled rolling 30-day
+operational view, not release evidence. The release gate captures one immutable,
+project-scoped baseline audit over the exact preceding 30 days. Candidate
+metrics are calculated only from activity after the recorded capture time
+through the comparison time. Metrics without a valid denominator remain
+`Unavailable` instead of being coerced to zero.
 
 The Phase 17A.2 pre-router reuses the existing server-owned action and task
 runtime. Exact task starts, active deterministic flow continuation,
@@ -1255,15 +1258,13 @@ normalized query, so one project cannot reuse another project's cache entry.
 Model identifiers, retry limits, timeouts, and internal cost controls are no
 longer repeated inside the model-visible project-policy block.
 
-The Phase 17A.6 release gate reuses the Phase 17 evaluation datasets and
-project-scoped audit log. It derives candidate request and token metrics from
-the retained 30-day window and structured-decision metrics from retained turn
-audits, compares them with the manually recorded Phase 17A.1 baseline, and
-becomes ready only when the evaluation gate passes and at least one comparable
-model usage or latency metric decreases. Every comparison records the
-candidate and known-good rollback deployment or commit references. Recording
-evidence does not claim to deploy or roll back code; those actions remain in
-the staging deployment history referenced by the audit event.
+The Phase 17A.6 release gate loads the immutable baseline, calculates candidate
+metrics only from the exact post-baseline window, and stores a project-scoped
+audit record containing both window boundaries, candidate and rollback
+references, efficiency deltas, evaluation-gate status, and final readiness
+decision. No manual baseline values are accepted. Recording evidence does not
+claim to deploy or roll back code; those actions remain in the staging
+deployment history referenced by the audit event.
 
 Phase 17A exit gate: the optimized runtime demonstrably reduces model usage or
 latency against the recorded baseline without lowering completion, grounding,
