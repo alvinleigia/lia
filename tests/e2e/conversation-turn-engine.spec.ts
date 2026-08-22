@@ -374,6 +374,49 @@ test("a side question during a task uses grounded knowledge retrieval", async ()
   expect(retriever.lastInput?.limit).toBe(4);
 });
 
+test("referential knowledge questions use bounded recent visitor context for retrieval", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      fieldCandidates: [],
+      grounding: { status: "grounded", excerptIds: ["document:12"] },
+      reply: "consult@ewissen.in",
+      turnKind: "ordinary_question",
+    }),
+  ]);
+  const retriever = new FixtureRetriever();
+  const engine = new StructuredTurnEngine({ provider, retriever });
+
+  await engine.execute({
+    ...engineInput(),
+    activeTask: null,
+    history: [
+      {
+        content: "What are Ewissen Infra's three main service areas?",
+        role: "user",
+      },
+      {
+        content: "Real Estate, Corporate Finance, and Project Management.",
+        role: "assistant",
+      },
+      { content: "What is its sales helpline?", role: "user" },
+      { content: "+91 9319 212 233", role: "assistant" },
+      { content: "What is its general contact number?", role: "user" },
+      { content: "+91 70575 60596", role: "assistant" },
+    ],
+    stage: "knowledge",
+    visitorMessage: "What email address is listed?",
+  });
+
+  expect(retriever.lastInput?.query).toBe(
+    [
+      "What are Ewissen Infra's three main service areas?",
+      "What is its sales helpline?",
+      "What is its general contact number?",
+      "What email address is listed?",
+    ].join("\n"),
+  );
+});
+
 test("knowledge retrieval respects the published allowed source policy", async () => {
   const provider = new QueueProvider([
     baseTurn({

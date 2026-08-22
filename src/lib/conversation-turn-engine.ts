@@ -130,6 +130,48 @@ const TASK_INTENT_FILLER_WORDS = new Set([
   "you",
 ]);
 
+const CONTEXTUAL_KNOWLEDGE_REFERENCE_PATTERN =
+  /\b(?:it|its|they|their|them|this|that|these|those|listed|above|earlier|previous|former|latter)\b/i;
+const MAX_RETRIEVAL_CONTEXT_MESSAGES = 6;
+const MAX_RETRIEVAL_QUERY_CHARACTERS = 1_200;
+
+function buildKnowledgeRetrievalQuery(input: {
+  history: TurnMessageV1[];
+  visitorMessage: string;
+}) {
+  const visitorMessage = input.visitorMessage.trim();
+  if (!CONTEXTUAL_KNOWLEDGE_REFERENCE_PATTERN.test(visitorMessage)) {
+    return visitorMessage;
+  }
+
+  const context: string[] = [];
+  let characters = visitorMessage.length;
+
+  for (let index = input.history.length - 1; index >= 0; index -= 1) {
+    const message = input.history[index];
+    if (!message || message.role !== "user") continue;
+
+    const content = message.content.trim();
+    if (
+      !content ||
+      content === visitorMessage ||
+      !isPotentialKnowledgeSideQuestion(content)
+    ) {
+      continue;
+    }
+
+    if (characters + content.length + 1 > MAX_RETRIEVAL_QUERY_CHARACTERS) {
+      continue;
+    }
+
+    context.unshift(content);
+    characters += content.length + 1;
+    if (context.length === MAX_RETRIEVAL_CONTEXT_MESSAGES) break;
+  }
+
+  return [...context, visitorMessage].join("\n");
+}
+
 function normalizeTaskIntent(value: string) {
   return value
     .toLowerCase()
@@ -731,7 +773,7 @@ export class StructuredTurnEngine {
             4,
           ),
           projectId: input.projectId,
-          query: input.visitorMessage,
+          query: buildKnowledgeRetrievalQuery(input),
         });
       } catch {
         return {
