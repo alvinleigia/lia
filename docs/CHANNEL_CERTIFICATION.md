@@ -28,9 +28,11 @@ The reference adapter is not a production channel. It is not stored in the
 database and has no navigation or customer-facing UI. It proves that a future
 transport can preserve correlation, reply capability, text, fallback text,
 structured payload, and envelope version through the public adapter contract.
-Telnyx Voice is stored through the existing channel tables and participates in
-the automated matrix, but it does not become a certified production channel
-until verified-webhook and call-control automation plus live UAT pass.
+Legacy Telnyx Programmable Voice is stored through the existing channel tables
+and participates in the automated matrix, but it is not the active production
+release target. The Telnyx-hosted AI Assistant path has a separate deployment
+and tool boundary and does not become a certified production channel until its
+hosted milestones and live UAT pass.
 
 ## Public Extension Contracts
 
@@ -130,6 +132,29 @@ a separately defined breaking contract is introduced.
   leaving it blank preserves the existing credential. Activation requires a
   connection ID, API key, and valid Ed25519 public key. Audit metadata records
   only configuration booleans, channel status, and project-owned identifiers.
+
+### Hosted voice deployment contracts
+
+- `src/lib/hosted-voice-contract.ts` owns `VoiceAgentDefinitionV1`, deterministic
+  normalization and hashing, explicit required capabilities, compatibility
+  reporting, and the hosted-provider compile and remote lifecycle interfaces.
+- The canonical voice definition contains behavior, greeting, locale,
+  immutable task/tool references, confirmation, identity, handoff, retention,
+  and required capabilities. Provider assistant/version IDs, models, voices,
+  transcription settings, credentials, URLs, and payload shapes are rejected.
+- `compileHostedVoiceAgent` validates required capabilities before a provider
+  compiler runs. A missing capability is a blocking compatibility error; an
+  adapter must not silently replace or omit required behavior.
+- `src/lib/telnyx-hosted-voice.ts` is the provider-owned compiler boundary for
+  Telnyx model, voice, and transcription settings. It produces a deterministic
+  telephony-enabled Assistant draft plan using the current Telnyx greeting,
+  `voice_settings`, and transcription fields, but performs no remote calls and
+  receives no credential in the Phase 18.9 contract milestone.
+- `tests/e2e/hosted-voice-contract.spec.ts` proves that provider deployment
+  details cannot enter the canonical definition, hashes are stable across
+  unordered references, Telnyx and a fake second provider compile the same
+  definition hash, missing capabilities block compilation, and remote IDs stay
+  outside the definition.
 
 Contract versions are explicit. Backward-compatible additions may extend a V1
 schema only when existing consumers continue to validate and behave the same.
@@ -279,7 +304,7 @@ domain, browser, or device. Record these checks in Phase 14 of
 Automated certification passing means the release candidate is ready for live
 UAT. It does not by itself mean the release is approved.
 
-For Phase 18 Telnyx sign-off, also record:
+For legacy Telnyx Programmable Voice sign-off, also record:
 
 - Voice API application ownership, number assignment, connection ID, and
   verified webhook delivery on staging.
@@ -289,3 +314,19 @@ For Phase 18 Telnyx sign-off, also record:
   record, with no credential or raw provider response exposed.
 - Remote hangup closes the channel conversation and a later new call starts a
   separate active conversation.
+
+For the active Phase 18 hosted-assistant sign-off, record:
+
+- The Lia voice definition hash, Telnyx Assistant candidate and main version
+  IDs, promotion record, and verified rollback target.
+- Native greeting, ordinary conversation, interruption, transfer, and hangup
+  without Lia processing each speech turn.
+- Availability and every appointment write through the authenticated Lia tool
+  gateway, including explicit confirmation, duplicate delivery, a slot race,
+  and verified final state.
+- Fast, pending, provider-failure, and `outcome_unknown` behavior without a
+  false spoken success or duplicate write.
+- A direct Telnyx managed-field change that is detected as drift and blocks an
+  accidental overwrite.
+- Redacted correlated diagnostics plus normal-turn and tool P50/P95/P99
+  latency, actual call cost, and estimated cost per verified booking.

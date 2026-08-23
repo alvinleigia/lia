@@ -108,7 +108,7 @@ shared-runtime, persistence, model, and tool authorization proofs are complete.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Engineering complete; 1 certification item remains unchecked | Live Telnyx UAT has not started | Configure the staging Voice API application and complete the live-call checklist. |
+| 18 | Legacy Programmable Voice engineering complete; hosted milestone 18.9 implemented | Hosted Telnyx live UAT has not started | Implement 18.10 Telnyx AI Assistant deployment and drift control. |
 
 ## Product Direction
 
@@ -1281,16 +1281,20 @@ safety, validation, or routing quality.
 
 ## Phase 18: Future Channels And Extension Model
 
-Goal: prove that channels, models, tools, and task families extend the same
-universal contracts, using Telnyx Voice AI as the first real external-channel
-implementation.
+Goal: prove that Lia can author, version, secure, and observe a provider-neutral
+voice agent while deploying a provider-native low-latency runtime, using Telnyx
+AI Assistant as the first hosted provider. Ordinary conversation turns stay
+inside Telnyx; Lia is called only for authoritative business tools and post-call
+synchronization.
 
 - [x] The reference future adapter consumes the current universal runtime envelope.
 - [x] Document the public conversational task, reply, tool, operation, and Phase 12 / Flow Builder V2 adapter contracts in `docs/CHANNEL_CERTIFICATION.md`.
 - [x] Add conformance tests for third-party channel adapters.
 - [x] Add conformance tests for model providers and business tools.
-- [ ] Implement and certify Telnyx Voice AI as the first real non-WhatsApp
-  external channel.
+- [x] Implement and automate the legacy Telnyx Programmable Voice adapter as
+  engineering evidence.
+- [ ] Implement and certify the Telnyx-hosted AI Assistant architecture as the
+  production voice target.
 - [x] Define plugin boundaries for inbound normalization and outbound delivery.
 - [x] Define plugin boundaries for capability declarations and readable fallbacks.
 - [x] Define plugin boundaries for encrypted credentials and tool authorization.
@@ -1320,8 +1324,9 @@ Operation-backed tool fixtures prove canonical server input, typed output
 allowlists and mappings, and removal of provider URLs and credential material
 from published contracts. All 224 channel and extension contract tests passed.
 
-The Phase 18 Telnyx channel-contract milestone completed on 2026-08-23. Telnyx
-Voice is now a typed channel, final transcripts normalize through the universal
+The Phase 18 legacy Telnyx Programmable Voice channel-contract milestone
+completed on 2026-08-23. Telnyx Voice is now a typed channel, final transcripts
+normalize through the universal
 V1 inbound contract, task/model policy accepts the voice channel, and the
 adapter speaks text, converts rich replies to readable speech, and converts a
 handoff to a transfer only when a destination is configured. Telnyx carries the
@@ -1329,8 +1334,9 @@ same source reply, correlation, call identifiers, and deterministic command ID.
 All 229 channel and extension contract tests passed. Live provider UAT remains
 in progress, so the Telnyx implementation checkbox remains open.
 
-The Phase 18 Telnyx webhook-runtime milestone completed on 2026-08-23. The
-provider route validates the event envelope, resolves an active project channel,
+The Phase 18 legacy Telnyx Programmable Voice webhook-runtime milestone
+completed on 2026-08-23. The provider route validates the event envelope,
+resolves an active project channel,
 verifies the Ed25519 signature and five-minute replay window, records lifecycle
 events idempotently, and sends deterministic answer, speech, interruption, and
 transfer commands. Only final non-empty transcripts enter the shared Lia task
@@ -1339,7 +1345,8 @@ remain encrypted at rest and are sent only in Telnyx authorization headers, and
 provider error bodies do not cross the delivery boundary. All 234 channel and
 extension contract tests passed. Live provider UAT remains in progress.
 
-The Phase 18 Telnyx project-configuration milestone completed on 2026-08-23.
+The Phase 18 legacy Telnyx Programmable Voice project-configuration milestone
+completed on 2026-08-23.
 Authorized project managers can configure the Voice API connection, phone
 number, webhook public key, encrypted API key, greeting, transcription, voice,
 and approved transfer destination. The server action re-resolves project scope,
@@ -1371,16 +1378,73 @@ transfer. Database-backed certification completes the same published booking
 state across project chat, widget, WhatsApp, and Telnyx, then proves that a
 Telnyx-owned run cannot execute a project operation before confirmation or read
 the attempt through another project. All 240 contract tests and 29 focused
-database runtime tests passed. Engineering is complete; the Telnyx implementation
-checkbox remains open until the live staging checklist passes.
+database runtime tests passed. Legacy Programmable Voice engineering is
+complete; its live checklist is retained as non-release evidence and has been
+superseded by the hosted-assistant production target below.
 
-Initial Telnyx scope: inbound Voice AI conversations, verified webhooks and
+Legacy Programmable Voice scope: inbound Voice AI conversations, verified webhooks and
 call lifecycle, real-time speech turns, interruption handling, existing Lia
 tasks and flows, cancellation, handoff, end-call behavior, authorized tools,
 and project-scoped diagnostics. Outbound campaigns, call recording,
 multilingual voice catalogs, advanced PSTN transfers, and production-volume
-certification remain outside this initial Phase 18 target unless scheduled
-separately.
+certification remain outside this legacy track unless scheduled separately.
+
+### Phase 18 Hosted Voice Milestones
+
+- [x] 18.9 Define an immutable `VoiceAgentDefinitionV1`, deterministic content
+  hashing, explicit required-capability validation, and a hosted-provider
+  adapter contract for compile, draft deployment, inspection, promotion, and
+  deactivation. Prove the same provider-neutral fixture compiles through Telnyx
+  and a fake second provider without provider IDs, credentials, URLs, or payload
+  shapes entering the canonical definition.
+- [ ] 18.10 Create, inspect, version, promote, and roll back Telnyx AI
+  Assistants through a project-scoped deployment record. Publish candidates
+  without promotion, verify the remote managed-field hash, block remote drift,
+  and require an explicit import, overwrite, or cancel decision.
+- [ ] 18.11 Add an authenticated provider-neutral voice tool gateway that
+  resolves project and allowed tools from an opaque deployment binding,
+  validates typed input and output, records deterministic provider-call
+  idempotency, and exposes prepare/commit semantics for writes.
+- [ ] 18.12 Add direct Google Calendar availability, booking, lookup,
+  rescheduling, and cancellation inside Lia. Use live free/busy data,
+  configured clinic rules, verified identity, opaque appointment references,
+  explicit confirmation, recheck-before-write, post-write verification,
+  concurrency control, and `outcome_unknown` reconciliation.
+- [ ] 18.13 Keep ordinary STT, model, TTS, interruption, transfer, and hangup
+  inside Telnyx; add bounded synchronous tools, provider-native async
+  continuation, post-call synchronization, redacted diagnostics, and measured
+  latency and cost dimensions without a duplicate Lia model call per turn.
+- [ ] 18.14 Complete live hosted-assistant staging UAT with a candidate version
+  and dedicated test number. Certify native conversation, availability and all
+  appointment writes, confirmation, duplicate delivery, slot races, pending
+  and unknown outcomes, interruption, drift, promotion, rollback, privacy,
+  latency, and cost per verified booking.
+
+Phase 18 hosted-voice exit gate: a versioned Lia voice definition deploys to a
+Telnyx-hosted Assistant without provider data entering the canonical contract;
+ordinary voice turns remain Telnyx-native; authenticated Lia tools complete one
+explicitly confirmed, idempotent, and verified calendar booking; drift,
+slow/unknown outcomes, interruption, diagnostics, rollback, latency, and cost
+pass staging UAT; and a fake provider proves the business contract is
+replaceable.
+
+Telnyx Edge calendar execution, LiveKit-on-Telnyx production use, automatic
+drift merging, full Flow Builder-to-Telnyx Workflow compilation, multi-agent
+handoff, outbound campaigns, recording, multilingual certification, and a full
+second-provider implementation are deferred until a measured production need
+justifies them.
+
+Phase 18.9 completed on 2026-08-24. `VoiceAgentDefinitionV1` now validates the
+provider-neutral behavior, locale, immutable task/tool references, explicit
+write confirmation, identity, handoff, retention, and required capabilities;
+normalization and SHA-256 hashing are deterministic across unordered reference
+sets. `HostedVoiceProviderCompiler` and `HostedVoiceProviderAdapter` define the
+compile and remote lifecycle boundary without credentials or provider IDs in
+the canonical definition. The Telnyx compiler keeps model, voice, and
+transcription settings in its provider-owned input, while a fake hosted
+provider proves the same definition and hash are replaceable. Missing required
+capabilities block compilation. TypeScript, focused lint, and all 247 channel
+and extension contract tests passed.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.

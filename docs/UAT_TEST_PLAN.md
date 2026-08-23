@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18 engineering is in progress
+- Current staging milestone: Phase 17A passed; Phase 18.9 hosted voice contract complete; Phase 18.10 next
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -22,7 +22,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Engineering complete; UAT pending | Configure a staging Telnyx Voice API application and complete the live-call checklist. |
+| 18 - Telnyx and extensions | Legacy Programmable Voice engineering complete; hosted-assistant implementation in progress | Complete hosted milestones 18.9-18.14; live UAT starts only after their engineering gates pass. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -999,9 +999,11 @@ Result: [x] Pass [ ] Fail
 
 # Phase 18 - Telnyx And Extensions
 
-Phase 18 engineering started after the Phase 17A release gate passed. Live
-Telnyx UAT begins only after the provider adapter and verified webhook runtime
-reach staging.
+Phase 18 engineering started after the Phase 17A release gate passed. Milestones
+18.1-18.7 retain the completed extension and legacy Programmable Voice evidence.
+The production target is now the Telnyx-hosted AI Assistant architecture in
+18.9-18.14, where ordinary conversation stays inside Telnyx and Lia handles
+deployment control, authoritative tools, audit, and post-call synchronization.
 
 ## 18.1 Third-Party Channel Adapter Conformance
 
@@ -1031,7 +1033,7 @@ Result: [x] Engineering gate passed [ ] Fail
 
 Manual staging result: Not applicable to this contract-only milestone.
 
-## 18.3 Telnyx Voice Channel Contract
+## 18.3 Legacy Telnyx Programmable Voice Channel Contract
 
 - [x] `telnyx_voice` uses the existing universal channel and conversation
       persistence types without a schema migration.
@@ -1045,9 +1047,11 @@ Manual staging result: Not applicable to this contract-only milestone.
 
 Result: [x] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending live Telnyx setup.
+Manual staging result: Not run. Automated engineering evidence is retained for
+the legacy Programmable Voice path; this path is not the active production
+release target.
 
-## 18.4 Telnyx Verified Webhook And Call Control
+## 18.4 Legacy Telnyx Programmable Voice Verified Webhook And Call Control
 
 - [x] The webhook rejects invalid JSON, invalid event envelopes, missing or
       stale signatures, and payloads changed after signing.
@@ -1065,9 +1069,11 @@ Manual staging result: Pending live Telnyx setup.
 
 Result: [x] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending live Telnyx setup.
+Manual staging result: Not run. Automated engineering evidence is retained for
+the legacy Programmable Voice path; this path is not the active production
+release target.
 
-## 18.5 Telnyx Project Configuration
+## 18.5 Legacy Telnyx Programmable Voice Project Configuration
 
 - [x] Authorized project managers can open `Projects` > `Telnyx Voice` and save
       project-scoped Voice API, speech, and transfer settings.
@@ -1084,7 +1090,9 @@ Manual staging result: Pending live Telnyx setup.
 
 Result: [x] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending live Telnyx account and inbound-call setup.
+Manual staging result: Not run. Automated engineering evidence is retained for
+the legacy Programmable Voice path; this path is not the active production
+release target.
 
 ## 18.6 Reusable Plugin Boundaries
 
@@ -1108,7 +1116,7 @@ Result: [x] Engineering gate passed [ ] Fail
 
 Manual staging result: Not applicable to this contract-only milestone.
 
-## 18.7 Telnyx Lifecycle And Shared State
+## 18.7 Legacy Telnyx Programmable Voice Lifecycle And Shared State
 
 - [x] Incoming calls plan deterministic answer and greeting commands; outgoing
       initiation does not trigger the inbound answer path.
@@ -1128,9 +1136,16 @@ Manual staging result: Not applicable to this contract-only milestone.
 
 Result: [x] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending live Telnyx account and inbound-call setup.
+Manual staging result: Not run. Automated engineering evidence is retained for
+the legacy Programmable Voice path; this path is not the active production
+release target.
 
-## 18.8 Live Telnyx Staging UAT
+## 18.8 Legacy Programmable Voice Live UAT - Superseded
+
+This checklist is retained for future certification if the legacy adapter is
+ever released. It is not the active Phase 18 release gate because it tests Lia
+processing final transcripts and issuing Voice API commands rather than a
+Telnyx-hosted Assistant runtime.
 
 Use a dedicated test number and non-production destination. Do not paste API
 keys, private customer data, or raw signed webhook payloads into this record.
@@ -1159,12 +1174,144 @@ keys, private customer data, or raw signed webhook payloads into this record.
        closed with correlated call/event IDs, readable runtime events, and no
        API key, signature, private reasoning, or raw provider response.
 
-Result: [ ] Pass [ ] Fail
+Result: Not run - superseded by the hosted-assistant architecture decision.
 
 - Telnyx test number: `<masked number>`
 - Connection ID: `<masked ID>`
 - Tested project/action/task: `<project and published versions>`
 - Correlated call/session IDs: `<masked IDs>`
+- Defects/evidence: `<none or links>`
+- Tester/date: `<name/date>`
+
+## 18.9 Provider-Neutral Hosted Voice Contract
+
+- [x] An immutable `VoiceAgentDefinitionV1` contains only provider-neutral
+      policy, greeting, locale, published task/tool references, confirmation,
+      identity, handoff, retention, and required capabilities.
+- [x] Telnyx assistant, model, voice, transcription, tool, credential, URL, and
+      payload details remain outside the canonical definition.
+- [x] Deterministic normalization produces the same content hash for the same
+      definition.
+- [x] A hosted-provider contract covers capability validation, compile, draft
+      deployment, inspection, promotion, and deactivation.
+- [x] The same fixture compiles through Telnyx and a fake second provider.
+- [x] Missing required capabilities block compilation without silent fallback.
+- [x] Focused contract tests, TypeScript, and lint pass.
+
+Result: [x] Engineering gate passed [ ] Fail
+
+Manual staging result: Not applicable to this contract-only milestone.
+
+- Automated evidence: `npm run test:channel-certification` - 247 passed.
+- TypeScript: `npm run typecheck` - passed.
+- Focused lint: passed for the hosted voice contract, Telnyx compiler, test, and
+  contract-suite configuration.
+- Completed: 2026-08-24.
+
+## 18.10 Telnyx AI Assistant Deployment And Drift
+
+- [ ] Lia creates or updates a non-main Telnyx Assistant candidate and stores
+      the remote assistant/version IDs plus local and observed managed hashes.
+- [ ] A pre-publish inspection detects remote changes and blocks stale writes.
+- [ ] Drift requires an explicit import, overwrite-after-confirmation, or cancel
+      decision; automatic merge is not allowed.
+- [ ] Promotion is a separate audited action and rollback references a verified
+      prior version.
+- [ ] Credentials remain encrypted/write-only and never enter deployment
+      snapshots, diagnostics, errors, or audit metadata.
+- [ ] A post-deploy fetch proves the managed remote fields match Lia's hash.
+
+Result: [ ] Engineering gate passed [ ] Fail
+
+Manual staging result: Pending a restricted staging Telnyx API key.
+
+## 18.11 Provider-Neutral Voice Tool Gateway
+
+- [ ] Provider authentication normalizes into one canonical tool-call envelope.
+- [ ] An opaque deployment binding resolves project and allowed tool server-side;
+      model-supplied tenant, project, operation, or calendar IDs are rejected.
+- [ ] Typed input/output, tenant scope, safe errors, and deterministic provider
+      tool-call idempotency are enforced.
+- [ ] Read calls support a bounded synchronous path; writes expose provider-
+      neutral prepare and commit semantics.
+- [ ] A commit token is expiring, single-use, and bound to project, deployment,
+      tool, and canonical input.
+- [ ] Telnyx and the fake provider pass the same gateway conformance tests.
+
+Result: [ ] Engineering gate passed [ ] Fail
+
+Manual staging result: Pending 18.10.
+
+## 18.12 Verified Google Calendar Appointment Operations
+
+- [ ] Lia calls Google Calendar directly with encrypted project-scoped
+      credentials; the supplied Flask connector remains reference behavior only.
+- [ ] Availability uses live free/busy data and configured timezone, hours,
+      duration, and scheduling horizon.
+- [ ] Past, weekend, closed-hour, and overlapping slots are never returned.
+- [ ] Appointment lookup requires configured identity factors and returns opaque
+      references instead of Google event IDs.
+- [ ] Booking, reschedule, and cancel use prepare, explicit caller confirmation,
+      and commit with recheck and remote verification.
+- [ ] Duplicate commits execute once; two callers cannot both receive verified
+      success for one slot.
+- [ ] A possible write timeout becomes `outcome_unknown` and reconciles before
+      retry; diagnostics exclude secrets, raw Google responses, and unnecessary
+      patient data.
+
+Result: [ ] Engineering gate passed [ ] Fail
+
+Manual staging result: Pending a dedicated test calendar and credential.
+
+## 18.13 Native Call UX, Async Completion, And Observability
+
+- [ ] Ordinary speech turns make zero Lia model/runtime calls; Telnyx owns STT,
+      model response, TTS, barge-in, transfer, and hangup.
+- [ ] Fast tools remain synchronous; measured slow work returns `pending` and
+      resumes through provider-native continuation without claiming success.
+- [ ] Interrupting a read may cancel it; interrupting a committed write cannot
+      duplicate or silently cancel it.
+- [ ] Truthful caller wording is tested for `success`, `conflict`, `not_found`,
+      `ambiguous`, `pending`, `outcome_unknown`, and `provider_unavailable`.
+- [ ] Post-call synchronization records provider/version, tool outcome,
+      P50/P95/P99 latency, interruption, transfer, and cost inputs under the
+      approved retention policy.
+
+Result: [ ] Engineering gate passed [ ] Fail
+
+Manual staging result: Pending 18.10-18.12.
+
+## 18.14 Live Telnyx Hosted Assistant Staging UAT
+
+Use a dedicated test number, calendar, and transfer destination. Do not use real
+patient data or paste credentials or raw provider payloads into this record.
+
+1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
+       the staging number or approved test callers to it.
+2. [ ] Confirm greeting, ordinary conversation, interruption, transfer, and
+       hangup remain Telnyx-native with no Lia turn processing.
+3. [ ] Complete availability, booking, find, reschedule, and cancel through Lia
+       tools; confirm every spoken success matches a verified operation result.
+4. [ ] Prove explicit confirmation precedes commit and duplicate delivery creates
+       one appointment.
+5. [ ] Race two calls for one slot and confirm exactly one receives success.
+6. [ ] Exercise fast, pending, provider-failure, and post-write unknown outcomes;
+       confirm the caller may continue while async work is pending.
+7. [ ] Change a Lia-managed field directly in Telnyx and confirm drift blocks an
+       accidental overwrite.
+8. [ ] Promote the tested version, then roll back to the recorded prior version.
+9. [ ] Confirm diagnostics contain correlated safe evidence with no credentials,
+       raw provider payloads, private reasoning, or prohibited patient data.
+10. [ ] Record normal-turn and tool P50/P95/P99 latency, actual call cost, and
+        estimated cost per verified booking against the approved release targets.
+
+Result: [ ] Pass [ ] Fail
+
+- Telnyx test number: `<masked number>`
+- Assistant/candidate/main version IDs: `<masked IDs>`
+- Tested Lia voice version and tools: `<versions>`
+- Correlated call/conversation IDs: `<masked IDs>`
+- Latency/cost evidence: `<metrics or links>`
 - Defects/evidence: `<none or links>`
 - Tester/date: `<name/date>`
 
