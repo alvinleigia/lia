@@ -129,6 +129,13 @@ export function StructuredTurnTest({
     toast.success("Conversation reset.");
   }
 
+  const hasResettableConversation =
+    history.length > 0 ||
+    result !== null ||
+    message.trim().length > 0 ||
+    error !== null ||
+    stage !== "knowledge";
+
   const proposal = result?.execution.proposal;
   const turnBadgeLabel =
     proposal?.safety.decision === "refuse"
@@ -234,7 +241,7 @@ export function StructuredTurnTest({
             type="button"
             variant="outline"
             onClick={resetTest}
-            disabled={pending}
+            disabled={pending || !hasResettableConversation}
           >
             <RefreshCw className="h-4 w-4" />
             Reset Conversation
