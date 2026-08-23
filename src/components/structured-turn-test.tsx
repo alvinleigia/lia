@@ -2,6 +2,7 @@
 
 import { Bot, CircleAlert, RefreshCw, Send, ShieldCheck } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -125,9 +126,18 @@ export function StructuredTurnTest({
     setMessage("");
     setResult(null);
     setStage("knowledge");
+    toast.success("Conversation reset.");
   }
 
   const proposal = result?.execution.proposal;
+  const turnBadgeLabel =
+    proposal?.safety.decision === "refuse"
+      ? "safety refusal"
+      : proposal?.safety.decision === "clarify"
+        ? "safety clarification"
+        : proposal?.safety.decision === "handoff"
+          ? "safety handoff"
+          : proposal?.turnKind.replaceAll("_", " ");
   const recommendedTask = tasks.find(
     ({ id }) => id === proposal?.taskRecommendation?.taskId,
   );
@@ -245,7 +255,7 @@ export function StructuredTurnTest({
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge>{proposal.turnKind.replaceAll("_", " ")}</Badge>
+              <Badge>{turnBadgeLabel}</Badge>
               <Badge variant="outline">
                 Next: {proposal.nextAction.replaceAll("_", " ")}
               </Badge>
