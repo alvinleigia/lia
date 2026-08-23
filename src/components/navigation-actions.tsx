@@ -18,6 +18,7 @@ import {
   Menu,
   MessageSquare,
   MoreHorizontal,
+  PhoneCall,
   PlugZap,
   Plus,
   ScanSearch,
@@ -90,6 +91,11 @@ const projectNavigationGroups: NavigationItem[][] = [
       href: "/projects/channels/whatsapp",
       icon: Smartphone,
       label: "WhatsApp",
+    },
+    {
+      href: "/projects/channels/telnyx",
+      icon: PhoneCall,
+      label: "Telnyx Voice",
     },
     {
       href: "/projects/answer-tests",

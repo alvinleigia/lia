@@ -248,6 +248,15 @@ function readTelnyxPublicKey(value: string): KeyObject {
   });
 }
 
+export function isValidTelnyxVoicePublicKey(value: string) {
+  try {
+    readTelnyxPublicKey(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function verifyTelnyxWebhookSignature(input: {
   nowSeconds?: number;
   publicKey: string;

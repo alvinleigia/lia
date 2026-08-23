@@ -6,6 +6,7 @@ import {
 } from "../../src/lib/channel-adapter-contract";
 import { normalizeChannelInboundV1 } from "../../src/lib/channel-inbound-contract";
 import type { SelectProjectChannel } from "../../src/lib/db-schema";
+import { encryptSecretValue } from "../../src/lib/encrypted-secrets";
 import {
   createChoiceReply,
   createHandoffReply,
@@ -15,6 +16,8 @@ import { createTelnyxVoiceChannelAdapter } from "../../src/lib/telnyx-voice";
 import {
   buildTelnyxAnswerBody,
   getTelnyxFinalTranscript,
+  isValidTelnyxVoicePublicKey,
+  normalizeTelnyxVoiceConfig,
   sendTelnyxVoiceCommand,
   telnyxVoiceWebhookSchema,
   verifyTelnyxWebhookSignature,
@@ -187,6 +190,11 @@ test("Telnyx webhook signatures reject stale and tampered payloads", () => {
   const publicKeyPem = publicKey
     .export({ format: "pem", type: "spki" })
     .toString();
+  const publicKeyBase64 = publicKey.export({ format: "jwk" }).x;
+
+  expect(isValidTelnyxVoicePublicKey(publicKeyPem)).toBe(true);
+  expect(isValidTelnyxVoicePublicKey(publicKeyBase64 ?? "")).toBe(true);
+  expect(isValidTelnyxVoicePublicKey("not-a-public-key")).toBe(false);
 
   expect(
     verifyTelnyxWebhookSignature({
@@ -215,6 +223,15 @@ test("Telnyx webhook signatures reject stale and tampered payloads", () => {
       timestamp,
     }),
   ).toBe(false);
+});
+
+test("Telnyx configuration decrypts stored API credentials without exposing the envelope", () => {
+  const encryptedApiKey = encryptSecretValue("telnyx-secret");
+  const config = normalizeTelnyxVoiceConfig({ apiKey: encryptedApiKey });
+
+  expect(encryptedApiKey).not.toEqual("telnyx-secret");
+  expect(JSON.stringify(encryptedApiKey)).not.toContain("telnyx-secret");
+  expect(config.apiKey).toBe("telnyx-secret");
 });
 
 test("Telnyx webhook parsing accepts call events and only returns final speech", () => {

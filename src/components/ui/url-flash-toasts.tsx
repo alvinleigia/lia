@@ -135,6 +135,11 @@ const FLASH_RULES: FlashRule[] = [
     message: "Test message sent through WhatsApp Cloud API.",
   },
   {
+    path: "/projects/channels/telnyx",
+    param: "updated",
+    message: "Telnyx Voice settings saved.",
+  },
+  {
     path: "/projects/documents",
     param: "deleted",
     message: "Document deleted.",

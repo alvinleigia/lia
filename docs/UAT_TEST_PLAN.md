@@ -22,7 +22,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Engineering in progress | Implement the Telnyx Voice AI adapter and verified webhook runtime; live Telnyx UAT has not started. |
+| 18 - Telnyx and extensions | Engineering in progress | Configure a staging Telnyx Voice API application, run live call UAT, and finish the extension-boundary proofs. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -1045,7 +1045,7 @@ Manual staging result: Not applicable to this contract-only milestone.
 
 Result: [x] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending project configuration UI and live Telnyx setup.
+Manual staging result: Pending live Telnyx setup.
 
 ## 18.4 Telnyx Verified Webhook And Call Control
 
@@ -1065,7 +1065,26 @@ Manual staging result: Pending project configuration UI and live Telnyx setup.
 
 Result: [x] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending project configuration UI and live Telnyx setup.
+Manual staging result: Pending live Telnyx setup.
+
+## 18.5 Telnyx Project Configuration
+
+- [x] Authorized project managers can open `Projects` > `Telnyx Voice` and save
+      project-scoped Voice API, speech, and transfer settings.
+- [x] Enabling the channel requires a connection ID, API key, and valid
+      Ed25519 public key; validation failures remain inside the form and retain
+      the entered values.
+- [x] The API key is write-only, encrypted before persistence, and preserved
+      when the field is left blank on a later save.
+- [x] Audit metadata records status and configuration booleans without the API
+      key, public-key content, greeting, phone number, or transfer destination.
+- [x] The page displays the project webhook URL and exposes navigation and a
+      success notification without adding a provider-specific database table.
+- [x] TypeScript, focused lint, and all 235 channel contract tests pass.
+
+Result: [x] Engineering gate passed [ ] Fail
+
+Manual staging result: Pending live Telnyx account and inbound-call setup.
 
 # Final Release Record
 

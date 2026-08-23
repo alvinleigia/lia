@@ -120,6 +120,11 @@ a separately defined breaking contract is introduced.
   final non-empty transcripts into the shared runtime. API credentials are
   encrypted in project channel configuration, used only in authorization
   headers, and excluded from provider error messages and persisted deliveries.
+- `src/app/projects/channels/telnyx` is the authorized project configuration
+  surface. The API key is write-only in the form and encrypted before storage;
+  leaving it blank preserves the existing credential. Activation requires a
+  connection ID, API key, and valid Ed25519 public key. Audit metadata records
+  only configuration booleans, channel status, and project-owned identifiers.
 
 Contract versions are explicit. Backward-compatible additions may extend a V1
 schema only when existing consumers continue to validate and behave the same.
