@@ -217,6 +217,27 @@ export function recordChannelOutboundMessage(
   });
 }
 
+export async function mergeChannelMessagePayload(input: {
+  messageId: number;
+  payload: Record<string, unknown>;
+  projectId: number;
+}) {
+  const [message] = await db
+    .update(channelMessages)
+    .set({
+      payload: sql`${channelMessages.payload} || ${JSON.stringify(input.payload)}::jsonb`,
+    })
+    .where(
+      and(
+        eq(channelMessages.projectId, input.projectId),
+        eq(channelMessages.id, input.messageId),
+      ),
+    )
+    .returning();
+
+  return message ?? null;
+}
+
 export async function getChannelConversation(input: {
   projectId: number;
   channelType: ChannelType;

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { and, eq, inArray } from "drizzle-orm";
+import type { ChannelType } from "../../src/lib/channels";
 import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
@@ -29,6 +30,7 @@ import {
   channelConversations,
   channelMessages,
   companies,
+  conversationalTaskAuditEvents,
   conversationalTasks,
   conversationalTaskVersions,
   conversationExecutionStates,
@@ -161,12 +163,15 @@ async function createPublishedTask(input: {
   return { task, version };
 }
 
-async function startReadyRun(taskId: number) {
+async function startReadyRun(
+  taskId: number,
+  channelType: ChannelType = "project_chat",
+) {
   if (!fixture) throw new Error("The operation fixture is not ready.");
   const [conversation] = await db
     .insert(channelConversations)
     .values({
-      channelType: "project_chat",
+      channelType,
       externalConversationId: `operation-runtime-${suffix}-${conversationIds.length}`,
       projectId: fixture.projectId,
     })
@@ -177,7 +182,7 @@ async function startReadyRun(taskId: number) {
     anonymousVisitorId: `visitor-${conversation.id}`,
     authenticatedUserId: null,
     channelIdentity: { browserSession: `operation-${conversation.id}` },
-    channelType: "project_chat",
+    channelType,
     conversationId: conversation.id,
     eventId: `start-${conversation.id}`,
     identityKind: "anonymous",
@@ -213,7 +218,7 @@ async function startReadyRun(taskId: number) {
       },
     ],
     channelIdentity: { browserSession: `operation-${conversation.id}` },
-    channelType: "project_chat",
+    channelType,
     conversationId: conversation.id,
     correction: false,
     eventId: `fields-${conversation.id}`,
@@ -659,6 +664,91 @@ test("requires explicit confirmation and invalidates it after correction", async
   });
   expect(refreshed.canonicalHash).not.toBe(pending.canonicalHash);
   expect(refreshed.status).toBe("pending");
+});
+
+test("runs one authorized project operation from Telnyx task state", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const run = await startReadyRun(fixture.manualTaskId, "telnyx_voice");
+  const pending = await prepareTaskOperationConfirmation({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+    toolId: fixture.manualToolId,
+  });
+
+  await expect(
+    executeConfirmedTaskOperation({
+      confirmationId: pending.id,
+      principal,
+      projectId: fixture.projectId,
+      taskRunId: run.taskRunId,
+    }),
+  ).rejects.toThrow("Confirm the current summary");
+  await confirmTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  await executeConfirmedTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  const executed = await processAndReconcileTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    workerId: `phase18-telnyx-tool-${suffix}`,
+  });
+  const [conversation] = await db
+    .select({ channelType: channelConversations.channelType })
+    .from(channelConversations)
+    .where(
+      and(
+        eq(channelConversations.projectId, fixture.projectId),
+        eq(channelConversations.id, run.conversationId),
+      ),
+    )
+    .limit(1);
+
+  expect(conversation?.channelType).toBe("telnyx_voice");
+  expect(executed.attempt).toMatchObject({
+    projectId: fixture.projectId,
+    status: "completed",
+    taskConfirmationId: pending.id,
+  });
+  expect(
+    await getTaskOperationAttempt({
+      confirmationId: pending.id,
+      projectId: fixture.otherProjectId,
+    }),
+  ).toBeNull();
+  const runtime = await getConversationalTaskRuntime({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  expect(runtime?.tools[0]).toMatchObject({
+    result: { mode: "manual_review" },
+    status: "success",
+  });
+  const auditEvents = await db
+    .select({ eventType: conversationalTaskAuditEvents.eventType })
+    .from(conversationalTaskAuditEvents)
+    .where(
+      and(
+        eq(conversationalTaskAuditEvents.projectId, fixture.projectId),
+        eq(conversationalTaskAuditEvents.taskRunId, run.taskRunId),
+      ),
+    );
+  expect(auditEvents.map(({ eventType }) => eventType)).toEqual(
+    expect.arrayContaining([
+      "confirmation.prepared",
+      "confirmation.confirmed",
+      "operation.queued",
+      "operation.completed",
+    ]),
+  );
 });
 
 test("queues one durable attempt and completes from sanitized mapped output", async () => {

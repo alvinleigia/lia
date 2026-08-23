@@ -3,6 +3,7 @@ import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import { processChannelFlowText } from "@/lib/channel-flow-runtime";
 import {
   getChannelConversation,
+  mergeChannelMessagePayload,
   recordChannelInboundMessage,
   recordChannelOutboundMessage,
   updateChannelConversationStatus,
@@ -15,13 +16,14 @@ import {
   TELNYX_VOICE_FLOW_SOURCE,
 } from "@/lib/telnyx-voice";
 import {
-  buildTelnyxAnswerBody,
   getActiveTelnyxVoiceChannelByConnectionId,
   getTelnyxFinalTranscript,
-  hasTelnyxSpeech,
+  getTelnyxVoiceLifecycleCommand,
   normalizeTelnyxVoiceConfig,
   sendTelnyxVoiceCommand,
   sendTelnyxVoiceDelivery,
+  shouldCloseTelnyxConversation,
+  shouldInterruptTelnyxSpeech,
   type TelnyxVoiceWebhook,
   telnyxVoiceWebhookSchema,
   verifyTelnyxWebhookSignature,
@@ -99,11 +101,15 @@ async function handleFinalTranscript(input: {
       confidence: payload.transcription_data?.confidence ?? null,
       normalizedInbound,
       occurredAt: event.data.occurred_at,
+      processingStatus: "received",
     },
     projectId: channel.projectId,
     text,
   });
-  if (inboundRecord.duplicate) {
+  if (
+    inboundRecord.duplicate &&
+    inboundRecord.message.payload.processingStatus === "completed"
+  ) {
     return { duplicate: true, replies: 0 };
   }
 
@@ -176,7 +182,13 @@ async function handleFinalTranscript(input: {
     });
   }
 
-  return { duplicate: false, replies: replies.length };
+  await mergeChannelMessagePayload({
+    messageId: inboundRecord.message.id,
+    payload: { processingStatus: "completed", replyCount: replies.length },
+    projectId: channel.projectId,
+  });
+
+  return { duplicate: inboundRecord.duplicate, replies: replies.length };
 }
 
 export async function POST(req: Request) {
@@ -220,7 +232,12 @@ export async function POST(req: Request) {
       externalConversationId: payload.call_session_id,
       projectId: channel.projectId,
     });
-    if (hasTelnyxSpeech(event) && conversation?.metadata.telnyxSpeaking) {
+    if (
+      shouldInterruptTelnyxSpeech({
+        event,
+        isSpeaking: conversation?.metadata.telnyxSpeaking === true,
+      })
+    ) {
       await sendTelnyxVoiceCommand({
         action: "playback_stop",
         body: { command_id: `${event.data.id}:interrupt` },
@@ -245,32 +262,17 @@ export async function POST(req: Request) {
     event,
     projectId: channel.projectId,
   });
-  if (lifecycle.duplicate) {
-    return NextResponse.json({ duplicate: true, ok: true });
+  const lifecycleCommand = getTelnyxVoiceLifecycleCommand({ config, event });
+  if (lifecycleCommand) {
+    await sendTelnyxVoiceCommand({
+      action: lifecycleCommand.action,
+      body: lifecycleCommand.body,
+      callControlId: payload.call_control_id,
+      channel,
+    });
   }
-
-  if (eventType === "call.initiated" && payload.direction === "incoming") {
-    await sendTelnyxVoiceCommand({
-      action: "answer",
-      body: buildTelnyxAnswerBody({
-        commandId: `${event.data.id}:answer`,
-        config,
-      }),
-      callControlId: payload.call_control_id,
-      channel,
-    });
-  } else if (eventType === "call.answered" && config.greeting) {
-    const commandId = `${event.data.id}:greeting`;
-    await sendTelnyxVoiceCommand({
-      action: "speak",
-      body: {
-        command_id: commandId,
-        payload: config.greeting,
-        voice: config.voice,
-      },
-      callControlId: payload.call_control_id,
-      channel,
-    });
+  if (lifecycleCommand?.action === "speak") {
+    const commandId = String(lifecycleCommand.body.command_id);
     await recordChannelOutboundMessage({
       channelType: "telnyx_voice",
       externalConversationId: payload.call_session_id,
@@ -283,7 +285,8 @@ export async function POST(req: Request) {
       projectId: channel.projectId,
       text: config.greeting,
     });
-  } else if (eventType === "call.hangup") {
+  }
+  if (shouldCloseTelnyxConversation(event)) {
     await updateChannelConversationStatus({
       channelType: "telnyx_voice",
       externalConversationId: payload.call_session_id,
@@ -294,6 +297,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     eventType,
+    duplicate: lifecycle.duplicate,
     ok: true,
     recorded: true,
   });

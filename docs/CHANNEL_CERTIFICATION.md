@@ -221,6 +221,13 @@ It verifies:
 - Telnyx webhooks reject missing, stale, or tampered signatures; final speech,
   call-control configuration, credential placement, and retryable delivery
   errors pass the provider-boundary contract tests.
+- Telnyx lifecycle planning covers answer, greeting, speech interruption,
+  cancellation delivery, transfer handoff, and hangup closure. Incomplete final
+  transcript processing can resume on a provider retry without reinterpreting a
+  completed turn.
+- Database runtime certification completes one immutable task contract across
+  all four persisted channels and executes one confirmed, project-scoped
+  operation from Telnyx state without bypassing the operation attempt ledger.
 
 Run the full automated release gate before UAT sign-off:
 
@@ -271,3 +278,14 @@ domain, browser, or device. Record these checks in Phase 14 of
 
 Automated certification passing means the release candidate is ready for live
 UAT. It does not by itself mean the release is approved.
+
+For Phase 18 Telnyx sign-off, also record:
+
+- Voice API application ownership, number assignment, connection ID, and
+  verified webhook delivery on staging.
+- Audible greeting, final-transcript turns, and interruption of active speech.
+- One shared task cancellation and one approved handoff transfer.
+- One confirmed project operation and its project-scoped attempt/diagnostic
+  record, with no credential or raw provider response exposed.
+- Remote hangup closes the channel conversation and a later new call starts a
+  separate active conversation.

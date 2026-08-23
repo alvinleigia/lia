@@ -22,7 +22,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Engineering in progress | Configure a staging Telnyx Voice API application, run live call UAT, and finish the extension-boundary proofs. |
+| 18 - Telnyx and extensions | Engineering complete; UAT pending | Configure a staging Telnyx Voice API application and complete the live-call checklist. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -1107,6 +1107,66 @@ Manual staging result: Pending live Telnyx account and inbound-call setup.
 Result: [x] Engineering gate passed [ ] Fail
 
 Manual staging result: Not applicable to this contract-only milestone.
+
+## 18.7 Telnyx Lifecycle And Shared State
+
+- [x] Incoming calls plan deterministic answer and greeting commands; outgoing
+      initiation does not trigger the inbound answer path.
+- [x] Speech during active playback plans a deterministic playback stop, while
+      only final non-empty transcripts enter the shared runtime.
+- [x] Duplicate lifecycle events reuse deterministic provider command IDs, and
+      incomplete transcript processing remains retryable until marked complete.
+- [x] Task cancellation becomes native speech, approved handoff becomes a
+      transfer, and provider hangup closes the universal conversation.
+- [x] One published booking task reaches the same field state and outcome over
+      project chat, widget, WhatsApp, and Telnyx without a task/flow migration.
+- [x] A Telnyx task run cannot execute a write operation before confirmation;
+      after confirmation it records one project-scoped attempt and rejects a
+      cross-project read.
+- [x] A custom model remains behind the unchanged structured-turn/task contract.
+- [x] All 240 channel contract tests and 29 focused database runtime tests pass.
+
+Result: [x] Engineering gate passed [ ] Fail
+
+Manual staging result: Pending live Telnyx account and inbound-call setup.
+
+## 18.8 Live Telnyx Staging UAT
+
+Use a dedicated test number and non-production destination. Do not paste API
+keys, private customer data, or raw signed webhook payloads into this record.
+
+1. [ ] Open `Projects` > `Telnyx Voice`, save the staging connection ID, assigned
+       test number, webhook public key, API key, greeting, voice, and an approved
+       test handoff destination. Enable the channel.
+2. [ ] Configure the displayed callback URL on the staging Telnyx Voice API
+       application and confirm a signed inbound `call.initiated` webhook returns
+       success.
+3. [ ] Call the test number. Confirm Lia answers once and speaks the configured
+       greeting once even if Telnyx retries the lifecycle event.
+4. [ ] Speak one normal question and confirm only the final transcript produces
+       a response. Speak while Lia is talking and confirm playback stops before
+       Lia processes the new final turn.
+5. [ ] Complete one published test task, then start another call and cancel the
+       task. Confirm the spoken cancellation and verify the two calls do not
+       share active task state.
+6. [ ] Trigger a write tool/action. Confirm it does not execute before the spoken
+       confirmation, executes once after confirmation, and records a
+       project-scoped operation attempt without credentials or raw provider data.
+7. [ ] Trigger human handoff and confirm transfer reaches only the configured
+       test destination. Clear the destination and confirm the same handoff uses
+       readable speech instead of an unapproved transfer.
+8. [ ] Hang up and confirm Conversation Diagnostics shows the Telnyx conversation
+       closed with correlated call/event IDs, readable runtime events, and no
+       API key, signature, private reasoning, or raw provider response.
+
+Result: [ ] Pass [ ] Fail
+
+- Telnyx test number: `<masked number>`
+- Connection ID: `<masked ID>`
+- Tested project/action/task: `<project and published versions>`
+- Correlated call/session IDs: `<masked IDs>`
+- Defects/evidence: `<none or links>`
+- Tester/date: `<name/date>`
 
 # Final Release Record
 

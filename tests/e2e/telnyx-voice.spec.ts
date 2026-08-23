@@ -10,15 +10,22 @@ import { encryptSecretValue } from "../../src/lib/encrypted-secrets";
 import {
   createChoiceReply,
   createHandoffReply,
+  createTaskRuntimeReply,
   createTextReply,
 } from "../../src/lib/runtime-replies";
-import { createTelnyxVoiceChannelAdapter } from "../../src/lib/telnyx-voice";
+import {
+  createTelnyxVoiceChannelAdapter,
+  createTelnyxVoiceChannelPlugin,
+} from "../../src/lib/telnyx-voice";
 import {
   buildTelnyxAnswerBody,
   getTelnyxFinalTranscript,
+  getTelnyxVoiceLifecycleCommand,
   isValidTelnyxVoicePublicKey,
   normalizeTelnyxVoiceConfig,
   sendTelnyxVoiceCommand,
+  shouldCloseTelnyxConversation,
+  shouldInterruptTelnyxSpeech,
   telnyxVoiceWebhookSchema,
   verifyTelnyxWebhookSignature,
 } from "../../src/lib/telnyx-voice-provider";
@@ -45,6 +52,7 @@ const channel = {
 } satisfies SelectProjectChannel;
 
 function createWebhook(overrides?: {
+  direction?: string;
   eventType?: string;
   isFinal?: boolean;
   transcript?: string;
@@ -59,7 +67,7 @@ function createWebhook(overrides?: {
         call_leg_id: "call-leg-1",
         call_session_id: "call-session-1",
         connection_id: "connection-1",
-        direction: "incoming",
+        direction: overrides?.direction ?? "incoming",
         from: "+15550000001",
         to: "+15550000002",
         transcription_data: {
@@ -273,6 +281,95 @@ test("Telnyx answer commands enable transcription with deterministic metadata", 
       transcription_engine: "Telnyx",
       transcription_model: "distil-whisper",
     },
+  });
+});
+
+test("Telnyx lifecycle plans answer, greeting, interruption, and termination deterministically", () => {
+  const config = {
+    apiKey: "secret",
+    connectionId: "connection-1",
+    greeting: "Hello",
+    language: "en",
+    phoneNumber: "+15550000002",
+    publicKey: "public-key",
+    transcriptionEngine: "Telnyx" as const,
+    transcriptionModel: "",
+    transferDestination: "+15550000003",
+    voice: "Telnyx.NaturalHD.astra",
+  };
+  const incoming = telnyxVoiceWebhookSchema.parse(
+    createWebhook({ eventType: "call.initiated" }),
+  );
+  const outgoing = telnyxVoiceWebhookSchema.parse(
+    createWebhook({ direction: "outgoing", eventType: "call.initiated" }),
+  );
+  const answered = telnyxVoiceWebhookSchema.parse(
+    createWebhook({ eventType: "call.answered" }),
+  );
+  const transcription = telnyxVoiceWebhookSchema.parse(createWebhook());
+  const hangup = telnyxVoiceWebhookSchema.parse(
+    createWebhook({ eventType: "call.hangup" }),
+  );
+
+  expect(
+    getTelnyxVoiceLifecycleCommand({ config, event: incoming }),
+  ).toMatchObject({
+    action: "answer",
+    body: { command_id: "event-1:answer", transcription: true },
+  });
+  expect(
+    getTelnyxVoiceLifecycleCommand({ config, event: outgoing }),
+  ).toBeNull();
+  expect(getTelnyxVoiceLifecycleCommand({ config, event: answered })).toEqual({
+    action: "speak",
+    body: {
+      command_id: "event-1:greeting",
+      payload: "Hello",
+      voice: "Telnyx.NaturalHD.astra",
+    },
+  });
+  expect(
+    shouldInterruptTelnyxSpeech({ event: transcription, isSpeaking: true }),
+  ).toBe(true);
+  expect(
+    shouldInterruptTelnyxSpeech({ event: transcription, isSpeaking: false }),
+  ).toBe(false);
+  expect(shouldCloseTelnyxConversation(hangup)).toBe(true);
+  expect(shouldCloseTelnyxConversation(answered)).toBe(false);
+});
+
+test("Telnyx speaks task cancellation and transfers handoff from the same reply contract", () => {
+  const plugin = createTelnyxVoiceChannelPlugin();
+  const cancellation = plugin.outbound.adaptReply({
+    context,
+    reply: createTaskRuntimeReply({
+      nextAction: "cancel",
+      text: "No problem. I cancelled this request.",
+    }),
+  });
+  const handoff = plugin.outbound.adaptReply({
+    context,
+    reply: createTaskRuntimeReply({
+      nextAction: "handoff",
+      text: "A team member will continue.",
+    }),
+  });
+
+  expect(cancellation).toMatchObject({
+    delivery: {
+      action: "speak",
+      body: { payload: "No problem. I cancelled this request." },
+    },
+    mode: "native",
+    source: { intent: "outcome", type: "text" },
+  });
+  expect(handoff).toMatchObject({
+    delivery: {
+      action: "transfer",
+      body: { to: "+15551234567" },
+    },
+    mode: "native",
+    source: { intent: "handoff", type: "handoff" },
   });
 });
 

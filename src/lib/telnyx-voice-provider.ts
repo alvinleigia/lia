@@ -306,6 +306,17 @@ export function hasTelnyxSpeech(event: TelnyxVoiceWebhook) {
   return Boolean(event.data.payload.transcription_data?.transcript.trim());
 }
 
+export function shouldInterruptTelnyxSpeech(input: {
+  event: TelnyxVoiceWebhook;
+  isSpeaking: boolean;
+}) {
+  return (
+    input.event.data.event_type === "call.transcription" &&
+    input.isSpeaking &&
+    hasTelnyxSpeech(input.event)
+  );
+}
+
 type TelnyxCallAction =
   | "answer"
   | "hangup"
@@ -363,6 +374,41 @@ export function buildTelnyxAnswerBody(input: {
         : {}),
     },
   };
+}
+
+export function getTelnyxVoiceLifecycleCommand(input: {
+  config: Required<TelnyxVoiceChannelConfig>;
+  event: TelnyxVoiceWebhook;
+}) {
+  const { event, config } = input;
+  if (
+    event.data.event_type === "call.initiated" &&
+    event.data.payload.direction === "incoming"
+  ) {
+    return {
+      action: "answer" as const,
+      body: buildTelnyxAnswerBody({
+        commandId: `${event.data.id}:answer`,
+        config,
+      }),
+    };
+  }
+  if (event.data.event_type === "call.answered" && config.greeting) {
+    return {
+      action: "speak" as const,
+      body: {
+        command_id: `${event.data.id}:greeting`,
+        payload: config.greeting,
+        voice: config.voice,
+      },
+    };
+  }
+
+  return null;
+}
+
+export function shouldCloseTelnyxConversation(event: TelnyxVoiceWebhook) {
+  return event.data.event_type === "call.hangup";
 }
 
 export function sendTelnyxVoiceDelivery(input: {

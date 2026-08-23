@@ -530,7 +530,12 @@ test("lists scoped catalog choices for channel input controls", async () => {
 });
 
 test("certifies identical booking fields and outcomes across live channel types", async () => {
-  const channels: ChannelType[] = ["project_chat", "widget", "whatsapp"];
+  const channels: ChannelType[] = [
+    "project_chat",
+    "widget",
+    "whatsapp",
+    "telnyx_voice",
+  ];
 
   const results = await Promise.all(
     channels.map(async (channelType, channelIndex) => {
@@ -697,7 +702,7 @@ test("certifies identical booking fields and outcomes across live channel types"
     }),
   );
 
-  expect(results).toHaveLength(3);
+  expect(results).toHaveLength(4);
   expect(results[0]).toMatchObject({
     outcomeKey: "completed",
     status: "completed",

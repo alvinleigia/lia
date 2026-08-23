@@ -93,9 +93,8 @@ immutable baseline and audited post-baseline comparison are complete: model
 rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 0.00%, and the evaluation gate passed 5/5 cases with zero safety failures.
 
-Current target: validate Telnyx lifecycle behavior and the remaining persistence,
-model, and tool authorization proofs before live staging UAT. The Telnyx channel
-implementation and reusable plugin boundaries are complete.
+Current target: complete live Telnyx staging UAT. All Phase 18 engineering,
+shared-runtime, persistence, model, and tool authorization proofs are complete.
 
 ### Phase Tracking Snapshot
 
@@ -109,7 +108,7 @@ implementation and reusable plugin boundaries are complete.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Telnyx engineering implementation and reusable channel/model/tool plugin boundaries complete; 5 implementation items remain unchecked | Engineering in progress; live Telnyx UAT has not started | Telnyx lifecycle, persistence, and authorization proofs plus live UAT. |
+| 18 | Engineering complete; 1 certification item remains unchecked | Live Telnyx UAT has not started | Configure the staging Voice API application and complete the live-call checklist. |
 
 ## Product Direction
 
@@ -1295,12 +1294,12 @@ implementation.
 - [x] Define plugin boundaries for inbound normalization and outbound delivery.
 - [x] Define plugin boundaries for capability declarations and readable fallbacks.
 - [x] Define plugin boundaries for encrypted credentials and tool authorization.
-- [ ] Validate the Telnyx inbound-call lifecycle, speech turns, interruptions,
+- [x] Validate the Telnyx inbound-call lifecycle, speech turns, interruptions,
   cancellation, handoff, call termination, and existing action/tool execution
   over the same task state.
-- [ ] Confirm a new channel can be added without changing task or flow persistence.
-- [ ] Confirm a new model can be added without changing business task contracts.
-- [ ] Confirm a new business tool cannot bypass tenant, validation, confirmation, or audit boundaries.
+- [x] Confirm a new channel can be added without changing task or flow persistence.
+- [x] Confirm a new model can be added without changing business task contracts.
+- [x] Confirm a new business tool cannot bypass tenant, validation, confirmation, or audit boundaries.
 
 Phase 18 contract-reference milestone completed on 2026-08-21. The existing
 channel-certification guide now identifies the supported task, reply, tool,
@@ -1360,6 +1359,20 @@ remain owned by `ChannelAdapterProfile`; provider configuration moves sensitive
 keys into encrypted server-only references; and business tools remain declarative
 operation bindings whose inputs and outputs pass the existing authorization and
 validation runtime. All 238 channel and extension contract tests passed.
+
+The Phase 18 lifecycle and shared-state milestone completed on 2026-08-23.
+Deterministic lifecycle planning now covers inbound answer, greeting speech,
+barge-in playback stop, final-transcript handling, and hangup closure. Duplicate
+lifecycle deliveries replay only deterministic provider command IDs, while a
+transcript message is marked complete only after shared-runtime processing and
+delivery finish, allowing an incomplete provider retry to resume safely. Task
+cancellation remains a spoken runtime outcome and handoff remains an approved
+transfer. Database-backed certification completes the same published booking
+state across project chat, widget, WhatsApp, and Telnyx, then proves that a
+Telnyx-owned run cannot execute a project operation before confirmation or read
+the attempt through another project. All 240 contract tests and 29 focused
+database runtime tests passed. Engineering is complete; the Telnyx implementation
+checkbox remains open until the live staging checklist passes.
 
 Initial Telnyx scope: inbound Voice AI conversations, verified webhooks and
 call lifecycle, real-time speech turns, interruption handling, existing Lia
