@@ -23,6 +23,7 @@ export default defineConfig({
     "flow-message-editor.spec.ts",
     "hybrid-flow.spec.ts",
     "media-storage-contract.spec.ts",
+    "model-tool-conformance.spec.ts",
     "phase17-analytics.spec.ts",
     "runtime-action-experiments.spec.ts",
     "runtime-stage-timing.spec.ts",

@@ -127,6 +127,25 @@ verifies that an adapter:
 New adapters must add their factory and provider-delivery reader to this
 conformance pattern before they are added to the certification matrix.
 
+### Model and business-tool conformance
+
+`tests/e2e/model-tool-conformance.spec.ts` proves that extension providers stay
+behind the existing public contracts:
+
+- a `StructuredTurnProvider` receives bounded provider-neutral input and
+  returns only a proposal plus usage metadata;
+- the server rejects provider output that names fields or actions outside the
+  immutable published task;
+- business-tool input is rebuilt from canonical server state and rejects
+  mismatched or undeclared proposed values;
+- tool output retains only declared typed paths and approved result mappings;
+  and
+- provider URLs and credential material do not survive parsing into a
+  published `ToolDefinitionV1`.
+
+New model providers and business-tool adapters must pass equivalent fixtures
+before they are selected by runtime configuration.
+
 ## Automated Evidence
 
 Run the fast gate during development:
@@ -148,6 +167,8 @@ It verifies:
 - Tenant-scope, TypeScript, lint, and cron checks pass.
 - Third-party adapter profiles and deliveries conform to the public adapter
   boundary.
+- Model providers remain proposal-only, and business tools preserve canonical
+  input, typed output, and secret-free published contracts.
 
 Run the full automated release gate before UAT sign-off:
 

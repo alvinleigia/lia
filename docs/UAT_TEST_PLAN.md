@@ -22,7 +22,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Engineering in progress | Add model-provider and business-tool conformance tests; live Telnyx UAT has not started. |
+| 18 - Telnyx and extensions | Engineering in progress | Implement the Telnyx Voice AI adapter and verified webhook runtime; live Telnyx UAT has not started. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -1010,6 +1010,22 @@ reach staging.
       explicit native and readable-fallback declarations.
 - [x] Delivery failures preserve runtime semantics and explicit retryability.
 - [x] `npm run test:channel-certification` passes all 219 contract tests.
+
+Result: [x] Engineering gate passed [ ] Fail
+
+Manual staging result: Not applicable to this contract-only milestone.
+
+## 18.2 Model Provider And Business Tool Conformance
+
+- [x] A custom structured-turn provider receives bounded provider-neutral
+      input and reports usage through the shared result contract.
+- [x] Provider proposals outside the published task allowlist are rejected and
+      fall back deterministically.
+- [x] Business-tool input is rebuilt from canonical server state and rejects
+      mismatched or undeclared values.
+- [x] Business-tool output keeps only declared typed paths and approved
+      mappings; provider URLs and credential material do not persist.
+- [x] `npm run test:channel-certification` passes all 224 contract tests.
 
 Result: [x] Engineering gate passed [ ] Fail
 

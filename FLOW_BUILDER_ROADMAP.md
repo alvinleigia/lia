@@ -93,8 +93,8 @@ immutable baseline and audited post-baseline comparison are complete: model
 rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 0.00%, and the evaluation gate passed 5/5 cases with zero safety failures.
 
-Current target: continue Phase 18 with conformance tests for model providers
-and business tools. Third-party channel adapter conformance is complete.
+Current target: implement and certify Telnyx Voice AI as the first real
+non-WhatsApp external channel. Extension conformance tests are complete.
 
 ### Phase Tracking Snapshot
 
@@ -108,7 +108,7 @@ and business tools. Third-party channel adapter conformance is complete.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Future-adapter foundation, public contract reference, and third-party channel adapter conformance complete; 9 implementation items remain unchecked | Engineering in progress; live Telnyx UAT has not started | Model and tool conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
+| 18 | Future-adapter foundation, public contract reference, and channel/model/tool conformance complete; 8 implementation items remain unchecked | Engineering in progress; live Telnyx UAT has not started | Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
 
@@ -1288,7 +1288,7 @@ implementation.
 - [x] The reference future adapter consumes the current universal runtime envelope.
 - [x] Document the public conversational task, reply, tool, operation, and Phase 12 / Flow Builder V2 adapter contracts in `docs/CHANNEL_CERTIFICATION.md`.
 - [x] Add conformance tests for third-party channel adapters.
-- [ ] Add conformance tests for model providers and business tools.
+- [x] Add conformance tests for model providers and business tools.
 - [ ] Implement and certify Telnyx Voice AI as the first real non-WhatsApp
   external channel.
 - [ ] Define plugin boundaries for inbound normalization and outbound delivery.
@@ -1312,6 +1312,13 @@ and readable-fallback modes, preserves source replies and correlation, and
 requires semantic-preserving delivery errors. All 219 channel contract tests
 passed. Phase 17A staging UAT passed on 2026-08-23, and no Telnyx runtime
 implementation has started.
+
+Phase 18 model and business-tool conformance completed on 2026-08-23. A custom
+structured-turn provider now proves bounded provider-neutral requests, usage
+reporting, and server rejection of identifiers outside the published task.
+Operation-backed tool fixtures prove canonical server input, typed output
+allowlists and mappings, and removal of provider URLs and credential material
+from published contracts. All 224 channel and extension contract tests passed.
 
 Initial Telnyx scope: inbound Voice AI conversations, verified webhooks and
 call lifecycle, real-time speech turns, interruption handling, existing Lia
