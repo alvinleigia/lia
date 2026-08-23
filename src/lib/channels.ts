@@ -327,3 +327,27 @@ export async function markChannelConversationForReview(input: {
 
   return updatedConversation ?? null;
 }
+
+export async function updateChannelConversationStatus(input: {
+  channelType: ChannelType;
+  externalConversationId: string;
+  projectId: number;
+  status: ChannelConversationStatus;
+}) {
+  const [conversation] = await db
+    .update(channelConversations)
+    .set({ status: input.status, updatedAt: new Date() })
+    .where(
+      and(
+        eq(channelConversations.projectId, input.projectId),
+        eq(channelConversations.channelType, input.channelType),
+        eq(
+          channelConversations.externalConversationId,
+          input.externalConversationId,
+        ),
+      ),
+    )
+    .returning();
+
+  return conversation ?? null;
+}

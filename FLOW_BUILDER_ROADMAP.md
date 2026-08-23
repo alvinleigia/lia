@@ -93,8 +93,9 @@ immutable baseline and audited post-baseline comparison are complete: model
 rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 0.00%, and the evaluation gate passed 5/5 cases with zero safety failures.
 
-Current target: complete the verified Telnyx Voice webhook and shared-runtime
-delivery path. The Telnyx channel contract and adapter are complete.
+Current target: add project-owned Telnyx Voice configuration and staging setup.
+The Telnyx channel contract, verified webhook, and shared-runtime delivery path
+are complete.
 
 ### Phase Tracking Snapshot
 
@@ -1326,9 +1327,20 @@ V1 inbound contract, task/model policy accepts the voice channel, and the
 adapter speaks text, converts rich replies to readable speech, and converts a
 handoff to a transfer only when a destination is configured. Telnyx carries the
 same source reply, correlation, call identifiers, and deterministic command ID.
-All 229 channel and extension contract tests passed. Verified webhook handling,
-call control, project configuration, and live provider UAT remain in progress,
-so the Telnyx implementation checkbox remains open.
+All 229 channel and extension contract tests passed. Project configuration and
+live provider UAT remain in progress, so the Telnyx implementation checkbox
+remains open.
+
+The Phase 18 Telnyx webhook-runtime milestone completed on 2026-08-23. The
+provider route validates the event envelope, resolves an active project channel,
+verifies the Ed25519 signature and five-minute replay window, records lifecycle
+events idempotently, and sends deterministic answer, speech, interruption, and
+transfer commands. Only final non-empty transcripts enter the shared Lia task
+runtime; hangup closes the universal channel conversation. Provider credentials
+remain encrypted at rest and are sent only in Telnyx authorization headers, and
+provider error bodies do not cross the delivery boundary. All 234 channel and
+extension contract tests passed. Project settings and live provider UAT remain
+in progress.
 
 Initial Telnyx scope: inbound Voice AI conversations, verified webhooks and
 call lifecycle, real-time speech turns, interruption handling, existing Lia

@@ -30,7 +30,7 @@ transport can preserve correlation, reply capability, text, fallback text,
 structured payload, and envelope version through the public adapter contract.
 Telnyx Voice is stored through the existing channel tables and participates in
 the automated matrix, but it does not become a certified production channel
-until verified webhooks, call control, and live UAT pass.
+until verified-webhook and call-control automation plus live UAT pass.
 
 ## Public Extension Contracts
 
@@ -112,6 +112,14 @@ a separately defined breaking contract is introduced.
   transcripts enter as universal text input; text replies use native speech,
   rich replies use readable speech fallback, and handoff uses transfer only
   when the project has an approved destination.
+- `src/lib/telnyx-voice-provider.ts` and
+  `src/app/api/telnyx/voice/webhook/route.ts` form the server-owned provider
+  boundary. The route validates the provider envelope and Ed25519 signature
+  before accepting a call event. It stores provider lifecycle IDs for
+  idempotency, sends deterministic call-control command IDs, and forwards only
+  final non-empty transcripts into the shared runtime. API credentials are
+  encrypted in project channel configuration, used only in authorization
+  headers, and excluded from provider error messages and persisted deliveries.
 
 Contract versions are explicit. Backward-compatible additions may extend a V1
 schema only when existing consumers continue to validate and behave the same.
@@ -181,6 +189,9 @@ It verifies:
   boundary.
 - Model providers remain proposal-only, and business tools preserve canonical
   input, typed output, and secret-free published contracts.
+- Telnyx webhooks reject missing, stale, or tampered signatures; final speech,
+  call-control configuration, credential placement, and retryable delivery
+  errors pass the provider-boundary contract tests.
 
 Run the full automated release gate before UAT sign-off:
 

@@ -1045,7 +1045,27 @@ Manual staging result: Not applicable to this contract-only milestone.
 
 Result: [x] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending the verified webhook and call-control runtime.
+Manual staging result: Pending project configuration UI and live Telnyx setup.
+
+## 18.4 Telnyx Verified Webhook And Call Control
+
+- [x] The webhook rejects invalid JSON, invalid event envelopes, missing or
+      stale signatures, and payloads changed after signing.
+- [x] Active project channels are resolved by the provider connection ID before
+      a signed event can affect runtime state.
+- [x] Incoming calls use deterministic answer commands with transcription
+      enabled, and answered calls use deterministic greeting speech commands.
+- [x] Partial speech can stop active playback, while only final non-empty
+      transcripts enter the shared task and hybrid-flow runtime.
+- [x] Lifecycle events and transcript turns retain provider event IDs for
+      idempotency; hangup closes the universal channel conversation.
+- [x] API credentials remain encrypted at rest, appear only in provider
+      authorization headers, and cannot leak through delivery errors.
+- [x] `npm run test:channel-certification` passes all 234 contract tests.
+
+Result: [x] Engineering gate passed [ ] Fail
+
+Manual staging result: Pending project configuration UI and live Telnyx setup.
 
 # Final Release Record
 
