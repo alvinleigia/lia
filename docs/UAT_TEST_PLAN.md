@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18 is next and not started
+- Current staging milestone: Phase 17A passed; Phase 18 engineering is in progress
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -22,7 +22,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Not started | Start after Phase 17A; the Phase 17A exit gate passed on 2026-08-23. |
+| 18 - Telnyx and extensions | Engineering in progress | Add model-provider and business-tool conformance tests; live Telnyx UAT has not started. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -997,6 +997,24 @@ Result: [x] Pass [ ] Fail
   or secrets were visible.
 - Tester/date: `Single tester / release owner / 2026-08-23`
 
+# Phase 18 - Telnyx And Extensions
+
+Phase 18 engineering started after the Phase 17A release gate passed. Live
+Telnyx UAT begins only after the provider adapter and verified webhook runtime
+reach staging.
+
+## 18.1 Third-Party Channel Adapter Conformance
+
+- [x] The reference future adapter passes the reusable conformance pattern.
+- [x] A custom channel type outside Lia's built-in channel union passes with
+      explicit native and readable-fallback declarations.
+- [x] Delivery failures preserve runtime semantics and explicit retryability.
+- [x] `npm run test:channel-certification` passes all 219 contract tests.
+
+Result: [x] Engineering gate passed [ ] Fail
+
+Manual staging result: Not applicable to this contract-only milestone.
+
 # Final Release Record
 
 - Phase 14: [x] Pass [ ] Fail
@@ -1004,7 +1022,7 @@ Result: [x] Pass [ ] Fail
 - Phase 16: [x] Pass [ ] Fail [ ] In progress
 - Phase 17: [x] Pass [ ] Fail [ ] In progress
 - Phase 17A: [x] Pass [ ] Fail [ ] In progress
-- Phase 18: [ ] Pass [ ] Fail [ ] In progress [x] Not started
+- Phase 18: [ ] Pass [ ] Fail [x] In progress [ ] Not started
 - Critical defects open: `0`
 - High defects open: `0`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).

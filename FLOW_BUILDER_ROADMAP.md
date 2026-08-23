@@ -93,8 +93,8 @@ immutable baseline and audited post-baseline comparison are complete: model
 rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 0.00%, and the evaluation gate passed 5/5 cases with zero safety failures.
 
-Current target: begin Phase 18 Telnyx Voice AI and extension implementation
-against the completed Phase 17A efficiency and safety gate.
+Current target: continue Phase 18 with conformance tests for model providers
+and business tools. Third-party channel adapter conformance is complete.
 
 ### Phase Tracking Snapshot
 
@@ -108,7 +108,7 @@ against the completed Phase 17A efficiency and safety gate.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Future-adapter foundation and public contract reference complete; 10 implementation items remain unchecked | Not started; Phase 17A release gate passed on 2026-08-23 | Conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
+| 18 | Future-adapter foundation, public contract reference, and third-party channel adapter conformance complete; 9 implementation items remain unchecked | Engineering in progress; live Telnyx UAT has not started | Model and tool conformance tests, Telnyx Voice AI, plugin boundaries, and extension proofs. |
 
 ## Product Direction
 
@@ -1287,7 +1287,7 @@ implementation.
 
 - [x] The reference future adapter consumes the current universal runtime envelope.
 - [x] Document the public conversational task, reply, tool, operation, and Phase 12 / Flow Builder V2 adapter contracts in `docs/CHANNEL_CERTIFICATION.md`.
-- [ ] Add conformance tests for third-party channel adapters.
+- [x] Add conformance tests for third-party channel adapters.
 - [ ] Add conformance tests for model providers and business tools.
 - [ ] Implement and certify Telnyx Voice AI as the first real non-WhatsApp
   external channel.
@@ -1305,8 +1305,13 @@ Phase 18 contract-reference milestone completed on 2026-08-21. The existing
 channel-certification guide now identifies the supported task, reply, tool,
 operation, inbound, and adapter surfaces; distinguishes the Flow Builder V2
 adapter milestone from the current V1 wire schemas; and records the server-only
-security boundary. All 213 channel contract tests passed. Phase 17A staging UAT
-passed on 2026-08-23, and no Telnyx runtime implementation has started.
+security boundary. Phase 18 channel-adapter conformance completed on 2026-08-23.
+The contract suite now exercises every reply capability through both the
+reference implementation and a custom channel type, verifies declared native
+and readable-fallback modes, preserves source replies and correlation, and
+requires semantic-preserving delivery errors. All 219 channel contract tests
+passed. Phase 17A staging UAT passed on 2026-08-23, and no Telnyx runtime
+implementation has started.
 
 Initial Telnyx scope: inbound Voice AI conversations, verified webhooks and
 call lifecycle, real-time speech turns, interruption handling, existing Lia

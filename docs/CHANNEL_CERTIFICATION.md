@@ -108,6 +108,25 @@ A breaking field, meaning, or lifecycle change requires a new exported version
 and an explicit compatibility path; provider-specific data stays behind its
 adapter rather than changing these universal contracts.
 
+### Third-party adapter conformance
+
+`tests/e2e/channel-adapter-conformance.spec.ts` is the executable contract for
+a channel type that is not part of Lia's built-in `ChannelType` union. It
+verifies that an adapter:
+
+- declares all public reply capabilities, inbound support, and finite or
+  unbounded provider limits;
+- accepts every `RuntimeReplyV1` capability without mutating the source reply;
+- returns only a delivery mode allowed by its declared support;
+- preserves correlation, visitor-facing text, readable fallback text, and the
+  V1 envelope version in its provider delivery;
+- reports non-empty fallback warnings; and
+- throws `ChannelDeliveryError` when delivery fails so runtime semantics remain
+  unchanged and retryability stays explicit.
+
+New adapters must add their factory and provider-delivery reader to this
+conformance pattern before they are added to the certification matrix.
+
 ## Automated Evidence
 
 Run the fast gate during development:
@@ -127,6 +146,8 @@ It verifies:
   provider requirements and limits.
 - Unsupported rich messages retain readable text fallbacks.
 - Tenant-scope, TypeScript, lint, and cron checks pass.
+- Third-party adapter profiles and deliveries conform to the public adapter
+  boundary.
 
 Run the full automated release gate before UAT sign-off:
 

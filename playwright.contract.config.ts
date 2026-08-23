@@ -7,6 +7,7 @@ export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: [
     "catalog-resource-dependencies.spec.ts",
+    "channel-adapter-conformance.spec.ts",
     "channel-adapter.spec.ts",
     "channel-certification.spec.ts",
     "conversation-control-intents.spec.ts",
