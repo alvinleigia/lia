@@ -7,6 +7,12 @@ import {
   CHANNEL_REPLY_CAPABILITIES,
   getRuntimeReplyCapability,
 } from "@/lib/channel-adapter-contract";
+import {
+  type ChannelInboundProductV1,
+  type ChannelInboundSelectionInputV1,
+  normalizeChannelInboundV1,
+} from "@/lib/channel-inbound-contract";
+import type { ChannelPluginContract } from "@/lib/channel-plugin-contract";
 
 export const REFERENCE_CHANNEL_TYPE = "reference_future" as const;
 
@@ -17,6 +23,14 @@ export type ReferenceChannelDelivery = {
   payload: Record<string, unknown> | null;
   schemaVersion: 1;
   text: string;
+};
+
+export type ReferenceChannelInbound = {
+  location?: Record<string, unknown> | null;
+  media?: Record<string, unknown> | null;
+  products?: ChannelInboundProductV1[];
+  selection?: ChannelInboundSelectionInputV1 | null;
+  text?: string | null;
 };
 
 const referenceReplySupport = Object.fromEntries(
@@ -61,5 +75,23 @@ export function createReferenceChannelAdapter() {
     { correlationId: string },
     ReferenceChannelDelivery,
     typeof REFERENCE_CHANNEL_TYPE
+  >;
+}
+
+export function createReferenceChannelPlugin() {
+  return {
+    channelType: REFERENCE_CHANNEL_TYPE,
+    normalizeInbound(input) {
+      return normalizeChannelInboundV1({
+        ...input,
+        channelType: REFERENCE_CHANNEL_TYPE,
+      });
+    },
+    outbound: createReferenceChannelAdapter(),
+  } satisfies ChannelPluginContract<
+    typeof REFERENCE_CHANNEL_TYPE,
+    ReferenceChannelInbound,
+    { correlationId: string },
+    ReferenceChannelDelivery
   >;
 }

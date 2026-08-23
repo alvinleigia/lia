@@ -1086,6 +1086,28 @@ Result: [x] Engineering gate passed [ ] Fail
 
 Manual staging result: Pending live Telnyx account and inbound-call setup.
 
+## 18.6 Reusable Plugin Boundaries
+
+- [x] `ChannelPluginContract` composes one provider inbound normalizer and one
+      outbound reply adapter without exposing task mutation or persistence.
+- [x] A channel name outside Lia's persisted union normalizes text and stable
+      selections through the universal V1 inbound envelope.
+- [x] Telnyx uses the same plugin contract for final-transcript normalization
+      and runtime-reply delivery.
+- [x] Capability and provider-limit declarations remain complete, while every
+      non-native delivery retains readable fallback text.
+- [x] Channel credentials stay in server-owned transport configuration, and
+      sensitive operation-provider keys become encrypted references before
+      ordinary configuration persistence.
+- [x] Tool extensions remain declarative operation bindings; canonical input,
+      project ownership, typed output, confirmation, attempt, and audit rules
+      remain server-controlled.
+- [x] TypeScript, focused lint, and all 238 channel contract tests pass.
+
+Result: [x] Engineering gate passed [ ] Fail
+
+Manual staging result: Not applicable to this contract-only milestone.
+
 # Final Release Record
 
 - Phase 14: [x] Pass [ ] Fail

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import { processChannelFlowText } from "@/lib/channel-flow-runtime";
-import { normalizeChannelInboundV1 } from "@/lib/channel-inbound-contract";
 import {
   getChannelConversation,
   recordChannelInboundMessage,
@@ -12,7 +11,7 @@ import type { SelectProjectChannel } from "@/lib/db-schema";
 import { resolveTraceId } from "@/lib/execution-trace";
 import { runHybridChannelFlowBoundary } from "@/lib/hybrid-channel-runtime";
 import {
-  createTelnyxVoiceChannelAdapter,
+  createTelnyxVoiceChannelPlugin,
   TELNYX_VOICE_FLOW_SOURCE,
 } from "@/lib/telnyx-voice";
 import {
@@ -84,10 +83,8 @@ async function handleFinalTranscript(input: {
 }) {
   const { channel, event, text } = input;
   const payload = event.data.payload;
-  const normalizedInbound = normalizeChannelInboundV1({
-    channelType: "telnyx_voice",
-    text,
-  });
+  const plugin = createTelnyxVoiceChannelPlugin();
+  const normalizedInbound = plugin.normalizeInbound({ transcript: text });
   const inboundRecord = await recordChannelInboundMessage({
     channelType: "telnyx_voice",
     externalConversationId: payload.call_session_id,
@@ -144,11 +141,10 @@ async function handleFinalTranscript(input: {
     : { replies: [] };
   const replies = [...result.replies, ...hybrid.replies];
   const config = normalizeTelnyxVoiceConfig(channel.config);
-  const adapter = createTelnyxVoiceChannelAdapter();
 
   for (const [index, reply] of replies.entries()) {
     const commandId = `${event.data.id}:reply:${index + 1}`;
-    const adapted = adapter.adaptReply({
+    const adapted = plugin.outbound.adaptReply({
       context: {
         callControlId: payload.call_control_id,
         callSessionId: payload.call_session_id,

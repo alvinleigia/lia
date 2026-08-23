@@ -4,6 +4,8 @@ import {
   getChannelAdapterProfile,
   getRuntimeReplyCapability,
 } from "@/lib/channel-adapter-contract";
+import { normalizeChannelInboundV1 } from "@/lib/channel-inbound-contract";
+import type { ChannelPluginContract } from "@/lib/channel-plugin-contract";
 import type { RuntimeReply } from "@/lib/runtime-replies";
 
 export const TELNYX_VOICE_CHANNEL_TYPE = "telnyx_voice" as const;
@@ -99,5 +101,23 @@ export function createTelnyxVoiceChannelAdapter() {
     TelnyxVoiceAdapterContext,
     TelnyxVoiceDelivery,
     typeof TELNYX_VOICE_CHANNEL_TYPE
+  >;
+}
+
+export function createTelnyxVoiceChannelPlugin() {
+  return {
+    channelType: TELNYX_VOICE_CHANNEL_TYPE,
+    normalizeInbound(input) {
+      return normalizeChannelInboundV1({
+        channelType: TELNYX_VOICE_CHANNEL_TYPE,
+        text: input.transcript,
+      });
+    },
+    outbound: createTelnyxVoiceChannelAdapter(),
+  } satisfies ChannelPluginContract<
+    typeof TELNYX_VOICE_CHANNEL_TYPE,
+    { transcript: string },
+    TelnyxVoiceAdapterContext,
+    TelnyxVoiceDelivery
   >;
 }

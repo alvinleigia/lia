@@ -35,8 +35,10 @@ export type ChannelInboundProductV1 = {
   retailerId: string;
 };
 
-export type NormalizedChannelInboundV1 = {
-  channelType: ChannelType;
+export type NormalizedChannelInboundV1<
+  TChannelType extends string = ChannelType,
+> = {
+  channelType: TChannelType;
   kind: ChannelInboundKind;
   location: Record<string, unknown> | null;
   media: Record<string, unknown> | null;
@@ -58,14 +60,16 @@ function getStableResource(value: string) {
   };
 }
 
-export function normalizeChannelInboundV1(input: {
-  channelType: ChannelType;
+export function normalizeChannelInboundV1<
+  TChannelType extends string = ChannelType,
+>(input: {
+  channelType: TChannelType;
   location?: Record<string, unknown> | null;
   media?: Record<string, unknown> | null;
   products?: ChannelInboundProductV1[];
   selection?: ChannelInboundSelectionInputV1 | null;
   text?: string | null;
-}): NormalizedChannelInboundV1 {
+}): NormalizedChannelInboundV1<TChannelType> {
   const selection = input.selection
     ? {
         ...input.selection,
@@ -96,7 +100,7 @@ export function normalizeChannelInboundV1(input: {
 }
 
 export function getNormalizedChannelInboundRuntimeValue(
-  inbound: NormalizedChannelInboundV1,
+  inbound: NormalizedChannelInboundV1<string>,
 ) {
   if (inbound.selection) {
     return inbound.selection.value;

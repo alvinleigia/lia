@@ -98,6 +98,11 @@ a separately defined breaking contract is introduced.
 - `src/lib/channel-inbound-contract.ts` owns
   `NormalizedChannelInboundV1` and `normalizeChannelInboundV1` for text,
   selections, media, location, and product selections.
+- `src/lib/channel-plugin-contract.ts` composes one provider inbound normalizer
+  and one outbound `ChannelReplyAdapter`. Its channel name is generic, so a
+  third-party adapter can normalize input without joining Lia's persisted
+  `ChannelType` union. It deliberately has no credential, database, task-state,
+  model, or tool-execution member.
 - `src/lib/channel-adapter-contract.ts` owns `ChannelAdapterProfile`,
   `ChannelReplyAdapter`, `AdaptedChannelReply`, declared native/fallback
   support, and provider limits.
@@ -169,6 +174,25 @@ behind the existing public contracts:
 
 New model providers and business-tool adapters must pass equivalent fixtures
 before they are selected by runtime configuration.
+
+### Credentials and tool authorization
+
+- Channel plugins receive provider events and runtime replies, never stored
+  credentials. Server-owned transport code resolves the project channel and
+  decrypts only the credential required for the authorized provider call.
+- Operation-provider configuration passes through
+  `prepareProviderConfig` in `src/lib/provider-secrets.ts`. Sensitive keys such
+  as tokens, API keys, authorization headers, passwords, and private keys become
+  encrypted project/provider-owned references before ordinary configuration is
+  persisted.
+- A business-tool extension supplies a published `ToolDefinitionV1` operation
+  binding, not an arbitrary executable callback. The server rebuilds canonical
+  input, verifies project and task-version ownership, enforces stage and
+  confirmation rules, executes the project-owned operation, validates typed
+  output, applies only approved mappings, and records the attempt and audit
+  trail.
+- These server authorization paths are not overridable members of
+  `ChannelPluginContract`, `StructuredTurnProvider`, or `ToolDefinitionV1`.
 
 ## Automated Evidence
 

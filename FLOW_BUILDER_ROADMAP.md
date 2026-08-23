@@ -93,9 +93,9 @@ immutable baseline and audited post-baseline comparison are complete: model
 rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 0.00%, and the evaluation gate passed 5/5 cases with zero safety failures.
 
-Current target: run live Telnyx staging UAT and complete the remaining plugin
-boundary proofs. The Telnyx channel contract, verified webhook, shared-runtime
-delivery path, and project-owned settings are complete.
+Current target: validate Telnyx lifecycle behavior and the remaining persistence,
+model, and tool authorization proofs before live staging UAT. The Telnyx channel
+implementation and reusable plugin boundaries are complete.
 
 ### Phase Tracking Snapshot
 
@@ -109,7 +109,7 @@ delivery path, and project-owned settings are complete.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Future-adapter foundation, public contract reference, and channel/model/tool conformance complete; 8 implementation items remain unchecked | Engineering in progress; live Telnyx UAT has not started | Telnyx Voice AI, plugin boundaries, and extension proofs. |
+| 18 | Telnyx engineering implementation and reusable channel/model/tool plugin boundaries complete; 5 implementation items remain unchecked | Engineering in progress; live Telnyx UAT has not started | Telnyx lifecycle, persistence, and authorization proofs plus live UAT. |
 
 ## Product Direction
 
@@ -1292,9 +1292,9 @@ implementation.
 - [x] Add conformance tests for model providers and business tools.
 - [ ] Implement and certify Telnyx Voice AI as the first real non-WhatsApp
   external channel.
-- [ ] Define plugin boundaries for inbound normalization and outbound delivery.
-- [ ] Define plugin boundaries for capability declarations and readable fallbacks.
-- [ ] Define plugin boundaries for encrypted credentials and tool authorization.
+- [x] Define plugin boundaries for inbound normalization and outbound delivery.
+- [x] Define plugin boundaries for capability declarations and readable fallbacks.
+- [x] Define plugin boundaries for encrypted credentials and tool authorization.
 - [ ] Validate the Telnyx inbound-call lifecycle, speech turns, interruptions,
   cancellation, handoff, call termination, and existing action/tool execution
   over the same task state.
@@ -1349,6 +1349,17 @@ write-only field is blank, and records a secret-free audit event. The navigation
 and success notification now expose the channel setup page. Automated contract
 coverage also proves that stored API-key envelopes do not contain plaintext and
 decrypt only at the provider boundary. Live Telnyx staging UAT remains pending.
+
+The Phase 18 plugin-boundary milestone completed on 2026-08-23.
+`ChannelPluginContract` now composes a provider-specific inbound normalizer with
+the existing outbound reply adapter, while the universal inbound V1 envelope is
+generic enough for third-party channel names outside Lia's persisted channel
+union. The reference and Telnyx plugins prove this boundary without receiving
+credentials or runtime state. Capability declarations and readable fallbacks
+remain owned by `ChannelAdapterProfile`; provider configuration moves sensitive
+keys into encrypted server-only references; and business tools remain declarative
+operation bindings whose inputs and outputs pass the existing authorization and
+validation runtime. All 238 channel and extension contract tests passed.
 
 Initial Telnyx scope: inbound Voice AI conversations, verified webhooks and
 call lifecycle, real-time speech turns, interruption handling, existing Lia

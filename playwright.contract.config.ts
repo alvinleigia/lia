@@ -10,6 +10,7 @@ export default defineConfig({
     "channel-adapter-conformance.spec.ts",
     "channel-adapter.spec.ts",
     "channel-certification.spec.ts",
+    "channel-plugin-boundaries.spec.ts",
     "conversation-control-intents.spec.ts",
     "conversation-diagnostics.spec.ts",
     "conversation-turn-contracts.spec.ts",
