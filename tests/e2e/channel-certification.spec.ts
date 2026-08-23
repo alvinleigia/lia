@@ -104,7 +104,12 @@ test("production provider limitations stay explicit and tied to runtime constant
     CHANNEL_PROVIDER_RULES.length,
   );
 
-  for (const channel of ["project_chat", "widget", "whatsapp"] as const) {
+  for (const channel of [
+    "project_chat",
+    "widget",
+    "whatsapp",
+    "telnyx_voice",
+  ] as const) {
     expect(listChannelProviderRules(channel).length).toBeGreaterThan(0);
   }
 

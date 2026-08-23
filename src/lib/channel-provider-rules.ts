@@ -90,6 +90,34 @@ export const CHANNEL_PROVIDER_RULES = [
     key: "outbox_max_attempts",
     value: WHATSAPP_OUTBOX_MAX_ATTEMPTS,
   },
+  {
+    behavior:
+      "Every webhook must pass Ed25519 signature verification and a bounded timestamp freshness check before processing.",
+    channel: "telnyx_voice",
+    key: "verified_webhook_signature",
+    value: true,
+  },
+  {
+    behavior:
+      "Only final speech transcripts enter the shared runtime as visitor turns.",
+    channel: "telnyx_voice",
+    key: "final_transcripts_only",
+    value: true,
+  },
+  {
+    behavior:
+      "Rich replies use their readable fallback text for speech delivery.",
+    channel: "telnyx_voice",
+    key: "spoken_readable_fallback",
+    value: true,
+  },
+  {
+    behavior:
+      "Call-control commands carry deterministic command IDs so provider retries cannot duplicate side effects.",
+    channel: "telnyx_voice",
+    key: "idempotent_command_ids",
+    value: true,
+  },
 ] as const satisfies readonly ChannelProviderRule[];
 
 export function listChannelProviderRules(channel: ChannelType) {

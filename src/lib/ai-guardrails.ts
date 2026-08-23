@@ -3,7 +3,11 @@ import {
   type ProjectAiSettings,
 } from "@/lib/project-ai-settings";
 
-type KnowledgeChatChannel = "project_chat" | "widget_chat" | "whatsapp";
+type KnowledgeChatChannel =
+  | "project_chat"
+  | "widget_chat"
+  | "whatsapp"
+  | "telnyx_voice";
 
 type BuildKnowledgeChatSystemPromptInput = {
   channel: KnowledgeChatChannel;
@@ -147,7 +151,9 @@ export function buildKnowledgeChatSystemPrompt({
         ? "website widget"
         : channel === "whatsapp"
           ? "WhatsApp"
-          : "project chat"
+          : channel === "telnyx_voice"
+            ? "voice call"
+            : "project chat"
     }`,
   ].filter(Boolean);
 

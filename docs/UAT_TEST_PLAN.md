@@ -1031,6 +1031,22 @@ Result: [x] Engineering gate passed [ ] Fail
 
 Manual staging result: Not applicable to this contract-only milestone.
 
+## 18.3 Telnyx Voice Channel Contract
+
+- [x] `telnyx_voice` uses the existing universal channel and conversation
+      persistence types without a schema migration.
+- [x] Final speech text normalizes through `NormalizedChannelInboundV1`.
+- [x] Text replies use speech delivery and rich replies retain readable speech
+      fallbacks.
+- [x] Handoff becomes a transfer only when an approved destination is present.
+- [x] Correlation, call identifiers, source reply, and deterministic command ID
+      cross the adapter boundary.
+- [x] `npm run test:channel-certification` passes all 229 contract tests.
+
+Result: [x] Engineering gate passed [ ] Fail
+
+Manual staging result: Pending the verified webhook and call-control runtime.
+
 # Final Release Record
 
 - Phase 14: [x] Pass [ ] Fail

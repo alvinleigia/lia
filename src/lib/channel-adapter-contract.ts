@@ -132,6 +132,28 @@ export const CHANNEL_ADAPTER_PROFILES = {
       text: "native",
     },
   },
+  telnyx_voice: {
+    channelType: "telnyx_voice",
+    inbound: {
+      interactiveSelection: false,
+      location: false,
+      media: false,
+      productSelection: false,
+      text: true,
+    },
+    limits: { buttonOptions: 0, listOptions: 0, productItems: 0 },
+    replies: {
+      buttons: "fallback",
+      catalog_message: "fallback",
+      handoff: "conditional",
+      list: "fallback",
+      media: "fallback",
+      multiple_products: "fallback",
+      single_product: "fallback",
+      template: "fallback",
+      text: "native",
+    },
+  },
 } as const satisfies Record<ChannelType, ChannelAdapterProfile>;
 
 function readProductMode(reply: RuntimeReply) {
@@ -158,7 +180,9 @@ export function getRuntimeReplyCapability(
   return reply.type;
 }
 
-export function getChannelAdapterProfile(channelType: ChannelType) {
+export function getChannelAdapterProfile<TChannelType extends ChannelType>(
+  channelType: TChannelType,
+) {
   return CHANNEL_ADAPTER_PROFILES[channelType];
 }
 

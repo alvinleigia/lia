@@ -7,7 +7,12 @@ import {
   projectChannels,
 } from "@/lib/db-schema";
 
-export const CHANNEL_TYPES = ["project_chat", "widget", "whatsapp"] as const;
+export const CHANNEL_TYPES = [
+  "project_chat",
+  "widget",
+  "whatsapp",
+  "telnyx_voice",
+] as const;
 export const CHANNEL_STATUSES = ["active", "disabled"] as const;
 export const CHANNEL_CONVERSATION_STATUSES = [
   "active",
@@ -51,6 +56,8 @@ export function getChannelTypeForFlowSource(source: string): ChannelType {
   switch (source) {
     case "whatsapp_chat":
       return "whatsapp";
+    case "telnyx_voice":
+      return "telnyx_voice";
     case "widget_chat":
       return "widget";
     default:

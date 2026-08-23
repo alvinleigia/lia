@@ -16,6 +16,10 @@ Production channels:
 - Website widget
 - WhatsApp
 
+Engineering channel pending live certification:
+
+- Telnyx Voice
+
 Contract-only extension target:
 
 - `reference_future`
@@ -24,6 +28,9 @@ The reference adapter is not a production channel. It is not stored in the
 database and has no navigation or customer-facing UI. It proves that a future
 transport can preserve correlation, reply capability, text, fallback text,
 structured payload, and envelope version through the public adapter contract.
+Telnyx Voice is stored through the existing channel tables and participates in
+the automated matrix, but it does not become a certified production channel
+until verified webhooks, call control, and live UAT pass.
 
 ## Public Extension Contracts
 
@@ -101,6 +108,10 @@ a separately defined breaking contract is introduced.
 - `ChannelDeliveryError` must preserve runtime semantics. A delivery failure
   may be retryable, but it must not advance, cancel, resubmit, or reinterpret
   the underlying task or flow.
+- `src/lib/telnyx-voice.ts` is the first real external adapter. Final speech
+  transcripts enter as universal text input; text replies use native speech,
+  rich replies use readable speech fallback, and handoff uses transfer only
+  when the project has an approved destination.
 
 Contract versions are explicit. Backward-compatible additions may extend a V1
 schema only when existing consumers continue to validate and behave the same.
@@ -158,7 +169,8 @@ It verifies:
 
 - Every enabled flow step has one typed certification family.
 - Every enabled step has an explicit project-chat, widget, WhatsApp, and future
-  adapter certification cell.
+  adapter certification cell, with Telnyx Voice tracked as an additional
+  engineering channel.
 - All nine reply capabilities cross the shared adapter boundary.
 - Project Chat and widget preserve equivalent browser deliveries.
 - WhatsApp native buttons, lists, media, templates, and product messages obey

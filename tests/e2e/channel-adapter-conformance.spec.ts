@@ -15,6 +15,7 @@ import {
   createTextReply,
   type RuntimeReplyV1,
 } from "../../src/lib/runtime-replies";
+import { createTelnyxVoiceChannelAdapter } from "../../src/lib/telnyx-voice";
 
 type ConformanceDelivery = {
   correlationId: string;
@@ -95,11 +96,12 @@ function createConformanceReplies(): RuntimeReplyV1[] {
   ];
 }
 
-async function expectChannelAdapterConformance<TDelivery>(input: {
-  adapter: ChannelReplyAdapter<{ correlationId: string }, TDelivery, string>;
+async function expectChannelAdapterConformance<TContext, TDelivery>(input: {
+  adapter: ChannelReplyAdapter<TContext, TDelivery, string>;
+  createContext: (correlationId: string) => TContext;
   readDelivery: (delivery: TDelivery) => ConformanceDelivery;
 }) {
-  const { adapter, readDelivery } = input;
+  const { adapter, createContext, readDelivery } = input;
   const profile = adapter.profile;
   const replies = createConformanceReplies();
 
@@ -121,7 +123,7 @@ async function expectChannelAdapterConformance<TDelivery>(input: {
     const before = structuredClone(reply);
     const correlationId = `conformance-${index + 1}`;
     const adapted = await adapter.adaptReply({
-      context: { correlationId },
+      context: createContext(correlationId),
       reply,
     });
     const capability = getRuntimeReplyCapability(reply);
@@ -153,6 +155,7 @@ async function expectChannelAdapterConformance<TDelivery>(input: {
 test("reference implementation passes the third-party channel adapter contract", async () => {
   await expectChannelAdapterConformance({
     adapter: createReferenceChannelAdapter(),
+    createContext: (correlationId) => ({ correlationId }),
     readDelivery: (delivery) => ({
       correlationId: delivery.correlationId,
       fallbackText: delivery.fallbackText,
@@ -215,7 +218,28 @@ test("a custom adapter can declare readable fallback support without a Lia chann
 
   await expectChannelAdapterConformance({
     adapter,
+    createContext: (correlationId) => ({ correlationId }),
     readDelivery: (delivery) => delivery,
+  });
+});
+
+test("Telnyx Voice passes the shared channel adapter conformance pattern", async () => {
+  await expectChannelAdapterConformance({
+    adapter: createTelnyxVoiceChannelAdapter(),
+    createContext: (correlationId) => ({
+      callControlId: "call-control-1",
+      callSessionId: "call-session-1",
+      commandId: `command-${correlationId}`,
+      correlationId,
+      transferDestination: "+15551234567",
+      voice: "Telnyx.NaturalHD.astra",
+    }),
+    readDelivery: (delivery) => ({
+      correlationId: delivery.correlationId,
+      fallbackText: delivery.fallbackText,
+      schemaVersion: delivery.schemaVersion,
+      text: delivery.text,
+    }),
   });
 });
 

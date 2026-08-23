@@ -28,7 +28,7 @@ type CompileTurnInput = {
   activeTask: ConversationalTaskSnapshotV1 | null;
   assistantBehavior: ProjectAiSettings;
   assistantIntroduced: boolean;
-  channel: "project_chat" | "widget" | "whatsapp";
+  channel: "project_chat" | "widget" | "whatsapp" | "telnyx_voice";
   companyName: string;
   context: TurnContextValueV1[];
   fieldState: TurnFieldStateV1[];

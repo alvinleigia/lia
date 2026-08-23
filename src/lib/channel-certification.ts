@@ -19,6 +19,7 @@ export const CERTIFICATION_CHANNELS = [
   "project_chat",
   "widget",
   "whatsapp",
+  "telnyx_voice",
   "reference_future",
 ] as const;
 
@@ -157,7 +158,9 @@ export function buildInboundCertificationMatrix(): InboundCertificationCell[] {
 function toComponentChannel(
   channel: CertificationChannel,
 ): FlowComponentChannel {
-  return channel === "reference_future" ? "future" : channel;
+  return channel === "reference_future" || channel === "telnyx_voice"
+    ? "future"
+    : channel;
 }
 
 function isTransportFamily(family: FlowCertificationFamily) {

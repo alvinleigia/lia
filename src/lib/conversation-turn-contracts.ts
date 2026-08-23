@@ -182,7 +182,7 @@ export const structuredTurnRequestV1Schema = z
     activeTaskId: z.number().int().positive().nullable().default(null),
     assistantIntroduced: z.boolean().default(false),
     channel: z
-      .enum(["project_chat", "widget", "whatsapp"])
+      .enum(["project_chat", "widget", "whatsapp", "telnyx_voice"])
       .default("project_chat"),
     contactId: z.number().int().positive().nullable().default(null),
     history: z.array(turnMessageV1Schema).max(50).default([]),

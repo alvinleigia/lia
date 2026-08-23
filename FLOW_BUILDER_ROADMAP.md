@@ -93,8 +93,8 @@ immutable baseline and audited post-baseline comparison are complete: model
 rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 0.00%, and the evaluation gate passed 5/5 cases with zero safety failures.
 
-Current target: implement and certify Telnyx Voice AI as the first real
-non-WhatsApp external channel. Extension conformance tests are complete.
+Current target: complete the verified Telnyx Voice webhook and shared-runtime
+delivery path. The Telnyx channel contract and adapter are complete.
 
 ### Phase Tracking Snapshot
 
@@ -1319,6 +1319,16 @@ reporting, and server rejection of identifiers outside the published task.
 Operation-backed tool fixtures prove canonical server input, typed output
 allowlists and mappings, and removal of provider URLs and credential material
 from published contracts. All 224 channel and extension contract tests passed.
+
+The Phase 18 Telnyx channel-contract milestone completed on 2026-08-23. Telnyx
+Voice is now a typed channel, final transcripts normalize through the universal
+V1 inbound contract, task/model policy accepts the voice channel, and the
+adapter speaks text, converts rich replies to readable speech, and converts a
+handoff to a transfer only when a destination is configured. Telnyx carries the
+same source reply, correlation, call identifiers, and deterministic command ID.
+All 229 channel and extension contract tests passed. Verified webhook handling,
+call control, project configuration, and live provider UAT remain in progress,
+so the Telnyx implementation checkbox remains open.
 
 Initial Telnyx scope: inbound Voice AI conversations, verified webhooks and
 call lifecycle, real-time speech turns, interruption handling, existing Lia
