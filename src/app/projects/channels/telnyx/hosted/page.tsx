@@ -172,7 +172,7 @@ export default async function TelnyxHostedVoicePage() {
                   <Input
                     id="transcriptionLanguage"
                     name="transcriptionLanguage"
-                    defaultValue={config?.transcriptionLanguage ?? "en-AU"}
+                    defaultValue={config?.transcriptionLanguage ?? "en"}
                     required
                   />
                 </Field>

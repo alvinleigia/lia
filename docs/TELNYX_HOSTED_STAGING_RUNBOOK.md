@@ -23,6 +23,19 @@ provider console, not through source control:
 Do not continue if the staging origin is not HTTPS, the number receives public
 traffic, or the calendar contains real customer or patient data.
 
+For the first English-language latency baseline, use these provider values:
+
+- Model ID: `moonshotai/Kimi-K2.6`
+- Voice ID: `Telnyx.NaturalHD.astra`
+- Transcription model ID: `deepgram/flux`
+- Transcription language: `en`
+- Estimated cost microunits/minute: `0` during setup; replace it with the
+  observed staging rate before cost sign-off.
+
+Keep the separate Lia voice-definition locale as `en-AU` and timezone as
+`Australia/Sydney`. If Telnyx no longer offers one of these IDs in the Portal,
+stop and select a currently listed native equivalent before publishing.
+
 ## 1. Publish a Lia candidate
 
 1. Deploy the commit containing this runbook and open
