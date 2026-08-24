@@ -21,28 +21,29 @@ export type TelnyxHostedVoiceSettings = z.infer<
   typeof telnyxHostedVoiceSettingsSchema
 >;
 
-export type TelnyxHostedAssistantDraftPlan = {
-  assistant: {
-    enabled_features: ["telephony"];
-    greeting: string;
-    instructions: string;
-    model: string;
-    name: string;
-    transcription: {
-      language: string;
-      model: string;
-    };
-    voice_settings: {
-      voice: string;
-    };
-  };
-  policies: Pick<
-    VoiceAgentDefinitionV1,
-    "confirmation" | "handoff" | "identity" | "retention"
-  >;
-  taskVersionReferences: VoiceAgentDefinitionV1["publishedTaskVersions"];
-  toolReferences: VoiceAgentDefinitionV1["tools"];
-};
+export const telnyxHostedAssistantManagedConfigSchema = z
+  .object({
+    enabled_features: z.array(z.enum(["messaging", "telephony"])),
+    greeting: z.string(),
+    instructions: z.string(),
+    model: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    privacy_settings: z.object({ data_retention: z.boolean() }).strict(),
+    transcription: z
+      .object({
+        language: z.string().trim().min(1),
+        model: z.string().trim().min(1),
+      })
+      .strict(),
+    voice_settings: z.object({ voice: z.string().trim().min(1) }).strict(),
+  })
+  .strict();
+
+export type TelnyxHostedAssistantManagedConfig = z.infer<
+  typeof telnyxHostedAssistantManagedConfigSchema
+>;
+
+export type TelnyxHostedAssistantDraftPlan = TelnyxHostedAssistantManagedConfig;
 
 export const TELNYX_HOSTED_VOICE_PROFILE = {
   provider: TELNYX_HOSTED_VOICE_PROVIDER,
@@ -60,28 +61,21 @@ export function createTelnyxHostedVoiceCompiler(
     profile: TELNYX_HOSTED_VOICE_PROFILE,
     compile({ definition }) {
       return {
-        assistant: {
-          enabled_features: ["telephony"],
-          greeting: compileGreeting(definition),
-          instructions: definition.instructions,
-          model: settings.modelId,
-          name: definition.name,
-          transcription: {
-            language: settings.transcriptionLanguage,
-            model: settings.transcriptionModelId,
-          },
-          voice_settings: {
-            voice: settings.voiceId,
-          },
+        enabled_features: ["telephony"],
+        greeting: compileGreeting(definition),
+        instructions: definition.instructions,
+        model: settings.modelId,
+        name: definition.name,
+        privacy_settings: {
+          data_retention: definition.retention.mode !== "disabled",
         },
-        policies: {
-          confirmation: definition.confirmation,
-          handoff: definition.handoff,
-          identity: definition.identity,
-          retention: definition.retention,
+        transcription: {
+          language: settings.transcriptionLanguage,
+          model: settings.transcriptionModelId,
         },
-        taskVersionReferences: definition.publishedTaskVersions,
-        toolReferences: definition.tools,
+        voice_settings: {
+          voice: settings.voiceId,
+        },
       } satisfies TelnyxHostedAssistantDraftPlan;
     },
   } satisfies HostedVoiceProviderCompiler<TelnyxHostedAssistantDraftPlan>;

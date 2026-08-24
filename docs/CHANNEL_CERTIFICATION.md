@@ -147,14 +147,33 @@ a separately defined breaking contract is introduced.
   adapter must not silently replace or omit required behavior.
 - `src/lib/telnyx-hosted-voice.ts` is the provider-owned compiler boundary for
   Telnyx model, voice, and transcription settings. It produces a deterministic
-  telephony-enabled Assistant draft plan using the current Telnyx greeting,
-  `voice_settings`, and transcription fields, but performs no remote calls and
-  receives no credential in the Phase 18.9 contract milestone.
+  telephony-enabled Assistant managed configuration using the current Telnyx
+  greeting, `voice_settings`, transcription, feature, and privacy fields.
+- `src/lib/telnyx-hosted-voice-adapter.ts` owns current Assistant API calls. It
+  creates a bootstrap main only for a new Assistant, creates Lia changes with
+  `promote_to_main: false`, inspects exact versions, and promotes a version only
+  through the explicit lifecycle action. Idempotency keys are deterministic;
+  the API key is sent only in the authorization header; raw provider bodies are
+  excluded from errors.
+- `src/lib/hosted-voice-deployment.ts` owns provider-neutral inspection,
+  candidate verification, drift decisions, promotion, and rollback.
+  `src/lib/hosted-voice-deployment-store.ts` persists these transitions with
+  project filters, optimistic revisions, immutable version snapshots, and
+  redacted audit metadata. A confirmed overwrite first records the observed
+  remote main as the verified rollback baseline; it never merges remote fields
+  into a Lia definition.
+- `src/lib/telnyx-hosted-voice-provider.ts` registers and resolves the hosted
+  provider through the existing encrypted project-secret store. It is separate
+  from operation providers, so Telnyx deployment credentials cannot be selected
+  as a business-operation executor.
 - `tests/e2e/hosted-voice-contract.spec.ts` proves that provider deployment
   details cannot enter the canonical definition, hashes are stable across
   unordered references, Telnyx and a fake second provider compile the same
   definition hash, missing capabilities block compilation, and remote IDs stay
   outside the definition.
+- `tests/e2e/hosted-voice-deployment.spec.ts` proves non-main creation, exact
+  post-write inspection, secret-safe failures, drift blocking and all three
+  explicit decisions, promotion, rollback, and cross-project rejection.
 
 Contract versions are explicit. Backward-compatible additions may extend a V1
 schema only when existing consumers continue to validate and behave the same.

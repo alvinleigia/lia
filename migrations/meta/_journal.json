@@ -295,6 +295,13 @@
       "when": 1787394600000,
       "tag": "0041_company_time_zone",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1787481000000,
+      "tag": "0042_hosted_voice_deployments",
+      "breakpoints": true
     }
   ]
 }

@@ -93,8 +93,9 @@ immutable baseline and audited post-baseline comparison are complete: model
 rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 0.00%, and the evaluation gate passed 5/5 cases with zero safety failures.
 
-Current target: complete live Telnyx staging UAT. All Phase 18 engineering,
-shared-runtime, persistence, model, and tool authorization proofs are complete.
+Current target: implement the Phase 18.11 provider-neutral voice tool gateway.
+Hosted deployment and drift control are complete; live Telnyx staging UAT stays
+deferred until the remaining hosted engineering milestones pass.
 
 ### Phase Tracking Snapshot
 
@@ -108,7 +109,7 @@ shared-runtime, persistence, model, and tool authorization proofs are complete.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Legacy Programmable Voice engineering complete; hosted milestone 18.9 implemented | Hosted Telnyx live UAT has not started | Implement 18.10 Telnyx AI Assistant deployment and drift control. |
+| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.10 implemented | Hosted Telnyx live UAT has not started | Implement 18.11 provider-neutral voice tool gateway. |
 
 ## Product Direction
 
@@ -1397,7 +1398,7 @@ certification remain outside this legacy track unless scheduled separately.
   deactivation. Prove the same provider-neutral fixture compiles through Telnyx
   and a fake second provider without provider IDs, credentials, URLs, or payload
   shapes entering the canonical definition.
-- [ ] 18.10 Create, inspect, version, promote, and roll back Telnyx AI
+- [x] 18.10 Create, inspect, version, promote, and roll back Telnyx AI
   Assistants through a project-scoped deployment record. Publish candidates
   without promotion, verify the remote managed-field hash, block remote drift,
   and require an explicit import, overwrite, or cancel decision.
@@ -1445,6 +1446,20 @@ transcription settings in its provider-owned input, while a fake hosted
 provider proves the same definition and hash are replaceable. Missing required
 capabilities block compilation. TypeScript, focused lint, and all 247 channel
 and extension contract tests passed.
+
+Phase 18.10 completed on 2026-08-24. Project-scoped deployment and immutable
+version records now retain Telnyx Assistant/version identifiers and separate
+local, candidate, and observed managed-field hashes. The Telnyx adapter creates
+a bootstrap main only when required, publishes every Lia change as a non-main
+candidate, then fetches the exact version to verify its hash. Inspection blocks
+remote main-version or managed-field drift until an explicit import, overwrite,
+or cancel decision; confirmed overwrite adopts the observed main only as the
+verified rollback baseline before creating a fresh Lia candidate. Promotion and
+rollback are separate verified, optimistic, audited actions. Provider keys use
+the existing encrypted project-secret boundary and never enter snapshots,
+provider bodies, errors, or audit metadata. TypeScript, focused lint, migration
+journal validation, and all 254 channel and extension contract tests passed.
+Live provider proof remains pending a restricted staging Telnyx API key.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.

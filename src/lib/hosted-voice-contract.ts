@@ -151,6 +151,7 @@ export interface HostedVoiceProviderCompiler<TManagedConfig> {
 
 export type HostedVoiceRemoteVersion = {
   assistantId: string;
+  previousMainVersionId: string | null;
   versionId: string;
 };
 
@@ -167,10 +168,12 @@ export interface HostedVoiceProviderAdapter<TManagedConfig>
     definitionHash: string;
     managedConfig: TManagedConfig;
     remoteAssistantId: string | null;
+    versionName: string;
   }): Promise<HostedVoiceRemoteVersion>;
   deactivate(input: { assistantId: string }): Promise<void>;
   inspect(input: {
     assistantId: string;
+    versionId?: string;
   }): Promise<HostedVoiceRemoteInspection<TManagedConfig>>;
   promote(input: HostedVoiceRemoteVersion): Promise<void>;
 }
@@ -213,6 +216,10 @@ export function hashVoiceAgentDefinitionV1(value: unknown) {
   return createHash("sha256")
     .update(stableJson(normalizeVoiceAgentDefinitionV1(value)))
     .digest("hex");
+}
+
+export function hashHostedVoiceManagedConfig(value: unknown) {
+  return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
 export function getHostedVoiceCompatibility(input: {

@@ -23,6 +23,7 @@ export default defineConfig({
     "flow-content-runtime.spec.ts",
     "flow-message-editor.spec.ts",
     "hosted-voice-contract.spec.ts",
+    "hosted-voice-deployment.spec.ts",
     "hybrid-flow.spec.ts",
     "media-storage-contract.spec.ts",
     "model-tool-conformance.spec.ts",

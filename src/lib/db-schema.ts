@@ -311,6 +311,78 @@ export const providerSecrets = pgTable(
   ],
 );
 
+export const hostedVoiceDeployments = pgTable(
+  "hosted_voice_deployments",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    providerId: integer("provider_id")
+      .notNull()
+      .references(() => integrationProviders.id),
+    definitionKey: text("definition_key").notNull(),
+    status: text("status").notNull().default("draft"),
+    remoteAssistantId: text("remote_assistant_id"),
+    mainRemoteVersionId: text("main_remote_version_id"),
+    candidateRemoteVersionId: text("candidate_remote_version_id"),
+    rollbackRemoteVersionId: text("rollback_remote_version_id"),
+    mainManagedHash: text("main_managed_hash"),
+    candidateManagedHash: text("candidate_managed_hash"),
+    observedManagedHash: text("observed_managed_hash"),
+    revision: integer("revision").notNull().default(0),
+    lastInspectedAt: timestamp("last_inspected_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("hosted_voice_deployments_project_idx").on(table.projectId),
+    index("hosted_voice_deployments_provider_idx").on(table.providerId),
+    index("hosted_voice_deployments_status_idx").on(table.status),
+    uniqueIndex("hosted_voice_deployments_scope_unique").on(
+      table.projectId,
+      table.providerId,
+      table.definitionKey,
+    ),
+  ],
+);
+
+export const hostedVoiceDeploymentVersions = pgTable(
+  "hosted_voice_deployment_versions",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    deploymentId: integer("deployment_id")
+      .notNull()
+      .references(() => hostedVoiceDeployments.id),
+    definitionHash: text("definition_hash"),
+    definition: jsonb("definition").$type<Record<string, unknown>>(),
+    managedConfig: jsonb("managed_config")
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    managedHash: text("managed_hash").notNull(),
+    observedManagedHash: text("observed_managed_hash").notNull(),
+    remoteVersionId: text("remote_version_id").notNull(),
+    status: text("status").notNull(),
+    source: text("source").notNull().default("lia"),
+    promotedAt: timestamp("promoted_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("hosted_voice_deployment_versions_project_idx").on(table.projectId),
+    index("hosted_voice_deployment_versions_deployment_idx").on(
+      table.deploymentId,
+    ),
+    index("hosted_voice_deployment_versions_status_idx").on(table.status),
+    uniqueIndex("hosted_voice_deployment_versions_remote_unique").on(
+      table.deploymentId,
+      table.remoteVersionId,
+    ),
+  ],
+);
+
 export const operations = pgTable(
   "operations",
   {
@@ -1830,6 +1902,14 @@ export type SelectIntegrationProvider =
   typeof integrationProviders.$inferSelect;
 export type InsertProviderSecret = typeof providerSecrets.$inferInsert;
 export type SelectProviderSecret = typeof providerSecrets.$inferSelect;
+export type InsertHostedVoiceDeployment =
+  typeof hostedVoiceDeployments.$inferInsert;
+export type SelectHostedVoiceDeployment =
+  typeof hostedVoiceDeployments.$inferSelect;
+export type InsertHostedVoiceDeploymentVersion =
+  typeof hostedVoiceDeploymentVersions.$inferInsert;
+export type SelectHostedVoiceDeploymentVersion =
+  typeof hostedVoiceDeploymentVersions.$inferSelect;
 export type InsertOperation = typeof operations.$inferInsert;
 export type SelectOperation = typeof operations.$inferSelect;
 export type InsertOperationAttempt = typeof operationAttempts.$inferInsert;

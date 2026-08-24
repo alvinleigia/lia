@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18.9 hosted voice contract complete; Phase 18.10 next
+- Current staging milestone: Phase 17A passed; Phase 18.10 hosted deployment engineering complete; Phase 18.11 next
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -1210,20 +1210,29 @@ Manual staging result: Not applicable to this contract-only milestone.
 
 ## 18.10 Telnyx AI Assistant Deployment And Drift
 
-- [ ] Lia creates or updates a non-main Telnyx Assistant candidate and stores
+- [x] Lia creates or updates a non-main Telnyx Assistant candidate and stores
       the remote assistant/version IDs plus local and observed managed hashes.
-- [ ] A pre-publish inspection detects remote changes and blocks stale writes.
-- [ ] Drift requires an explicit import, overwrite-after-confirmation, or cancel
+- [x] A pre-publish inspection detects remote changes and blocks stale writes.
+- [x] Drift requires an explicit import, overwrite-after-confirmation, or cancel
       decision; automatic merge is not allowed.
-- [ ] Promotion is a separate audited action and rollback references a verified
+- [x] Promotion is a separate audited action and rollback references a verified
       prior version.
-- [ ] Credentials remain encrypted/write-only and never enter deployment
+- [x] Credentials remain encrypted/write-only and never enter deployment
       snapshots, diagnostics, errors, or audit metadata.
-- [ ] A post-deploy fetch proves the managed remote fields match Lia's hash.
+- [x] A post-deploy fetch proves the managed remote fields match Lia's hash.
 
-Result: [ ] Engineering gate passed [ ] Fail
+Result: [x] Engineering gate passed [ ] Fail
 
 Manual staging result: Pending a restricted staging Telnyx API key.
+
+- Automated evidence: `npm run test:channel-certification` - 254 passed.
+- TypeScript: `npm run typecheck` - passed.
+- Focused lint: passed for deployment persistence, lifecycle, Telnyx adapter,
+  provider-secret boundary, schemas, migration, and contract fixtures.
+- Migration journal: 43 SQL migrations registered and validated.
+- Tenant-scope analyzer: no Phase 18.10 finding; the two existing audit-table
+  findings in `src/lib/audit.ts` and `src/lib/phase17-analytics.ts` remain.
+- Completed: 2026-08-24.
 
 ## 18.11 Provider-Neutral Voice Tool Gateway
 
@@ -1240,7 +1249,8 @@ Manual staging result: Pending a restricted staging Telnyx API key.
 
 Result: [ ] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending 18.10.
+Manual staging result: Pending 18.11 engineering and authenticated provider
+testing.
 
 ## 18.12 Verified Google Calendar Appointment Operations
 

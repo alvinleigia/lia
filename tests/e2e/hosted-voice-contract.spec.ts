@@ -86,7 +86,11 @@ const referenceAdapter: HostedVoiceProviderAdapter<ReferenceManagedConfig> = {
     };
   },
   async createDraft(_input) {
-    return { assistantId: "reference-agent-1", versionId: "version-2" };
+    return {
+      assistantId: "reference-agent-1",
+      previousMainVersionId: null,
+      versionId: "version-2",
+    };
   },
   async deactivate() {},
   async inspect(_input) {
@@ -176,15 +180,13 @@ test("one provider-neutral definition compiles through Telnyx and a second provi
   expect(reference.provider).toBe("reference_hosted");
   expect(telnyx.definitionHash).toBe(reference.definitionHash);
   expect(telnyx.managedConfig).toMatchObject({
-    assistant: {
-      enabled_features: ["telephony"],
-      greeting: "Thanks for calling. How can I help?",
-      instructions: voiceDefinition.instructions,
-      model: "moonshotai/Kimi-K2.6",
-      transcription: { language: "en", model: "deepgram/flux" },
-      voice_settings: { voice: "Telnyx.Ultra.australian_female" },
-    },
-    toolReferences: voiceDefinition.tools,
+    enabled_features: ["telephony"],
+    greeting: "Thanks for calling. How can I help?",
+    instructions: voiceDefinition.instructions,
+    model: "moonshotai/Kimi-K2.6",
+    privacy_settings: { data_retention: true },
+    transcription: { language: "en", model: "deepgram/flux" },
+    voice_settings: { voice: "Telnyx.Ultra.australian_female" },
   });
   expect(JSON.stringify(telnyx.definition)).not.toContain("Telnyx");
   expect(JSON.stringify(telnyx.definition)).not.toContain("deepgram");
@@ -213,8 +215,8 @@ test("Telnyx greeting strategies compile to the current Assistant API values", (
     },
   });
 
-  expect(wait.managedConfig.assistant.greeting).toBe("");
-  expect(generated.managedConfig.assistant.greeting).toBe(
+  expect(wait.managedConfig.greeting).toBe("");
+  expect(generated.managedConfig.greeting).toBe(
     "<assistant-speaks-first-with-model-generated-message>",
   );
 });
@@ -261,10 +263,12 @@ test("hosted provider lifecycle keeps remote identifiers outside the definition"
     definitionHash: compiled.definitionHash,
     managedConfig: compiled.managedConfig,
     remoteAssistantId: null,
+    versionName: "Lia reference version",
   });
 
   expect(remote).toEqual({
     assistantId: "reference-agent-1",
+    previousMainVersionId: null,
     versionId: "version-2",
   });
   expect(compiled.definition).not.toHaveProperty("assistantId");
