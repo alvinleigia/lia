@@ -1,9 +1,11 @@
-import { KeyRound, PhoneCall, Save, ShieldCheck } from "lucide-react";
+import { Bot, KeyRound, PhoneCall, Save, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { NoProjectState } from "@/components/no-project-state";
 import {
   ActionFormError,
   ActionStateForm,
 } from "@/components/ui/action-state-form";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +62,26 @@ export default async function TelnyxVoiceChannelPage() {
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">
       <div className="mx-auto max-w-5xl space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Bot className="h-5 w-5" />
+              Telnyx Hosted Assistant
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Use the provider-native low-latency architecture for Phase 18.14
+              staging, candidate deployment, Lia tools, drift, and rollback.
+            </p>
+            <Button asChild>
+              <Link href="/projects/channels/telnyx/hosted">
+                Open hosted staging
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

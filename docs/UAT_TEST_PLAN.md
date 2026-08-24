@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18.13 hosted runtime engineering complete; Phase 18.14 live Telnyx UAT next
+- Current staging milestone: Phase 17A passed; Phase 18.14 staging controls ready; live Telnyx UAT next
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -22,7 +22,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.13 implemented | Complete Phase 18.14 live hosted-assistant UAT. |
+| 18 - Telnyx and extensions | Hosted milestones 18.9-18.13 and staging controls implemented | Complete Phase 18.14 live hosted-assistant UAT. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -1330,6 +1330,9 @@ delivery require the restricted live credentials and dedicated test assets.
 
 Use a dedicated test number, calendar, and transfer destination. Do not use real
 patient data or paste credentials or raw provider payloads into this record.
+The staging console and secret-safe setup procedure are implemented; follow
+[`TELNYX_HOSTED_STAGING_RUNBOOK.md`](TELNYX_HOSTED_STAGING_RUNBOOK.md).
+Live execution has not started, so every result below remains unchecked.
 
 1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
        the staging number or approved test callers to it.

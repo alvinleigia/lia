@@ -8,6 +8,7 @@ import {
   HOSTED_VOICE_TOOL_OUTCOMES,
   resolveHostedVoiceVersionAttribution,
 } from "../../src/lib/hosted-voice-runtime";
+import { buildTelnyxHostedVoiceToolSetupManifest } from "../../src/lib/hosted-voice-staging";
 import { createTelnyxHostedVoiceCompiler } from "../../src/lib/telnyx-hosted-voice";
 import { sendTelnyxHostedVoiceContinuation } from "../../src/lib/telnyx-hosted-voice-continuation";
 import { getTelnyxHostedVoiceConversationEnded } from "../../src/lib/telnyx-hosted-voice-events";
@@ -196,4 +197,71 @@ test("post-call synchronization keeps safe metadata, latency, and cost inputs", 
       toolVersionIds: [],
     }),
   ).toEqual({ deploymentVersionId: 8, source: "current_main_at_sync" });
+});
+
+test("Telnyx candidate setup preserves Lia's read and two-phase write boundary", () => {
+  const common = {
+    description: "Manage the caller's booking.",
+    execution: {
+      adapter: "built_in" as const,
+      cancellation: "unsupported" as const,
+      handler: "calendar",
+      mode: "synchronous" as const,
+      retryAttempts: 0,
+      retryDelayMs: 0,
+      timeoutMs: 15_000,
+    },
+    inputSchema: {
+      fields: [
+        {
+          key: "startsAt",
+          required: true,
+          source: { key: "startsAt", kind: "field" as const },
+          type: "text" as const,
+        },
+        {
+          key: "calendarId",
+          required: true,
+          source: { kind: "literal" as const, value: "private-calendar" },
+          type: "text" as const,
+        },
+      ],
+    },
+    name: "Booking",
+    outputSchema: { fields: [] },
+    projectId: 12,
+    requiredForCompletion: true,
+    resultMappings: [],
+    schemaVersion: 1 as const,
+    version: 3,
+  };
+  const manifest = buildTelnyxHostedVoiceToolSetupManifest({
+    baseUrl: "https://staging.example.com",
+    toolDefinitions: [
+      { ...common, access: "read", id: "calendar_availability" },
+      { ...common, access: "write", id: "calendar_booking" },
+    ],
+  });
+
+  expect(manifest.eventWebhookUrl).toBe(
+    "https://staging.example.com/api/hosted-voice/telnyx/events",
+  );
+  expect(manifest.tools.map(({ phase }) => phase)).toEqual([
+    "read",
+    "prepare",
+    "commit",
+  ]);
+  expect(manifest.tools[0]?.body_parameters).toMatchObject({
+    properties: { startsAt: { type: "string" } },
+    required: ["startsAt"],
+  });
+  expect(manifest.tools[1]?.timeout_ms).toBe(10_000);
+  expect(manifest.tools[2]?.body_parameters).toMatchObject({
+    properties: { commitToken: { type: "string" } },
+    required: ["commitToken"],
+  });
+  const serialized = JSON.stringify(manifest);
+  expect(serialized).not.toContain("private-calendar");
+  expect(serialized).not.toContain("Bearer ");
+  expect(serialized).not.toContain("secret-api-key");
 });

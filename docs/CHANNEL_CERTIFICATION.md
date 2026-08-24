@@ -411,6 +411,8 @@ For legacy Telnyx Programmable Voice sign-off, also record:
 
 For the active Phase 18 hosted-assistant sign-off, record:
 
+- Completion of the isolation, secret handling, candidate setup, and cleanup
+  controls in [`TELNYX_HOSTED_STAGING_RUNBOOK.md`](TELNYX_HOSTED_STAGING_RUNBOOK.md).
 - The Lia voice definition hash, Telnyx Assistant candidate and main version
   IDs, promotion record, and verified rollback target.
 - Native greeting, ordinary conversation, interruption, transfer, and hangup

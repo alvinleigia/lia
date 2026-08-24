@@ -62,6 +62,114 @@ export async function createProjectTelnyxHostedVoiceProvider(input: {
   });
 }
 
+export async function getProjectTelnyxHostedVoiceProviderRecord(
+  projectId: number,
+) {
+  const [provider] = await db
+    .select()
+    .from(integrationProviders)
+    .where(
+      and(
+        eq(integrationProviders.projectId, projectId),
+        eq(integrationProviders.providerType, "telnyx_ai_assistant"),
+        eq(integrationProviders.status, "active"),
+      ),
+    )
+    .limit(1);
+
+  return provider ?? null;
+}
+
+export async function upsertProjectTelnyxHostedVoiceProvider(input: {
+  apiKey?: string;
+  costRateMicrounitsPerMinute: number;
+  modelId: string;
+  name: string;
+  projectId: number;
+  transcriptionLanguage: string;
+  transcriptionModelId: string;
+  voiceId: string;
+  webhookPublicKey?: string;
+}) {
+  const existing = await getProjectTelnyxHostedVoiceProviderRecord(
+    input.projectId,
+  );
+  const existingConfig = existing
+    ? await hydrateProviderConfig({
+        config: existing.config,
+        projectId: input.projectId,
+        providerId: existing.id,
+      })
+    : null;
+  const apiKey = input.apiKey?.trim() || existingConfig?.apiKey;
+  if (typeof apiKey !== "string" || apiKey.trim().length === 0) {
+    throw new Error("A Telnyx API key is required for the hosted provider.");
+  }
+  const config = telnyxHostedVoiceProviderConfigSchema.parse({
+    apiKey,
+    costRateMicrounitsPerMinute: input.costRateMicrounitsPerMinute,
+    modelId: input.modelId,
+    transcriptionLanguage: input.transcriptionLanguage,
+    transcriptionModelId: input.transcriptionModelId,
+    voiceId: input.voiceId,
+    webhookPublicKey: input.webhookPublicKey || undefined,
+  });
+
+  if (!existing) {
+    return createProjectTelnyxHostedVoiceProvider({
+      config,
+      name: input.name,
+      projectId: input.projectId,
+    });
+  }
+
+  const prepared = prepareProviderConfig(config);
+  return db.transaction(async (tx) => {
+    const [provider] = await tx
+      .update(integrationProviders)
+      .set({
+        config: prepared.config,
+        name: input.name,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(integrationProviders.id, existing.id),
+          eq(integrationProviders.projectId, input.projectId),
+          eq(integrationProviders.providerType, "telnyx_ai_assistant"),
+          eq(integrationProviders.status, "active"),
+        ),
+      )
+      .returning();
+    if (!provider) {
+      throw new Error("Active Telnyx AI Assistant provider was not found.");
+    }
+
+    for (const secret of prepared.secrets) {
+      await tx
+        .insert(providerSecrets)
+        .values({
+          ...secret,
+          projectId: input.projectId,
+          providerId: provider.id,
+        })
+        .onConflictDoUpdate({
+          target: [providerSecrets.providerId, providerSecrets.secretName],
+          set: {
+            authenticationTag: secret.authenticationTag,
+            ciphertext: secret.ciphertext,
+            initializationVector: secret.initializationVector,
+            keyVersion: secret.keyVersion,
+            projectId: input.projectId,
+            updatedAt: new Date(),
+          },
+        });
+    }
+
+    return provider;
+  });
+}
+
 export async function getProjectTelnyxHostedVoiceProvider(input: {
   fetchImpl?: typeof fetch;
   projectId: number;

@@ -1,6 +1,6 @@
 # Lia Conversational Flow Roadmap
 
-Status date: 2026-08-23
+Status date: 2026-08-24
 
 ## Document Authority
 
@@ -96,7 +96,9 @@ rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 Current target: complete Phase 18.14 live Telnyx hosted-assistant staging UAT.
 Hosted deployment, drift control, the provider-neutral tool gateway, verified
 Google Calendar operations, asynchronous continuation, and metadata-only
-post-call synchronization are complete.
+post-call synchronization are complete. The project-scoped staging console and
+operator runbook are ready; restricted live credentials and dedicated test
+assets are the remaining gate.
 
 ### Phase Tracking Snapshot
 
@@ -110,7 +112,7 @@ post-call synchronization are complete.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.13 implemented | Hosted Telnyx live UAT has not started | Complete 18.14 with a restricted Telnyx key, signed event webhook, dedicated test number/calendar, and approved test callers. |
+| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.13 and staging controls implemented | Hosted Telnyx live UAT has not started | Complete 18.14 with a restricted Telnyx key, signed event webhook, dedicated test number/calendar, and approved test callers. |
 
 ## Product Direction
 
@@ -1521,6 +1523,18 @@ webhook/number assignment, and event-webhook delivery remain explicit Phase
 lint, and all 274 channel and extension contract tests passed. Repository-wide
 lint reports only the three pre-existing warnings, and the tenant analyzer
 reports only the two pre-existing `auditLogs` findings.
+
+Phase 18.14 staging preparation completed on 2026-08-24. The authorized,
+project-scoped hosted Telnyx console now stores the provider key through Lia's
+encrypted secret boundary, builds a provider-neutral definition from selected
+published task versions, publishes a verified non-main candidate, rotates its
+opaque tool binding, and emits a secret-free setup manifest for the exact
+candidate. Promotion and rollback require explicit confirmation, while drift
+inspection remains a separate blocking action. The operator procedure is in
+`docs/TELNYX_HOSTED_STAGING_RUNBOOK.md`. Live UAT remains unchecked until the
+release owner supplies the restricted staging assets and all ten checks pass.
+TypeScript, focused lint, the production build, and all 275 channel and
+extension contract tests passed.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
