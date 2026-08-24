@@ -202,6 +202,44 @@ a separately defined breaking contract is introduced.
   conformance plus authentication, scope rejection, canonical validation,
   deterministic replay, prepare/commit, expiry, and cross-binding cases.
 
+### Verified Google Calendar operations
+
+- `google_calendar` is a project-scoped operation-provider type. Configuration
+  supplies `clientEmail`, encrypted `privateKey`, `calendarId`, `timezone`,
+  `workingDays`, `openTime`, `closeTime`, `appointmentDurationMinutes`,
+  `slotIntervalMinutes`, `schedulingHorizonDays`, and one to five
+  `identityFactors`. `privateKeyId` and a bounded request timeout are optional.
+- `src/lib/google-calendar-api.ts` owns direct Google Calendar v3 REST calls.
+  It signs service-account JWT assertions with `jose`, caches short-lived OAuth
+  access tokens, uses fixed Google endpoints and the calendar-events/free-busy
+  scopes, and never copies raw provider response bodies into errors.
+- Supported operation types are `google_calendar.availability`, `.book`,
+  `.lookup`, `.reschedule`, and `.cancel`. Published booking, reschedule, and
+  cancel tools must retain write access so the existing Lia confirmation and
+  hosted-voice prepare/commit boundaries authorize their side effects.
+- Availability queries Google free/busy, then Lia generates only future slots
+  inside the configured timezone, working days, hours, duration, interval, and
+  horizon. The model never calculates gaps or chooses a calendar identifier.
+- Lia-created appointments store a random opaque reference and HMAC of the
+  configured identity factors. Lookup returns only those scoped records and
+  never Google event IDs. Unrelated or staff-created calendar events still
+  block availability but are not caller-searchable without a Lia identity
+  mapping.
+- Booking and rescheduling recheck free/busy while project/provider/day and
+  appointment advisory locks serialize Lia writes. Deterministic Google event
+  IDs make creation idempotent; post-write `events.get` verification gates
+  success. Reschedule and cancellation use the last verified etag through
+  `If-Match`, then verify the final remote state.
+- A possibly applied write stores `outcome_unknown` under its deterministic
+  operation hash. Replaying that uncertain operation preserves the provider
+  idempotency key and reconciles the exact event before attempting another
+  insert. Responses and operation diagnostics exclude credentials, Google IDs,
+  raw provider bodies, and patient identity values.
+- `tests/e2e/google-calendar-operations.spec.ts` proves encrypted credentials,
+  direct Google request shapes, token reuse, clinic-rule filtering, opaque
+  identity-gated lifecycle operations, duplicate replay, slot-race exclusion,
+  remote verification, and unknown-outcome reconciliation.
+
 Contract versions are explicit. Backward-compatible additions may extend a V1
 schema only when existing consumers continue to validate and behave the same.
 A breaking field, meaning, or lifecycle change requires a new exported version

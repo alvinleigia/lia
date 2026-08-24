@@ -93,10 +93,11 @@ immutable baseline and audited post-baseline comparison are complete: model
 rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 0.00%, and the evaluation gate passed 5/5 cases with zero safety failures.
 
-Current target: implement Phase 18.12 verified Google Calendar appointment
-operations. Hosted deployment, drift control, and the provider-neutral tool
-gateway are complete; live Telnyx staging UAT stays deferred until the
-remaining hosted engineering milestones pass.
+Current target: implement Phase 18.13 native call UX, asynchronous completion,
+and observability. Hosted deployment, drift control, the provider-neutral tool
+gateway, and verified Google Calendar operations are complete; live Telnyx
+staging UAT stays deferred until the remaining hosted engineering milestones
+pass.
 
 ### Phase Tracking Snapshot
 
@@ -110,7 +111,7 @@ remaining hosted engineering milestones pass.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.11 implemented | Hosted Telnyx live UAT has not started | Implement 18.12 verified Google Calendar appointment operations. |
+| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.12 implemented | Hosted Telnyx live UAT has not started | Implement 18.13 native call UX, asynchronous completion, and observability. |
 
 ## Product Direction
 
@@ -1407,7 +1408,7 @@ certification remain outside this legacy track unless scheduled separately.
   resolves project and allowed tools from an opaque deployment binding,
   validates typed input and output, records deterministic provider-call
   idempotency, and exposes prepare/commit semantics for writes.
-- [ ] 18.12 Add direct Google Calendar availability, booking, lookup,
+- [x] 18.12 Add direct Google Calendar availability, booking, lookup,
   rescheduling, and cancellation inside Lia. Use live free/busy data,
   configured clinic rules, verified identity, opaque appointment references,
   explicit confirmation, recheck-before-write, post-write verification,
@@ -1475,6 +1476,25 @@ input. Commit claims the prepared call atomically, executes it once, and
 replays the recorded result on duplicate delivery. Telnyx and a fake provider
 pass the same gateway conformance suite. TypeScript, focused lint, migration
 journal validation, and all 258 channel and extension contract tests passed.
+
+Phase 18.12 completed on 2026-08-24. The project-scoped `google_calendar`
+operation provider now calls Google Calendar v3 directly with a cached,
+service-account OAuth token; its private key uses Lia's existing encrypted
+provider-secret store. Availability comes from Google free/busy and is reduced
+server-side to future slots inside the configured IANA timezone, working days,
+opening hours, duration, interval, and scheduling horizon. Lia-created
+appointments retain an opaque caller reference, HMAC identity-factor hash,
+remote event ID, etag, and deterministic operation hash under project and
+provider scope; Google IDs never enter tool output. Booking and rescheduling
+recheck the target interval while a database advisory lock serializes Lia
+writes, then fetch the remote event before success. Updates and deletes use
+`If-Match`; cancellation is verified. An ambiguous booking persists as
+`outcome_unknown`, and a replay reconciles the same deterministic Google event
+before any new insert. The existing voice prepare/commit and task confirmation
+boundaries remain authoritative for writes. TypeScript, focused lint,
+migration journal validation, and all 267 channel and extension contract tests
+passed. Live proof remains pending a dedicated staging calendar shared with a
+restricted service account.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.

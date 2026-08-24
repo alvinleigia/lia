@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18.11 voice tool gateway engineering complete; Phase 18.12 next
+- Current staging milestone: Phase 17A passed; Phase 18.12 verified Google Calendar engineering complete; Phase 18.13 next
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -1262,24 +1262,36 @@ Completed: 2026-08-24.
 
 ## 18.12 Verified Google Calendar Appointment Operations
 
-- [ ] Lia calls Google Calendar directly with encrypted project-scoped
+- [x] Lia calls Google Calendar directly with encrypted project-scoped
       credentials; the supplied Flask connector remains reference behavior only.
-- [ ] Availability uses live free/busy data and configured timezone, hours,
+- [x] Availability uses live free/busy data and configured timezone, hours,
       duration, and scheduling horizon.
-- [ ] Past, weekend, closed-hour, and overlapping slots are never returned.
-- [ ] Appointment lookup requires configured identity factors and returns opaque
+- [x] Past, weekend, closed-hour, and overlapping slots are never returned.
+- [x] Appointment lookup requires configured identity factors and returns opaque
       references instead of Google event IDs.
-- [ ] Booking, reschedule, and cancel use prepare, explicit caller confirmation,
+- [x] Booking, reschedule, and cancel use prepare, explicit caller confirmation,
       and commit with recheck and remote verification.
-- [ ] Duplicate commits execute once; two callers cannot both receive verified
+- [x] Duplicate commits execute once; two callers cannot both receive verified
       success for one slot.
-- [ ] A possible write timeout becomes `outcome_unknown` and reconciles before
+- [x] A possible write timeout becomes `outcome_unknown` and reconciles before
       retry; diagnostics exclude secrets, raw Google responses, and unnecessary
       patient data.
 
-Result: [ ] Engineering gate passed [ ] Fail
+Result: [x] Engineering gate passed [ ] Fail
 
 Manual staging result: Pending a dedicated test calendar and credential.
+
+Evidence: the direct client contract covers cached service-account JWT
+authentication, v3 free/busy, event insertion, conditional patch/delete, and
+safe response handling. Appointment contracts cover past/closed/busy filtering,
+opaque references, identity-gated lookup, verified booking/reschedule/cancel,
+duplicate replay, a two-caller slot race, and `outcome_unknown` reconciliation.
+TypeScript and focused lint passed; the migration journal contains 45 ordered
+migrations; all 267 channel and extension contract tests passed. The tenant
+analyzer reports only the pre-existing `auditLogs` findings in
+`src/lib/audit.ts` and `src/lib/phase17-analytics.ts`.
+
+Completed: 2026-08-24.
 
 ## 18.13 Native Call UX, Async Completion, And Observability
 
@@ -1297,7 +1309,7 @@ Manual staging result: Pending a dedicated test calendar and credential.
 
 Result: [ ] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending 18.12 engineering.
+Manual staging result: Pending 18.13 engineering.
 
 ## 18.14 Live Telnyx Hosted Assistant Staging UAT
 

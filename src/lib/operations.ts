@@ -19,6 +19,8 @@ import {
   failDurableJob,
 } from "@/lib/durable-jobs";
 import { resolveTraceId } from "@/lib/execution-trace";
+import { executeGoogleCalendarProviderOperation } from "@/lib/google-calendar";
+import { googleCalendarAppointmentStore } from "@/lib/google-calendar-store";
 import { HTTP_METHODS, type HttpMethod } from "@/lib/operation-contracts";
 import {
   hydrateProviderConfig,
@@ -34,6 +36,7 @@ export const INTEGRATION_PROVIDER_TYPES = [
   "webhook",
   "n8n_webhook",
   "meta_conversions_api",
+  "google_calendar",
 ] as const;
 export const INTEGRATION_PROVIDER_STATUSES = ["active", "disabled"] as const;
 export const OPERATION_STATUSES = ["active", "disabled"] as const;
@@ -828,6 +831,8 @@ export async function reconcileOperationAttemptOutcome(input: {
 async function executeProvider(input: {
   config: Record<string, unknown>;
   idempotencyKey: string;
+  projectId: number;
+  providerId: number;
   providerType: string;
   operationType: string;
   payload: Record<string, unknown>;
@@ -879,6 +884,22 @@ async function executeProvider(input: {
       input.payload,
       input.idempotencyKey,
     );
+  }
+
+  if (input.providerType === "google_calendar") {
+    return executeGoogleCalendarProviderOperation({
+      config: input.config,
+      identitySecret:
+        process.env.GOOGLE_CALENDAR_IDENTITY_SECRET ??
+        process.env.AUTH_SECRET ??
+        "",
+      idempotencyKey: input.idempotencyKey,
+      operationType: input.operationType,
+      payload: input.payload,
+      projectId: input.projectId,
+      providerId: input.providerId,
+      store: googleCalendarAppointmentStore,
+    });
   }
 
   return {
@@ -2459,6 +2480,12 @@ export async function replayOperationAttempt(input: {
   };
   const startedAt = new Date();
   const idempotencyKey = `replay:${sourceAttempt.id}:${startedAt.getTime()}`;
+  const providerIdempotencyKey =
+    provider.providerType === "google_calendar" &&
+    sourceAttempt.status === "outcome_unknown" &&
+    sourceAttempt.idempotencyKey
+      ? sourceAttempt.idempotencyKey
+      : idempotencyKey;
   const [attempt] = await db
     .insert(operationAttempts)
     .values({
@@ -2477,7 +2504,7 @@ export async function replayOperationAttempt(input: {
 
   const result = await executeConfiguredProvider({
     config: provider.config,
-    idempotencyKey,
+    idempotencyKey: providerIdempotencyKey,
     projectId: input.projectId,
     providerId: provider.id,
     providerType: provider.providerType,

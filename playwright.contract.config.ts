@@ -22,6 +22,7 @@ export default defineConfig({
     "flow-content-lifecycle.spec.ts",
     "flow-content-runtime.spec.ts",
     "flow-message-editor.spec.ts",
+    "google-calendar-operations.spec.ts",
     "hosted-voice-contract.spec.ts",
     "hosted-voice-deployment.spec.ts",
     "hosted-voice-tool-gateway.spec.ts",

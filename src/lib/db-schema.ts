@@ -458,6 +458,56 @@ export const hostedVoiceToolCalls = pgTable(
   ],
 );
 
+export const googleCalendarAppointments = pgTable(
+  "google_calendar_appointments",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    providerId: integer("provider_id")
+      .notNull()
+      .references(() => integrationProviders.id),
+    reference: text("reference").notNull(),
+    remoteEventId: text("remote_event_id").notNull(),
+    remoteEtag: text("remote_etag").notNull(),
+    identityHash: text("identity_hash").notNull(),
+    operationKeyHash: text("operation_key_hash").notNull(),
+    startAt: timestamp("start_at").notNull(),
+    endAt: timestamp("end_at").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("google_calendar_appointments_project_idx").on(table.projectId),
+    index("google_calendar_appointments_identity_idx").on(
+      table.projectId,
+      table.providerId,
+      table.identityHash,
+      table.status,
+    ),
+    index("google_calendar_appointments_start_idx").on(
+      table.projectId,
+      table.providerId,
+      table.startAt,
+    ),
+    uniqueIndex("google_calendar_appointments_reference_unique").on(
+      table.projectId,
+      table.providerId,
+      table.reference,
+    ),
+    uniqueIndex("google_calendar_appointments_remote_unique").on(
+      table.providerId,
+      table.remoteEventId,
+    ),
+    uniqueIndex("google_calendar_appointments_operation_unique").on(
+      table.providerId,
+      table.operationKeyHash,
+    ),
+  ],
+);
+
 export const operations = pgTable(
   "operations",
   {
@@ -1993,6 +2043,10 @@ export type InsertHostedVoiceToolCall =
   typeof hostedVoiceToolCalls.$inferInsert;
 export type SelectHostedVoiceToolCall =
   typeof hostedVoiceToolCalls.$inferSelect;
+export type InsertGoogleCalendarAppointment =
+  typeof googleCalendarAppointments.$inferInsert;
+export type SelectGoogleCalendarAppointment =
+  typeof googleCalendarAppointments.$inferSelect;
 export type InsertOperation = typeof operations.$inferInsert;
 export type SelectOperation = typeof operations.$inferSelect;
 export type InsertOperationAttempt = typeof operationAttempts.$inferInsert;
