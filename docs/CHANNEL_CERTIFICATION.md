@@ -337,6 +337,16 @@ It verifies:
 - Database runtime certification completes one immutable task contract across
   all four persisted channels and executes one confirmed, project-scoped
   operation from Telnyx state without bypassing the operation attempt ledger.
+- Hosted Telnyx ordinary-turn configuration contains no Lia chat or turn
+  endpoint. Fast tools remain bounded and synchronous; asynchronous tools use
+  one durable job and a deterministic, non-interrupting Add Messages
+  continuation without duplicating committed writes.
+- Hosted result wording covers the seven fixed outcomes without treating an
+  unknown provider status as success. Signed call-ended synchronization stores
+  hashed metadata, explicit version-attribution source, tool
+  outcome/latency/interruption metrics, transfer state, and configured cost
+  inputs under the pinned retention policy while discarding caller numbers,
+  transcripts, insight contents, and raw provider payloads.
 
 Run the full automated release gate before UAT sign-off:
 

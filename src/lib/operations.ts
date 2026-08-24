@@ -1583,9 +1583,6 @@ export async function runOperationForHostedVoiceTool(input: {
         "This hosted voice tool call is already being processed.",
       );
     }
-    if (existing.status !== "completed") {
-      throw new Error("The hosted voice operation did not complete.");
-    }
     return getOperationAttemptToolResult({ attempt: existing, operation });
   }
 
@@ -1614,9 +1611,6 @@ export async function runOperationForHostedVoiceTool(input: {
     )
     .returning();
   const attempt = completed ?? created;
-  if (attempt.status !== "completed") {
-    throw new Error("The hosted voice operation did not complete.");
-  }
   return getOperationAttemptToolResult({ attempt, operation });
 }
 

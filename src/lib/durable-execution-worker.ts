@@ -3,6 +3,7 @@ import { db } from "@/lib/db-config";
 import { durableJobs, outboxMessages } from "@/lib/db-schema";
 import { processProjectFlowResponsePolicyQueue } from "@/lib/durable-flow-response-policy";
 import { processProjectFlowResumeQueue } from "@/lib/durable-flow-resume";
+import { processProjectHostedVoiceToolQueue } from "@/lib/hosted-voice-tool-worker";
 import { processProjectDurableOperationQueue } from "@/lib/operations";
 import { processProjectOutboxQueue } from "@/lib/outbox";
 import { processProjectPostConversationQueue } from "@/lib/post-conversation-jobs";
@@ -107,6 +108,11 @@ export async function processDurableExecutionQueue(input?: {
       projectId,
       workerId: projectWorkerId,
     });
+    const hostedVoiceTools = await processProjectHostedVoiceToolQueue({
+      maxJobs: maxItemsPerQueue,
+      projectId,
+      workerId: projectWorkerId,
+    });
     const outbox = await processProjectOutboxQueue({
       maxMessages: maxItemsPerQueue,
       projectId,
@@ -115,6 +121,7 @@ export async function processDurableExecutionQueue(input?: {
 
     projects.push({
       operations,
+      hostedVoiceTools,
       outbox,
       postConversation,
       projectId,

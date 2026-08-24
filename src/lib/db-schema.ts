@@ -429,6 +429,10 @@ export const hostedVoiceToolCalls = pgTable(
       .notNull()
       .references(() => hostedVoiceToolBindings.id),
     providerCallId: text("provider_call_id").notNull(),
+    providerConversation: jsonb("provider_conversation").$type<
+      Record<string, unknown>
+    >(),
+    providerConversationHash: text("provider_conversation_hash"),
     toolId: text("tool_id").notNull(),
     toolVersion: integer("tool_version").notNull(),
     phase: text("phase").notNull(),
@@ -444,6 +448,14 @@ export const hostedVoiceToolCalls = pgTable(
     commitTokenHash: text("commit_token_hash"),
     commitExpiresAt: timestamp("commit_expires_at"),
     committedAt: timestamp("committed_at"),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    latencyMs: integer("latency_ms"),
+    outcome: text("outcome"),
+    interruptedAt: timestamp("interrupted_at"),
+    continuationStatus: text("continuation_status"),
+    continuationErrorCode: text("continuation_error_code"),
+    continuationSentAt: timestamp("continuation_sent_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -451,9 +463,68 @@ export const hostedVoiceToolCalls = pgTable(
     index("hosted_voice_tool_calls_project_idx").on(table.projectId),
     index("hosted_voice_tool_calls_binding_idx").on(table.bindingId),
     index("hosted_voice_tool_calls_status_idx").on(table.status),
+    index("hosted_voice_tool_calls_conversation_idx").on(
+      table.projectId,
+      table.providerConversationHash,
+    ),
     uniqueIndex("hosted_voice_tool_calls_provider_unique").on(
       table.bindingId,
       table.providerCallId,
+    ),
+  ],
+);
+
+export const hostedVoiceCallObservations = pgTable(
+  "hosted_voice_call_observations",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    deploymentId: integer("deployment_id")
+      .notNull()
+      .references(() => hostedVoiceDeployments.id),
+    deploymentVersionId: integer("deployment_version_id").references(
+      () => hostedVoiceDeploymentVersions.id,
+    ),
+    versionAttribution: text("version_attribution").notNull(),
+    provider: text("provider").notNull(),
+    providerEventId: text("provider_event_id").notNull(),
+    providerConversationHash: text("provider_conversation_hash").notNull(),
+    endedAt: timestamp("ended_at").notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    endReason: text("end_reason").notNull(),
+    llmModel: text("llm_model").notNull(),
+    sttModel: text("stt_model").notNull(),
+    ttsProvider: text("tts_provider").notNull(),
+    ttsModel: text("tts_model").notNull(),
+    toolOutcomeCounts: jsonb("tool_outcome_counts")
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
+    toolLatencyP50Ms: integer("tool_latency_p50_ms"),
+    toolLatencyP95Ms: integer("tool_latency_p95_ms"),
+    toolLatencyP99Ms: integer("tool_latency_p99_ms"),
+    toolInterruptionCount: integer("tool_interruption_count")
+      .notNull()
+      .default(0),
+    transferred: boolean("transferred").notNull().default(false),
+    costRateMicrounitsPerMinute: integer(
+      "cost_rate_microunits_per_minute",
+    ).notNull(),
+    estimatedCostMicrounits: integer("estimated_cost_microunits").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("hosted_voice_call_observations_project_idx").on(table.projectId),
+    index("hosted_voice_call_observations_deployment_idx").on(
+      table.deploymentId,
+    ),
+    index("hosted_voice_call_observations_expires_idx").on(table.expiresAt),
+    uniqueIndex("hosted_voice_call_observations_event_unique").on(
+      table.deploymentId,
+      table.providerEventId,
     ),
   ],
 );
@@ -2043,6 +2114,10 @@ export type InsertHostedVoiceToolCall =
   typeof hostedVoiceToolCalls.$inferInsert;
 export type SelectHostedVoiceToolCall =
   typeof hostedVoiceToolCalls.$inferSelect;
+export type InsertHostedVoiceCallObservation =
+  typeof hostedVoiceCallObservations.$inferInsert;
+export type SelectHostedVoiceCallObservation =
+  typeof hostedVoiceCallObservations.$inferSelect;
 export type InsertGoogleCalendarAppointment =
   typeof googleCalendarAppointments.$inferInsert;
 export type SelectGoogleCalendarAppointment =

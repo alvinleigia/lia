@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18.12 verified Google Calendar engineering complete; Phase 18.13 next
+- Current staging milestone: Phase 17A passed; Phase 18.13 hosted runtime engineering complete; Phase 18.14 live Telnyx UAT next
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -22,7 +22,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Legacy Programmable Voice engineering complete; hosted-assistant implementation in progress | Complete hosted milestones 18.9-18.14; live UAT starts only after their engineering gates pass. |
+| 18 - Telnyx and extensions | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.13 implemented | Complete Phase 18.14 live hosted-assistant UAT. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -1295,21 +1295,36 @@ Completed: 2026-08-24.
 
 ## 18.13 Native Call UX, Async Completion, And Observability
 
-- [ ] Ordinary speech turns make zero Lia model/runtime calls; Telnyx owns STT,
+- [x] Ordinary speech turns make zero Lia model/runtime calls; Telnyx owns STT,
       model response, TTS, barge-in, transfer, and hangup.
-- [ ] Fast tools remain synchronous; measured slow work returns `pending` and
+- [x] Fast tools remain synchronous; measured slow work returns `pending` and
       resumes through provider-native continuation without claiming success.
-- [ ] Interrupting a read may cancel it; interrupting a committed write cannot
+- [x] Interrupting a read may cancel it; interrupting a committed write cannot
       duplicate or silently cancel it.
-- [ ] Truthful caller wording is tested for `success`, `conflict`, `not_found`,
+- [x] Truthful caller wording is tested for `success`, `conflict`, `not_found`,
       `ambiguous`, `pending`, `outcome_unknown`, and `provider_unavailable`.
-- [ ] Post-call synchronization records provider/version, tool outcome,
+- [x] Post-call synchronization records provider/version, tool outcome,
       P50/P95/P99 latency, interruption, transfer, and cost inputs under the
       approved retention policy.
 
-Result: [ ] Engineering gate passed [ ] Fail
+Result: [x] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending 18.13 engineering.
+Engineering evidence: asynchronous tool calls use the project durable worker,
+committed writes remain idempotent, and completed work is injected with one
+deterministic Telnyx Add Messages command that does not interrupt active caller
+speech. The signed call-ended route stores hashed, metadata-only observations
+and approved-retention expiry; Telnyx insight content is ignored. Exact version
+attribution comes from a pinned tool binding, while a no-tool call is labelled
+as the current main at sync. Tool latency and tool-interruption measurements
+are labelled separately from Telnyx-native turn behavior. TypeScript,
+production build, migration journal validation,
+focused lint, and all 274 channel and extension contract tests passed. Full
+lint has only the three pre-existing warnings; tenant analysis has only the two
+pre-existing `auditLogs` findings.
+
+Manual staging result: Pending Phase 18.14. Native turn latency/barge-in,
+actual Telnyx cost, number and tool-webhook assignment, and signed event
+delivery require the restricted live credentials and dedicated test assets.
 
 ## 18.14 Live Telnyx Hosted Assistant Staging UAT
 

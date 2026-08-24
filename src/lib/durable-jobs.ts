@@ -10,6 +10,7 @@ export const DURABLE_JOB_TYPES = [
   "flow_resume",
   "flow_response_policy",
   "post_conversation",
+  "hosted_voice_tool",
 ] as const;
 export const DURABLE_JOB_STATUSES = [
   "queued",

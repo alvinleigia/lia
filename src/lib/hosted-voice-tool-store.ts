@@ -14,7 +14,12 @@ import {
   hostedVoiceToolBindings,
   hostedVoiceToolCalls,
 } from "@/lib/db-schema";
+import {
+  decryptSecretValue,
+  encryptSecretValue,
+} from "@/lib/encrypted-secrets";
 import { voiceAgentDefinitionV1Schema } from "@/lib/hosted-voice-contract";
+import { getHostedVoiceToolOutcome } from "@/lib/hosted-voice-runtime";
 import {
   HostedVoiceToolRequestError,
   hashHostedVoiceToolValue,
@@ -110,78 +115,19 @@ export const hostedVoiceToolGatewayRepository = {
       )
       .limit(1);
     if (!binding) return null;
-
-    const [version] = await db
-      .select()
-      .from(hostedVoiceDeploymentVersions)
-      .where(
-        and(
-          eq(hostedVoiceDeploymentVersions.id, binding.deploymentVersionId),
-          eq(hostedVoiceDeploymentVersions.deploymentId, binding.deploymentId),
-          eq(hostedVoiceDeploymentVersions.projectId, binding.projectId),
-        ),
-      )
-      .limit(1);
-    if (!version?.definition) return null;
-    const voiceDefinition = voiceAgentDefinitionV1Schema.parse(
-      version.definition,
-    );
-    const toolRef = voiceDefinition.tools.find(({ id }) => id === toolId);
-    if (!toolRef) return null;
-    const taskVersionIds = voiceDefinition.publishedTaskVersions.map(
-      ({ taskVersionId }) => taskVersionId,
-    );
-    if (taskVersionIds.length === 0) return null;
-    const snapshots = await db
-      .select({ snapshot: conversationalTaskVersions.snapshot })
-      .from(conversationalTaskVersions)
-      .where(
-        and(
-          eq(conversationalTaskVersions.projectId, binding.projectId),
-          inArray(conversationalTaskVersions.id, taskVersionIds),
-        ),
-      );
-    const definitions = snapshots
-      .map(({ snapshot }) => conversationalTaskSnapshotV1Schema.parse(snapshot))
-      .flatMap((snapshot: ConversationalTaskSnapshotV1) =>
-        snapshot.toolDefinitions.filter(
-          (definition) =>
-            definition.id === toolRef.id &&
-            definition.version === toolRef.version &&
-            definition.projectId === binding.projectId,
-        ),
-      );
-    if (definitions.length === 0) return null;
-    if (
-      definitions.some(
-        (definition) =>
-          hashHostedVoiceToolValue(definition) !==
-          hashHostedVoiceToolValue(definitions[0]),
-      )
-    ) {
-      throw new HostedVoiceToolRequestError(
-        "ambiguous_tool_definition",
-        "The pinned tool definition is inconsistent across task versions.",
-        409,
-      );
-    }
-    return {
-      definition: definitions[0],
-      deploymentId: binding.deploymentId,
-      id: binding.id,
-      locale: voiceDefinition.locale.language,
-      projectId: binding.projectId,
-      provider: binding.provider,
-      timezone: voiceDefinition.locale.timezone,
-    };
+    return resolveBindingDefinition(binding, toolId);
   },
 
   async reserve(input) {
+    const { providerConversationId, ...call } = input;
     const [created] = await db
       .insert(hostedVoiceToolCalls)
       .values({
-        ...input,
+        ...call,
         canonicalInput: input.canonicalInput,
+        providerConversation: providerConversationId
+          ? encryptSecretValue(providerConversationId)
+          : null,
       })
       .onConflictDoNothing()
       .returning();
@@ -204,10 +150,21 @@ export const hostedVoiceToolGatewayRepository = {
     return { call: mapCall(row), created: Boolean(created) };
   },
 
-  async claimCommit({ bindingId, now, projectId, providerCallId, tokenHash }) {
+  async claimCommit({
+    bindingId,
+    executionStatus,
+    now,
+    projectId,
+    providerCallId,
+    tokenHash,
+  }) {
     const [claimed] = await db
       .update(hostedVoiceToolCalls)
-      .set({ status: "executing", updatedAt: now })
+      .set({
+        startedAt: executionStatus === "executing" ? now : null,
+        status: executionStatus,
+        updatedAt: now,
+      })
       .where(
         and(
           eq(hostedVoiceToolCalls.projectId, projectId),
@@ -230,20 +187,36 @@ export const hostedVoiceToolGatewayRepository = {
           eq(hostedVoiceToolCalls.bindingId, bindingId),
           eq(hostedVoiceToolCalls.providerCallId, providerCallId),
           eq(hostedVoiceToolCalls.commitTokenHash, tokenHash),
-          eq(hostedVoiceToolCalls.status, "completed"),
+          inArray(hostedVoiceToolCalls.status, [
+            "completed",
+            "executing",
+            "pending",
+          ]),
         ),
       )
       .limit(1);
-    return existing
-      ? { call: mapCall(existing), state: "completed" as const }
-      : null;
+    if (!existing) return null;
+    return {
+      call: mapCall(existing),
+      state:
+        existing.status === "completed"
+          ? ("completed" as const)
+          : ("pending" as const),
+    };
   },
 
   async complete({ call, committedAt, result }) {
+    const completedAt = new Date();
     const [updated] = await db
       .update(hostedVoiceToolCalls)
       .set({
         committedAt: committedAt ?? null,
+        completedAt,
+        latencyMs: Math.max(
+          0,
+          completedAt.getTime() - (call.startedAt ?? call.createdAt).getTime(),
+        ),
+        outcome: getHostedVoiceToolOutcome(result),
         result,
         status: "completed",
         updatedAt: new Date(),
@@ -278,7 +251,13 @@ export const hostedVoiceToolGatewayRepository = {
   async fail({ call, errorCode }) {
     await db
       .update(hostedVoiceToolCalls)
-      .set({ errorCode, status: "failed", updatedAt: new Date() })
+      .set({
+        completedAt: new Date(),
+        errorCode,
+        outcome: "provider_unavailable",
+        status: "failed",
+        updatedAt: new Date(),
+      })
       .where(
         and(
           eq(hostedVoiceToolCalls.id, call.id),
@@ -301,7 +280,146 @@ export const hostedVoiceToolGatewayRepository = {
   },
 } satisfies HostedVoiceToolGatewayRepository;
 
+export async function claimHostedVoiceAsyncToolWork(input: {
+  callId: number;
+  projectId: number;
+}) {
+  const now = new Date();
+  const [claimed] = await db
+    .update(hostedVoiceToolCalls)
+    .set({ startedAt: now, status: "executing", updatedAt: now })
+    .where(
+      and(
+        eq(hostedVoiceToolCalls.id, input.callId),
+        eq(hostedVoiceToolCalls.projectId, input.projectId),
+        eq(hostedVoiceToolCalls.status, "pending"),
+      ),
+    )
+    .returning();
+  const row =
+    claimed ??
+    (
+      await db
+        .select()
+        .from(hostedVoiceToolCalls)
+        .where(
+          and(
+            eq(hostedVoiceToolCalls.id, input.callId),
+            eq(hostedVoiceToolCalls.projectId, input.projectId),
+          ),
+        )
+        .limit(1)
+    )[0];
+  if (!row || !["completed", "executing"].includes(row.status)) return null;
+  const [bindingRow] = await db
+    .select()
+    .from(hostedVoiceToolBindings)
+    .where(
+      and(
+        eq(hostedVoiceToolBindings.id, row.bindingId),
+        eq(hostedVoiceToolBindings.projectId, input.projectId),
+        eq(hostedVoiceToolBindings.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (!bindingRow) return null;
+  const binding = await resolveBindingDefinition(bindingRow, row.toolId);
+  return binding ? { binding, call: mapCall(row) } : null;
+}
+
+export async function markHostedVoiceContinuation(input: {
+  callId: number;
+  errorCode?: string | null;
+  projectId: number;
+  status: "call_ended" | "failed" | "sent";
+}) {
+  await db
+    .update(hostedVoiceToolCalls)
+    .set({
+      continuationErrorCode: input.errorCode ?? null,
+      continuationSentAt: input.status === "sent" ? new Date() : null,
+      continuationStatus: input.status,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(hostedVoiceToolCalls.id, input.callId),
+        eq(hostedVoiceToolCalls.projectId, input.projectId),
+      ),
+    );
+}
+
+async function resolveBindingDefinition(
+  binding: typeof hostedVoiceToolBindings.$inferSelect,
+  toolId: string,
+) {
+  const [version] = await db
+    .select()
+    .from(hostedVoiceDeploymentVersions)
+    .where(
+      and(
+        eq(hostedVoiceDeploymentVersions.id, binding.deploymentVersionId),
+        eq(hostedVoiceDeploymentVersions.deploymentId, binding.deploymentId),
+        eq(hostedVoiceDeploymentVersions.projectId, binding.projectId),
+      ),
+    )
+    .limit(1);
+  if (!version?.definition) return null;
+  const voiceDefinition = voiceAgentDefinitionV1Schema.parse(
+    version.definition,
+  );
+  const toolRef = voiceDefinition.tools.find(({ id }) => id === toolId);
+  if (!toolRef) return null;
+  const taskVersionIds = voiceDefinition.publishedTaskVersions.map(
+    ({ taskVersionId }) => taskVersionId,
+  );
+  if (taskVersionIds.length === 0) return null;
+  const snapshots = await db
+    .select({ snapshot: conversationalTaskVersions.snapshot })
+    .from(conversationalTaskVersions)
+    .where(
+      and(
+        eq(conversationalTaskVersions.projectId, binding.projectId),
+        inArray(conversationalTaskVersions.id, taskVersionIds),
+      ),
+    );
+  const definitions = snapshots
+    .map(({ snapshot }) => conversationalTaskSnapshotV1Schema.parse(snapshot))
+    .flatMap((snapshot: ConversationalTaskSnapshotV1) =>
+      snapshot.toolDefinitions.filter(
+        (definition) =>
+          definition.id === toolRef.id &&
+          definition.version === toolRef.version &&
+          definition.projectId === binding.projectId,
+      ),
+    );
+  if (definitions.length === 0) return null;
+  if (
+    definitions.some(
+      (definition) =>
+        hashHostedVoiceToolValue(definition) !==
+        hashHostedVoiceToolValue(definitions[0]),
+    )
+  ) {
+    throw new HostedVoiceToolRequestError(
+      "ambiguous_tool_definition",
+      "The pinned tool definition is inconsistent across task versions.",
+      409,
+    );
+  }
+  return {
+    definition: definitions[0],
+    deploymentId: binding.deploymentId,
+    id: binding.id,
+    locale: voiceDefinition.locale.language,
+    projectId: binding.projectId,
+    provider: binding.provider,
+    timezone: voiceDefinition.locale.timezone,
+  };
+}
+
 const callStatusSchema = z.enum([
+  "cancelled",
   "completed",
   "executing",
   "failed",
@@ -319,12 +437,16 @@ function mapCall(
     canonicalInputHash: row.canonicalInputHash,
     commitExpiresAt: row.commitExpiresAt,
     commitTokenHash: row.commitTokenHash,
+    createdAt: row.createdAt,
     id: row.id,
     phase: z.enum(["prepare", "read"]).parse(row.phase),
     projectId: row.projectId,
     providerCallId: row.providerCallId,
+    providerConversationHash: row.providerConversationHash,
+    providerConversationId: decryptSecretValue(row.providerConversation),
     result: row.result,
     status: callStatusSchema.parse(row.status),
+    startedAt: row.startedAt,
     toolId: row.toolId,
     toolVersion: row.toolVersion,
   };

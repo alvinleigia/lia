@@ -93,11 +93,10 @@ immutable baseline and audited post-baseline comparison are complete: model
 rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 0.00%, and the evaluation gate passed 5/5 cases with zero safety failures.
 
-Current target: implement Phase 18.13 native call UX, asynchronous completion,
-and observability. Hosted deployment, drift control, the provider-neutral tool
-gateway, and verified Google Calendar operations are complete; live Telnyx
-staging UAT stays deferred until the remaining hosted engineering milestones
-pass.
+Current target: complete Phase 18.14 live Telnyx hosted-assistant staging UAT.
+Hosted deployment, drift control, the provider-neutral tool gateway, verified
+Google Calendar operations, asynchronous continuation, and metadata-only
+post-call synchronization are complete.
 
 ### Phase Tracking Snapshot
 
@@ -111,7 +110,7 @@ pass.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.12 implemented | Hosted Telnyx live UAT has not started | Implement 18.13 native call UX, asynchronous completion, and observability. |
+| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.13 implemented | Hosted Telnyx live UAT has not started | Complete 18.14 with a restricted Telnyx key, signed event webhook, dedicated test number/calendar, and approved test callers. |
 
 ## Product Direction
 
@@ -1413,7 +1412,7 @@ certification remain outside this legacy track unless scheduled separately.
   configured clinic rules, verified identity, opaque appointment references,
   explicit confirmation, recheck-before-write, post-write verification,
   concurrency control, and `outcome_unknown` reconciliation.
-- [ ] 18.13 Keep ordinary STT, model, TTS, interruption, transfer, and hangup
+- [x] 18.13 Keep ordinary STT, model, TTS, interruption, transfer, and hangup
   inside Telnyx; add bounded synchronous tools, provider-native async
   continuation, post-call synchronization, redacted diagnostics, and measured
   latency and cost dimensions without a duplicate Lia model call per turn.
@@ -1495,6 +1494,33 @@ boundaries remain authoritative for writes. TypeScript, focused lint,
 migration journal validation, and all 267 channel and extension contract tests
 passed. Live proof remains pending a dedicated staging calendar shared with a
 restricted service account.
+
+Phase 18.13 completed on 2026-08-24. Ordinary speech remains in the Telnyx
+Assistant configuration and never enters Lia's per-turn model runtime. Tools
+with a bounded synchronous contract still return inline; asynchronous reads
+and explicitly committed writes now enter the existing project-scoped durable
+queue and immediately return `pending`. The worker executes each pinned
+operation once, classifies its verified result into a fixed truthful outcome,
+and injects a deterministic, non-interrupting system continuation through
+Telnyx Add Messages. Duplicate deliveries replay the durable call, and a
+committed write remains authoritative even when the caller interrupts.
+
+The signed call-ended endpoint stores only project/deployment/version,
+provider/model, attributed version, duration/end reason, hashed correlation,
+tool outcomes, tool P50/P95/P99 latency, tool-interruption count, transfer
+state, and configured cost inputs. Tool-bearing calls use the immutable binding
+version; otherwise the record is explicitly labelled as the current main at
+sync rather than an exact Telnyx runtime version. It ignores insight contents,
+never stores caller numbers or transcripts, and expires observations under the
+pinned retention policy.
+Telnyx's message-list endpoint was deliberately not used for metrics because
+it returns full conversation text and does not prove speech-end-to-first-audio
+latency. Native turn latency, ordinary barge-in behavior, actual billing, tool
+webhook/number assignment, and event-webhook delivery remain explicit Phase
+18.14 live evidence. TypeScript, production build, migration journal, focused
+lint, and all 274 channel and extension contract tests passed. Repository-wide
+lint reports only the three pre-existing warnings, and the tenant analyzer
+reports only the two pre-existing `auditLogs` findings.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.

@@ -45,12 +45,22 @@ export type HostedVoiceToolCall = {
   canonicalInputHash: string;
   commitExpiresAt: Date | null;
   commitTokenHash: string | null;
+  createdAt: Date;
   id: number;
+  providerConversationHash: string | null;
+  providerConversationId: string | null;
   phase: "prepare" | "read";
   projectId: number;
   providerCallId: string;
   result: Record<string, unknown> | null;
-  status: "completed" | "executing" | "failed" | "pending" | "prepared";
+  status:
+    | "cancelled"
+    | "completed"
+    | "executing"
+    | "failed"
+    | "pending"
+    | "prepared";
+  startedAt: Date | null;
   toolId: string;
   toolVersion: number;
 };
@@ -58,13 +68,14 @@ export type HostedVoiceToolCall = {
 export interface HostedVoiceToolGatewayRepository {
   claimCommit(input: {
     bindingId: number;
+    executionStatus: "executing" | "pending";
     now: Date;
     projectId: number;
     providerCallId: string;
     tokenHash: string;
   }): Promise<{
     call: HostedVoiceToolCall;
-    state: "claimed" | "completed";
+    state: "claimed" | "completed" | "pending";
   } | null>;
   complete(input: {
     call: HostedVoiceToolCall;
@@ -73,7 +84,10 @@ export interface HostedVoiceToolGatewayRepository {
   }): Promise<HostedVoiceToolCall>;
   fail(input: { call: HostedVoiceToolCall; errorCode: string }): Promise<void>;
   reserve(
-    input: Omit<HostedVoiceToolCall, "id" | "result" | "status"> & {
+    input: Omit<
+      HostedVoiceToolCall,
+      "createdAt" | "id" | "result" | "startedAt" | "status"
+    > & {
       status: "pending" | "prepared";
     },
   ): Promise<{ call: HostedVoiceToolCall; created: boolean }>;
@@ -85,6 +99,7 @@ export interface HostedVoiceToolGatewayRepository {
 }
 
 export interface HostedVoiceToolExecutor {
+  enqueue?(input: { callId: number; projectId: number }): Promise<void>;
   execute(input: {
     definition: ToolDefinitionV1;
     idempotencyKey: string;
@@ -128,10 +143,13 @@ export async function executeHostedVoiceToolEnvelope(input: {
       403,
     );
   }
-  if (definition.execution.mode !== "synchronous") {
+  if (
+    definition.execution.mode === "synchronous" &&
+    definition.execution.timeoutMs > 10_000
+  ) {
     throw new HostedVoiceToolRequestError(
-      "synchronous_tool_required",
-      "This tool is not available synchronously.",
+      "synchronous_tool_timeout_too_long",
+      "This tool must use asynchronous continuation.",
       409,
     );
   }
@@ -165,6 +183,10 @@ export async function executeHostedVoiceToolEnvelope(input: {
       phase: "prepare",
       projectId: binding.projectId,
       providerCallId: input.envelope.providerCallId,
+      providerConversationHash: hashHostedVoiceToolValue(
+        input.envelope.conversationId,
+      ),
+      providerConversationId: input.envelope.conversationId,
       status: "prepared",
       toolId: definition.id,
       toolVersion: definition.version,
@@ -204,6 +226,10 @@ export async function executeHostedVoiceToolEnvelope(input: {
     phase: "read",
     projectId: binding.projectId,
     providerCallId: input.envelope.providerCallId,
+    providerConversationHash: hashHostedVoiceToolValue(
+      input.envelope.conversationId,
+    ),
+    providerConversationId: input.envelope.conversationId,
     status: "pending",
     toolId: definition.id,
     toolVersion: definition.version,
@@ -218,6 +244,12 @@ export async function executeHostedVoiceToolEnvelope(input: {
     if (reserved.call.status === "completed" && reserved.call.result) {
       return { result: reserved.call.result, status: "completed" as const };
     }
+    if (
+      definition.execution.mode === "asynchronous" &&
+      ["pending", "executing"].includes(reserved.call.status)
+    ) {
+      return { status: "pending" as const };
+    }
     throw new HostedVoiceToolRequestError(
       "tool_call_in_progress",
       "This tool call is already being processed.",
@@ -225,7 +257,15 @@ export async function executeHostedVoiceToolEnvelope(input: {
     );
   }
 
-  return executeAndComplete({
+  if (definition.execution.mode === "asynchronous") {
+    return queueAndAcknowledge({
+      call: reserved.call,
+      executor: input.executor,
+      repository: input.repository,
+    });
+  }
+
+  return executeAndCompleteHostedVoiceTool({
     binding,
     call: reserved.call,
     executor: input.executor,
@@ -271,6 +311,10 @@ async function commitHostedVoiceTool(input: {
   }
   const claimed = await input.repository.claimCommit({
     bindingId: payload.bindingId,
+    executionStatus:
+      input.binding.definition.execution.mode === "asynchronous"
+        ? "pending"
+        : "executing",
     now: input.now,
     projectId: payload.projectId,
     providerCallId: payload.providerCallId,
@@ -299,7 +343,15 @@ async function commitHostedVoiceTool(input: {
   if (claimed.state === "completed" && claimed.call.result) {
     return { result: claimed.call.result, status: "completed" as const };
   }
-  return executeAndComplete({
+  if (claimed.state === "pending") return { status: "pending" as const };
+  if (input.binding.definition.execution.mode === "asynchronous") {
+    return queueAndAcknowledge({
+      call: claimed.call,
+      executor: input.executor,
+      repository: input.repository,
+    });
+  }
+  return executeAndCompleteHostedVoiceTool({
     binding: input.binding,
     call: claimed.call,
     executor: input.executor,
@@ -308,7 +360,7 @@ async function commitHostedVoiceTool(input: {
   });
 }
 
-async function executeAndComplete(input: {
+export async function executeAndCompleteHostedVoiceTool(input: {
   binding: HostedVoiceToolBinding;
   call: HostedVoiceToolCall;
   executor: HostedVoiceToolExecutor;
@@ -354,6 +406,41 @@ async function executeAndComplete(input: {
       code,
       "The hosted voice tool could not be completed.",
       502,
+    );
+  }
+}
+
+async function queueAndAcknowledge(input: {
+  call: HostedVoiceToolCall;
+  executor: HostedVoiceToolExecutor;
+  repository: HostedVoiceToolGatewayRepository;
+}) {
+  if (!input.executor.enqueue) {
+    await input.repository.fail({
+      call: input.call,
+      errorCode: "asynchronous_executor_unavailable",
+    });
+    throw new HostedVoiceToolRequestError(
+      "asynchronous_executor_unavailable",
+      "The asynchronous tool executor is unavailable.",
+      503,
+    );
+  }
+  try {
+    await input.executor.enqueue({
+      callId: input.call.id,
+      projectId: input.call.projectId,
+    });
+    return { status: "pending" as const };
+  } catch {
+    await input.repository.fail({
+      call: input.call,
+      errorCode: "asynchronous_enqueue_failed",
+    });
+    throw new HostedVoiceToolRequestError(
+      "asynchronous_enqueue_failed",
+      "The asynchronous tool could not be queued.",
+      503,
     );
   }
 }

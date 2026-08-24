@@ -19,7 +19,10 @@ import {
 const COMMIT_SECRET = "phase-18-11-commit-secret-at-least-32-characters";
 const CREDENTIAL = "opaque-provider-binding-secret";
 
-function toolDefinition(access: "read" | "write"): ToolDefinitionV1 {
+function toolDefinition(
+  access: "read" | "write",
+  mode: "asynchronous" | "synchronous" = "synchronous",
+): ToolDefinitionV1 {
   return {
     access,
     description: `${access} appointment tool`,
@@ -27,7 +30,7 @@ function toolDefinition(access: "read" | "write"): ToolDefinitionV1 {
       adapter: "operation",
       cancellation: "unsupported",
       handler: access === "read" ? "701" : "702",
-      mode: "synchronous",
+      mode,
       retryAttempts: 0,
       retryDelayMs: 0,
       timeoutMs: 3000,
@@ -258,6 +261,66 @@ test("expired or cross-binding commit tokens cannot execute", async () => {
   expect(crossBinding.code).toBe("invalid_commit_token");
 });
 
+test("asynchronous reads acknowledge pending once without blocking the call", async () => {
+  const definition = toolDefinition("read", "asynchronous");
+  const repository = new MemoryRepository({ definition, provider: "telnyx" });
+  const executor = new MemoryExecutor();
+  const request = envelope(definition, "read", { phone: "+61412345678" });
+  const first = await executeHostedVoiceToolEnvelope({
+    commitSecret: COMMIT_SECRET,
+    credential: CREDENTIAL,
+    envelope: request,
+    executor,
+    repository,
+  });
+  const replay = await executeHostedVoiceToolEnvelope({
+    commitSecret: COMMIT_SECRET,
+    credential: CREDENTIAL,
+    envelope: request,
+    executor,
+    repository,
+  });
+  expect(first).toEqual({ status: "pending" });
+  expect(replay).toEqual(first);
+  expect(executor.calls).toHaveLength(0);
+  expect(executor.queued).toEqual([{ callId: 1, projectId: 10 }]);
+});
+
+test("an asynchronous committed write stays pending and cannot enqueue twice", async () => {
+  const definition = toolDefinition("write", "asynchronous");
+  const repository = new MemoryRepository({ definition, provider: "telnyx" });
+  const executor = new MemoryExecutor();
+  const prepared = await executeHostedVoiceToolEnvelope({
+    commitSecret: COMMIT_SECRET,
+    credential: CREDENTIAL,
+    envelope: envelope(definition, "prepare", { phone: "+61412345678" }),
+    executor,
+    repository,
+  });
+  if (prepared.status !== "prepared") throw new Error("Expected preparation.");
+  const request = envelope(definition, "commit", {
+    commitToken: prepared.commitToken,
+  });
+  const first = await executeHostedVoiceToolEnvelope({
+    commitSecret: COMMIT_SECRET,
+    credential: CREDENTIAL,
+    envelope: request,
+    executor,
+    repository,
+  });
+  const replay = await executeHostedVoiceToolEnvelope({
+    commitSecret: COMMIT_SECRET,
+    credential: CREDENTIAL,
+    envelope: request,
+    executor,
+    repository,
+  });
+  expect(first).toEqual({ status: "pending" });
+  expect(replay).toEqual(first);
+  expect(executor.calls).toHaveLength(0);
+  expect(executor.queued).toEqual([{ callId: 1, projectId: 10 }]);
+});
+
 function envelope(
   definition: ToolDefinitionV1,
   phase: HostedVoiceToolEnvelope["phase"],
@@ -281,6 +344,11 @@ class MemoryExecutor implements HostedVoiceToolExecutor {
     idempotencyKey: string;
     payload: Record<string, unknown>;
   }> = [];
+  readonly queued: Array<{ callId: number; projectId: number }> = [];
+
+  async enqueue(input: { callId: number; projectId: number }) {
+    this.queued.push(input);
+  }
 
   async execute(input: {
     idempotencyKey: string;
@@ -323,7 +391,10 @@ class MemoryRepository implements HostedVoiceToolGatewayRepository {
   }
 
   async reserve(
-    input: Omit<HostedVoiceToolCall, "id" | "result" | "status"> & {
+    input: Omit<
+      HostedVoiceToolCall,
+      "createdAt" | "id" | "result" | "startedAt" | "status"
+    > & {
       status: "pending" | "prepared";
     },
   ) {
@@ -335,8 +406,10 @@ class MemoryRepository implements HostedVoiceToolGatewayRepository {
     if (existing) return { call: existing, created: false };
     const call: HostedVoiceToolCall = {
       ...structuredClone(input),
+      createdAt: new Date(),
       id: this.calls.length + 1,
       result: null,
+      startedAt: null,
     };
     this.calls.push(call);
     return { call, created: true };
@@ -344,6 +417,7 @@ class MemoryRepository implements HostedVoiceToolGatewayRepository {
 
   async claimCommit(input: {
     bindingId: number;
+    executionStatus: "executing" | "pending";
     now: Date;
     projectId: number;
     providerCallId: string;
@@ -360,6 +434,9 @@ class MemoryRepository implements HostedVoiceToolGatewayRepository {
     if (call.status === "completed") {
       return { call, state: "completed" as const };
     }
+    if (["executing", "pending"].includes(call.status)) {
+      return { call, state: "pending" as const };
+    }
     if (
       call.status !== "prepared" ||
       !call.commitExpiresAt ||
@@ -367,7 +444,8 @@ class MemoryRepository implements HostedVoiceToolGatewayRepository {
     ) {
       return null;
     }
-    call.status = "executing";
+    call.status = input.executionStatus;
+    call.startedAt = input.executionStatus === "executing" ? input.now : null;
     return { call, state: "claimed" as const };
   }
 

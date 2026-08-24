@@ -25,6 +25,7 @@ export default defineConfig({
     "google-calendar-operations.spec.ts",
     "hosted-voice-contract.spec.ts",
     "hosted-voice-deployment.spec.ts",
+    "hosted-voice-runtime.spec.ts",
     "hosted-voice-tool-gateway.spec.ts",
     "hybrid-flow.spec.ts",
     "media-storage-contract.spec.ts",
