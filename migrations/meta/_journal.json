@@ -302,6 +302,13 @@
       "when": 1787481000000,
       "tag": "0042_hosted_voice_deployments",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1787567400000,
+      "tag": "0043_hosted_voice_tool_gateway",
+      "breakpoints": true
     }
   ]
 }

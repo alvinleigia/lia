@@ -383,6 +383,81 @@ export const hostedVoiceDeploymentVersions = pgTable(
   ],
 );
 
+export const hostedVoiceToolBindings = pgTable(
+  "hosted_voice_tool_bindings",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    deploymentId: integer("deployment_id")
+      .notNull()
+      .references(() => hostedVoiceDeployments.id),
+    deploymentVersionId: integer("deployment_version_id")
+      .notNull()
+      .references(() => hostedVoiceDeploymentVersions.id),
+    provider: text("provider").notNull(),
+    credentialHash: text("credential_hash").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("hosted_voice_tool_bindings_project_idx").on(table.projectId),
+    index("hosted_voice_tool_bindings_deployment_idx").on(table.deploymentId),
+    index("hosted_voice_tool_bindings_version_idx").on(
+      table.deploymentVersionId,
+    ),
+    uniqueIndex("hosted_voice_tool_bindings_credential_unique").on(
+      table.credentialHash,
+    ),
+    uniqueIndex("hosted_voice_tool_bindings_version_provider_unique").on(
+      table.deploymentVersionId,
+      table.provider,
+    ),
+  ],
+);
+
+export const hostedVoiceToolCalls = pgTable(
+  "hosted_voice_tool_calls",
+  {
+    id: serial("id").primaryKey(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    bindingId: integer("binding_id")
+      .notNull()
+      .references(() => hostedVoiceToolBindings.id),
+    providerCallId: text("provider_call_id").notNull(),
+    toolId: text("tool_id").notNull(),
+    toolVersion: integer("tool_version").notNull(),
+    phase: text("phase").notNull(),
+    access: text("access").notNull(),
+    canonicalInput: jsonb("canonical_input")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    canonicalInputHash: text("canonical_input_hash").notNull(),
+    status: text("status").notNull().default("pending"),
+    result: jsonb("result").$type<Record<string, unknown>>(),
+    errorCode: text("error_code"),
+    commitTokenHash: text("commit_token_hash"),
+    commitExpiresAt: timestamp("commit_expires_at"),
+    committedAt: timestamp("committed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("hosted_voice_tool_calls_project_idx").on(table.projectId),
+    index("hosted_voice_tool_calls_binding_idx").on(table.bindingId),
+    index("hosted_voice_tool_calls_status_idx").on(table.status),
+    uniqueIndex("hosted_voice_tool_calls_provider_unique").on(
+      table.bindingId,
+      table.providerCallId,
+    ),
+  ],
+);
+
 export const operations = pgTable(
   "operations",
   {
@@ -1910,6 +1985,14 @@ export type InsertHostedVoiceDeploymentVersion =
   typeof hostedVoiceDeploymentVersions.$inferInsert;
 export type SelectHostedVoiceDeploymentVersion =
   typeof hostedVoiceDeploymentVersions.$inferSelect;
+export type InsertHostedVoiceToolBinding =
+  typeof hostedVoiceToolBindings.$inferInsert;
+export type SelectHostedVoiceToolBinding =
+  typeof hostedVoiceToolBindings.$inferSelect;
+export type InsertHostedVoiceToolCall =
+  typeof hostedVoiceToolCalls.$inferInsert;
+export type SelectHostedVoiceToolCall =
+  typeof hostedVoiceToolCalls.$inferSelect;
 export type InsertOperation = typeof operations.$inferInsert;
 export type SelectOperation = typeof operations.$inferSelect;
 export type InsertOperationAttempt = typeof operationAttempts.$inferInsert;

@@ -175,6 +175,33 @@ a separately defined breaking contract is introduced.
   post-write inspection, secret-safe failures, drift blocking and all three
   explicit decisions, promotion, rollback, and cross-project rejection.
 
+### Hosted voice tool gateway
+
+- `src/lib/hosted-voice-tool-contract.ts` defines the provider-neutral request
+  envelope and adapter boundary. The Telnyx adapter derives a deterministic
+  provider-call ID from its call-control ID and canonical tool request; a fake
+  provider normalizes into the same contract.
+- A project-scoped binding stores only a hash of its bearer credential and pins
+  one Lia-authored deployment version. Immutable voice and task snapshots
+  resolve the allowed tool IDs, versions, locale, timezone, and execution
+  contract server-side.
+- `POST /api/voice-tools/[toolId]/[phase]` supports `read`, `prepare`, and
+  `commit`. Provider or model payloads cannot select tenant, project,
+  deployment, operation, calendar, task, or tool-version scope, and Lia's
+  existing field validators and output allowlists remain authoritative.
+- Reads are bounded, synchronous, and idempotently replayed. A write prepare
+  performs no external side effect and creates a five-minute HMAC token bound
+  to the project, deployment binding, tool version, provider call, and
+  canonical input. Commit claims that prepared call atomically; duplicate
+  delivery replays the saved result without executing again.
+- The executor reuses Lia's existing project-scoped operation-provider path.
+  Credentials and commit tokens are not stored in plaintext, and public errors
+  and audit metadata exclude credentials, tokens, raw provider bodies, and
+  canonical field values.
+- `tests/e2e/hosted-voice-tool-gateway.spec.ts` runs Telnyx and fake-provider
+  conformance plus authentication, scope rejection, canonical validation,
+  deterministic replay, prepare/commit, expiry, and cross-binding cases.
+
 Contract versions are explicit. Backward-compatible additions may extend a V1
 schema only when existing consumers continue to validate and behave the same.
 A breaking field, meaning, or lifecycle change requires a new exported version

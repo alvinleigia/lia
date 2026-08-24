@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18.10 hosted deployment engineering complete; Phase 18.11 next
+- Current staging milestone: Phase 17A passed; Phase 18.11 voice tool gateway engineering complete; Phase 18.12 next
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -1236,21 +1236,29 @@ Manual staging result: Pending a restricted staging Telnyx API key.
 
 ## 18.11 Provider-Neutral Voice Tool Gateway
 
-- [ ] Provider authentication normalizes into one canonical tool-call envelope.
-- [ ] An opaque deployment binding resolves project and allowed tool server-side;
+- [x] Provider authentication normalizes into one canonical tool-call envelope.
+- [x] An opaque deployment binding resolves project and allowed tool server-side;
       model-supplied tenant, project, operation, or calendar IDs are rejected.
-- [ ] Typed input/output, tenant scope, safe errors, and deterministic provider
+- [x] Typed input/output, tenant scope, safe errors, and deterministic provider
       tool-call idempotency are enforced.
-- [ ] Read calls support a bounded synchronous path; writes expose provider-
+- [x] Read calls support a bounded synchronous path; writes expose provider-
       neutral prepare and commit semantics.
-- [ ] A commit token is expiring, single-use, and bound to project, deployment,
+- [x] A commit token is expiring, single-use, and bound to project, deployment,
       tool, and canonical input.
-- [ ] Telnyx and the fake provider pass the same gateway conformance tests.
+- [x] Telnyx and the fake provider pass the same gateway conformance tests.
 
-Result: [ ] Engineering gate passed [ ] Fail
+Result: [x] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending 18.11 engineering and authenticated provider
-testing.
+Manual staging result: Pending authenticated provider testing in Phase 18.14.
+
+Evidence: TypeScript and focused lint passed; the migration journal contains
+44 ordered migrations; all 258 channel and extension contract tests passed,
+including Telnyx/fake-provider conformance, scope rejection, deterministic read
+replay, prepare/commit, duplicate commit, expiry, and cross-binding rejection.
+The tenant analyzer reports only the pre-existing `auditLogs` findings in
+`src/lib/audit.ts` and `src/lib/phase17-analytics.ts`.
+
+Completed: 2026-08-24.
 
 ## 18.12 Verified Google Calendar Appointment Operations
 
@@ -1289,7 +1297,7 @@ Manual staging result: Pending a dedicated test calendar and credential.
 
 Result: [ ] Engineering gate passed [ ] Fail
 
-Manual staging result: Pending 18.10-18.12.
+Manual staging result: Pending 18.12 engineering.
 
 ## 18.14 Live Telnyx Hosted Assistant Staging UAT
 

@@ -1509,6 +1509,96 @@ async function addOperationSubmissionEvent(input: {
   });
 }
 
+export async function runOperationForHostedVoiceTool(input: {
+  idempotencyKey: string;
+  operationId: number;
+  payload: Record<string, unknown>;
+  projectId: number;
+}) {
+  const operationContext = await getProjectOperation(
+    input.projectId,
+    input.operationId,
+  );
+  if (!operationContext) return null;
+  const { operation, provider } = operationContext;
+  if (operation.status !== "active" || provider.status !== "active") {
+    return null;
+  }
+
+  const requestPayload = {
+    idempotencyKey: input.idempotencyKey,
+    operationType: operation.operationType,
+    payload: input.payload,
+  };
+  const startedAt = new Date();
+  const [created] = await db
+    .insert(operationAttempts)
+    .values({
+      idempotencyKey: input.idempotencyKey,
+      operationId: operation.id,
+      projectId: input.projectId,
+      providerId: provider.id,
+      requestPayload,
+      startedAt,
+      status: "pending",
+      traceId: resolveTraceId(),
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (!created) {
+    const [existing] = await db
+      .select()
+      .from(operationAttempts)
+      .where(
+        and(
+          eq(operationAttempts.projectId, input.projectId),
+          eq(operationAttempts.idempotencyKey, input.idempotencyKey),
+          eq(operationAttempts.operationId, operation.id),
+        ),
+      )
+      .limit(1);
+    if (!existing || existing.status === "pending") {
+      throw new Error(
+        "This hosted voice tool call is already being processed.",
+      );
+    }
+    if (existing.status !== "completed") {
+      throw new Error("The hosted voice operation did not complete.");
+    }
+    return getOperationAttemptToolResult({ attempt: existing, operation });
+  }
+
+  const result = await executeConfiguredProvider({
+    config: provider.config,
+    idempotencyKey: input.idempotencyKey,
+    operationType: operation.operationType,
+    payload: requestPayload,
+    projectId: input.projectId,
+    providerId: provider.id,
+    providerType: provider.providerType,
+  });
+  const [completed] = await db
+    .update(operationAttempts)
+    .set({
+      errorMessage: result.errorMessage ?? null,
+      finishedAt: new Date(),
+      responsePayload: result.responsePayload,
+      status: result.status,
+    })
+    .where(
+      and(
+        eq(operationAttempts.id, created.id),
+        eq(operationAttempts.projectId, input.projectId),
+      ),
+    )
+    .returning();
+  const attempt = completed ?? created;
+  if (attempt.status !== "completed") {
+    throw new Error("The hosted voice operation did not complete.");
+  }
+  return getOperationAttemptToolResult({ attempt, operation });
+}
+
 export async function runOperationForSubmission(input: {
   actionId: number;
   fields: Record<string, unknown>;
