@@ -106,6 +106,7 @@ export default async function NewTaskPage({ searchParams }: NewTaskPageProps) {
             <ActionStateForm
               action={createConversationalTaskAction}
               className="space-y-4"
+              key={selectedTemplateKey}
             >
               <ActionFormError />
               <input

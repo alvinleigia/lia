@@ -1296,8 +1296,9 @@ are exposed as read tools and are not required for task completion. Booking,
 reschedule, and cancellation remain write tools and retain explicit
 confirmation. TypeScript, production build, focused lint, and all 276 channel
 and extension contract tests passed. Project navigation groups Operations under
-Projects for the provider setup workflow. Live staging evidence is still
-pending.
+Projects for the provider setup workflow, and the new-task form resets its
+template defaults when the starting point changes. Live staging evidence is
+still pending.
 
 Completed: 2026-08-24.
 

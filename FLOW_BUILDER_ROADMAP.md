@@ -1539,7 +1539,8 @@ tool definitions now classify Google Calendar availability and lookup as reads
 that do not complete the task, while booking, rescheduling, and cancellation
 remain consequential writes subject to prepare, explicit confirmation, and
 commit. Project navigation now groups Operations under Projects for the
-provider setup workflow. Live UAT remains unchecked.
+provider setup workflow, and changing task templates resets stale form defaults
+before a Phase 18 task is created. Live UAT remains unchecked.
 TypeScript, focused lint, the production build, and all 276 channel and
 extension contract tests passed.
 
