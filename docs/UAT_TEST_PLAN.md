@@ -1295,7 +1295,9 @@ Follow-up engineering evidence on 2026-08-30 confirms availability and lookup
 are exposed as read tools and are not required for task completion. Booking,
 reschedule, and cancellation remain write tools and retain explicit
 confirmation. TypeScript, production build, focused lint, and all 276 channel
-and extension contract tests passed. Live staging evidence is still pending.
+and extension contract tests passed. Project navigation groups Operations under
+Projects for the provider setup workflow. Live staging evidence is still
+pending.
 
 Completed: 2026-08-24.
 

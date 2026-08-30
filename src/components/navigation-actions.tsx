@@ -103,6 +103,7 @@ const projectNavigationGroups: NavigationItem[][] = [
       label: "Answer Tests",
     },
     { href: "/projects/analytics", icon: BarChart3, label: "Analytics" },
+    { href: "/projects/operations", icon: PlugZap, label: "Operations" },
   ],
 ];
 
@@ -118,7 +119,6 @@ const automationNavigationGroups: NavigationItem[][] = [
     },
   ],
   [
-    { href: "/projects/operations", icon: PlugZap, label: "Operations" },
     { href: "/projects/contacts", icon: ContactRound, label: "Contacts" },
     {
       href: "/projects/diagnostics",

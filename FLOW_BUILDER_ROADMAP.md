@@ -1538,7 +1538,8 @@ Phase 18.14 preparation follow-up completed on 2026-08-30. Operation-backed
 tool definitions now classify Google Calendar availability and lookup as reads
 that do not complete the task, while booking, rescheduling, and cancellation
 remain consequential writes subject to prepare, explicit confirmation, and
-commit. Live UAT remains unchecked.
+commit. Project navigation now groups Operations under Projects for the
+provider setup workflow. Live UAT remains unchecked.
 TypeScript, focused lint, the production build, and all 276 channel and
 extension contract tests passed.
 
