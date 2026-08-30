@@ -36,6 +36,26 @@ export type BuiltInToolExecutionResult = {
     | "cancelled";
 };
 
+export function isRunnableTaskLookupTool(input: {
+  binding: ConversationalTaskDefinitionV1["tools"][number] | undefined;
+  definition: ToolDefinitionV1;
+}) {
+  if (
+    input.binding?.access !== "read" ||
+    !input.binding.allowedStages.includes("lookup") ||
+    input.definition.access !== "read"
+  ) {
+    return false;
+  }
+
+  return (
+    (input.definition.execution.adapter === "built_in" &&
+      input.definition.execution.mode === "synchronous") ||
+    (input.definition.execution.adapter === "operation" &&
+      input.definition.execution.mode === "asynchronous")
+  );
+}
+
 type ToolTemplate = Omit<ToolDefinitionV1, "projectId">;
 
 const serviceIdInput = {

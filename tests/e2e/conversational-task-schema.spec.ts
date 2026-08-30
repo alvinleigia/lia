@@ -9,16 +9,18 @@ import {
   REFERENCE_BOOKING_TASK_DEFINITION,
 } from "../../src/lib/conversation-contract-fixtures";
 import {
-  getConversationLanguageOptions,
-  isAllowedConversationLanguage,
-} from "../../src/lib/conversation-languages";
-import {
+  type ConversationalTaskDefinitionV1,
   conversationalTaskDefinitionV1Schema,
   conversationalTaskSnapshotV1Schema,
   conversationProjectPolicyV1Schema,
   normalizeConversationalTaskDefinition,
+  type ToolDefinitionV1,
   taskIntentRecommendationV1Schema,
 } from "../../src/lib/conversation-contracts";
+import {
+  getConversationLanguageOptions,
+  isAllowedConversationLanguage,
+} from "../../src/lib/conversation-languages";
 import {
   buildFriendlyValidation,
   buildRequiredWhen,
@@ -41,6 +43,7 @@ import {
 import {
   getMissingTaskToolSourceKeys,
   getOperationToolSemantics,
+  isRunnableTaskLookupTool,
   resolveProjectTaskToolDefinition,
 } from "../../src/lib/conversational-task-tools";
 import { validateConversationalTaskForPublish } from "../../src/lib/conversational-task-validation";
@@ -264,6 +267,48 @@ test("Google Calendar reads do not inherit write confirmation semantics", () => 
       }),
     ).toEqual({ access: "write", requiredForCompletion: true });
   }
+});
+
+test("runtime lookup eligibility includes operation reads but excludes writes", () => {
+  const binding = {
+    access: "read" as const,
+    allowedStages: ["lookup" as const],
+    tool: { id: "operation:701", version: 1 },
+  } satisfies ConversationalTaskDefinitionV1["tools"][number];
+  const definition = {
+    access: "read",
+    description: "Read calendar availability.",
+    execution: {
+      adapter: "operation",
+      cancellation: "best_effort",
+      handler: "701",
+      mode: "asynchronous",
+      retryAttempts: 0,
+      retryDelayMs: 0,
+      timeoutMs: 15_000,
+    },
+    id: "operation:701",
+    inputSchema: { fields: [] },
+    name: "Check Calendar Availability",
+    outputSchema: { fields: [] },
+    projectId: 42,
+    requiredForCompletion: false,
+    resultMappings: [],
+    schemaVersion: 1,
+    version: 1,
+  } satisfies ToolDefinitionV1;
+
+  expect(isRunnableTaskLookupTool({ binding, definition })).toBe(true);
+  expect(
+    isRunnableTaskLookupTool({
+      binding: { ...binding, access: "write", allowedStages: ["operation"] },
+      definition: {
+        ...definition,
+        access: "write",
+        requiredForCompletion: true,
+      },
+    }),
+  ).toBe(false);
 });
 
 test("reference booking fixture satisfies the universal contracts", () => {

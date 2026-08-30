@@ -24,6 +24,8 @@ import {
   getTaskRuntimeTestConversationId,
   runtimeResultMessage,
 } from "@/lib/conversational-task-runtime-session";
+import { isRunnableTaskLookupTool } from "@/lib/conversational-task-tools";
+import { runOperationForTool } from "@/lib/operations";
 
 const fieldInputSchema = z.object({
   fieldKey: z
@@ -362,15 +364,7 @@ export async function requestTaskRuntimeTestToolAction(
       candidate.version === binding?.tool.version &&
       candidate.projectId === test.project.id,
   );
-  if (
-    !binding ||
-    !definition ||
-    binding.access !== "read" ||
-    !binding.allowedStages.includes("lookup") ||
-    definition.access !== "read" ||
-    definition.execution.adapter !== "built_in" ||
-    definition.execution.mode !== "synchronous"
-  ) {
+  if (!definition || !isRunnableTaskLookupTool({ binding, definition })) {
     return {
       error:
         "This test screen can run only published, read-only business lookups.",
@@ -392,6 +386,71 @@ export async function requestTaskRuntimeTestToolAction(
   const error = runtimeResultMessage(result);
   if (error) {
     return { error: toolErrorMessages[error] ?? "The lookup could not run." };
+  }
+
+  if (definition.execution.adapter === "operation") {
+    const refreshed = await getConversationTaskRuntimeSession({
+      channelType: "project_chat",
+      externalConversationId: test.externalConversationId,
+      projectId: test.project.id,
+    });
+    const request = refreshed.runtime?.tools.find(
+      (candidate) => candidate.requestId === requestId,
+    );
+    const operationId = Number(definition.execution.handler);
+    if (
+      !request ||
+      !Number.isInteger(operationId) ||
+      operationId <= 0 ||
+      result.revision === null
+    ) {
+      return { error: "The published lookup request could not be loaded." };
+    }
+
+    let operationResult: Record<string, unknown> | null = null;
+    try {
+      operationResult = await runOperationForTool({
+        idempotencyKey: requestId,
+        operationId,
+        payload: request.input,
+        projectId: test.project.id,
+      });
+    } catch {
+      operationResult = null;
+    }
+
+    const now = new Date().toISOString();
+    const completion = await applyConversationalTaskEvent({
+      authentication: {
+        keyId: null,
+        kind: "user",
+        principal: String(test.user.id),
+        verifiedAt: now,
+      },
+      channelIdentity: runtimeChannelIdentity(test.user.id),
+      channelType: "project_chat",
+      conversationId: active.runtime.run.conversationId,
+      errorCode: operationResult ? null : "operation_lookup_failed",
+      eventId: crypto.randomUUID(),
+      expectedRevision: result.revision,
+      occurredAt: now,
+      projectId: test.project.id,
+      providerSequence: null,
+      receivedAt: now,
+      requestId,
+      result: operationResult,
+      schemaVersion: 1,
+      status: operationResult ? "success" : "provider_failure",
+      taskRunId: active.runtime.run.id,
+      type: "tool.result",
+    });
+    const completionError = runtimeResultMessage(completion);
+    if (completionError) {
+      return { error: "The lookup result could not be recorded." };
+    }
+    if (!operationResult) {
+      return { error: "The lookup provider did not complete the request." };
+    }
   }
 
   revalidatePath(runtimePath(test.task.id));

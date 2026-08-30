@@ -1547,6 +1547,16 @@ because multilingual certification is deferred. Live UAT remains unchecked.
 TypeScript, focused lint, the production build, and all 277 channel and
 extension contract tests passed.
 
+Phase 18.14 runtime-test follow-up completed on 2026-08-30. The Business Lookup
+test now includes published operation-backed reads and executes them through
+the existing project-scoped operation boundary using only runtime-canonical
+task values. Built-in synchronous reads retain their existing path, while
+booking and every other write remain excluded from lookup and continue through
+prepare, explicit confirmation, and commit. The shared executor now has a
+channel-neutral entry point, with the hosted-voice entry point retained as a
+compatibility wrapper. TypeScript, focused lint, the production build, and all
+278 channel and extension contract tests passed. Live UAT remains unchecked.
+
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
 

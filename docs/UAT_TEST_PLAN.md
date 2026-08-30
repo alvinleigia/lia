@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18.14 staging controls ready; live Telnyx UAT next
+- Current staging milestone: Phase 17A passed; Phase 18.14 staging preflight in progress
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -22,7 +22,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Hosted milestones 18.9-18.13 and staging controls implemented | Complete Phase 18.14 live hosted-assistant UAT. |
+| 18 - Telnyx and extensions | Hosted milestones 18.9-18.13 complete; 18.14 staging preflight in progress | Resume the runtime availability test, then complete live hosted-assistant UAT. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -1341,10 +1341,26 @@ Use a dedicated test number, calendar, and transfer destination. Do not use real
 patient data or paste credentials or raw provider payloads into this record.
 The staging console and secret-safe setup procedure are implemented; follow
 [`TELNYX_HOSTED_STAGING_RUNBOOK.md`](TELNYX_HOSTED_STAGING_RUNBOOK.md).
-Live execution has not started, so every result below remains unchecked.
+Live Telnyx call execution has not started, so every numbered result below
+remains unchecked.
 The shared Behavior policy and task Workflow language controls now use the same
 typo-safe selector; English is the only certified choice for this baseline, and
 existing legacy values remain preserved until intentionally changed.
+
+Staging preflight evidence on 2026-08-30:
+
+- [x] A dedicated Google Calendar provider and read/write appointment operations
+      are active in project `#94`.
+- [x] `Phase 18 Booking UAT` version 1 is published with four required fields,
+      read-only availability, and confirmed booking.
+- [x] The structured conversation test collected the supplied date, name, and
+      contact number, requested the missing time, and made no tool call or
+      booking claim.
+- [x] The Runtime Test now admits operation-backed reads through the
+      channel-neutral, project-scoped operation executor using canonical saved
+      fields; write operations remain excluded from Business Lookup.
+- [x] TypeScript, focused lint, the production build, and all 278 channel and
+      extension contract tests pass.
 
 1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
        the staging number or approved test callers to it.

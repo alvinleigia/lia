@@ -42,6 +42,7 @@ import {
   getTaskRuntimeTestConversationId,
 } from "@/lib/conversational-task-runtime-session";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
+import { isRunnableTaskLookupTool } from "@/lib/conversational-task-tools";
 import {
   getProjectConversationalTask,
   listConversationalTaskVersions,
@@ -257,13 +258,7 @@ export default async function TaskRuntimeTestPage({
           candidate.tool.id === definition.id &&
           candidate.tool.version === definition.version,
       );
-      return (
-        binding?.access === "read" &&
-        binding.allowedStages.includes("lookup") &&
-        definition.access === "read" &&
-        definition.execution.adapter === "built_in" &&
-        definition.execution.mode === "synchronous"
-      );
+      return isRunnableTaskLookupTool({ binding, definition });
     }) ?? [];
   const writeOperations =
     session.snapshot?.toolDefinitions.flatMap((definition) => {
@@ -757,8 +752,8 @@ export default async function TaskRuntimeTestPage({
 
               {runnableTools.length === 0 && (
                 <p className="rounded-md border px-4 py-3 text-sm text-muted-foreground">
-                  Publish at least one read-only built-in tool with the Lookup
-                  stage enabled to test it here.
+                  Publish at least one read-only tool with the Lookup stage
+                  enabled to test it here.
                 </p>
               )}
 

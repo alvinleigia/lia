@@ -1530,12 +1530,14 @@ async function addOperationSubmissionEvent(input: {
   });
 }
 
-export async function runOperationForHostedVoiceTool(input: {
+export type OperationToolRunInput = {
   idempotencyKey: string;
   operationId: number;
   payload: Record<string, unknown>;
   projectId: number;
-}) {
+};
+
+export async function runOperationForTool(input: OperationToolRunInput) {
   const operationContext = await getProjectOperation(
     input.projectId,
     input.operationId,
@@ -1579,9 +1581,7 @@ export async function runOperationForHostedVoiceTool(input: {
       )
       .limit(1);
     if (!existing || existing.status === "pending") {
-      throw new Error(
-        "This hosted voice tool call is already being processed.",
-      );
+      throw new Error("This operation tool call is already being processed.");
     }
     return getOperationAttemptToolResult({ attempt: existing, operation });
   }
@@ -1612,6 +1612,12 @@ export async function runOperationForHostedVoiceTool(input: {
     .returning();
   const attempt = completed ?? created;
   return getOperationAttemptToolResult({ attempt, operation });
+}
+
+export async function runOperationForHostedVoiceTool(
+  input: OperationToolRunInput,
+) {
+  return runOperationForTool(input);
 }
 
 export async function runOperationForSubmission(input: {
