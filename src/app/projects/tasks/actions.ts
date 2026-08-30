@@ -27,11 +27,11 @@ import {
   taskOutcomeV1Schema,
   toolBindingV1Schema,
 } from "@/lib/conversation-contracts";
+import { isAllowedConversationLanguage } from "@/lib/conversation-languages";
 import {
   getConversationProjectPolicy,
   saveConversationProjectPolicy,
 } from "@/lib/conversation-project-policies";
-import { isAllowedConversationLanguage } from "@/lib/conversation-languages";
 import { resolveConversationalTaskMutation } from "@/lib/conversational-task-access";
 import {
   buildFriendlyValidation,
@@ -395,6 +395,10 @@ export async function updateConversationProjectPolicyAction(
   }
 
   const current = await getConversationProjectPolicy(context.project.id);
+  const language = String(formData.get("language") ?? "").trim();
+  if (!isAllowedConversationLanguage(language, current.assistant.language)) {
+    return { error: "Please select a supported language." };
+  }
   const stageOverrides = TURN_MODEL_STAGES.flatMap((stage) => {
     const modelId = String(formData.get(`stageModelId:${stage}`) ?? "").trim();
     if (!modelId) {
@@ -419,7 +423,7 @@ export async function updateConversationProjectPolicyAction(
       baseInstructions: formData.get("baseInstructions") || null,
       greeting: formData.get("greeting") || null,
       greetingStrategy: formData.get("greetingStrategy"),
-      language: formData.get("language"),
+      language,
       modelPolicy: {
         ...current.assistant.modelPolicy,
         mode: formData.get("modelPolicyMode"),

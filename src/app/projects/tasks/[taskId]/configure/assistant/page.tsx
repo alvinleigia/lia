@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TURN_MODEL_STAGES } from "@/lib/conversation-contracts";
+import { getConversationLanguageOptions } from "@/lib/conversation-languages";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
 import { getProjectConversationalTask } from "@/lib/conversational-tasks";
@@ -62,6 +63,9 @@ export default async function AssistantPolicyPage({
   if (!task) {
     redirect("/projects/tasks?error=Task%20not%20found.");
   }
+  const languageOptions = getConversationLanguageOptions(
+    policy.assistant.language,
+  );
   const stageOverrides = new Map(
     policy.assistant.modelPolicy.stageOverrides.map((override) => [
       override.stage,
@@ -130,12 +134,19 @@ export default async function AssistantPolicyPage({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="language">Default Language</Label>
-                  <Input
+                  <select
                     id="language"
                     name="language"
+                    className={selectClass}
                     defaultValue={policy.assistant.language}
                     required
-                  />
+                  >
+                    {languageOptions.map((language) => (
+                      <option key={language} value={language}>
+                        {language}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="space-y-2">

@@ -1540,12 +1540,12 @@ that do not complete the task, while booking, rescheduling, and cancellation
 remain consequential writes subject to prepare, explicit confirmation, and
 commit. Project navigation now groups Operations under Projects for the
 provider setup workflow, and changing task templates resets stale form defaults
-before a Phase 18 task is created. The task Workflow now uses a controlled
-language selector and rejects new arbitrary values while preserving legacy
-saved values; English remains the only certified language because multilingual
-certification is deferred. Live UAT remains unchecked. TypeScript, focused
-lint, the production build, and all 277 channel and extension contract tests
-passed.
+before a Phase 18 task is created. The shared Behavior policy and task Workflow
+now use one controlled language selector and reject new arbitrary values while
+preserving legacy saved values; English remains the only certified language
+because multilingual certification is deferred. Live UAT remains unchecked.
+TypeScript, focused lint, the production build, and all 277 channel and
+extension contract tests passed.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
