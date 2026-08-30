@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
+import { getConversationLanguageOptions } from "@/lib/conversation-languages";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
 import {
   getProjectConversationalTask,
@@ -78,6 +79,9 @@ export default async function TaskOutcomesPage({
   ]);
   if (!task) redirect("/projects/tasks?error=Task%20not%20found.");
   const definition = readConversationalTaskDefinition(task.definition);
+  const taskLanguageOptions = getConversationLanguageOptions(
+    definition.taskPolicy.language,
+  );
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10">
@@ -258,11 +262,19 @@ export default async function TaskOutcomesPage({
               <div className="grid gap-4 md:grid-cols-4">
                 <div className="space-y-2">
                   <Label htmlFor="taskLanguage">Task Language</Label>
-                  <Input
+                  <select
                     id="taskLanguage"
                     name="language"
+                    className={selectClass}
                     defaultValue={definition.taskPolicy.language}
-                  />
+                    required
+                  >
+                    {taskLanguageOptions.map((language) => (
+                      <option key={language} value={language}>
+                        {language}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="responseLength">Response Length</Label>

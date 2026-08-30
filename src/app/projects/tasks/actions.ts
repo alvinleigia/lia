@@ -31,6 +31,7 @@ import {
   getConversationProjectPolicy,
   saveConversationProjectPolicy,
 } from "@/lib/conversation-project-policies";
+import { isAllowedConversationLanguage } from "@/lib/conversation-languages";
 import { resolveConversationalTaskMutation } from "@/lib/conversational-task-access";
 import {
   buildFriendlyValidation,
@@ -1089,7 +1090,17 @@ export async function updateConversationalTaskSafetyAction(
   const parsed = z
     .object({
       responseLength: z.enum(["short", "balanced", "detailed"]),
-      language: z.string().trim().min(2).max(40),
+      language: z
+        .string()
+        .trim()
+        .min(2)
+        .max(40)
+        .refine((language) =>
+          isAllowedConversationLanguage(
+            language,
+            definition.taskPolicy.language,
+          ),
+        ),
       fallbackMessage: z.string().trim().max(1000).nullable(),
       handoffMessage: z.string().trim().max(1000).nullable(),
       instructions: z.string().trim().max(2000).nullable(),

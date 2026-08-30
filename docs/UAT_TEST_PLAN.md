@@ -1342,6 +1342,9 @@ patient data or paste credentials or raw provider payloads into this record.
 The staging console and secret-safe setup procedure are implemented; follow
 [`TELNYX_HOSTED_STAGING_RUNBOOK.md`](TELNYX_HOSTED_STAGING_RUNBOOK.md).
 Live execution has not started, so every result below remains unchecked.
+The task Workflow language control is now a typo-safe selector; English is the
+only certified choice for this baseline, and existing legacy values remain
+preserved until intentionally changed.
 
 1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
        the staging number or approved test callers to it.

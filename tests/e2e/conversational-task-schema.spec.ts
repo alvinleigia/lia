@@ -9,6 +9,10 @@ import {
   REFERENCE_BOOKING_TASK_DEFINITION,
 } from "../../src/lib/conversation-contract-fixtures";
 import {
+  getConversationLanguageOptions,
+  isAllowedConversationLanguage,
+} from "../../src/lib/conversation-languages";
+import {
   conversationalTaskDefinitionV1Schema,
   conversationalTaskSnapshotV1Schema,
   conversationProjectPolicyV1Schema,
@@ -41,6 +45,17 @@ import {
 } from "../../src/lib/conversational-task-tools";
 import { validateConversationalTaskForPublish } from "../../src/lib/conversational-task-validation";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
+
+test("conversation language options prevent new free-text values without breaking legacy tasks", () => {
+  expect(getConversationLanguageOptions("English")).toEqual(["English"]);
+  expect(getConversationLanguageOptions("French")).toEqual([
+    "French",
+    "English",
+  ]);
+  expect(isAllowedConversationLanguage("English", "English")).toBe(true);
+  expect(isAllowedConversationLanguage("Englsh", "English")).toBe(false);
+  expect(isAllowedConversationLanguage("French", "French")).toBe(true);
+});
 
 test("conversational task details normalize a valid draft", () => {
   const parsed = conversationalTaskDetailsSchema.parse({
