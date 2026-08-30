@@ -1291,6 +1291,12 @@ migrations; all 267 channel and extension contract tests passed. The tenant
 analyzer reports only the pre-existing `auditLogs` findings in
 `src/lib/audit.ts` and `src/lib/phase17-analytics.ts`.
 
+Follow-up engineering evidence on 2026-08-30 confirms availability and lookup
+are exposed as read tools and are not required for task completion. Booking,
+reschedule, and cancellation remain write tools and retain explicit
+confirmation. TypeScript, production build, focused lint, and all 276 channel
+and extension contract tests passed. Live staging evidence is still pending.
+
 Completed: 2026-08-24.
 
 ## 18.13 Native Call UX, Async Completion, And Observability
@@ -1339,7 +1345,8 @@ Live execution has not started, so every result below remains unchecked.
 2. [ ] Confirm greeting, ordinary conversation, interruption, transfer, and
        hangup remain Telnyx-native with no Lia turn processing.
 3. [ ] Complete availability, booking, find, reschedule, and cancel through Lia
-       tools; confirm every spoken success matches a verified operation result.
+       tools; confirm availability and find require no write confirmation, and
+       every spoken success matches a verified operation result.
 4. [ ] Prove explicit confirmation precedes commit and duplicate delivery creates
        one appointment.
 5. [ ] Race two calls for one slot and confirm exactly one receives success.

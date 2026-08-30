@@ -36,6 +36,7 @@ import {
 } from "../../src/lib/conversational-task-templates";
 import {
   getMissingTaskToolSourceKeys,
+  getOperationToolSemantics,
   resolveProjectTaskToolDefinition,
 } from "../../src/lib/conversational-task-tools";
 import { validateConversationalTaskForPublish } from "../../src/lib/conversational-task-validation";
@@ -220,6 +221,34 @@ test("tool readiness uses required task sources from the runtime contract", asyn
       toolDefinition,
     }),
   ).toEqual(["serviceId"]);
+});
+
+test("Google Calendar reads do not inherit write confirmation semantics", () => {
+  expect(
+    getOperationToolSemantics({
+      operationType: "google_calendar.availability",
+      providerType: "google_calendar",
+    }),
+  ).toEqual({ access: "read", requiredForCompletion: false });
+  expect(
+    getOperationToolSemantics({
+      operationType: "google_calendar.lookup",
+      providerType: "google_calendar",
+    }),
+  ).toEqual({ access: "read", requiredForCompletion: false });
+
+  for (const operationType of [
+    "google_calendar.book",
+    "google_calendar.reschedule",
+    "google_calendar.cancel",
+  ]) {
+    expect(
+      getOperationToolSemantics({
+        operationType,
+        providerType: "google_calendar",
+      }),
+    ).toEqual({ access: "write", requiredForCompletion: true });
+  }
 });
 
 test("reference booking fixture satisfies the universal contracts", () => {

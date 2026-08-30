@@ -18,6 +18,11 @@ export type ProjectTaskToolOption = {
   version: number;
 };
 
+export type OperationToolSemantics = {
+  access: "read" | "write";
+  requiredForCompletion: boolean;
+};
+
 export type BuiltInToolExecutionResult = {
   errorCode: string | null;
   result: Record<string, unknown> | null;
@@ -258,6 +263,20 @@ function stableSourceKey(value: string) {
   return /^[a-z][a-zA-Z0-9_]*$/.test(normalized) ? normalized : null;
 }
 
+export function getOperationToolSemantics(input: {
+  operationType: string;
+  providerType: string;
+}): OperationToolSemantics {
+  const isGoogleCalendarRead =
+    input.providerType === "google_calendar" &&
+    (input.operationType === "google_calendar.availability" ||
+      input.operationType === "google_calendar.lookup");
+
+  return isGoogleCalendarRead
+    ? { access: "read", requiredForCompletion: false }
+    : { access: "write", requiredForCompletion: true };
+}
+
 function operationDefinition(input: {
   definition: ConversationalTaskDefinitionV1;
   operationRow: Awaited<ReturnType<typeof getProjectOperation>>;
@@ -353,8 +372,12 @@ function operationDefinition(input: {
     300_000,
     Math.max(0, numberSetting(config, "retryDelayMs", 1_000)),
   );
+  const semantics = getOperationToolSemantics({
+    operationType: row.operation.operationType,
+    providerType: row.provider.providerType,
+  });
   return toolDefinitionV1Schema.parse({
-    access: "write",
+    access: semantics.access,
     description: `${row.operation.name} via ${row.provider.name}.`,
     execution: {
       adapter: "operation",
@@ -370,7 +393,7 @@ function operationDefinition(input: {
     name: row.operation.name,
     outputSchema: { fields: outputFields },
     projectId: input.projectId,
-    requiredForCompletion: true,
+    requiredForCompletion: semantics.requiredForCompletion,
     resultMappings,
     schemaVersion: 1,
     version: 1,
@@ -401,7 +424,10 @@ export async function listProjectTaskToolOptions(
       operation.status === "active" && provider.status === "active"
         ? [
             {
-              access: "write" as const,
+              access: getOperationToolSemantics({
+                operationType: operation.operationType,
+                providerType: provider.providerType,
+              }).access,
               description: `${operation.name} via ${provider.name}.`,
               id: `operation:${operation.id}`,
               kind: "operation" as const,

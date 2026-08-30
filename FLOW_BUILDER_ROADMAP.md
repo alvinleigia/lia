@@ -1533,7 +1533,13 @@ candidate. Promotion and rollback require explicit confirmation, while drift
 inspection remains a separate blocking action. The operator procedure is in
 `docs/TELNYX_HOSTED_STAGING_RUNBOOK.md`. Live UAT remains unchecked until the
 release owner supplies the restricted staging assets and all ten checks pass.
-TypeScript, focused lint, the production build, and all 275 channel and
+
+Phase 18.14 preparation follow-up completed on 2026-08-30. Operation-backed
+tool definitions now classify Google Calendar availability and lookup as reads
+that do not complete the task, while booking, rescheduling, and cancellation
+remain consequential writes subject to prepare, explicit confirmation, and
+commit. Live UAT remains unchecked.
+TypeScript, focused lint, the production build, and all 276 channel and
 extension contract tests passed.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without

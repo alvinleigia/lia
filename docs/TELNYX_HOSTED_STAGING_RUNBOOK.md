@@ -70,6 +70,8 @@ Publishing a candidate must not route production traffic or make it main.
    `prepare` and `commit` tools. The Assistant must ask for explicit caller
    confirmation after prepare and pass the returned `commitToken` unchanged to
    commit. Never synthesize, edit, or reuse a commit token for another request.
+   Availability and lookup are reads; booking, rescheduling, and cancellation
+   are writes. Stop if the generated manifest classifies them differently.
 5. Configure Telnyx-native transfer and hangup tools on the same candidate.
    Transfer may target only the approved staging destination.
 6. Configure the manifest's signed event webhook URL for conversation-ended
