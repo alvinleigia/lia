@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18.14 booking reconciliation retest pending
+- Current staging milestone: Phase 17A passed; Phase 18.14 appointment lifecycle preflight in progress
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -22,7 +22,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Hosted milestones 18.9-18.13 complete; 18.14 staging preflight in progress | Deploy the confirmation-state fix, reconcile Attempt #25 without rebooking, then complete live hosted-assistant UAT. |
+| 18 - Telnyx and extensions | Hosted milestones 18.9-18.13 complete; booking and duplicate protection passed in 18.14 staging preflight | Complete find, reschedule, cancel, then live hosted-assistant UAT. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -1371,9 +1371,10 @@ Additional staging preflight evidence on 2026-08-31:
       before queueing.
 - [x] Duplicate protection reused durable Attempt #25 instead of creating a
       second operation attempt.
-- [ ] Reconcile Attempt #25 and verify the one expected calendar event after
-      the staging confirmation-state fix deploys. The first processing pass
-      stopped at `confirmation_required`; do not queue or book again.
+- [x] The deployed fix reconciled the existing Attempt #25 without another
+      provider attempt. The dedicated calendar contains exactly one synthetic
+      appointment at 04:30 IST, the correct local display of 09:00
+      Australia/Sydney (23:00 UTC).
 - [x] The regression fix preserves confirmation for an unchanged provider
       result and safely recovers an already-delivered attempt only when current
       field values exactly match its immutable confirmation summary. The
@@ -1390,7 +1391,7 @@ Additional staging preflight evidence on 2026-08-31:
 3. [ ] Complete availability, booking, find, reschedule, and cancel through Lia
        tools; confirm availability and find require no write confirmation, and
        every spoken success matches a verified operation result.
-4. [ ] Prove explicit confirmation precedes commit and duplicate delivery creates
+4. [x] Prove explicit confirmation precedes commit and duplicate delivery creates
        one appointment.
 5. [ ] Race two calls for one slot and confirm exactly one receives success.
 6. [ ] Exercise fast, pending, provider-failure, and post-write unknown outcomes;
@@ -1410,7 +1411,7 @@ Result: [ ] Pass [ ] Fail
 - Tested Lia voice version and tools: `<versions>`
 - Correlated call/conversation IDs: `<masked IDs>`
 - Latency/cost evidence: `<metrics or links>`
-- Defects/evidence: `Attempt #25 confirmation-state reconciliation retest pending`
+- Defects/evidence: `Attempt #25 confirmation-state defect fixed and staging retest passed`
 - Tester/date: `<name/date>`
 
 # Final Release Record
@@ -1422,7 +1423,7 @@ Result: [ ] Pass [ ] Fail
 - Phase 17A: [x] Pass [ ] Fail [ ] In progress
 - Phase 18: [ ] Pass [ ] Fail [x] In progress [ ] Not started
 - Critical defects open: `0`
-- High defects open: `1 - Attempt #25 staging reconciliation retest pending`
+- High defects open: `0`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 - Phase 16 approver/date: `Single tester / release owner - 2026-08-16`
 - Phase 17 approver/date: `Single tester / release owner - 2026-08-20`

@@ -97,8 +97,8 @@ Current target: complete Phase 18.14 live Telnyx hosted-assistant staging UAT.
 Hosted deployment, drift control, the provider-neutral tool gateway, verified
 Google Calendar operations, asynchronous continuation, and metadata-only
 post-call synchronization are complete. Staging availability, explicit
-confirmation, and durable duplicate protection have passed; deploy and safely
-reconcile the existing booking attempt before continuing the live call matrix.
+confirmation, durable duplicate protection, and one verified booking have
+passed; continue with find, reschedule, cancel, and the live call matrix.
 
 ### Phase Tracking Snapshot
 
@@ -112,7 +112,7 @@ reconcile the existing booking attempt before continuing the live call matrix.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.13 and staging controls implemented | Phase 18.14 staging preflight in progress | Reconcile booking Attempt #25 after the confirmation-state fix, then complete the live hosted-assistant call matrix. |
+| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.13 and staging controls implemented | Phase 18.14 staging preflight in progress; booking and duplicate protection passed | Complete find, reschedule, cancel, then the live hosted-assistant call matrix. |
 
 ## Product Direction
 
@@ -1573,8 +1573,15 @@ calendar insert. The focused 13-test runtime suite, TypeScript, the production
 build, and all 279 channel and extension contract tests pass. The
 database-backed recovery scenario is implemented but its local run was blocked
 before fixture creation because the configured Supabase tenant was
-unreachable. Staging retry and calendar verification remain required before
-the booking UAT result is accepted.
+unreachable. At that checkpoint, staging retry and calendar verification
+remained required before the booking UAT result could be accepted.
+
+The 2026-08-31 staging retry then completed the same durable Attempt #25 and
+recorded the task outcome without another provider attempt. The dedicated
+Google Calendar contained exactly one synthetic appointment at 04:30 IST,
+which is the correct display of 09:00 Australia/Sydney (23:00 UTC), so the
+confirmation-state defect is closed and the booking/duplicate-protection
+preflight is accepted. Find, reschedule, and cancel remain next.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
