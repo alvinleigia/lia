@@ -1591,9 +1591,11 @@ from reporting required fields. Unresolved mappings now remain in the
 provider-neutral input contract as required field or explicitly named context
 sources; configured fields still retain their canonical types. The blank-task
 regression, all 28 task-schema tests, TypeScript, the production build, and all
-280 channel and extension contract tests pass. Staging must confirm that the
-calendar cards now show their exact `Needs setup` field keys before
-reschedule configuration continues.
+280 channel and extension contract tests pass. The staging retest now confirms
+that blank-task calendar cards show `Needs setup` with exact missing field
+keys; reschedule reports `rescheduleStart`, `patientName`, `contactNumber`, and
+`appointmentRef`. The readiness defect is closed and reschedule configuration
+can continue.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
