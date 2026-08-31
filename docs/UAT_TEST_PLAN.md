@@ -1391,6 +1391,15 @@ Additional staging preflight evidence on 2026-08-31:
       required provider-neutral field or context sources. All 28 task-schema
       tests, TypeScript, the production build, and all 280 channel and extension
       contract tests pass.
+- [x] Published `Phase 18 Reschedule UAT` version 1 with five required fields,
+      three allowed tools, and two outcomes. The read-only find lookup located
+      the existing 09:00 Australia/Sydney appointment, and availability excluded
+      that occupied slot and returned 09:30 as the first verified alternative.
+- [x] Explicit confirmation and duplicate protection reused durable Attempt
+      #28 before the reschedule was processed. The operation completed and the
+      dedicated calendar now contains exactly one synthetic appointment at
+      05:00 IST, the correct display of 09:30 Australia/Sydney (23:30 UTC); the
+      former 04:30 IST event no longer exists.
 
 1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
        the staging number or approved test callers to it.
@@ -1419,7 +1428,7 @@ Result: [ ] Pass [ ] Fail
 - Tested Lia voice version and tools: `<versions>`
 - Correlated call/conversation IDs: `<masked IDs>`
 - Latency/cost evidence: `<metrics or links>`
-- Defects/evidence: `Attempt #25 and blank-task operation readiness fixed and verified`
+- Defects/evidence: `Attempts #25 and #28, booking, find, reschedule, and blank-task readiness verified; cancel pending`
 - Tester/date: `<name/date>`
 
 # Final Release Record

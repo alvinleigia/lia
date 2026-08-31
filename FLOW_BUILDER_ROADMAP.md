@@ -1581,7 +1581,8 @@ recorded the task outcome without another provider attempt. The dedicated
 Google Calendar contained exactly one synthetic appointment at 04:30 IST,
 which is the correct display of 09:00 Australia/Sydney (23:00 UTC), so the
 confirmation-state defect is closed and the booking/duplicate-protection
-preflight is accepted. Find, reschedule, and cancel remain next.
+preflight is accepted. Find, reschedule, and cancel remained next at this
+checkpoint.
 
 Phase 18.14 operation-readiness follow-up completed on 2026-08-31 after a new
 blank reschedule task incorrectly displayed every calendar operation as
@@ -1596,6 +1597,17 @@ that blank-task calendar cards show `Needs setup` with exact missing field
 keys; reschedule reports `rescheduleStart`, `patientName`, `contactNumber`, and
 `appointmentRef`. The readiness defect is closed and reschedule configuration
 can continue.
+
+Phase 18.14 find and reschedule staging preflight passed on 2026-08-31 with
+published `Phase 18 Reschedule UAT` version 1: five required task fields, three
+allowed tools, and two outcomes. The read-only lookup found the existing 09:00
+Australia/Sydney appointment, and availability correctly excluded the occupied
+slot and returned 09:30 first. Explicit confirmation preceded the write,
+duplicate protection reused durable Attempt #28, and the reschedule completed.
+The dedicated Google Calendar contains exactly one synthetic appointment at
+05:00 IST, the correct display of 09:30 Australia/Sydney (23:30 UTC), and the
+former 04:30 IST event is gone. Find and reschedule are accepted; cancel remains
+next.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
