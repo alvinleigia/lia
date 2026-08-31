@@ -31,7 +31,9 @@ import {
   channelMessages,
   companies,
   conversationalTaskAuditEvents,
+  conversationalTaskFieldValues,
   conversationalTasks,
+  conversationalTaskToolRequests,
   conversationalTaskVersions,
   conversationExecutionStates,
   conversationInboundEvents,
@@ -51,6 +53,8 @@ import {
 import {
   createIntegrationProvider,
   createOperation,
+  getOperationAttemptToolResult,
+  getProjectOperationAttemptWithDetails,
   processProjectDurableOperationQueue,
 } from "../../src/lib/operations";
 import {
@@ -296,6 +300,7 @@ test.beforeAll(async () => {
     operationType: "manual_review",
     outputMapping: {
       "contactAttributes.reviewMode": "responsePayload.mode",
+      "fields.guestName": "requestPayload.payload.guestName",
     },
     projectId: project.id,
     providerId: manualProvider.id,
@@ -836,6 +841,132 @@ test("queues one durable attempt and completes from sanitized mapped output", as
   });
   expect(exported.confirmations).toContainEqual(
     expect.objectContaining({ id: pending.id, status: "consumed" }),
+  );
+});
+
+test("recovers a delivered attempt after legacy completion lost confirmation", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const run = await startReadyRun(fixture.manualTaskId);
+  const pending = await prepareTaskOperationConfirmation({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+    toolId: fixture.manualToolId,
+  });
+  await confirmTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  const queued = await executeConfirmedTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  const delivered = await processProjectDurableOperationQueue({
+    maxJobs: 1,
+    projectId: fixture.projectId,
+    workerId: `legacy-confirmation-${suffix}`,
+  });
+  expect(delivered.completed).toBe(1);
+  const attemptDetails = await getProjectOperationAttemptWithDetails(
+    fixture.projectId,
+    queued.attempt.id,
+  );
+  if (!attemptDetails || !queued.attempt.taskToolRequestId) {
+    throw new Error("The delivered attempt details are missing.");
+  }
+  const [request] = await db
+    .select()
+    .from(conversationalTaskToolRequests)
+    .where(
+      and(
+        eq(conversationalTaskToolRequests.projectId, fixture.projectId),
+        eq(conversationalTaskToolRequests.id, queued.attempt.taskToolRequestId),
+      ),
+    )
+    .limit(1);
+  if (!request) throw new Error("The operation request is missing.");
+  const occurredAt = new Date().toISOString();
+  const result = await applyConversationalTaskEvent({
+    authentication: {
+      keyId: null,
+      kind: principal.kind,
+      principal: principal.principal,
+      verifiedAt: occurredAt,
+    },
+    channelIdentity: { browserSession: `operation-${run.conversationId}` },
+    channelType: "project_chat",
+    conversationId: run.conversationId,
+    errorCode: null,
+    eventId: `operation:${queued.attempt.id}:result:completed`,
+    expectedRevision: null,
+    occurredAt,
+    projectId: fixture.projectId,
+    providerSequence: null,
+    receivedAt: occurredAt,
+    requestId: request.requestId,
+    result: getOperationAttemptToolResult(attemptDetails),
+    schemaVersion: 1,
+    status: "success",
+    taskRunId: run.taskRunId,
+    type: "tool.result",
+  });
+  expect(result.disposition).toBe("applied");
+  await db
+    .update(conversationalTaskFieldValues)
+    .set({ state: "valid" })
+    .where(
+      and(
+        eq(conversationalTaskFieldValues.projectId, fixture.projectId),
+        eq(conversationalTaskFieldValues.taskRunId, run.taskRunId),
+        eq(conversationalTaskFieldValues.fieldKey, "guestName"),
+      ),
+    );
+  const legacyCompletion = await applyConversationalTaskEvent({
+    authentication: {
+      keyId: null,
+      kind: principal.kind,
+      principal: principal.principal,
+      verifiedAt: occurredAt,
+    },
+    channelIdentity: { browserSession: `operation-${run.conversationId}` },
+    channelType: "project_chat",
+    conversationId: run.conversationId,
+    eventId: `operation:${queued.attempt.id}:task-complete`,
+    expectedRevision: null,
+    occurredAt,
+    outcomeKey: "completed",
+    projectId: fixture.projectId,
+    providerSequence: null,
+    receivedAt: occurredAt,
+    schemaVersion: 1,
+    taskRunId: run.taskRunId,
+    type: "task.complete",
+  });
+  expect(legacyCompletion).toMatchObject({
+    disposition: "quarantined",
+    reason: "confirmation_required",
+  });
+
+  const recovered = await processAndReconcileTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    workerId: `legacy-confirmation-retry-${suffix}`,
+  });
+  expect(recovered.attempt.id).toBe(queued.attempt.id);
+  const runtime = await getConversationalTaskRuntime({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  expect(runtime?.run).toMatchObject({
+    outcomeKey: "completed",
+    status: "completed",
+  });
+  expect(runtime?.fields).toContainEqual(
+    expect.objectContaining({ fieldKey: "guestName", state: "confirmed" }),
   );
 });
 

@@ -125,6 +125,48 @@ test("one turn can supply several canonical field candidates", () => {
   });
 });
 
+test("an unchanged valid candidate preserves explicit confirmation", () => {
+  const fields = initializeRuntimeTaskFields({
+    expiresAt: EXPIRES_AT,
+    snapshot,
+  });
+  const current = fields.get("guestName");
+  if (!current) throw new Error("The guest name field is missing.");
+  fields.set("guestName", {
+    ...current,
+    canonicalValue: "Phase Eighteen Tester",
+    naturalValue: "Phase Eighteen Tester",
+    state: "confirmed",
+  });
+
+  const result = applyFieldCandidates({
+    candidates: [candidate("guestName", "Phase Eighteen Tester")],
+    definition: snapshot.task.definition,
+    eventId: "operation-result-1",
+    fields,
+    now: NOW,
+  });
+
+  expect(result.fields.get("guestName")).toMatchObject({
+    canonicalValue: "Phase Eighteen Tester",
+    changed: false,
+    state: "confirmed",
+  });
+
+  const changed = applyFieldCandidates({
+    candidates: [candidate("guestName", "Corrected Tester")],
+    definition: snapshot.task.definition,
+    eventId: "operation-result-2",
+    fields: result.fields,
+    now: NOW,
+  });
+  expect(changed.fields.get("guestName")).toMatchObject({
+    canonicalValue: "Corrected Tester",
+    changed: true,
+    state: "valid",
+  });
+});
+
 test("correcting an upstream value invalidates dependent values", () => {
   const initial = initializeRuntimeTaskFields({
     expiresAt: EXPIRES_AT,

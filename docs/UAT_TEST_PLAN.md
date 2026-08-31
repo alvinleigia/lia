@@ -4,7 +4,7 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18.14 staging preflight in progress
+- Current staging milestone: Phase 17A passed; Phase 18.14 booking reconciliation retest pending
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
@@ -22,7 +22,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Hosted milestones 18.9-18.13 complete; 18.14 staging preflight in progress | Resume the runtime availability test, then complete live hosted-assistant UAT. |
+| 18 - Telnyx and extensions | Hosted milestones 18.9-18.13 complete; 18.14 staging preflight in progress | Deploy the confirmation-state fix, reconcile Attempt #25 without rebooking, then complete live hosted-assistant UAT. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -1362,6 +1362,27 @@ Staging preflight evidence on 2026-08-30:
 - [x] TypeScript, focused lint, the production build, and all 278 channel and
       extension contract tests pass.
 
+Additional staging preflight evidence on 2026-08-31:
+
+- [x] Runtime availability returned three verified 30-minute Sydney slots for
+      2 September 2026 and retained the chosen 9:00 am slot with the synthetic
+      name and contact number.
+- [x] The booking summary remained immutable and required explicit confirmation
+      before queueing.
+- [x] Duplicate protection reused durable Attempt #25 instead of creating a
+      second operation attempt.
+- [ ] Reconcile Attempt #25 and verify the one expected calendar event after
+      the staging confirmation-state fix deploys. The first processing pass
+      stopped at `confirmation_required`; do not queue or book again.
+- [x] The regression fix preserves confirmation for an unchanged provider
+      result and safely recovers an already-delivered attempt only when current
+      field values exactly match its immutable confirmation summary. The
+      focused 13-test runtime suite, TypeScript, production build, and all 279
+      channel and extension contract tests pass.
+- [ ] Re-run the database-backed recovery scenario when a reachable local test
+      database is available. The 2026-08-31 run stopped before fixture creation
+      because the configured Supabase tenant could not be reached.
+
 1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
        the staging number or approved test callers to it.
 2. [ ] Confirm greeting, ordinary conversation, interruption, transfer, and
@@ -1389,7 +1410,7 @@ Result: [ ] Pass [ ] Fail
 - Tested Lia voice version and tools: `<versions>`
 - Correlated call/conversation IDs: `<masked IDs>`
 - Latency/cost evidence: `<metrics or links>`
-- Defects/evidence: `<none or links>`
+- Defects/evidence: `Attempt #25 confirmation-state reconciliation retest pending`
 - Tester/date: `<name/date>`
 
 # Final Release Record
@@ -1401,7 +1422,7 @@ Result: [ ] Pass [ ] Fail
 - Phase 17A: [x] Pass [ ] Fail [ ] In progress
 - Phase 18: [ ] Pass [ ] Fail [x] In progress [ ] Not started
 - Critical defects open: `0`
-- High defects open: `0`
+- High defects open: `1 - Attempt #25 staging reconciliation retest pending`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 - Phase 16 approver/date: `Single tester / release owner - 2026-08-16`
 - Phase 17 approver/date: `Single tester / release owner - 2026-08-20`

@@ -216,6 +216,10 @@ export function applyFieldCandidates(input: {
         ? selected.naturalValue
         : selected.canonicalValue;
     const changed = !valuesMatch(current.canonicalValue, canonicalValue);
+    const nextState =
+      !changed && current.state === "confirmed" && selected.state === "valid"
+        ? "confirmed"
+        : selected.state;
     if (changed) changedKeys.add(key);
     updates.set(key, {
       ...current,
@@ -238,9 +242,8 @@ export function applyFieldCandidates(input: {
         sourceReference: selected.provenance.sourceReference,
       },
       revision: current.revision + 1,
-      state: selected.state,
-      validatedAt:
-        selected.state === "candidate" ? current.validatedAt : input.now,
+      state: nextState,
+      validatedAt: nextState === "candidate" ? current.validatedAt : input.now,
       validation: {
         checkedAt: input.now.toISOString(),
         code: selected.validation.code,

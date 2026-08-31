@@ -96,9 +96,9 @@ rate fell from 93.10% to 50.00%, retry/fallback rate fell from 14.81% to
 Current target: complete Phase 18.14 live Telnyx hosted-assistant staging UAT.
 Hosted deployment, drift control, the provider-neutral tool gateway, verified
 Google Calendar operations, asynchronous continuation, and metadata-only
-post-call synchronization are complete. The project-scoped staging console and
-operator runbook are ready; restricted live credentials and dedicated test
-assets are the remaining gate.
+post-call synchronization are complete. Staging availability, explicit
+confirmation, and durable duplicate protection have passed; deploy and safely
+reconcile the existing booking attempt before continuing the live call matrix.
 
 ### Phase Tracking Snapshot
 
@@ -112,7 +112,7 @@ assets are the remaining gate.
 | 16 | Complete | Passed on staging under the single-tester scope; post-gate deterministic interruption regression passed on 2026-08-18 | None. |
 | 17 | Complete | Passed on staging under the single-tester scope on 2026-08-20 | None. |
 | 17A | Milestones 17A.1 through 17A.6 implemented | Passed on staging under the single-tester scope on 2026-08-23 | None. |
-| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.13 and staging controls implemented | Hosted Telnyx live UAT has not started | Complete 18.14 with a restricted Telnyx key, signed event webhook, dedicated test number/calendar, and approved test callers. |
+| 18 | Legacy Programmable Voice engineering complete; hosted milestones 18.9-18.13 and staging controls implemented | Phase 18.14 staging preflight in progress | Reconcile booking Attempt #25 after the confirmation-state fix, then complete the live hosted-assistant call matrix. |
 
 ## Product Direction
 
@@ -1556,6 +1556,25 @@ prepare, explicit confirmation, and commit. The shared executor now has a
 channel-neutral entry point, with the hosted-voice entry point retained as a
 compatibility wrapper. TypeScript, focused lint, the production build, and all
 278 channel and extension contract tests passed. Live UAT remains unchecked.
+
+Phase 18.14 booking-reconciliation follow-up completed on 2026-08-31 after the
+staging Runtime Test returned three verified Sydney availability slots, retained
+all four required booking fields, prepared an immutable summary, required
+explicit confirmation, and reused durable Attempt #25 under duplicate
+protection. Processing exposed a confirmation-state regression: the successful
+operation result mapped the unchanged appointment value back as merely valid,
+so deterministic completion quarantined the event with
+`confirmation_required`. Unchanged valid result mappings now preserve an
+existing confirmed state, while an already-delivered attempt may restore only
+field values that exactly match its immutable confirmation summary. Recovery
+skips an already-successful tool result and uses a new deterministic completion
+event, so Attempt #25 can be reconciled without another provider call or
+calendar insert. The focused 13-test runtime suite, TypeScript, the production
+build, and all 279 channel and extension contract tests pass. The
+database-backed recovery scenario is implemented but its local run was blocked
+before fixture creation because the configured Supabase tenant was
+unreachable. Staging retry and calendar verification remain required before
+the booking UAT result is accepted.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.

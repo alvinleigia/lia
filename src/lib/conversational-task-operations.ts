@@ -822,6 +822,80 @@ function matchingOutcome(
   );
 }
 
+function confirmedFieldValues(summary: Record<string, unknown>) {
+  const values = new Map<string, unknown>();
+  if (!Array.isArray(summary.items)) return values;
+  for (const item of summary.items) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const entry = item as Record<string, unknown>;
+    if (
+      entry.source === "field" &&
+      typeof entry.key === "string" &&
+      "value" in entry
+    ) {
+      values.set(entry.key, entry.value);
+    }
+  }
+  return values;
+}
+
+async function restoreConfirmedOperationFields(input: {
+  confirmation: SelectConversationalTaskConfirmation;
+  now: Date;
+  projectId: number;
+}) {
+  const confirmedValues = confirmedFieldValues(input.confirmation.summary);
+  if (confirmedValues.size === 0) return;
+  const fields = await db
+    .select({
+      canonicalValue: conversationalTaskFieldValues.canonicalValue,
+      fieldKey: conversationalTaskFieldValues.fieldKey,
+      id: conversationalTaskFieldValues.id,
+      state: conversationalTaskFieldValues.state,
+    })
+    .from(conversationalTaskFieldValues)
+    .where(
+      and(
+        eq(conversationalTaskFieldValues.projectId, input.projectId),
+        eq(
+          conversationalTaskFieldValues.taskRunId,
+          input.confirmation.taskRunId,
+        ),
+        inArray(conversationalTaskFieldValues.fieldKey, [
+          ...confirmedValues.keys(),
+        ]),
+      ),
+    );
+  const fieldIds = fields
+    .filter(
+      (field) =>
+        field.state === "valid" &&
+        confirmedValues.has(field.fieldKey) &&
+        stableJson(field.canonicalValue) ===
+          stableJson(confirmedValues.get(field.fieldKey)),
+    )
+    .map(({ id }) => id);
+  if (fieldIds.length === 0) return;
+  await db
+    .update(conversationalTaskFieldValues)
+    .set({
+      revision: sql`${conversationalTaskFieldValues.revision} + 1`,
+      state: "confirmed",
+      updatedAt: input.now,
+    })
+    .where(
+      and(
+        eq(conversationalTaskFieldValues.projectId, input.projectId),
+        eq(
+          conversationalTaskFieldValues.taskRunId,
+          input.confirmation.taskRunId,
+        ),
+        eq(conversationalTaskFieldValues.state, "valid"),
+        inArray(conversationalTaskFieldValues.id, fieldIds),
+      ),
+    );
+}
+
 async function applyOperationResult(input: {
   confirmation: SelectConversationalTaskConfirmation;
   principal: TaskOperationPrincipal;
@@ -880,34 +954,38 @@ async function applyOperationResult(input: {
       : attemptContext.status === "outcome_unknown"
         ? "outcome_unknown"
         : "provider_failure";
-  const result = await applyConversationalTaskEvent({
-    authentication: authentication(input.principal, now),
-    channelIdentity: context.conversation.metadata,
-    channelType: context.conversation.channelType,
-    conversationId: context.runtime.run.conversationId,
-    errorCode:
-      attemptContext.status === "completed" ? null : attemptContext.status,
-    eventId: `operation:${attemptContext.id}:result:${attemptContext.status}`,
-    expectedRevision: null,
-    occurredAt: now.toISOString(),
-    projectId: input.projectId,
-    providerSequence: null,
-    receivedAt: now.toISOString(),
-    requestId: request.requestId,
-    result:
-      attemptContext.status === "completed"
-        ? getOperationAttemptToolResult({
-            attempt: attemptContext,
-            operation,
-          })
-        : null,
-    schemaVersion: 1,
-    status: eventStatus,
-    taskRunId: input.confirmation.taskRunId,
-    type: "tool.result",
-  });
-  if (result.disposition !== "applied" && result.reason !== "duplicate_event") {
-    throw new Error(result.reason ?? "The operation result was rejected.");
+  if (
+    !(attemptContext.status === "completed" && request.status === "success")
+  ) {
+    const result = await applyConversationalTaskEvent({
+      authentication: authentication(input.principal, now),
+      channelIdentity: context.conversation.metadata,
+      channelType: context.conversation.channelType,
+      conversationId: context.runtime.run.conversationId,
+      errorCode:
+        attemptContext.status === "completed" ? null : attemptContext.status,
+      eventId: `operation:${attemptContext.id}:result:${attemptContext.status}`,
+      expectedRevision: null,
+      occurredAt: now.toISOString(),
+      projectId: input.projectId,
+      providerSequence: null,
+      receivedAt: now.toISOString(),
+      requestId: request.requestId,
+      result:
+        attemptContext.status === "completed"
+          ? getOperationAttemptToolResult({
+              attempt: attemptContext,
+              operation,
+            })
+          : null,
+      schemaVersion: 1,
+      status: eventStatus,
+      taskRunId: input.confirmation.taskRunId,
+      type: "tool.result",
+    });
+    if (result.disposition !== "applied") {
+      throw new Error(result.reason ?? "The operation result was rejected.");
+    }
   }
 
   if (attemptContext.status === "outcome_unknown") {
@@ -938,12 +1016,17 @@ async function applyOperationResult(input: {
     throw new Error("The published task has no completed outcome.");
   }
   if (attemptContext.status === "completed" && terminalOutcome) {
+    await restoreConfirmedOperationFields({
+      confirmation: input.confirmation,
+      now,
+      projectId: input.projectId,
+    });
     const completion = await applyConversationalTaskEvent({
       authentication: authentication(input.principal, now),
       channelIdentity: context.conversation.metadata,
       channelType: context.conversation.channelType,
       conversationId: context.runtime.run.conversationId,
-      eventId: `operation:${attemptContext.id}:task-complete`,
+      eventId: `operation:${attemptContext.id}:confirmation:${input.confirmation.id}:task-complete`,
       expectedRevision: null,
       occurredAt: now.toISOString(),
       outcomeKey: terminalOutcome.key,
@@ -954,10 +1037,7 @@ async function applyOperationResult(input: {
       taskRunId: input.confirmation.taskRunId,
       type: "task.complete",
     });
-    if (
-      completion.disposition !== "applied" &&
-      completion.reason !== "duplicate_event"
-    ) {
+    if (completion.disposition !== "applied") {
       throw new Error(completion.reason ?? "The task could not be completed.");
     }
   } else if (terminalOutcome) {
