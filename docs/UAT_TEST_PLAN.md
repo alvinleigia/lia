@@ -1400,12 +1400,20 @@ Additional staging preflight evidence on 2026-08-31:
       dedicated calendar now contains exactly one synthetic appointment at
       05:00 IST, the correct display of 09:30 Australia/Sydney (23:30 UTC); the
       former 04:30 IST event no longer exists.
+- [x] Published `Phase 18 Cancel UAT` version 1 with three required fields, two
+      allowed tools, and two outcomes. The read-only find lookup located the
+      rescheduled 09:30 Australia/Sydney appointment and populated its exact
+      appointment reference.
+- [x] Explicit confirmation and duplicate protection reused durable Attempt
+      #30 before cancellation. The operation completed, the task outcome was
+      recorded, and the synthetic appointment was removed from the dedicated
+      staging calendar with no duplicate remaining.
 
 1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
        the staging number or approved test callers to it.
 2. [ ] Confirm greeting, ordinary conversation, interruption, transfer, and
        hangup remain Telnyx-native with no Lia turn processing.
-3. [ ] Complete availability, booking, find, reschedule, and cancel through Lia
+3. [x] Complete availability, booking, find, reschedule, and cancel through Lia
        tools; confirm availability and find require no write confirmation, and
        every spoken success matches a verified operation result.
 4. [x] Prove explicit confirmation precedes commit and duplicate delivery creates
@@ -1428,7 +1436,7 @@ Result: [ ] Pass [ ] Fail
 - Tested Lia voice version and tools: `<versions>`
 - Correlated call/conversation IDs: `<masked IDs>`
 - Latency/cost evidence: `<metrics or links>`
-- Defects/evidence: `Attempts #25 and #28, booking, find, reschedule, and blank-task readiness verified; cancel pending`
+- Defects/evidence: `Attempts #25, #28, and #30; booking, find, reschedule, cancel, and blank-task readiness verified`
 - Tester/date: `<name/date>`
 
 # Final Release Record

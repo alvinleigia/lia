@@ -1607,7 +1607,17 @@ duplicate protection reused durable Attempt #28, and the reschedule completed.
 The dedicated Google Calendar contains exactly one synthetic appointment at
 05:00 IST, the correct display of 09:30 Australia/Sydney (23:30 UTC), and the
 former 04:30 IST event is gone. Find and reschedule are accepted; cancel remains
-next.
+next at this checkpoint.
+
+Phase 18.14 cancellation staging preflight then passed on 2026-08-31 with
+published `Phase 18 Cancel UAT` version 1: three required task fields, two
+allowed tools, and two outcomes. The read-only lookup found the rescheduled
+09:30 Australia/Sydney appointment and populated its exact appointment
+reference. Explicit confirmation preceded the write, duplicate protection
+reused durable Attempt #30, and cancellation completed with the task outcome
+recorded. Calendar verification confirmed the synthetic appointment was
+deleted with no duplicate remaining. Availability, booking, find, reschedule,
+and cancel are now accepted for the isolated runtime lifecycle preflight.
 
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
