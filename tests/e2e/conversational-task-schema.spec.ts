@@ -41,6 +41,7 @@ import {
   createConversationalTaskDefinitionFromTemplate,
 } from "../../src/lib/conversational-task-templates";
 import {
+  buildOperationTaskInputFields,
   getMissingTaskToolSourceKeys,
   getOperationToolSemantics,
   isRunnableTaskLookupTool,
@@ -239,6 +240,44 @@ test("tool readiness uses required task sources from the runtime contract", asyn
       toolDefinition,
     }),
   ).toEqual(["serviceId"]);
+});
+
+test("operation readiness retains unresolved mapped task sources", () => {
+  const definition = createConversationalTaskDefinitionFromTemplate("custom");
+  const inputFields = buildOperationTaskInputFields({
+    definition,
+    inputMapping: {
+      appointmentRef: "fields.appointmentRef",
+      contactNumber: "fields.contactNumber",
+    },
+  });
+  const toolDefinition = {
+    access: "write",
+    description: "Reschedule an appointment.",
+    execution: {
+      adapter: "operation",
+      cancellation: "best_effort",
+      handler: "701",
+      mode: "asynchronous",
+      retryAttempts: 0,
+      retryDelayMs: 0,
+      timeoutMs: 5_000,
+    },
+    id: "operation:701",
+    inputSchema: { fields: inputFields },
+    name: "Reschedule Calendar Appointment",
+    outputSchema: { fields: [] },
+    projectId: 42,
+    requiredForCompletion: true,
+    resultMappings: [],
+    schemaVersion: 1,
+    version: 1,
+  } satisfies ToolDefinitionV1;
+
+  expect(getMissingTaskToolSourceKeys({ definition, toolDefinition })).toEqual([
+    "appointmentRef",
+    "contactNumber",
+  ]);
 });
 
 test("Google Calendar reads do not inherit write confirmation semantics", () => {

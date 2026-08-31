@@ -1583,6 +1583,18 @@ which is the correct display of 09:00 Australia/Sydney (23:00 UTC), so the
 confirmation-state defect is closed and the booking/duplicate-protection
 preflight is accepted. Find, reschedule, and cancel remain next.
 
+Phase 18.14 operation-readiness follow-up completed on 2026-08-31 after a new
+blank reschedule task incorrectly displayed every calendar operation as
+`Ready`. The operation tool builder had silently omitted mapped task sources
+that were not yet present, preventing the existing readiness and publish guards
+from reporting required fields. Unresolved mappings now remain in the
+provider-neutral input contract as required field or explicitly named context
+sources; configured fields still retain their canonical types. The blank-task
+regression, all 28 task-schema tests, TypeScript, the production build, and all
+280 channel and extension contract tests pass. Staging must confirm that the
+calendar cards now show their exact `Needs setup` field keys before
+reschedule configuration continues.
+
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
 

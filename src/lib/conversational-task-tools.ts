@@ -283,6 +283,65 @@ function stableSourceKey(value: string) {
   return /^[a-z][a-zA-Z0-9_]*$/.test(normalized) ? normalized : null;
 }
 
+export function buildOperationTaskInputFields(input: {
+  definition: ConversationalTaskDefinitionV1;
+  inputMapping: Record<string, unknown>;
+}) {
+  const fields = new Map(
+    input.definition.fields.map((field) => [field.key, field]),
+  );
+  const context = new Map(
+    input.definition.contextVariables.map((variable) => [
+      variable.key,
+      variable,
+    ]),
+  );
+  const inputFields: ToolDefinitionV1["inputSchema"]["fields"] = [];
+  for (const [target, source] of Object.entries(input.inputMapping)) {
+    if (typeof source !== "string") {
+      inputFields.push({
+        key: target,
+        required: true,
+        source: { kind: "literal", value: source },
+        type: "text",
+      });
+      continue;
+    }
+    const key = stableSourceKey(source);
+    if (!key) continue;
+    const field = fields.get(key);
+    if (field) {
+      inputFields.push({
+        key: target,
+        required: true,
+        source: { kind: "field", key },
+        type: field.type,
+      });
+      continue;
+    }
+    const variable = context.get(key);
+    if (variable) {
+      inputFields.push({
+        key: target,
+        required: true,
+        source: { kind: "context", key },
+        type: variable.type,
+      });
+      continue;
+    }
+    inputFields.push({
+      key: target,
+      required: true,
+      source: {
+        kind: source.startsWith("context.") ? "context" : "field",
+        key,
+      },
+      type: "text",
+    });
+  }
+  return inputFields;
+}
+
 export function getOperationToolSemantics(input: {
   operationType: string;
   providerType: string;
@@ -319,39 +378,10 @@ function operationDefinition(input: {
       variable,
     ]),
   );
-  const inputFields: ToolDefinitionV1["inputSchema"]["fields"] = [];
-  for (const [target, source] of Object.entries(row.operation.inputMapping)) {
-    if (typeof source !== "string") {
-      inputFields.push({
-        key: target,
-        required: true,
-        source: { kind: "literal", value: source },
-        type: "text",
-      });
-      continue;
-    }
-    const key = stableSourceKey(source);
-    if (!key) continue;
-    const field = fields.get(key);
-    if (field) {
-      inputFields.push({
-        key: target,
-        required: true,
-        source: { kind: "field", key },
-        type: field.type,
-      });
-      continue;
-    }
-    const variable = context.get(key);
-    if (variable) {
-      inputFields.push({
-        key: target,
-        required: true,
-        source: { kind: "context", key },
-        type: variable.type,
-      });
-    }
-  }
+  const inputFields = buildOperationTaskInputFields({
+    definition: input.definition,
+    inputMapping: row.operation.inputMapping,
+  });
   const outputFields: ToolDefinitionV1["outputSchema"]["fields"] = [];
   const resultMappings: ToolDefinitionV1["resultMappings"] = [];
   for (const [target, source] of Object.entries(row.operation.outputMapping)) {

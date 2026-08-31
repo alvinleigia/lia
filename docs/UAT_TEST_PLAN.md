@@ -1383,6 +1383,15 @@ Additional staging preflight evidence on 2026-08-31:
 - [ ] Re-run the database-backed recovery scenario when a reachable local test
       database is available. The 2026-08-31 run stopped before fixture creation
       because the configured Supabase tenant could not be reached.
+- [ ] Refresh the new blank `Phase 18 Reschedule UAT` task after the
+      operation-readiness fix deploys and confirm calendar tools show exact
+      `Needs setup` field keys. Before the fix, every calendar card
+      incorrectly displayed `Ready` because unresolved mapped inputs were
+      omitted.
+- [x] The readiness regression now retains unresolved operation inputs as
+      required provider-neutral field or context sources. All 28 task-schema
+      tests, TypeScript, the production build, and all 280 channel and extension
+      contract tests pass.
 
 1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
        the staging number or approved test callers to it.
@@ -1411,7 +1420,7 @@ Result: [ ] Pass [ ] Fail
 - Tested Lia voice version and tools: `<versions>`
 - Correlated call/conversation IDs: `<masked IDs>`
 - Latency/cost evidence: `<metrics or links>`
-- Defects/evidence: `Attempt #25 confirmation-state defect fixed and staging retest passed`
+- Defects/evidence: `Attempt #25 fixed and verified; blank-task operation readiness staging retest pending`
 - Tester/date: `<name/date>`
 
 # Final Release Record
@@ -1423,7 +1432,7 @@ Result: [ ] Pass [ ] Fail
 - Phase 17A: [x] Pass [ ] Fail [ ] In progress
 - Phase 18: [ ] Pass [ ] Fail [x] In progress [ ] Not started
 - Critical defects open: `0`
-- High defects open: `0`
+- High defects open: `1 - blank-task operation readiness staging retest pending`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 - Phase 16 approver/date: `Single tester / release owner - 2026-08-16`
 - Phase 17 approver/date: `Single tester / release owner - 2026-08-20`
