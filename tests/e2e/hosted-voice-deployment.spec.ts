@@ -194,7 +194,10 @@ test("Telnyx adapter finds the exact Integration Secret without exposing its val
     updatedAt: "2026-09-06T11:10:00.000Z",
   });
   expect(urls).toHaveLength(2);
-  expect(urls[0]).toContain("/integration_secrets?");
+  expect(urls[0]).toBe("https://api.telnyx.com/v2/integration_secrets");
+  expect(urls[1]).toBe(
+    "https://api.telnyx.com/v2/integration_secrets?page%5Bnumber%5D=2",
+  );
   expect(JSON.stringify(urls)).not.toContain("restricted-test-key");
 });
 

@@ -291,9 +291,11 @@ export function createTelnyxHostedVoiceAdapter(input: {
       const expected =
         telnyxIntegrationSecretIdentifierSchema.parse(identifier);
       for (let page = 1; ; page += 1) {
-        const { payload } = await requestPayload(
-          `/integration_secrets?page%5Bsize%5D=100&page%5Bnumber%5D=${page}`,
-        );
+        const path =
+          page === 1
+            ? "/integration_secrets"
+            : `/integration_secrets?page%5Bnumber%5D=${page}`;
+        const { payload } = await requestPayload(path);
         const parsed = telnyxIntegrationSecretListSchema.safeParse(payload);
         if (!parsed.success) {
           throw new TelnyxHostedVoiceApiError(
