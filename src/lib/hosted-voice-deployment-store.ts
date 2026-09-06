@@ -5,6 +5,7 @@ import {
   auditLogs,
   hostedVoiceDeployments,
   hostedVoiceDeploymentVersions,
+  hostedVoiceToolBindings,
   integrationProviders,
 } from "@/lib/db-schema";
 import { voiceAgentDefinitionV1Schema } from "@/lib/hosted-voice-contract";
@@ -86,6 +87,57 @@ export const telnyxHostedVoiceDeploymentRepository = {
       source: z.enum(["lia", "remote_import"]).parse(row.source),
       status: z.enum(["candidate", "main", "superseded"]).parse(row.status),
     };
+  },
+
+  async discardCandidate({ deployment }) {
+    const remoteVersionId = deployment.candidateRemoteVersionId;
+    if (!remoteVersionId) {
+      throw new HostedVoiceDeploymentStateError(
+        "Hosted voice deployment has no candidate to discard.",
+      );
+    }
+    return db.transaction(async (tx) => {
+      const [candidate] = await tx
+        .update(hostedVoiceDeploymentVersions)
+        .set({ status: "superseded" })
+        .where(
+          and(
+            eq(hostedVoiceDeploymentVersions.projectId, deployment.projectId),
+            eq(hostedVoiceDeploymentVersions.deploymentId, deployment.id),
+            eq(hostedVoiceDeploymentVersions.remoteVersionId, remoteVersionId),
+            eq(hostedVoiceDeploymentVersions.status, "candidate"),
+          ),
+        )
+        .returning({ id: hostedVoiceDeploymentVersions.id });
+      if (!candidate) {
+        throw new HostedVoiceDeploymentStateError(
+          "Hosted voice candidate changed before it could be discarded.",
+        );
+      }
+      await tx
+        .update(hostedVoiceToolBindings)
+        .set({ status: "revoked", updatedAt: new Date() })
+        .where(
+          and(
+            eq(hostedVoiceToolBindings.projectId, deployment.projectId),
+            eq(hostedVoiceToolBindings.deploymentId, deployment.id),
+            eq(hostedVoiceToolBindings.deploymentVersionId, candidate.id),
+            eq(hostedVoiceToolBindings.status, "active"),
+          ),
+        );
+      const updated = await updateDeployment(tx, {
+        deployment,
+        values: {
+          candidateManagedHash: null,
+          candidateRemoteVersionId: null,
+          status: deployment.mainRemoteVersionId ? "main" : "draft",
+        },
+      });
+      await insertAudit(tx, updated, "hosted_voice.candidate_discarded", {
+        remoteVersionId,
+      });
+      return updated;
+    });
   },
 
   async importRemote({ deployment, inspection, managedHash, resolution }) {

@@ -8,7 +8,10 @@ import {
   HOSTED_VOICE_TOOL_OUTCOMES,
   resolveHostedVoiceVersionAttribution,
 } from "../../src/lib/hosted-voice-runtime";
-import { buildTelnyxHostedVoiceToolSetupManifest } from "../../src/lib/hosted-voice-staging";
+import {
+  buildTelnyxHostedVoiceToolSetupManifest,
+  validateHostedVoiceVerificationFactors,
+} from "../../src/lib/hosted-voice-staging";
 import { createTelnyxHostedVoiceCompiler } from "../../src/lib/telnyx-hosted-voice";
 import { sendTelnyxHostedVoiceContinuation } from "../../src/lib/telnyx-hosted-voice-continuation";
 import { getTelnyxHostedVoiceConversationEnded } from "../../src/lib/telnyx-hosted-voice-events";
@@ -44,16 +47,21 @@ test("ordinary hosted speech remains entirely inside the Telnyx native config", 
       tools: [],
     },
   });
-  expect(compiled.managedConfig).toEqual({
+  expect(compiled.managedConfig).toMatchObject({
     enabled_features: ["telephony"],
     greeting: "Hello",
-    instructions: "Handle ordinary conversation natively.",
     model: "openai/gpt-4o-mini",
     name: "Clinic voice",
     privacy_settings: { data_retention: true },
     transcription: { language: "en", model: "deepgram/flux" },
     voice_settings: { voice: "Telnyx.Natural" },
   });
+  expect(compiled.managedConfig.instructions).toContain(
+    "Handle ordinary conversation natively.",
+  );
+  expect(compiled.managedConfig.instructions).toContain(
+    "No additional hosted-voice verification factors are configured.",
+  );
   expect(JSON.stringify(compiled.managedConfig)).not.toContain("/api/chat");
   expect(JSON.stringify(compiled.managedConfig)).not.toContain(
     "/api/conversation/turn",
@@ -264,4 +272,81 @@ test("Telnyx candidate setup preserves Lia's read and two-phase write boundary",
   expect(serialized).not.toContain("private-calendar");
   expect(serialized).not.toContain("Bearer ");
   expect(serialized).not.toContain("secret-api-key");
+});
+
+test("hosted candidates reject verification factors absent from selected tools", () => {
+  const tool = {
+    access: "read" as const,
+    description: "Find an appointment.",
+    execution: {
+      adapter: "built_in" as const,
+      cancellation: "unsupported" as const,
+      handler: "calendar",
+      mode: "synchronous" as const,
+      retryAttempts: 0,
+      retryDelayMs: 0,
+      timeoutMs: 8_000,
+    },
+    id: "calendar_lookup",
+    inputSchema: {
+      fields: [
+        {
+          key: "patientName",
+          required: true,
+          source: { key: "patientName", kind: "field" as const },
+          type: "text" as const,
+        },
+        {
+          key: "contactNumber",
+          required: true,
+          source: { key: "contactNumber", kind: "field" as const },
+          type: "text" as const,
+        },
+      ],
+    },
+    name: "Appointment lookup",
+    outputSchema: { fields: [] },
+    projectId: 12,
+    requiredForCompletion: false,
+    resultMappings: [],
+    schemaVersion: 1 as const,
+    version: 1,
+  };
+
+  expect(() =>
+    validateHostedVoiceVerificationFactors({
+      identityRequirement: "verified",
+      toolDefinitions: [tool],
+      verificationFactors: ["patientName", "contactNumber"],
+    }),
+  ).not.toThrow();
+  expect(() =>
+    validateHostedVoiceVerificationFactors({
+      identityRequirement: "verified",
+      toolDefinitions: [tool],
+      verificationFactors: ["date_of_birth", "contact_number"],
+    }),
+  ).toThrow(
+    "Verification factors are unavailable in the selected task tools: contact_number, date_of_birth.",
+  );
+  expect(() =>
+    validateHostedVoiceVerificationFactors({
+      identityRequirement: "verified",
+      toolDefinitions: [
+        {
+          ...tool,
+          id: "lookup_by_name",
+          inputSchema: { fields: [tool.inputSchema.fields[0]] },
+        },
+        {
+          ...tool,
+          id: "lookup_by_contact",
+          inputSchema: { fields: [tool.inputSchema.fields[1]] },
+        },
+      ],
+      verificationFactors: ["patientName", "contactNumber"],
+    }),
+  ).toThrow(
+    "No selected read tool accepts every configured verification factor.",
+  );
 });

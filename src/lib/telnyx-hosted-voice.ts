@@ -63,7 +63,7 @@ export function createTelnyxHostedVoiceCompiler(
       return {
         enabled_features: ["telephony"],
         greeting: compileGreeting(definition),
-        instructions: definition.instructions,
+        instructions: compileInstructions(definition),
         model: settings.modelId,
         name: definition.name,
         privacy_settings: {
@@ -87,4 +87,27 @@ function compileGreeting(definition: VoiceAgentDefinitionV1) {
     return "<assistant-speaks-first-with-model-generated-message>";
   }
   return definition.greeting.text;
+}
+
+function compileInstructions(definition: VoiceAgentDefinitionV1) {
+  const identityPolicy =
+    definition.identity.defaultRequirement === "verified"
+      ? `- Identity: Before using a tool that accesses or changes an existing appointment, collect every configured verification factor: ${definition.identity.verificationFactors.join(", ")}. Treat the caller as verified only after an approved lookup tool returns a matching appointment. Do not reveal appointment details or prepare or commit a change before verification succeeds.`
+      : "- Identity: No additional hosted-voice verification factors are configured. Continue to follow every approved tool's required inputs.";
+  const handoffPolicy = {
+    available:
+      "- Handoff: Offer and use the configured transfer tool when the caller requests it or the approved workflow cannot continue safely.",
+    disabled: "- Handoff: Do not offer or attempt a transfer.",
+    required:
+      "- Handoff: Use the configured transfer tool whenever the approved workflow requires human handling.",
+  }[definition.handoff.mode];
+
+  return [
+    definition.instructions,
+    "Lia managed policies:",
+    `- Locale: Speak ${definition.locale.language} and interpret dates and times in ${definition.locale.timezone}.`,
+    identityPolicy,
+    "- Writes: Prepare the exact action, summarize it, obtain explicit caller confirmation, and then commit using the returned commit token unchanged. Never claim success unless the approved tool returns verified success.",
+    handoffPolicy,
+  ].join("\\n\\n");
 }

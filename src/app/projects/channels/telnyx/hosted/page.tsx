@@ -29,6 +29,7 @@ import {
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
 import {
+  discardHostedVoiceCandidateAction,
   inspectHostedVoiceDeploymentAction,
   promoteHostedVoiceCandidateAction,
   publishHostedVoiceCandidateAction,
@@ -292,8 +293,8 @@ export default async function TelnyxHostedVoicePage() {
                   <Input
                     id="verificationFactors"
                     name="verificationFactors"
-                    defaultValue="date_of_birth,contact_number"
-                    placeholder="Comma-separated stable keys"
+                    defaultValue="patientName,contactNumber"
+                    placeholder="Canonical task input keys, comma-separated"
                   />
                 </Field>
                 <Field label="Handoff mode" name="handoffMode">
@@ -408,7 +409,7 @@ export default async function TelnyxHostedVoicePage() {
                 Drift, promotion, and rollback
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-5 lg:grid-cols-3">
+            <CardContent className="grid gap-5 lg:grid-cols-4">
               <LifecycleForm
                 action={inspectHostedVoiceDeploymentAction}
                 deploymentId={deployment.id}
@@ -421,6 +422,14 @@ export default async function TelnyxHostedVoicePage() {
                 deploymentId={deployment.id}
                 disabled={!deployment.candidateRemoteVersionId}
                 label="Promote candidate"
+              />
+              <LifecycleForm
+                action={discardHostedVoiceCandidateAction}
+                confirmLabel="Candidate traffic routing has been removed"
+                confirmValue="discard"
+                deploymentId={deployment.id}
+                disabled={!deployment.candidateRemoteVersionId}
+                label="Discard failed candidate"
               />
               <LifecycleForm
                 action={rollbackHostedVoiceDeploymentAction}

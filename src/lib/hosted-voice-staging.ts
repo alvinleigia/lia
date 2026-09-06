@@ -83,6 +83,7 @@ export async function buildHostedVoiceStagingDefinition(input: {
   }
 
   const tools = new Map<string, VoiceAgentDefinitionV1["tools"][number]>();
+  const toolDefinitions = new Map<string, ToolDefinitionV1>();
   for (const version of versions) {
     const snapshot = conversationalTaskSnapshotV1Schema.parse(version.snapshot);
     for (const definition of snapshot.toolDefinitions) {
@@ -90,8 +91,14 @@ export async function buildHostedVoiceStagingDefinition(input: {
         id: definition.id,
         version: definition.version,
       });
+      toolDefinitions.set(`${definition.id}:${definition.version}`, definition);
     }
   }
+  validateHostedVoiceVerificationFactors({
+    identityRequirement: value.identityRequirement,
+    toolDefinitions: [...toolDefinitions.values()],
+    verificationFactors: value.verificationFactors,
+  });
 
   return voiceAgentDefinitionV1Schema.parse({
     confirmation: { writeOperations: "explicit" },
@@ -116,6 +123,44 @@ export async function buildHostedVoiceStagingDefinition(input: {
     schemaVersion: 1,
     tools: [...tools.values()],
   });
+}
+
+export function validateHostedVoiceVerificationFactors(input: {
+  identityRequirement: "anonymous" | "verified";
+  toolDefinitions: ToolDefinitionV1[];
+  verificationFactors: string[];
+}) {
+  if (input.identityRequirement !== "verified") return;
+  const available = new Set(
+    input.toolDefinitions.flatMap((tool) =>
+      tool.inputSchema.fields
+        .filter(({ source }) => source.kind !== "literal")
+        .map(({ key }) => key),
+    ),
+  );
+  const missing = [...new Set(input.verificationFactors)]
+    .filter((factor) => !available.has(factor))
+    .sort();
+  if (missing.length > 0) {
+    throw new Error(
+      `Verification factors are unavailable in the selected task tools: ${missing.join(", ")}.`,
+    );
+  }
+  const hasVerifyingLookup = input.toolDefinitions
+    .filter(({ access }) => access === "read")
+    .some((tool) => {
+      const inputKeys = new Set(
+        tool.inputSchema.fields
+          .filter(({ source }) => source.kind !== "literal")
+          .map(({ key }) => key),
+      );
+      return input.verificationFactors.every((factor) => inputKeys.has(factor));
+    });
+  if (!hasVerifyingLookup) {
+    throw new Error(
+      "No selected read tool accepts every configured verification factor.",
+    );
+  }
 }
 
 export async function getHostedVoiceStagingState(projectId: number) {

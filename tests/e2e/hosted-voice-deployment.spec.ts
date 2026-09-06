@@ -4,6 +4,7 @@ import type {
   VoiceAgentDefinitionV1,
 } from "../../src/lib/hosted-voice-contract";
 import {
+  discardHostedVoiceCandidate,
   type HostedVoiceDeploymentRecord,
   type HostedVoiceDeploymentRepository,
   HostedVoiceDeploymentStateError,
@@ -369,6 +370,39 @@ test("successful reinspection restores a drifted candidate deployment", async ()
   });
 });
 
+test("a failed candidate can be discarded without changing main", async () => {
+  const adapter = new MemoryAdapter();
+  const repository = new MemoryRepository();
+  const published = await publishHostedVoiceCandidate({
+    adapter,
+    definition,
+    projectId: 10,
+    providerId: 20,
+    repository,
+  });
+
+  const discarded = await discardHostedVoiceCandidate({
+    adapter,
+    deploymentId: published.deployment.id,
+    projectId: 10,
+    repository,
+  });
+
+  expect(adapter.currentVersionId).toBe("main-1");
+  expect(discarded).toMatchObject({
+    candidateManagedHash: null,
+    candidateRemoteVersionId: null,
+    mainRemoteVersionId: "main-1",
+    status: "main",
+  });
+  expect(repository.events).toContain("discarded");
+  expect(
+    repository.versions.find(
+      ({ remoteVersionId }) => remoteVersionId === "candidate-2",
+    )?.status,
+  ).toBe("superseded");
+});
+
 test("deployment lookups cannot cross the project boundary", async () => {
   const adapter = new MemoryAdapter();
   const repository = new MemoryRepository();
@@ -585,6 +619,22 @@ class MemoryRepository
     this.versions.push(this.version(input, input.remoteVersionId, "candidate"));
     this.events.push("candidate_created");
     return this.deployment;
+  }
+
+  async discardCandidate(input: { deployment: HostedVoiceDeploymentRecord }) {
+    this.versions.forEach((version) => {
+      if (
+        version.remoteVersionId === input.deployment.candidateRemoteVersionId
+      ) {
+        version.status = "superseded";
+      }
+    });
+    this.events.push("discarded");
+    return this.update({
+      candidateManagedHash: null,
+      candidateRemoteVersionId: null,
+      status: input.deployment.mainRemoteVersionId ? "main" : "draft",
+    });
   }
 
   async markDrift(input: {

@@ -7,6 +7,7 @@ import type { ActionFormState } from "@/lib/action-form-state";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveUserAndProject } from "@/lib/auth-project";
 import {
+  discardHostedVoiceCandidate,
   HostedVoiceDriftError,
   inspectHostedVoiceDeployment,
   promoteHostedVoiceCandidate,
@@ -246,6 +247,29 @@ export async function promoteHostedVoiceCandidateAction(
         repository: telnyxHostedVoiceDeploymentRepository,
       });
       return "The tested Telnyx candidate is now the main version.";
+    },
+  );
+}
+
+export async function discardHostedVoiceCandidateAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  if (formData.get("confirm") !== "discard") {
+    return {
+      error: "Confirm that candidate traffic routing was removed first.",
+    };
+  }
+  return runDeploymentAction(
+    formData,
+    async ({ adapter, deploymentId, projectId }) => {
+      await discardHostedVoiceCandidate({
+        adapter,
+        deploymentId,
+        projectId,
+        repository: telnyxHostedVoiceDeploymentRepository,
+      });
+      return "Failed candidate discarded and its Lia tool binding revoked. The remote version remains non-main.";
     },
   );
 }

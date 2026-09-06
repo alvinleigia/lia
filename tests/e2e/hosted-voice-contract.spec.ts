@@ -182,12 +182,26 @@ test("one provider-neutral definition compiles through Telnyx and a second provi
   expect(telnyx.managedConfig).toMatchObject({
     enabled_features: ["telephony"],
     greeting: "Thanks for calling. How can I help?",
-    instructions: voiceDefinition.instructions,
     model: "moonshotai/Kimi-K2.6",
     privacy_settings: { data_retention: true },
     transcription: { language: "en", model: "deepgram/flux" },
     voice_settings: { voice: "Telnyx.Ultra.australian_female" },
   });
+  expect(telnyx.managedConfig.instructions).toContain(
+    voiceDefinition.instructions,
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "dateOfBirth, patientName",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "only after an approved lookup tool returns a matching appointment",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "obtain explicit caller confirmation",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "configured transfer tool",
+  );
   expect(JSON.stringify(telnyx.definition)).not.toContain("Telnyx");
   expect(JSON.stringify(telnyx.definition)).not.toContain("deepgram");
   expect(JSON.stringify(telnyx.definition)).not.toContain("Kimi");

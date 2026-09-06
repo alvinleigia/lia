@@ -57,6 +57,9 @@ export interface HostedVoiceDeploymentRepository<TManagedConfig> {
     projectId: number;
     remoteVersionId: string;
   }): Promise<HostedVoiceDeploymentVersionRecord<TManagedConfig> | null>;
+  discardCandidate(input: {
+    deployment: HostedVoiceDeploymentRecord;
+  }): Promise<HostedVoiceDeploymentRecord>;
   importRemote(input: {
     deployment: HostedVoiceDeploymentRecord;
     inspection: HostedVoiceRemoteInspection<TManagedConfig>;
@@ -250,6 +253,33 @@ export async function publishHostedVoiceCandidate<TManagedConfig>(input: {
   });
 
   return { compiled, deployment: saved, reused: false };
+}
+
+export async function discardHostedVoiceCandidate<TManagedConfig>(input: {
+  adapter: HostedVoiceProviderAdapter<TManagedConfig>;
+  deploymentId: number;
+  projectId: number;
+  repository: HostedVoiceDeploymentRepository<TManagedConfig>;
+}) {
+  let deployment = await requireDeployment(input);
+  if (!deployment.candidateRemoteVersionId) {
+    throw new HostedVoiceDeploymentStateError(
+      "Hosted voice deployment has no candidate to discard.",
+    );
+  }
+  const inspected = await inspectHostedVoiceDeployment({
+    adapter: input.adapter,
+    deployment,
+    repository: input.repository,
+  });
+  if (inspected.report) throw new HostedVoiceDriftError(inspected.report);
+  deployment = inspected.deployment;
+  if (!deployment.candidateRemoteVersionId) {
+    throw new HostedVoiceDeploymentStateError(
+      "Hosted voice candidate changed during inspection.",
+    );
+  }
+  return input.repository.discardCandidate({ deployment });
 }
 
 export async function resolveHostedVoiceDrift<TManagedConfig>(input: {
