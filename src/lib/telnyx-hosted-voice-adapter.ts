@@ -106,7 +106,10 @@ const telnyxApiErrorSchema = z
           .object({
             code: z.union([z.string(), z.number()]).optional(),
             source: z
-              .object({ pointer: z.string().optional() })
+              .object({
+                parameter: z.string().optional(),
+                pointer: z.string().optional(),
+              })
               .passthrough()
               .optional(),
           })
@@ -391,9 +394,9 @@ export function createTelnyxHostedVoiceAdapter(input: {
       const expectedTools = setupTools.map((tool) =>
         buildTelnyxWebhookTool(tool, identifier),
       );
-      const preservedTools = candidate.tools.filter(
-        (tool) => !isLiaWebhookTool(tool),
-      );
+      const preservedTools = candidate.tools
+        .filter((tool) => !isLiaWebhookTool(tool))
+        .map(normalizeTelnyxInlineToolForUpdate);
       const updated = await request(
         path,
         {
@@ -435,6 +438,10 @@ function buildTelnyxApiErrorDiagnostic(response: Response, payload: unknown) {
     if (code) parts.push(`code ${code}`);
     const pointer = toSafeTelnyxDiagnosticPath(providerError?.source?.pointer);
     if (pointer) parts.push(`field ${pointer}`);
+    const parameter = toSafeTelnyxDiagnosticToken(
+      providerError?.source?.parameter,
+    );
+    if (parameter && !pointer) parts.push(`field ${parameter}`);
 
     const validationError = parsed.data.detail?.[0];
     const location = toSafeTelnyxDiagnosticPath(validationError?.loc);
@@ -460,6 +467,14 @@ function toSafeTelnyxDiagnosticPath(value: unknown) {
       ? value.replace(/^\/+/, "").replaceAll("/", ".")
       : "";
   return /^[a-zA-Z0-9_.:-]{1,120}$/.test(path) ? path : null;
+}
+
+function normalizeTelnyxInlineToolForUpdate(tool: unknown) {
+  if (!tool || typeof tool !== "object" || Array.isArray(tool)) return tool;
+  const record = tool as Record<string, unknown>;
+  const type = record.type;
+  if (typeof type !== "string" || !(type in record)) return tool;
+  return { [type]: record[type], type };
 }
 
 function buildTelnyxWebhookTool(

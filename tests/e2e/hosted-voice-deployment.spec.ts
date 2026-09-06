@@ -202,7 +202,11 @@ test("Telnyx adapter finds the exact Integration Secret without exposing its val
 });
 
 test("Telnyx adapter replaces Lia webhooks on only the verified non-main candidate", async () => {
-  const nativeTool = { hangup: {}, type: "hangup" };
+  const nativeTool = {
+    hangup: { description: "End the completed conversation." },
+    id: "tool-provider-managed",
+    type: "hangup",
+  };
   const staleLiaTool = {
     type: "webhook",
     webhook: { name: "lia_read_stale" },
@@ -268,7 +272,10 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
   const pushedTools = requests[1]?.body.tools as Array<Record<string, unknown>>;
   expect(requests[1]?.body.name).toBe(definition.name);
   expect(pushedTools).toHaveLength(2);
-  expect(pushedTools[0]).toEqual(nativeTool);
+  expect(pushedTools[0]).toEqual({
+    hangup: { description: "End the completed conversation." },
+    type: "hangup",
+  });
   expect(pushedTools[1]).toMatchObject({
     type: "webhook",
     webhook: {
