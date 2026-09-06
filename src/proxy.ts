@@ -18,6 +18,7 @@ export default function proxy(req: NextRequest) {
   const isWhatsAppWebhookRoute = pathname === "/api/whatsapp/webhook";
   const isUploadWorkerRoute = pathname === "/api/upload/process-next";
   const isDurableWorkerRoute = pathname === "/api/durable/process-next";
+  const isHostedVoiceToolRoute = pathname.startsWith("/api/voice-tools/");
   const isHostedVoiceEventRoute =
     pathname === "/api/hosted-voice/telnyx/events";
   const hasSession =
@@ -32,7 +33,8 @@ export default function proxy(req: NextRequest) {
     isWhatsAppWebhookRoute ||
     isUploadWorkerRoute ||
     isDurableWorkerRoute ||
-    isHostedVoiceEventRoute
+    isHostedVoiceEventRoute ||
+    isHostedVoiceToolRoute
   ) {
     return NextResponse.next();
   }

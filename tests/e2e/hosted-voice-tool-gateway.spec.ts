@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { NextRequest } from "next/server";
+import proxy from "../../src/proxy";
 import type { ToolDefinitionV1 } from "../../src/lib/conversation-contracts";
 import {
   getHostedVoiceBearerCredential,
@@ -18,6 +20,24 @@ import {
 
 const COMMIT_SECRET = "phase-18-11-commit-secret-at-least-32-characters";
 const CREDENTIAL = "opaque-provider-binding-secret";
+
+test("proxy lets hosted voice tools reach their bearer-authenticated route", async () => {
+  const publicResponse = proxy(
+    new NextRequest(
+      "https://lia-staging.example.com/api/voice-tools/operation%3A85/read",
+    ),
+  );
+  expect(publicResponse.status).toBe(200);
+  expect(publicResponse.headers.get("x-middleware-next")).toBe("1");
+
+  const protectedResponse = proxy(
+    new NextRequest("https://lia-staging.example.com/api/private"),
+  );
+  expect(protectedResponse.status).toBe(401);
+  await expect(protectedResponse.json()).resolves.toEqual({
+    message: "Unauthorized",
+  });
+});
 
 function toolDefinition(
   access: "read" | "write",
