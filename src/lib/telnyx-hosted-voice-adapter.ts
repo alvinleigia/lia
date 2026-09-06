@@ -27,6 +27,7 @@ const telnyxHostedVoiceToolSetupEntrySchema = z
     description: z.string().trim().min(1),
     method: z.literal("POST"),
     name: z.string().trim().min(1).max(120).regex(/^lia_/),
+    phase: z.enum(["read", "prepare", "commit"]),
     timeout_ms: z.number().int().min(1).max(15_000),
     url: z.string().url(),
   })
@@ -287,7 +288,10 @@ export function createTelnyxHostedVoiceAdapter(input: {
         (tool) => !isLiaWebhookTool(tool),
       );
       const updated = await request(path, {
-        body: JSON.stringify({ tools: [...preservedTools, ...expectedTools] }),
+        body: JSON.stringify({
+          name: candidate.name,
+          tools: [...preservedTools, ...expectedTools],
+        }),
         method: "POST",
       });
       if (!updated || updated.version_id !== candidateVersionId) {

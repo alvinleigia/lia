@@ -204,6 +204,7 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
         description: "Check calendar availability.",
         method: "POST",
         name: "lia_read_operation_85",
+        phase: "read",
         timeout_ms: 8_000,
         url: "https://staging.example.com/api/voice-tools/operation%3A85/read",
       },
@@ -218,6 +219,7 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
     ),
   ).toBe(true);
   const pushedTools = requests[1]?.body.tools as Array<Record<string, unknown>>;
+  expect(requests[1]?.body.name).toBe(definition.name);
   expect(pushedTools).toHaveLength(2);
   expect(pushedTools[0]).toEqual(nativeTool);
   expect(pushedTools[1]).toMatchObject({
