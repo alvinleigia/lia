@@ -103,6 +103,21 @@ const telnyxSharedToolListSchema = z
   })
   .passthrough();
 
+const telnyxTemporaryAssistantSchema = z
+  .object({ id: z.string().trim().min(1) })
+  .passthrough();
+
+const telnyxToolTestResponseSchema = z
+  .object({
+    data: z
+      .object({
+        status_code: z.number().int().min(100).max(599),
+        success: z.boolean(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
 const telnyxApiErrorSchema = z
   .object({
     detail: z
@@ -202,6 +217,10 @@ export type TelnyxHostedVoiceAdapter =
       mainVersionId: string | null;
       tools: unknown[];
     }): Promise<{ routingWasSuspended: boolean; toolCount: number }>;
+    testWebhookToolWithoutCall(input: {
+      integrationSecretIdentifier: string;
+      tool: unknown;
+    }): Promise<{ statusCode: number; toolName: string }>;
   };
 
 export class TelnyxHostedVoiceApiError extends Error {
@@ -296,24 +315,8 @@ export function createTelnyxHostedVoiceAdapter(input: {
     namespace: string,
   ) {
     const name = expected.webhook.name;
-    const displayName = `${namespace}-${name}`;
-    const listPath = `/ai/tools?filter%5Bname%5D=${encodeURIComponent(displayName)}`;
-    const { payload: listPayload } = await requestPayload(
-      listPath,
-      undefined,
-      `Telnyx shared tool lookup for ${name}`,
-    );
-    const list = telnyxSharedToolListSchema.safeParse(listPayload);
-    if (!list.success) {
-      throw new TelnyxHostedVoiceApiError(
-        "Telnyx returned an invalid shared tool list.",
-        false,
-        200,
-      );
-    }
-    const existing = list.data.data.find(
-      (tool) => tool.display_name === displayName && tool.type === "webhook",
-    );
+    const displayName = getSharedWebhookToolDisplayName(namespace, name);
+    const existing = await findSharedWebhookTool(displayName, name);
     const body = JSON.stringify({
       display_name: displayName,
       type: "webhook",
@@ -337,6 +340,26 @@ export function createTelnyxHostedVoiceAdapter(input: {
     }
     verifyTelnyxSharedWebhookTool(tool.data, expected);
     return tool.data.id;
+  }
+
+  async function findSharedWebhookTool(displayName: string, toolName: string) {
+    const listPath = `/ai/tools?filter%5Bname%5D=${encodeURIComponent(displayName)}`;
+    const { payload: listPayload } = await requestPayload(
+      listPath,
+      undefined,
+      `Telnyx shared tool lookup for ${toolName}`,
+    );
+    const list = telnyxSharedToolListSchema.safeParse(listPayload);
+    if (!list.success) {
+      throw new TelnyxHostedVoiceApiError(
+        "Telnyx returned an invalid shared tool list.",
+        false,
+        200,
+      );
+    }
+    return list.data.data.find(
+      (tool) => tool.display_name === displayName && tool.type === "webhook",
+    );
   }
 
   return {
@@ -578,6 +601,99 @@ export function createTelnyxHostedVoiceAdapter(input: {
       }
       return { routingWasSuspended, toolCount: expectedTools.length };
     },
+    async testWebhookToolWithoutCall({ integrationSecretIdentifier, tool }) {
+      const identifier = telnyxIntegrationSecretIdentifierSchema.parse(
+        integrationSecretIdentifier,
+      );
+      const setupTool = telnyxHostedVoiceToolSetupEntrySchema.parse(tool);
+      if (setupTool.phase === "commit") {
+        throw new Error(
+          "A commit tool cannot be used for no-call verification.",
+        );
+      }
+      const expected = buildTelnyxWebhookTool(setupTool, identifier);
+      const displayName = getSharedWebhookToolDisplayName(
+        identifier,
+        setupTool.name,
+      );
+      const sharedTool = await findSharedWebhookTool(
+        displayName,
+        setupTool.name,
+      );
+      if (!sharedTool) {
+        throw new Error(
+          `The Telnyx shared tool "${setupTool.name}" was not found.`,
+        );
+      }
+      verifyTelnyxSharedWebhookTool(sharedTool, expected);
+
+      const { payload: assistantPayload, status: assistantStatus } =
+        await requestPayload(
+          "/ai/assistants",
+          {
+            body: JSON.stringify({
+              enabled_features: [],
+              greeting: "",
+              instructions:
+                "Temporary Lia assistant for a no-call webhook verification.",
+              name: `Lia no-call verification: ${setupTool.name}`,
+              privacy_settings: { data_retention: false },
+              tool_ids: [sharedTool.id],
+            }),
+            method: "POST",
+          },
+          "Telnyx no-call verification assistant creation",
+        );
+      const assistant =
+        telnyxTemporaryAssistantSchema.safeParse(assistantPayload);
+      if (!assistant.success) {
+        throw new TelnyxHostedVoiceApiError(
+          "Telnyx returned an invalid no-call verification assistant.",
+          false,
+          assistantStatus,
+        );
+      }
+
+      try {
+        const { payload, status } = await requestPayload(
+          `/ai/assistants/${encodeURIComponent(assistant.data.id)}/tools/${encodeURIComponent(sharedTool.id)}/test`,
+          {
+            body: JSON.stringify({
+              arguments: buildNoCallToolArguments(setupTool),
+            }),
+            method: "POST",
+          },
+          `Telnyx no-call execution test for ${setupTool.name}`,
+        );
+        const result = telnyxToolTestResponseSchema.safeParse(payload);
+        if (!result.success) {
+          throw new TelnyxHostedVoiceApiError(
+            "Telnyx returned an invalid no-call tool test result.",
+            false,
+            status,
+          );
+        }
+        if (
+          !result.data.data.success ||
+          result.data.data.status_code < 200 ||
+          result.data.data.status_code >= 300
+        ) {
+          throw new Error(
+            `The Lia webhook failed no-call verification with HTTP ${result.data.data.status_code}.`,
+          );
+        }
+        return {
+          statusCode: result.data.data.status_code,
+          toolName: setupTool.name,
+        };
+      } finally {
+        await requestPayload(
+          `/ai/assistants/${encodeURIComponent(assistant.data.id)}`,
+          { method: "DELETE" },
+          "Telnyx no-call verification assistant cleanup",
+        );
+      }
+    },
     async promote(remote: HostedVoiceRemoteVersion) {
       await request(
         `/ai/assistants/${encodeURIComponent(remote.assistantId)}/versions/${encodeURIComponent(remote.versionId)}/promote`,
@@ -585,6 +701,52 @@ export function createTelnyxHostedVoiceAdapter(input: {
       );
     },
   };
+}
+
+function getSharedWebhookToolDisplayName(namespace: string, toolName: string) {
+  return `${namespace}-${toolName}`;
+}
+
+function buildNoCallToolArguments(tool: TelnyxHostedVoiceToolSetupEntry) {
+  return Object.fromEntries(
+    tool.body_parameters.required.map((key) => {
+      const property = z
+        .object({ type: z.enum(["boolean", "integer", "number", "string"]) })
+        .passthrough()
+        .safeParse(tool.body_parameters.properties[key]);
+      if (!property.success) {
+        throw new Error(
+          `The required tool argument "${key}" cannot be safely tested.`,
+        );
+      }
+      return [key, buildNoCallToolArgumentValue(key, property.data.type)];
+    }),
+  );
+}
+
+function buildNoCallToolArgumentValue(
+  key: string,
+  type: "boolean" | "integer" | "number" | "string",
+) {
+  if (type === "boolean") return false;
+  if (type === "integer" || type === "number") return 1;
+
+  const normalizedKey = key.toLowerCase();
+  if (normalizedKey.includes("date")) {
+    return new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  }
+  if (normalizedKey.includes("time")) return "10:00";
+  if (
+    normalizedKey.includes("phone") ||
+    normalizedKey.includes("contactnumber")
+  ) {
+    return "+61400000000";
+  }
+  if (normalizedKey.includes("email")) {
+    return "lia-staging-verification@example.invalid";
+  }
+  if (normalizedKey.includes("name")) return "Synthetic Staging Tester";
+  return "lia-staging-verification";
 }
 
 function canaryRuleReferencesVersion(

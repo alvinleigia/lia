@@ -112,6 +112,30 @@ function telnyxSharedToolResponse(
   };
 }
 
+function expectedTelnyxSharedToolResponse() {
+  const setup = telnyxWebhookSetup()[0];
+  if (!setup) throw new Error("Expected a webhook setup fixture.");
+  return telnyxSharedToolResponse({
+    display_name: "lia-phase18-candidate-1-lia_read_operation_85",
+    webhook: {
+      async: true,
+      async_timeout_ms: 8_000,
+      body_parameters: setup.body_parameters,
+      description: setup.description,
+      headers: [
+        {
+          name: "Authorization",
+          value:
+            "Bearer {{#integration_secret}}lia-phase18-candidate-1{{/integration_secret}}",
+        },
+      ],
+      method: "POST",
+      name: setup.name,
+      url: setup.url,
+    },
+  });
+}
+
 test("Telnyx adapter creates a non-main candidate with idempotent API requests", async () => {
   const requests: Array<{ body: Record<string, unknown>; init?: RequestInit }> =
     [];
@@ -479,6 +503,108 @@ test("Telnyx adapter updates and reuses an existing Lia shared tool", async () =
     "existing-non-lia",
     "shared-lia-read-85",
   ]);
+});
+
+test("Telnyx adapter executes a shared webhook without a call and removes the temporary assistant", async () => {
+  const requests: Array<{
+    body: Record<string, unknown>;
+    method: string;
+    url: string;
+  }> = [];
+  const fetchImpl: typeof fetch = async (url, init) => {
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    const request = {
+      body,
+      method: init?.method ?? "GET",
+      url: String(url),
+    };
+    requests.push(request);
+    if (request.url.includes("/ai/tools?")) {
+      return Response.json({ data: [expectedTelnyxSharedToolResponse()] });
+    }
+    if (request.url.endsWith("/ai/assistants")) {
+      return Response.json({ id: "temporary-assistant" });
+    }
+    if (request.url.endsWith("/test")) {
+      return Response.json({
+        data: { status_code: 200, success: true },
+      });
+    }
+    if (
+      request.url.endsWith("/ai/assistants/temporary-assistant") &&
+      request.method === "DELETE"
+    ) {
+      return Response.json({ deleted: true, id: "temporary-assistant" });
+    }
+    return Response.json({}, { status: 404 });
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  await expect(
+    adapter.testWebhookToolWithoutCall({
+      integrationSecretIdentifier: "lia-phase18-candidate-1",
+      tool: telnyxWebhookSetup()[0],
+    }),
+  ).resolves.toEqual({
+    statusCode: 200,
+    toolName: "lia_read_operation_85",
+  });
+  expect(requests.map(({ method }) => method)).toEqual([
+    "GET",
+    "POST",
+    "POST",
+    "DELETE",
+  ]);
+  expect(requests[1]?.body).toMatchObject({
+    enabled_features: [],
+    privacy_settings: { data_retention: false },
+    tool_ids: ["shared-lia-read-85"],
+  });
+  expect(requests[2]?.url).toContain(
+    "/ai/assistants/temporary-assistant/tools/shared-lia-read-85/test",
+  );
+  expect(requests[2]?.body.arguments).toMatchObject({
+    date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+  });
+  expect(JSON.stringify(requests)).not.toContain("restricted-test-key");
+});
+
+test("Telnyx adapter removes the temporary assistant after a failed no-call webhook test", async () => {
+  const methods: string[] = [];
+  const fetchImpl: typeof fetch = async (url, init) => {
+    const method = init?.method ?? "GET";
+    methods.push(method);
+    const path = String(url);
+    if (path.includes("/ai/tools?")) {
+      return Response.json({ data: [expectedTelnyxSharedToolResponse()] });
+    }
+    if (path.endsWith("/ai/assistants")) {
+      return Response.json({ id: "temporary-assistant" });
+    }
+    if (path.endsWith("/test")) {
+      return Response.json({
+        data: { status_code: 401, success: false },
+      });
+    }
+    return Response.json({ deleted: true, id: "temporary-assistant" });
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  await expect(
+    adapter.testWebhookToolWithoutCall({
+      integrationSecretIdentifier: "lia-phase18-candidate-1",
+      tool: telnyxWebhookSetup()[0],
+    }),
+  ).rejects.toThrow("failed no-call verification with HTTP 401");
+  expect(methods.at(-1)).toBe("DELETE");
 });
 
 test("Telnyx adapter restores canary routing when the unlocked update still fails", async () => {

@@ -279,9 +279,13 @@ export async function pushHostedVoiceCandidateToolsAction(
       bindingUpdatedAt: deployment.bindingUpdatedAt,
       integrationSecretUpdatedAt: integrationSecret.updatedAt,
     });
-    const probeTool = setup.tools[0];
+    const probeTool =
+      setup.tools.find(({ phase }) => phase === "read") ??
+      setup.tools.find(({ phase }) => phase === "prepare");
     if (!probeTool) {
-      throw new Error("The candidate has no Lia webhook tool to preflight.");
+      throw new Error(
+        "The candidate has no safe Lia webhook tool for no-call verification.",
+      );
     }
     await verifyHostedVoiceToolEndpoint({ url: probeTool.url });
     const result = await adapter.pushCandidateTools({
@@ -291,24 +295,31 @@ export async function pushHostedVoiceCandidateToolsAction(
       mainVersionId: deployment.mainRemoteVersionId,
       tools: setup.tools,
     });
+    const verification = await adapter.testWebhookToolWithoutCall({
+      integrationSecretIdentifier: parsed.data.integrationSecretIdentifier,
+      tool: probeTool,
+    });
     await writeAuditLog({
       ...context,
       action: "hosted_voice.candidate_tools_pushed",
       metadata: {
         candidateRemoteVersionId: deployment.candidateRemoteVersionId,
         integrationSecretId: integrationSecret.id,
-        preflight: "passed",
+        noCallVerification: "passed",
         routingWasSuspended: result.routingWasSuspended,
         toolCount: result.toolCount,
+        verifiedStatusCode: verification.statusCode,
+        verifiedToolName: verification.toolName,
       },
       targetId: String(deployment.candidateDeploymentVersionId),
       targetType: "hosted_voice_deployment_version",
     });
     revalidatePath("/projects/channels/telnyx/hosted");
+    const routingMessage = result.routingWasSuspended
+      ? " Candidate routing was restored."
+      : "";
     return {
-      success: result.routingWasSuspended
-        ? `${result.toolCount} Lia webhook tools were pushed, candidate routing was restored, and the no-call binding preflight passed.`
-        : `${result.toolCount} Lia webhook tools were pushed and the no-call binding preflight passed.`,
+      success: `${result.toolCount} Lia webhook tools were pushed.${routingMessage} ${verification.toolName} passed an authenticated no-call execution test (HTTP ${verification.statusCode}).`,
     };
   } catch (error) {
     return { error: getHostedVoiceActionError(error) };
