@@ -26,6 +26,7 @@ import {
   verifyHostedVoiceToolEndpoint,
 } from "@/lib/hosted-voice-tool-preflight";
 import { createHostedVoiceToolBinding } from "@/lib/hosted-voice-tool-store";
+import { TelnyxHostedVoiceVerificationError } from "@/lib/telnyx-hosted-voice-adapter";
 import {
   getProjectTelnyxHostedVoiceProvider,
   getProjectTelnyxHostedVoiceProviderRecord,
@@ -236,6 +237,7 @@ export async function pushHostedVoiceCandidateToolsAction(
 
   const context = await resolveUserAndProject();
   assertPermission(context.membership, "company.widget.manage");
+  const diagnosticSteps: string[] = [];
   try {
     const state = await getHostedVoiceStagingState(context.project.id);
     const deployment = state.deployment;
@@ -260,6 +262,9 @@ export async function pushHostedVoiceCandidateToolsAction(
         "Webhook tools can only be pushed to a non-main candidate.",
       );
     }
+    diagnosticSteps.push(
+      `Validated candidate version …${deployment.candidateRemoteVersionId.slice(-8)} and active binding.`,
+    );
     const provider = await getProjectTelnyxHostedVoiceProviderRecord(
       context.project.id,
     );
@@ -268,6 +273,9 @@ export async function pushHostedVoiceCandidateToolsAction(
       deploymentVersionId: deployment.candidateDeploymentVersionId,
       projectId: context.project.id,
     });
+    diagnosticSteps.push(
+      `Generated ${setup.tools.length} pinned Lia webhook definitions.`,
+    );
     const { adapter } = await getProjectTelnyxHostedVoiceProvider({
       projectId: context.project.id,
       providerId: provider.id,
@@ -279,6 +287,9 @@ export async function pushHostedVoiceCandidateToolsAction(
       bindingUpdatedAt: deployment.bindingUpdatedAt,
       integrationSecretUpdatedAt: integrationSecret.updatedAt,
     });
+    diagnosticSteps.push(
+      "Resolved the named Integration Secret and verified that it is current.",
+    );
     const probeTool =
       setup.tools.find(({ phase }) => phase === "read") ??
       setup.tools.find(({ phase }) => phase === "prepare");
@@ -288,6 +299,9 @@ export async function pushHostedVoiceCandidateToolsAction(
       );
     }
     await verifyHostedVoiceToolEndpoint({ url: probeTool.url });
+    diagnosticSteps.push(
+      "Reached the public Lia webhook and confirmed its bearer-authentication boundary.",
+    );
     const result = await adapter.pushCandidateTools({
       assistantId: deployment.remoteAssistantId,
       candidateVersionId: deployment.candidateRemoteVersionId,
@@ -295,6 +309,9 @@ export async function pushHostedVoiceCandidateToolsAction(
       mainVersionId: deployment.mainRemoteVersionId,
       tools: setup.tools,
     });
+    diagnosticSteps.push(
+      `Attached ${result.toolCount} shared tools to the exact candidate${result.routingWasSuspended ? " and restored its routing" : ""}.`,
+    );
     const verification = await adapter.testWebhookToolWithoutCall({
       integrationSecretIdentifier: parsed.data.integrationSecretIdentifier,
       tool: probeTool,
@@ -322,7 +339,20 @@ export async function pushHostedVoiceCandidateToolsAction(
       success: `${result.toolCount} Lia webhook tools were pushed.${routingMessage} ${verification.toolName} passed an authenticated no-call execution test (HTTP ${verification.statusCode}).`,
     };
   } catch (error) {
-    return { error: getHostedVoiceActionError(error) };
+    const verificationSteps =
+      error instanceof TelnyxHostedVoiceVerificationError ? error.steps : [];
+    const trace = [...diagnosticSteps, ...verificationSteps];
+    return {
+      error:
+        trace.length > 0
+          ? [
+              getHostedVoiceActionError(error),
+              "",
+              "Safe diagnostic trace:",
+              ...trace.map((step, index) => `${index + 1}. ${step}`),
+            ].join("\n")
+          : getHostedVoiceActionError(error),
+    };
   }
 }
 

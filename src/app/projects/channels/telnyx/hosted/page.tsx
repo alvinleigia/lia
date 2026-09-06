@@ -408,7 +408,7 @@ export default async function TelnyxHostedVoicePage() {
                   type="hidden"
                   value={deployment.id}
                 />
-                <ActionFormError />
+                <ActionFormError className="whitespace-pre-wrap font-mono" />
                 <ActionFormSuccessToast />
                 <p className="text-sm text-muted-foreground">
                   After storing the current binding credential in Telnyx, Lia

@@ -23,6 +23,7 @@ import {
 import {
   createTelnyxHostedVoiceAdapter,
   TelnyxHostedVoiceApiError,
+  TelnyxHostedVoiceVerificationError,
 } from "../../src/lib/telnyx-hosted-voice-adapter";
 
 const definition: VoiceAgentDefinitionV1 = {
@@ -587,7 +588,21 @@ test("Telnyx adapter removes the temporary assistant after a failed no-call webh
     }
     if (path.endsWith("/test")) {
       return Response.json({
-        data: { status_code: 401, success: false },
+        data: {
+          request: {
+            headers: {
+              authorization: "Bearer must-never-be-rendered",
+              "content-type": "application/json",
+              "x-request-id": "provider-request-id",
+            },
+          },
+          response: JSON.stringify({
+            error: "missing_provider_conversation",
+            message: "The provider conversation could not be verified.",
+          }),
+          status_code: 400,
+          success: false,
+        },
       });
     }
     return Response.json({ deleted: true, id: "temporary-assistant" });
@@ -598,12 +613,23 @@ test("Telnyx adapter removes the temporary assistant after a failed no-call webh
     settings,
   });
 
-  await expect(
-    adapter.testWebhookToolWithoutCall({
+  const error = await adapter
+    .testWebhookToolWithoutCall({
       integrationSecretIdentifier: "lia-phase18-candidate-1",
       tool: telnyxWebhookSetup()[0],
-    }),
-  ).rejects.toThrow("failed no-call verification with HTTP 401");
+    })
+    .catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(TelnyxHostedVoiceVerificationError);
+  expect(error.message).toContain("failed no-call verification with HTTP 400");
+  expect(error.steps).toEqual(
+    expect.arrayContaining([
+      "Generated synthetic arguments: date (string).",
+      "Execute the webhook through Telnyx failed (HTTP 400; Lia error missing_provider_conversation; request headers: content-type, x-request-id).",
+      "Deleted temporary assistant …ssistant.",
+    ]),
+  );
+  expect(JSON.stringify(error.steps)).not.toContain("must-never-be-rendered");
   expect(methods.at(-1)).toBe("DELETE");
 });
 
