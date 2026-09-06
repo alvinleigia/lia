@@ -1,9 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type {
   HostedVoiceProviderAdapter,
   HostedVoiceRemoteVersion,
 } from "@/lib/hosted-voice-contract";
 import { hashHostedVoiceToolValue } from "@/lib/hosted-voice-tool-contract";
+import { HOSTED_VOICE_NO_CALL_VERIFICATION_HEADER } from "@/lib/hosted-voice-tool-preflight";
 import {
   createTelnyxHostedVoiceCompiler,
   type TelnyxHostedAssistantManagedConfig,
@@ -222,6 +224,7 @@ export type TelnyxHostedVoiceAdapter =
     testWebhookToolWithoutCall(input: {
       integrationSecretIdentifier: string;
       tool: unknown;
+      verificationToken: string;
     }): Promise<{ statusCode: number; toolName: string }>;
   };
 
@@ -613,9 +616,14 @@ export function createTelnyxHostedVoiceAdapter(input: {
       }
       return { routingWasSuspended, toolCount: expectedTools.length };
     },
-    async testWebhookToolWithoutCall({ integrationSecretIdentifier, tool }) {
+    async testWebhookToolWithoutCall({
+      integrationSecretIdentifier,
+      tool,
+      verificationToken,
+    }) {
       const steps: string[] = [];
       let assistantId: string | null = null;
+      let verificationToolId: string | null = null;
       let failure: unknown;
       let failureDetail: string | null = null;
       let result: { statusCode: number; toolName: string } | null = null;
@@ -625,6 +633,12 @@ export function createTelnyxHostedVoiceAdapter(input: {
           integrationSecretIdentifier,
         );
         const setupTool = telnyxHostedVoiceToolSetupEntrySchema.parse(tool);
+        const token = z
+          .string()
+          .trim()
+          .min(1)
+          .max(4_000)
+          .parse(verificationToken);
         if (setupTool.phase === "commit") {
           throw new Error(
             "A commit tool cannot be used for no-call verification.",
@@ -652,6 +666,52 @@ export function createTelnyxHostedVoiceAdapter(input: {
           `Resolved shared tool …${shortTelnyxId(sharedTool.id)} and verified its definition.`,
         );
 
+        stage = "Create the temporary verification tool";
+        const verificationTool = telnyxWebhookToolSchema.parse({
+          ...expected,
+          webhook: {
+            ...expected.webhook,
+            headers: [
+              ...expected.webhook.headers,
+              {
+                name: HOSTED_VOICE_NO_CALL_VERIFICATION_HEADER,
+                value: token,
+              },
+            ],
+          },
+        });
+        const { payload: verificationToolPayload, status: verificationStatus } =
+          await requestPayload(
+            "/ai/tools",
+            {
+              body: JSON.stringify({
+                display_name: `lia-no-call-${randomUUID()}`,
+                type: "webhook",
+                webhook: verificationTool.webhook,
+              }),
+              method: "POST",
+            },
+            "Telnyx no-call verification tool creation",
+          );
+        const createdVerificationTool = telnyxSharedToolSchema.safeParse(
+          verificationToolPayload,
+        );
+        if (!createdVerificationTool.success) {
+          throw new TelnyxHostedVoiceApiError(
+            "Telnyx returned an invalid no-call verification tool.",
+            false,
+            verificationStatus,
+          );
+        }
+        verifyTelnyxSharedWebhookTool(
+          createdVerificationTool.data,
+          verificationTool,
+        );
+        verificationToolId = createdVerificationTool.data.id;
+        steps.push(
+          `Created temporary signed tool …${shortTelnyxId(verificationToolId)}.`,
+        );
+
         stage = "Generate synthetic staging arguments";
         const testArguments = buildNoCallToolArguments(setupTool);
         steps.push(`Generated synthetic arguments: ${testArguments.summary}.`);
@@ -668,7 +728,7 @@ export function createTelnyxHostedVoiceAdapter(input: {
                   "Temporary Lia assistant for a no-call webhook verification.",
                 name: `Lia no-call verification: ${setupTool.name}`,
                 privacy_settings: { data_retention: false },
-                tool_ids: [sharedTool.id],
+                tool_ids: [verificationToolId],
               }),
               method: "POST",
             },
@@ -690,7 +750,7 @@ export function createTelnyxHostedVoiceAdapter(input: {
 
         stage = "Execute the webhook through Telnyx";
         const { payload, status } = await requestPayload(
-          `/ai/assistants/${encodeURIComponent(assistantId)}/tools/${encodeURIComponent(sharedTool.id)}/test`,
+          `/ai/assistants/${encodeURIComponent(assistantId)}/tools/${encodeURIComponent(verificationToolId)}/test`,
           {
             body: JSON.stringify({ arguments: testArguments.arguments }),
             method: "POST",
@@ -754,6 +814,24 @@ export function createTelnyxHostedVoiceAdapter(input: {
         } catch (error) {
           steps.push(
             `Delete temporary assistant …${shortTelnyxId(assistantId)} failed (${getSafeVerificationFailure(error)}).`,
+          );
+          failure ??= error;
+        }
+      }
+
+      if (verificationToolId) {
+        try {
+          await requestPayload(
+            `/ai/tools/${encodeURIComponent(verificationToolId)}`,
+            { method: "DELETE" },
+            "Telnyx no-call verification tool cleanup",
+          );
+          steps.push(
+            `Deleted temporary signed tool …${shortTelnyxId(verificationToolId)}.`,
+          );
+        } catch (error) {
+          steps.push(
+            `Delete temporary signed tool …${shortTelnyxId(verificationToolId)} failed (${getSafeVerificationFailure(error)}).`,
           );
           failure ??= error;
         }

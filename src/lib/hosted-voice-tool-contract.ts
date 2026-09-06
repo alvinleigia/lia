@@ -30,15 +30,16 @@ export interface HostedVoiceToolProviderAdapter<TRawRequest> {
 export type TelnyxHostedVoiceToolRequest = {
   body: unknown;
   headers: Headers;
+  verifiedConversationId?: string;
 };
 
 export const telnyxHostedVoiceToolAdapter: HostedVoiceToolProviderAdapter<TelnyxHostedVoiceToolRequest> =
   {
     provider: "telnyx",
     normalize({ phase, raw, toolId }) {
-      const conversationId = raw.headers
-        .get("x-telnyx-call-control-id")
-        ?.trim();
+      const conversationId =
+        raw.headers.get("x-telnyx-call-control-id")?.trim() ||
+        raw.verifiedConversationId?.trim();
       if (!conversationId) {
         throw new HostedVoiceToolRequestError(
           "missing_provider_conversation",

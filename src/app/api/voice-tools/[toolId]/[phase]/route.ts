@@ -10,6 +10,10 @@ import {
   executeHostedVoiceToolEnvelope,
   HostedVoiceToolRequestError,
 } from "@/lib/hosted-voice-tool-gateway";
+import {
+  HOSTED_VOICE_NO_CALL_VERIFICATION_HEADER,
+  verifyHostedVoiceNoCallVerificationToken,
+} from "@/lib/hosted-voice-tool-preflight";
 import { hostedVoiceToolGatewayRepository } from "@/lib/hosted-voice-tool-store";
 
 const MAX_BODY_CHARACTERS = 64_000;
@@ -39,9 +43,22 @@ export async function POST(
     } catch {
       return NextResponse.json({ error: "invalid_json" }, { status: 400 });
     }
+    const verifiedConversationId = request.headers
+      .get("x-telnyx-call-control-id")
+      ?.trim()
+      ? undefined
+      : (verifyHostedVoiceNoCallVerificationToken({
+          phase: route.phase,
+          secret:
+            process.env.VOICE_TOOL_COMMIT_SECRET ??
+            process.env.AUTH_SECRET ??
+            "",
+          token: request.headers.get(HOSTED_VOICE_NO_CALL_VERIFICATION_HEADER),
+          toolId: route.toolId,
+        }) ?? undefined);
     const envelope = telnyxHostedVoiceToolAdapter.normalize({
       phase: route.phase,
-      raw: { body, headers: request.headers },
+      raw: { body, headers: request.headers, verifiedConversationId },
       toolId: route.toolId,
     });
     const result = await executeHostedVoiceToolEnvelope({

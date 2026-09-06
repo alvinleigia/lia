@@ -17,7 +17,10 @@ import {
   HostedVoiceToolRequestError,
 } from "../../src/lib/hosted-voice-tool-gateway";
 import {
+  createHostedVoiceNoCallVerificationToken,
+  HOSTED_VOICE_NO_CALL_VERIFICATION_HEADER,
   verifyHostedVoiceIntegrationSecretFreshness,
+  verifyHostedVoiceNoCallVerificationToken,
   verifyHostedVoiceToolEndpoint,
 } from "../../src/lib/hosted-voice-tool-preflight";
 import proxy from "../../src/proxy";
@@ -84,6 +87,98 @@ test("no-call preflight requires Lia bearer authentication and a current secret"
       integrationSecretUpdatedAt: "2026-09-06T11:09:00.000Z",
     }),
   ).toThrow("current binding credential");
+});
+
+test("no-call verification tokens are short-lived and route-bound", () => {
+  const now = new Date("2026-09-07T10:00:00.000Z");
+  const token = createHostedVoiceNoCallVerificationToken({
+    now,
+    phase: "read",
+    secret: COMMIT_SECRET,
+    toolId: "operation:85",
+  });
+  const valid = verifyHostedVoiceNoCallVerificationToken({
+    now,
+    phase: "read",
+    secret: COMMIT_SECRET,
+    token,
+    toolId: "operation:85",
+  });
+
+  expect(HOSTED_VOICE_NO_CALL_VERIFICATION_HEADER).toBe(
+    "X-Lia-No-Call-Verification",
+  );
+  expect(valid).toMatch(/^lia-no-call:[0-9a-f-]{36}$/);
+  expect(
+    verifyHostedVoiceNoCallVerificationToken({
+      now,
+      phase: "prepare",
+      secret: COMMIT_SECRET,
+      token,
+      toolId: "operation:85",
+    }),
+  ).toBeNull();
+  expect(
+    verifyHostedVoiceNoCallVerificationToken({
+      now,
+      phase: "read",
+      secret: COMMIT_SECRET,
+      token,
+      toolId: "operation:86",
+    }),
+  ).toBeNull();
+  expect(
+    verifyHostedVoiceNoCallVerificationToken({
+      now: new Date(now.getTime() + 5 * 60 * 1000),
+      phase: "read",
+      secret: COMMIT_SECRET,
+      token,
+      toolId: "operation:85",
+    }),
+  ).toBeNull();
+  expect(
+    verifyHostedVoiceNoCallVerificationToken({
+      now,
+      phase: "read",
+      secret: COMMIT_SECRET,
+      token: `${token}x`,
+      toolId: "operation:85",
+    }),
+  ).toBeNull();
+});
+
+test("Telnyx normalization accepts only a server-verified no-call identity fallback", () => {
+  const fallback = telnyxHostedVoiceToolAdapter.normalize({
+    phase: "read",
+    raw: {
+      body: { date: "2026-09-10" },
+      headers: new Headers(),
+      verifiedConversationId: "lia-no-call:verification-id",
+    },
+    toolId: "operation:85",
+  });
+  expect(fallback.conversationId).toBe("lia-no-call:verification-id");
+
+  const realCall = telnyxHostedVoiceToolAdapter.normalize({
+    phase: "read",
+    raw: {
+      body: { date: "2026-09-10" },
+      headers: new Headers({
+        "x-telnyx-call-control-id": "real-call-control-id",
+      }),
+      verifiedConversationId: "lia-no-call:verification-id",
+    },
+    toolId: "operation:85",
+  });
+  expect(realCall.conversationId).toBe("real-call-control-id");
+
+  expect(() =>
+    telnyxHostedVoiceToolAdapter.normalize({
+      phase: "read",
+      raw: { body: { date: "2026-09-10" }, headers: new Headers() },
+      toolId: "operation:85",
+    }),
+  ).toThrow(HostedVoiceToolRequestError);
 });
 
 function toolDefinition(

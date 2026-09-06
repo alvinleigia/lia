@@ -22,6 +22,7 @@ import {
   hostedVoiceStagingDefinitionInputSchema,
 } from "@/lib/hosted-voice-staging";
 import {
+  createHostedVoiceNoCallVerificationToken,
   verifyHostedVoiceIntegrationSecretFreshness,
   verifyHostedVoiceToolEndpoint,
 } from "@/lib/hosted-voice-tool-preflight";
@@ -312,9 +313,22 @@ export async function pushHostedVoiceCandidateToolsAction(
     diagnosticSteps.push(
       `Attached ${result.toolCount} shared tools to the exact candidate${result.routingWasSuspended ? " and restored its routing" : ""}.`,
     );
+    const verificationRoute = getHostedVoiceToolRoute(probeTool.url);
+    if (verificationRoute.phase !== probeTool.phase) {
+      throw new Error(
+        "The no-call verification route does not match the selected tool.",
+      );
+    }
+    const verificationToken = createHostedVoiceNoCallVerificationToken({
+      phase: verificationRoute.phase,
+      secret:
+        process.env.VOICE_TOOL_COMMIT_SECRET ?? process.env.AUTH_SECRET ?? "",
+      toolId: verificationRoute.toolId,
+    });
     const verification = await adapter.testWebhookToolWithoutCall({
       integrationSecretIdentifier: parsed.data.integrationSecretIdentifier,
       tool: probeTool,
+      verificationToken,
     });
     await writeAuditLog({
       ...context,
@@ -354,6 +368,25 @@ export async function pushHostedVoiceCandidateToolsAction(
           : getHostedVoiceActionError(error),
     };
   }
+}
+
+function getHostedVoiceToolRoute(url: string) {
+  const segments = new URL(url).pathname.split("/").filter(Boolean);
+  const parsed = z
+    .object({
+      phase: z.enum(["prepare", "read"]),
+      toolId: z.string().trim().min(1).max(120),
+    })
+    .safeParse({
+      phase: segments.at(-1),
+      toolId: segments.at(-2)
+        ? decodeURIComponent(segments.at(-2) as string)
+        : undefined,
+    });
+  if (!parsed.success) {
+    throw new Error("The no-call verification tool URL is invalid.");
+  }
+  return parsed.data;
 }
 
 export async function inspectHostedVoiceDeploymentAction(
