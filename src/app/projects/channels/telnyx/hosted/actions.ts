@@ -298,6 +298,7 @@ export async function pushHostedVoiceCandidateToolsAction(
         candidateRemoteVersionId: deployment.candidateRemoteVersionId,
         integrationSecretId: integrationSecret.id,
         preflight: "passed",
+        routingWasSuspended: result.routingWasSuspended,
         toolCount: result.toolCount,
       },
       targetId: String(deployment.candidateDeploymentVersionId),
@@ -305,7 +306,9 @@ export async function pushHostedVoiceCandidateToolsAction(
     });
     revalidatePath("/projects/channels/telnyx/hosted");
     return {
-      success: `${result.toolCount} Lia webhook tools were pushed and the no-call binding preflight passed.`,
+      success: result.routingWasSuspended
+        ? `${result.toolCount} Lia webhook tools were pushed, candidate routing was restored, and the no-call binding preflight passed.`
+        : `${result.toolCount} Lia webhook tools were pushed and the no-call binding preflight passed.`,
     };
   } catch (error) {
     return { error: getHostedVoiceActionError(error) };

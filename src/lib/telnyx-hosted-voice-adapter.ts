@@ -140,6 +140,36 @@ const telnyxAssistantSchema = z
   })
   .passthrough();
 
+const telnyxCanaryRuleSchema = z.object({
+  match: z
+    .array(
+      z.object({
+        attribute: z.string(),
+        operator: z.enum(["in", "not_in", "starts_with"]),
+        values: z.array(z.string()),
+      }),
+    )
+    .optional(),
+  serve: z.object({
+    rollout: z
+      .array(
+        z.object({
+          version_id: z.string().trim().min(1),
+          weight: z.number(),
+        }),
+      )
+      .optional(),
+    version_id: z.string().trim().min(1).optional(),
+  }),
+});
+
+const telnyxCanaryDeploymentSchema = z
+  .object({
+    assistant_id: z.string().trim().min(1),
+    rules: z.array(telnyxCanaryRuleSchema),
+  })
+  .passthrough();
+
 type TelnyxHostedVoiceToolSetupEntry = z.infer<
   typeof telnyxHostedVoiceToolSetupEntrySchema
 >;
@@ -155,7 +185,7 @@ export type TelnyxHostedVoiceAdapter =
       integrationSecretIdentifier: string;
       mainVersionId: string | null;
       tools: unknown[];
-    }): Promise<{ toolCount: number }>;
+    }): Promise<{ routingWasSuspended: boolean; toolCount: number }>;
   };
 
 export class TelnyxHostedVoiceApiError extends Error {
@@ -397,22 +427,86 @@ export function createTelnyxHostedVoiceAdapter(input: {
       const preservedTools = candidate.tools
         .filter((tool) => !isLiaWebhookTool(tool))
         .map(normalizeTelnyxInlineToolForUpdate);
-      const updated = await request(
-        path,
-        {
-          body: JSON.stringify({
-            name: candidate.name,
-            tools: [...preservedTools, ...expectedTools],
-          }),
-          method: "POST",
-        },
-        "Telnyx candidate tool update",
-      );
+      const updateCandidate = () =>
+        request(
+          path,
+          {
+            body: JSON.stringify({
+              name: candidate.name,
+              tools: [...preservedTools, ...expectedTools],
+            }),
+            method: "POST",
+          },
+          "Telnyx candidate tool update",
+        );
+      let routingWasSuspended = false;
+      let updated: Awaited<ReturnType<typeof updateCandidate>> | undefined;
+      try {
+        updated = await updateCandidate();
+      } catch (error) {
+        if (
+          !(error instanceof TelnyxHostedVoiceApiError) ||
+          error.status !== 400
+        ) {
+          throw error;
+        }
+
+        const canaryPath = `/ai/assistants/${encodeURIComponent(assistantId)}/canary-deploys`;
+        let canaryPayload: unknown;
+        try {
+          ({ payload: canaryPayload } = await requestPayload(
+            canaryPath,
+            undefined,
+            "Telnyx candidate routing inspection",
+          ));
+        } catch (inspectionError) {
+          if (
+            inspectionError instanceof TelnyxHostedVoiceApiError &&
+            inspectionError.status === 404
+          ) {
+            throw error;
+          }
+          throw inspectionError;
+        }
+        const canary = telnyxCanaryDeploymentSchema.safeParse(canaryPayload);
+        if (
+          !canary.success ||
+          canary.data.assistant_id !== assistantId ||
+          !canary.data.rules.some((rule) =>
+            canaryRuleReferencesVersion(rule, candidateVersionId),
+          )
+        ) {
+          throw error;
+        }
+
+        await requestPayload(
+          canaryPath,
+          { method: "DELETE" },
+          "Telnyx candidate routing suspension",
+        );
+        routingWasSuspended = true;
+
+        let updateError: unknown;
+        try {
+          updated = await updateCandidate();
+        } catch (retryError) {
+          updateError = retryError;
+        }
+        await requestPayload(
+          canaryPath,
+          {
+            body: JSON.stringify({ rules: canary.data.rules }),
+            method: "POST",
+          },
+          "Telnyx candidate routing restoration",
+        );
+        if (updateError) throw updateError;
+      }
       if (!updated || updated.version_id !== candidateVersionId) {
         throw new Error("Telnyx did not update the exact candidate version.");
       }
       verifyTelnyxWebhookTools(updated.tools, expectedTools);
-      return { toolCount: expectedTools.length };
+      return { routingWasSuspended, toolCount: expectedTools.length };
     },
     async promote(remote: HostedVoiceRemoteVersion) {
       await request(
@@ -421,6 +515,16 @@ export function createTelnyxHostedVoiceAdapter(input: {
       );
     },
   };
+}
+
+function canaryRuleReferencesVersion(
+  rule: z.infer<typeof telnyxCanaryRuleSchema>,
+  versionId: string,
+) {
+  return (
+    rule.serve.version_id === versionId ||
+    rule.serve.rollout?.some((slot) => slot.version_id === versionId) === true
+  );
 }
 
 function buildTelnyxApiErrorDiagnostic(response: Response, payload: unknown) {

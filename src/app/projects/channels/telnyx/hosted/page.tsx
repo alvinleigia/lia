@@ -415,7 +415,10 @@ export default async function TelnyxHostedVoicePage() {
                   every generated Lia webhook to the exact non-main candidate.
                   Lia first verifies that the Integration Secret is current and
                   that the public webhook reaches bearer authentication without
-                  placing a call. Existing non-Lia tools are preserved.
+                  placing a call. Existing non-Lia tools are preserved. If
+                  Telnyx locks an actively routed candidate, Lia briefly falls
+                  back to main, updates the candidate, and restores the exact
+                  traffic rules.
                 </p>
                 <Field
                   label="Telnyx Integration Secret identifier"

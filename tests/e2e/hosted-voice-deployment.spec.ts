@@ -79,6 +79,27 @@ function telnyxResponse(versionId: string, config = managedConfig()) {
   };
 }
 
+function telnyxWebhookSetup() {
+  return [
+    {
+      async: true,
+      body_parameters: {
+        properties: {
+          date: { description: "Canonical Lia input: date", type: "string" },
+        },
+        required: ["date"],
+        type: "object" as const,
+      },
+      description: "Check calendar availability.",
+      method: "POST" as const,
+      name: "lia_read_operation_85",
+      phase: "read" as const,
+      timeout_ms: 8_000,
+      url: "https://staging.example.com/api/voice-tools/operation%3A85/read",
+    },
+  ];
+}
+
 test("Telnyx adapter creates a non-main candidate with idempotent API requests", async () => {
   const requests: Array<{ body: Record<string, unknown>; init?: RequestInit }> =
     [];
@@ -242,27 +263,10 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
     candidateVersionId: "candidate-2",
     integrationSecretIdentifier: "lia-phase18-candidate-1",
     mainVersionId: "main-1",
-    tools: [
-      {
-        async: true,
-        body_parameters: {
-          properties: {
-            date: { description: "Canonical Lia input: date", type: "string" },
-          },
-          required: ["date"],
-          type: "object",
-        },
-        description: "Check calendar availability.",
-        method: "POST",
-        name: "lia_read_operation_85",
-        phase: "read",
-        timeout_ms: 8_000,
-        url: "https://staging.example.com/api/voice-tools/operation%3A85/read",
-      },
-    ],
+    tools: telnyxWebhookSetup(),
   });
 
-  expect(result).toEqual({ toolCount: 1 });
+  expect(result).toEqual({ routingWasSuspended: false, toolCount: 1 });
   expect(requests.map(({ method }) => method)).toEqual(["GET", "POST"]);
   expect(
     requests.every(({ url }) =>
@@ -294,6 +298,127 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
   expect(pushedTools[1]?.webhook).not.toHaveProperty("timeout_ms");
   expect(JSON.stringify(requests)).not.toContain("restricted-test-key");
   expect(JSON.stringify(pushedTools)).not.toContain("must-never-leak");
+});
+
+test("Telnyx adapter restores canary routing after updating a locked live candidate", async () => {
+  const canary = {
+    assistant_id: "assistant-1",
+    created_at: "2026-09-06T11:00:00.000Z",
+    rules: [
+      {
+        match: [
+          {
+            attribute: "end_user_target",
+            operator: "in",
+            values: ["test@sip.telnyx.com"],
+          },
+        ],
+        serve: { version_id: "candidate-2" },
+      },
+    ],
+    updated_at: "2026-09-06T11:00:00.000Z",
+  };
+  const requests: Array<{
+    body: Record<string, unknown>;
+    method: string;
+    url: string;
+  }> = [];
+  let updateAttempts = 0;
+  const fetchImpl: typeof fetch = async (url, init) => {
+    const method = init?.method ?? "GET";
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    const request = { body, method, url: String(url) };
+    requests.push(request);
+
+    if (request.url.endsWith("/canary-deploys")) {
+      if (method === "DELETE") return new Response(null, { status: 204 });
+      return Response.json(canary);
+    }
+    if (method === "POST") {
+      updateAttempts += 1;
+      if (updateAttempts === 1) {
+        return Response.json({ errors: [{ code: "10015" }] }, { status: 400 });
+      }
+      return Response.json({
+        ...telnyxResponse("candidate-2"),
+        tools: body.tools as unknown[],
+      });
+    }
+    return Response.json({ ...telnyxResponse("candidate-2"), tools: [] });
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  await expect(
+    adapter.pushCandidateTools({
+      assistantId: "assistant-1",
+      candidateVersionId: "candidate-2",
+      integrationSecretIdentifier: "lia-phase18-candidate-1",
+      mainVersionId: "main-1",
+      tools: telnyxWebhookSetup(),
+    }),
+  ).resolves.toEqual({ routingWasSuspended: true, toolCount: 1 });
+  expect(requests.map(({ method }) => method)).toEqual([
+    "GET",
+    "POST",
+    "GET",
+    "DELETE",
+    "POST",
+    "POST",
+  ]);
+  expect(requests[5]?.url).toContain("/canary-deploys");
+  expect(requests[5]?.body).toEqual({ rules: canary.rules });
+});
+
+test("Telnyx adapter restores canary routing when the unlocked update still fails", async () => {
+  const canary = {
+    assistant_id: "assistant-1",
+    created_at: "2026-09-06T11:00:00.000Z",
+    rules: [{ serve: { version_id: "candidate-2" } }],
+    updated_at: "2026-09-06T11:00:00.000Z",
+  };
+  const requests: Array<{ method: string; url: string }> = [];
+  let updateAttempts = 0;
+  const fetchImpl: typeof fetch = async (url, init) => {
+    const method = init?.method ?? "GET";
+    const request = { method, url: String(url) };
+    requests.push(request);
+
+    if (request.url.endsWith("/canary-deploys")) {
+      if (method === "DELETE") return new Response(null, { status: 204 });
+      return Response.json(canary);
+    }
+    if (method === "POST") {
+      updateAttempts += 1;
+      return Response.json(
+        { errors: [{ code: updateAttempts === 1 ? "10015" : "20001" }] },
+        { status: updateAttempts === 1 ? 400 : 422 },
+      );
+    }
+    return Response.json({ ...telnyxResponse("candidate-2"), tools: [] });
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  await expect(
+    adapter.pushCandidateTools({
+      assistantId: "assistant-1",
+      candidateVersionId: "candidate-2",
+      integrationSecretIdentifier: "lia-phase18-candidate-1",
+      mainVersionId: "main-1",
+      tools: telnyxWebhookSetup(),
+    }),
+  ).rejects.toMatchObject({ status: 422 });
+  expect(requests.at(-1)).toEqual({
+    method: "POST",
+    url: "https://api.telnyx.com/v2/ai/assistants/assistant-1/canary-deploys",
+  });
 });
 
 test("Telnyx adapter refuses to push webhook tools to main", async () => {
