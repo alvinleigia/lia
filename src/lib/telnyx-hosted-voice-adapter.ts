@@ -147,7 +147,11 @@ export function createTelnyxHostedVoiceAdapter(input: {
   const fetchImpl = input.fetchImpl ?? fetch;
   const compiler = createTelnyxHostedVoiceCompiler(input.settings);
 
-  async function requestPayload(path: string, init?: RequestInit) {
+  async function requestPayload(
+    path: string,
+    init?: RequestInit,
+    operation = "Telnyx Assistant request",
+  ) {
     let response: Response;
     try {
       response = await fetchImpl(`${TELNYX_API_BASE_URL}${path}`, {
@@ -161,7 +165,7 @@ export function createTelnyxHostedVoiceAdapter(input: {
       });
     } catch {
       throw new TelnyxHostedVoiceApiError(
-        "Telnyx Assistant request failed before a response was received.",
+        `${operation} failed before a response was received.`,
         true,
         null,
       );
@@ -169,7 +173,7 @@ export function createTelnyxHostedVoiceAdapter(input: {
 
     if (!response.ok) {
       throw new TelnyxHostedVoiceApiError(
-        `Telnyx Assistant request failed with status ${response.status}.`,
+        `${operation} failed with status ${response.status}.`,
         response.status === 408 ||
           response.status === 429 ||
           response.status >= 500,
@@ -186,8 +190,8 @@ export function createTelnyxHostedVoiceAdapter(input: {
     };
   }
 
-  async function request(path: string, init?: RequestInit) {
-    const { payload, status } = await requestPayload(path, init);
+  async function request(path: string, init?: RequestInit, operation?: string) {
+    const { payload, status } = await requestPayload(path, init, operation);
     if (payload === null) return null;
     const parsed = telnyxAssistantSchema.safeParse(payload);
     if (!parsed.success) {
@@ -295,7 +299,11 @@ export function createTelnyxHostedVoiceAdapter(input: {
           page === 1
             ? "/integration_secrets"
             : `/integration_secrets?page%5Bnumber%5D=${page}`;
-        const { payload } = await requestPayload(path);
+        const { payload } = await requestPayload(
+          path,
+          undefined,
+          "Telnyx Integration Secret lookup",
+        );
         const parsed = telnyxIntegrationSecretListSchema.safeParse(payload);
         if (!parsed.success) {
           throw new TelnyxHostedVoiceApiError(
@@ -333,7 +341,11 @@ export function createTelnyxHostedVoiceAdapter(input: {
         .max(100)
         .parse(tools);
       const path = `/ai/assistants/${encodeURIComponent(assistantId)}/versions/${encodeURIComponent(candidateVersionId)}`;
-      const candidate = await request(path);
+      const candidate = await request(
+        path,
+        undefined,
+        "Telnyx candidate inspection",
+      );
       if (!candidate || candidate.version_id !== candidateVersionId) {
         throw new Error(
           "The exact Telnyx candidate version could not be verified.",
@@ -345,13 +357,17 @@ export function createTelnyxHostedVoiceAdapter(input: {
       const preservedTools = candidate.tools.filter(
         (tool) => !isLiaWebhookTool(tool),
       );
-      const updated = await request(path, {
-        body: JSON.stringify({
-          name: candidate.name,
-          tools: [...preservedTools, ...expectedTools],
-        }),
-        method: "POST",
-      });
+      const updated = await request(
+        path,
+        {
+          body: JSON.stringify({
+            name: candidate.name,
+            tools: [...preservedTools, ...expectedTools],
+          }),
+          method: "POST",
+        },
+        "Telnyx candidate tool update",
+      );
       if (!updated || updated.version_id !== candidateVersionId) {
         throw new Error("Telnyx did not update the exact candidate version.");
       }

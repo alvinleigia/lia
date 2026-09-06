@@ -335,6 +335,29 @@ test("Telnyx adapter errors exclude credentials and provider response bodies", a
   expect(JSON.stringify(error)).not.toContain("raw provider body");
 });
 
+test("Telnyx adapter identifies Integration Secret lookup failures", async () => {
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "must-never-leak",
+    fetchImpl: async () =>
+      Response.json(
+        { error: "raw provider body with must-never-leak" },
+        { status: 400 },
+      ),
+    settings,
+  });
+
+  const error = await adapter
+    .inspectIntegrationSecret({ identifier: "lia-phase18-candidate-1" })
+    .catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(TelnyxHostedVoiceApiError);
+  expect(error.message).toBe(
+    "Telnyx Integration Secret lookup failed with status 400.",
+  );
+  expect(JSON.stringify(error)).not.toContain("must-never-leak");
+  expect(JSON.stringify(error)).not.toContain("raw provider body");
+});
+
 test("candidate deployment, promotion, and rollback preserve verified versions", async () => {
   const adapter = new MemoryAdapter();
   const repository = new MemoryRepository();
