@@ -62,17 +62,19 @@ Publishing a candidate must not route production traffic or make it main.
    the Telnyx Portal's secret selector when configuring authorization for each
    webhook tool. Do not put the credential in a URL, tool body, Assistant
    instructions, or Lia configuration. Lia will not show it again.
-3. Apply every tool entry from the manifest to the exact non-main candidate
-   version. Match its name, URL, method, body schema, async flag, and timeout.
-   Configure the `Authorization` header as bearer authentication backed by the
-   Integration Secret; the manifest intentionally contains no secret value.
+3. Enter the saved Telnyx Integration Secret identifier in Lia and select
+   **Push webhook tools to candidate**. Lia inspects the exact non-main version,
+   preserves non-Lia tools, replaces its generated webhook tools, and verifies
+   every returned tool. Use the generated manifest only as a manual recovery
+   reference.
 4. Keep read operations as one `read` tool. Keep each write as separate
    `prepare` and `commit` tools. The Assistant must ask for explicit caller
    confirmation after prepare and pass the returned `commitToken` unchanged to
    commit. Never synthesize, edit, or reuse a commit token for another request.
    Availability and lookup are reads; booking, rescheduling, and cancellation
    are writes. Stop if the generated manifest classifies them differently.
-5. Configure Telnyx-native transfer and hangup tools on the same candidate.
+5. Configure Telnyx-native transfer and hangup tools on the same candidate;
+   Lia does not own the transfer destination.
    Transfer may target only the approved staging destination.
 6. Configure the manifest's signed event webhook URL for conversation-ended
    delivery. Send a test event and confirm Lia accepts a valid signature and

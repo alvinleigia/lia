@@ -3,6 +3,7 @@ import type {
   HostedVoiceProviderAdapter,
   HostedVoiceRemoteVersion,
 } from "@/lib/hosted-voice-contract";
+import { hashHostedVoiceToolValue } from "@/lib/hosted-voice-tool-contract";
 import {
   createTelnyxHostedVoiceCompiler,
   type TelnyxHostedAssistantManagedConfig,
@@ -10,6 +11,61 @@ import {
 } from "@/lib/telnyx-hosted-voice";
 
 const TELNYX_API_BASE_URL = "https://api.telnyx.com/v2";
+
+const telnyxToolBodyParametersSchema = z
+  .object({
+    properties: z.record(z.string(), z.unknown()),
+    required: z.array(z.string()),
+    type: z.literal("object"),
+  })
+  .strict();
+
+const telnyxHostedVoiceToolSetupEntrySchema = z
+  .object({
+    async: z.boolean(),
+    body_parameters: telnyxToolBodyParametersSchema,
+    description: z.string().trim().min(1),
+    method: z.literal("POST"),
+    name: z.string().trim().min(1).max(120).regex(/^lia_/),
+    timeout_ms: z.number().int().min(1).max(15_000),
+    url: z.string().url(),
+  })
+  .strict();
+
+const telnyxWebhookToolSchema = z
+  .object({
+    type: z.literal("webhook"),
+    webhook: z
+      .object({
+        async: z.boolean(),
+        async_timeout_ms: z.number().int().positive().optional(),
+        body_parameters: telnyxToolBodyParametersSchema,
+        description: z.string(),
+        headers: z.array(
+          z.object({ name: z.string(), value: z.string() }).passthrough(),
+        ),
+        method: z.literal("POST"),
+        name: z.string(),
+        timeout_ms: z.number().int().positive(),
+        url: z.string().url(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+const telnyxWebhookToolIdentitySchema = z
+  .object({
+    type: z.literal("webhook"),
+    webhook: z.object({ name: z.string() }).passthrough(),
+  })
+  .passthrough();
+
+const telnyxIntegrationSecretIdentifierSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(120)
+  .regex(/^[a-zA-Z0-9._-]+$/);
 
 const telnyxAssistantSchema = z
   .object({
@@ -28,8 +84,24 @@ const telnyxAssistantSchema = z
       .passthrough(),
     version_id: z.string().trim().min(1),
     voice_settings: z.object({ voice: z.string().trim().min(1) }).passthrough(),
+    tools: z.array(z.unknown()).optional().default([]),
   })
   .passthrough();
+
+type TelnyxHostedVoiceToolSetupEntry = z.infer<
+  typeof telnyxHostedVoiceToolSetupEntrySchema
+>;
+
+export type TelnyxHostedVoiceAdapter =
+  HostedVoiceProviderAdapter<TelnyxHostedAssistantManagedConfig> & {
+    pushCandidateTools(input: {
+      assistantId: string;
+      candidateVersionId: string;
+      integrationSecretIdentifier: string;
+      mainVersionId: string | null;
+      tools: unknown[];
+    }): Promise<{ toolCount: number }>;
+  };
 
 export class TelnyxHostedVoiceApiError extends Error {
   constructor(
@@ -46,7 +118,7 @@ export function createTelnyxHostedVoiceAdapter(input: {
   apiKey: string;
   fetchImpl?: typeof fetch;
   settings: TelnyxHostedVoiceSettings;
-}): HostedVoiceProviderAdapter<TelnyxHostedAssistantManagedConfig> {
+}): TelnyxHostedVoiceAdapter {
   const apiKey = z.string().trim().min(1).parse(input.apiKey);
   const fetchImpl = input.fetchImpl ?? fetch;
   const compiler = createTelnyxHostedVoiceCompiler(input.settings);
@@ -181,12 +253,130 @@ export function createTelnyxHostedVoiceAdapter(input: {
         versionId: assistant.version_id,
       };
     },
+    async pushCandidateTools({
+      assistantId,
+      candidateVersionId,
+      integrationSecretIdentifier,
+      mainVersionId,
+      tools,
+    }) {
+      if (candidateVersionId === mainVersionId) {
+        throw new Error(
+          "Webhook tools can only be pushed to a non-main candidate.",
+        );
+      }
+      const identifier = telnyxIntegrationSecretIdentifierSchema.parse(
+        integrationSecretIdentifier,
+      );
+      const setupTools = z
+        .array(telnyxHostedVoiceToolSetupEntrySchema)
+        .min(1)
+        .max(100)
+        .parse(tools);
+      const path = `/ai/assistants/${encodeURIComponent(assistantId)}/versions/${encodeURIComponent(candidateVersionId)}`;
+      const candidate = await request(path);
+      if (!candidate || candidate.version_id !== candidateVersionId) {
+        throw new Error(
+          "The exact Telnyx candidate version could not be verified.",
+        );
+      }
+      const expectedTools = setupTools.map((tool) =>
+        buildTelnyxWebhookTool(tool, identifier),
+      );
+      const preservedTools = candidate.tools.filter(
+        (tool) => !isLiaWebhookTool(tool),
+      );
+      const updated = await request(path, {
+        body: JSON.stringify({ tools: [...preservedTools, ...expectedTools] }),
+        method: "POST",
+      });
+      if (!updated || updated.version_id !== candidateVersionId) {
+        throw new Error("Telnyx did not update the exact candidate version.");
+      }
+      verifyTelnyxWebhookTools(updated.tools, expectedTools);
+      return { toolCount: expectedTools.length };
+    },
     async promote(remote: HostedVoiceRemoteVersion) {
       await request(
         `/ai/assistants/${encodeURIComponent(remote.assistantId)}/versions/${encodeURIComponent(remote.versionId)}/promote`,
         { method: "POST" },
       );
     },
+  };
+}
+
+function buildTelnyxWebhookTool(
+  tool: TelnyxHostedVoiceToolSetupEntry,
+  integrationSecretIdentifier: string,
+) {
+  return telnyxWebhookToolSchema.parse({
+    type: "webhook",
+    webhook: {
+      async: tool.async,
+      async_timeout_ms: tool.async ? tool.timeout_ms : undefined,
+      body_parameters: tool.body_parameters,
+      description: tool.description,
+      headers: [
+        {
+          name: "Authorization",
+          value: `Bearer {{#integration_secret}}${integrationSecretIdentifier}{{/integration_secret}}`,
+        },
+      ],
+      method: tool.method,
+      name: tool.name,
+      timeout_ms: tool.timeout_ms,
+      url: tool.url,
+    },
+  });
+}
+
+function isLiaWebhookTool(tool: unknown) {
+  const parsed = telnyxWebhookToolIdentitySchema.safeParse(tool);
+  return parsed.success && parsed.data.webhook.name.startsWith("lia_");
+}
+
+function verifyTelnyxWebhookTools(
+  tools: unknown[],
+  expectedTools: Array<z.infer<typeof telnyxWebhookToolSchema>>,
+) {
+  const actualByName = new Map(
+    tools.flatMap((tool) => {
+      const parsed = telnyxWebhookToolSchema.safeParse(tool);
+      return parsed.success
+        ? [[parsed.data.webhook.name, parsed.data] as const]
+        : [];
+    }),
+  );
+  const missingOrChanged = expectedTools
+    .filter((expected) => {
+      const actual = actualByName.get(expected.webhook.name);
+      return (
+        !actual ||
+        hashHostedVoiceToolValue(selectVerifiedWebhookFields(actual)) !==
+          hashHostedVoiceToolValue(selectVerifiedWebhookFields(expected))
+      );
+    })
+    .map(({ webhook }) => webhook.name);
+  if (missingOrChanged.length > 0) {
+    throw new Error(
+      `Telnyx did not verify the candidate webhook tools: ${missingOrChanged.join(", ")}.`,
+    );
+  }
+}
+
+function selectVerifiedWebhookFields(
+  tool: z.infer<typeof telnyxWebhookToolSchema>,
+) {
+  return {
+    async: tool.webhook.async,
+    async_timeout_ms: tool.webhook.async_timeout_ms ?? null,
+    body_parameters: tool.webhook.body_parameters,
+    description: tool.webhook.description,
+    headers: tool.webhook.headers.map(({ name, value }) => ({ name, value })),
+    method: tool.webhook.method,
+    name: tool.webhook.name,
+    timeout_ms: tool.webhook.timeout_ms,
+    url: tool.webhook.url,
   };
 }
 

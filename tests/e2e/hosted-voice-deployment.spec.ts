@@ -154,6 +154,115 @@ test("Telnyx adapter uses version inspection and promotion endpoints", async () 
   expect(methods).toEqual(["GET", "POST"]);
 });
 
+test("Telnyx adapter replaces Lia webhooks on only the verified non-main candidate", async () => {
+  const nativeTool = { hangup: {}, type: "hangup" };
+  const staleLiaTool = {
+    type: "webhook",
+    webhook: { name: "lia_read_stale" },
+  };
+  const requests: Array<{
+    body: Record<string, unknown>;
+    method: string;
+    url: string;
+  }> = [];
+  const fetchImpl: typeof fetch = async (url, init) => {
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    requests.push({
+      body,
+      method: init?.method ?? "GET",
+      url: String(url),
+    });
+    return Response.json({
+      ...telnyxResponse("candidate-2"),
+      tools:
+        init?.method === "POST"
+          ? (body.tools as unknown[])
+          : [nativeTool, staleLiaTool],
+    });
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  const result = await adapter.pushCandidateTools({
+    assistantId: "assistant-1",
+    candidateVersionId: "candidate-2",
+    integrationSecretIdentifier: "lia-phase18-candidate-1",
+    mainVersionId: "main-1",
+    tools: [
+      {
+        async: true,
+        body_parameters: {
+          properties: {
+            date: { description: "Canonical Lia input: date", type: "string" },
+          },
+          required: ["date"],
+          type: "object",
+        },
+        description: "Check calendar availability.",
+        method: "POST",
+        name: "lia_read_operation_85",
+        timeout_ms: 8_000,
+        url: "https://staging.example.com/api/voice-tools/operation%3A85/read",
+      },
+    ],
+  });
+
+  expect(result).toEqual({ toolCount: 1 });
+  expect(requests.map(({ method }) => method)).toEqual(["GET", "POST"]);
+  expect(
+    requests.every(({ url }) =>
+      url.endsWith("/ai/assistants/assistant-1/versions/candidate-2"),
+    ),
+  ).toBe(true);
+  const pushedTools = requests[1]?.body.tools as Array<Record<string, unknown>>;
+  expect(pushedTools).toHaveLength(2);
+  expect(pushedTools[0]).toEqual(nativeTool);
+  expect(pushedTools[1]).toMatchObject({
+    type: "webhook",
+    webhook: {
+      async: true,
+      async_timeout_ms: 8_000,
+      headers: [
+        {
+          name: "Authorization",
+          value:
+            "Bearer {{#integration_secret}}lia-phase18-candidate-1{{/integration_secret}}",
+        },
+      ],
+      name: "lia_read_operation_85",
+      timeout_ms: 8_000,
+    },
+  });
+  expect(JSON.stringify(requests)).not.toContain("restricted-test-key");
+  expect(JSON.stringify(pushedTools)).not.toContain("must-never-leak");
+});
+
+test("Telnyx adapter refuses to push webhook tools to main", async () => {
+  let requested = false;
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl: async () => {
+      requested = true;
+      return Response.json(telnyxResponse("main-1"));
+    },
+    settings,
+  });
+
+  await expect(
+    adapter.pushCandidateTools({
+      assistantId: "assistant-1",
+      candidateVersionId: "main-1",
+      integrationSecretIdentifier: "lia-phase18-candidate-1",
+      mainVersionId: "main-1",
+      tools: [],
+    }),
+  ).rejects.toThrow("only be pushed to a non-main candidate");
+  expect(requested).toBe(false);
+});
+
 test("Telnyx adapter errors exclude credentials and provider response bodies", async () => {
   const adapter = createTelnyxHostedVoiceAdapter({
     apiKey: "must-never-leak",

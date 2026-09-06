@@ -18,6 +18,7 @@ import { telnyxHostedVoiceDeploymentRepository } from "@/lib/hosted-voice-deploy
 import {
   buildHostedVoiceStagingDefinition,
   buildTelnyxHostedVoiceToolSetup,
+  getHostedVoiceStagingState,
   hostedVoiceStagingDefinitionInputSchema,
 } from "@/lib/hosted-voice-staging";
 import { createHostedVoiceToolBinding } from "@/lib/hosted-voice-tool-store";
@@ -44,6 +45,12 @@ const hostedProviderSchema = z.object({
 });
 
 const deploymentIdSchema = z.coerce.number().int().positive();
+const integrationSecretIdentifierSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(120)
+  .regex(/^[a-zA-Z0-9._-]+$/);
 
 export type HostedVoiceBindingActionState = ActionFormState & {
   credential?: string;
@@ -198,6 +205,88 @@ export async function rotateHostedVoiceBindingAction(
       setupJson: JSON.stringify(setup, null, 2),
       success:
         "Binding rotated. Store the credential in Telnyx now; Lia cannot show it again.",
+    };
+  } catch (error) {
+    return { error: getHostedVoiceActionError(error) };
+  }
+}
+
+export async function pushHostedVoiceCandidateToolsAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const parsed = z
+    .object({
+      deploymentId: deploymentIdSchema,
+      integrationSecretIdentifier: integrationSecretIdentifierSchema,
+    })
+    .safeParse({
+      deploymentId: formData.get("deploymentId"),
+      integrationSecretIdentifier: formData.get("integrationSecretIdentifier"),
+    });
+  if (!parsed.success) {
+    return {
+      error: "Enter the existing Telnyx Integration Secret identifier.",
+    };
+  }
+
+  const context = await resolveUserAndProject();
+  assertPermission(context.membership, "company.widget.manage");
+  try {
+    const state = await getHostedVoiceStagingState(context.project.id);
+    const deployment = state.deployment;
+    if (!deployment || deployment.id !== parsed.data.deploymentId) {
+      throw new Error("Hosted voice deployment was not found.");
+    }
+    if (
+      !deployment.bindingId ||
+      !deployment.candidateDeploymentVersionId ||
+      !deployment.candidateRemoteVersionId ||
+      !deployment.remoteAssistantId
+    ) {
+      throw new Error(
+        "Rotate an active binding for the current Lia candidate first.",
+      );
+    }
+    if (
+      deployment.candidateRemoteVersionId === deployment.mainRemoteVersionId
+    ) {
+      throw new Error(
+        "Webhook tools can only be pushed to a non-main candidate.",
+      );
+    }
+    const provider = await getProjectTelnyxHostedVoiceProviderRecord(
+      context.project.id,
+    );
+    if (!provider) throw new Error("Hosted Telnyx provider was not found.");
+    const setup = await buildTelnyxHostedVoiceToolSetup({
+      deploymentVersionId: deployment.candidateDeploymentVersionId,
+      projectId: context.project.id,
+    });
+    const { adapter } = await getProjectTelnyxHostedVoiceProvider({
+      projectId: context.project.id,
+      providerId: provider.id,
+    });
+    const result = await adapter.pushCandidateTools({
+      assistantId: deployment.remoteAssistantId,
+      candidateVersionId: deployment.candidateRemoteVersionId,
+      integrationSecretIdentifier: parsed.data.integrationSecretIdentifier,
+      mainVersionId: deployment.mainRemoteVersionId,
+      tools: setup.tools,
+    });
+    await writeAuditLog({
+      ...context,
+      action: "hosted_voice.candidate_tools_pushed",
+      metadata: {
+        candidateRemoteVersionId: deployment.candidateRemoteVersionId,
+        toolCount: result.toolCount,
+      },
+      targetId: String(deployment.candidateDeploymentVersionId),
+      targetType: "hosted_voice_deployment_version",
+    });
+    revalidatePath("/projects/channels/telnyx/hosted");
+    return {
+      success: `${result.toolCount} Lia webhook tools were pushed to the non-main candidate and verified.`,
     };
   } catch (error) {
     return { error: getHostedVoiceActionError(error) };

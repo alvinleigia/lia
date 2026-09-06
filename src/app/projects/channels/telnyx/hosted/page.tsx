@@ -2,6 +2,7 @@ import {
   Activity,
   ArrowLeft,
   Bot,
+  CloudUpload,
   KeyRound,
   RotateCcw,
   Save,
@@ -33,6 +34,7 @@ import {
   inspectHostedVoiceDeploymentAction,
   promoteHostedVoiceCandidateAction,
   publishHostedVoiceCandidateAction,
+  pushHostedVoiceCandidateToolsAction,
   rollbackHostedVoiceDeploymentAction,
   rotateHostedVoiceBindingAction,
   saveHostedVoiceProviderAction,
@@ -397,6 +399,40 @@ export default async function TelnyxHostedVoicePage() {
                 action={rotateHostedVoiceBindingAction}
                 deploymentVersionId={deployment.candidateDeploymentVersionId}
               />
+              <ActionStateForm
+                action={pushHostedVoiceCandidateToolsAction}
+                className="space-y-4 border-t pt-4"
+              >
+                <input
+                  name="deploymentId"
+                  type="hidden"
+                  value={deployment.id}
+                />
+                <ActionFormError />
+                <ActionFormSuccessToast />
+                <p className="text-sm text-muted-foreground">
+                  After storing the current binding credential in Telnyx, push
+                  every generated Lia webhook to the exact non-main candidate.
+                  Existing non-Lia tools are preserved.
+                </p>
+                <Field
+                  label="Telnyx Integration Secret identifier"
+                  name="integrationSecretIdentifier"
+                >
+                  <Input
+                    id="integrationSecretIdentifier"
+                    name="integrationSecretIdentifier"
+                    defaultValue={`lia-phase18-candidate-${deployment.id}`}
+                    required
+                  />
+                </Field>
+                <FormSubmitButton
+                  disabled={!deployment.bindingId}
+                  icon={<CloudUpload className="size-4" />}
+                  label="Push webhook tools to candidate"
+                  pendingLabel="Pushing and verifying..."
+                />
+              </ActionStateForm>
             </CardContent>
           </Card>
         )}
