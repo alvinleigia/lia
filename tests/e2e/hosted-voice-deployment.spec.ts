@@ -154,6 +154,50 @@ test("Telnyx adapter uses version inspection and promotion endpoints", async () 
   expect(methods).toEqual(["GET", "POST"]);
 });
 
+test("Telnyx adapter finds the exact Integration Secret without exposing its value", async () => {
+  const urls: string[] = [];
+  const fetchImpl: typeof fetch = async (url) => {
+    urls.push(String(url));
+    const page = urls.length;
+    return Response.json({
+      data:
+        page === 1
+          ? [
+              {
+                id: "secret-old",
+                identifier: "unrelated-secret",
+                updated_at: "2026-09-06T10:00:00.000Z",
+              },
+            ]
+          : [
+              {
+                id: "secret-current",
+                identifier: "lia-phase18-candidate-1",
+                updated_at: "2026-09-06T11:10:00.000Z",
+              },
+            ],
+      meta: { page_number: page, total_pages: 2 },
+    });
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  await expect(
+    adapter.inspectIntegrationSecret({
+      identifier: "lia-phase18-candidate-1",
+    }),
+  ).resolves.toEqual({
+    id: "secret-current",
+    updatedAt: "2026-09-06T11:10:00.000Z",
+  });
+  expect(urls).toHaveLength(2);
+  expect(urls[0]).toContain("/integration_secrets?");
+  expect(JSON.stringify(urls)).not.toContain("restricted-test-key");
+});
+
 test("Telnyx adapter replaces Lia webhooks on only the verified non-main candidate", async () => {
   const nativeTool = { hangup: {}, type: "hangup" };
   const staleLiaTool = {

@@ -221,7 +221,10 @@ export async function getHostedVoiceStagingState(projectId: number) {
     : [];
   const [binding] = candidateVersion
     ? await db
-        .select({ id: hostedVoiceToolBindings.id })
+        .select({
+          id: hostedVoiceToolBindings.id,
+          updatedAt: hostedVoiceToolBindings.updatedAt,
+        })
         .from(hostedVoiceToolBindings)
         .where(
           and(
@@ -240,6 +243,7 @@ export async function getHostedVoiceStagingState(projectId: number) {
   return {
     deployment: {
       bindingId: binding?.id ?? null,
+      bindingUpdatedAt: binding?.updatedAt ?? null,
       candidateDefinitionHash: candidateVersion?.definitionHash ?? null,
       candidateDeploymentVersionId: candidateVersion?.id ?? null,
       candidateRemoteVersionId: deployment.candidateRemoteVersionId,

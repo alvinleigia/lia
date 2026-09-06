@@ -21,6 +21,10 @@ import {
   getHostedVoiceStagingState,
   hostedVoiceStagingDefinitionInputSchema,
 } from "@/lib/hosted-voice-staging";
+import {
+  verifyHostedVoiceIntegrationSecretFreshness,
+  verifyHostedVoiceToolEndpoint,
+} from "@/lib/hosted-voice-tool-preflight";
 import { createHostedVoiceToolBinding } from "@/lib/hosted-voice-tool-store";
 import {
   getProjectTelnyxHostedVoiceProvider,
@@ -240,6 +244,7 @@ export async function pushHostedVoiceCandidateToolsAction(
     }
     if (
       !deployment.bindingId ||
+      !deployment.bindingUpdatedAt ||
       !deployment.candidateDeploymentVersionId ||
       !deployment.candidateRemoteVersionId ||
       !deployment.remoteAssistantId
@@ -267,6 +272,18 @@ export async function pushHostedVoiceCandidateToolsAction(
       projectId: context.project.id,
       providerId: provider.id,
     });
+    const integrationSecret = await adapter.inspectIntegrationSecret({
+      identifier: parsed.data.integrationSecretIdentifier,
+    });
+    verifyHostedVoiceIntegrationSecretFreshness({
+      bindingUpdatedAt: deployment.bindingUpdatedAt,
+      integrationSecretUpdatedAt: integrationSecret.updatedAt,
+    });
+    const probeTool = setup.tools[0];
+    if (!probeTool) {
+      throw new Error("The candidate has no Lia webhook tool to preflight.");
+    }
+    await verifyHostedVoiceToolEndpoint({ url: probeTool.url });
     const result = await adapter.pushCandidateTools({
       assistantId: deployment.remoteAssistantId,
       candidateVersionId: deployment.candidateRemoteVersionId,
@@ -279,6 +296,8 @@ export async function pushHostedVoiceCandidateToolsAction(
       action: "hosted_voice.candidate_tools_pushed",
       metadata: {
         candidateRemoteVersionId: deployment.candidateRemoteVersionId,
+        integrationSecretId: integrationSecret.id,
+        preflight: "passed",
         toolCount: result.toolCount,
       },
       targetId: String(deployment.candidateDeploymentVersionId),
@@ -286,7 +305,7 @@ export async function pushHostedVoiceCandidateToolsAction(
     });
     revalidatePath("/projects/channels/telnyx/hosted");
     return {
-      success: `${result.toolCount} Lia webhook tools were pushed to the non-main candidate and verified.`,
+      success: `${result.toolCount} Lia webhook tools were pushed and the no-call binding preflight passed.`,
     };
   } catch (error) {
     return { error: getHostedVoiceActionError(error) };

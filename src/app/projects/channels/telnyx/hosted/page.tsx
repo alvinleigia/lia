@@ -413,7 +413,9 @@ export default async function TelnyxHostedVoicePage() {
                 <p className="text-sm text-muted-foreground">
                   After storing the current binding credential in Telnyx, push
                   every generated Lia webhook to the exact non-main candidate.
-                  Existing non-Lia tools are preserved.
+                  Lia first verifies that the Integration Secret is current and
+                  that the public webhook reaches bearer authentication without
+                  placing a call. Existing non-Lia tools are preserved.
                 </p>
                 <Field
                   label="Telnyx Integration Secret identifier"
@@ -430,7 +432,7 @@ export default async function TelnyxHostedVoicePage() {
                   disabled={!deployment.bindingId}
                   icon={<CloudUpload className="size-4" />}
                   label="Push webhook tools to candidate"
-                  pendingLabel="Pushing and verifying..."
+                  pendingLabel="Preflighting and pushing..."
                 />
               </ActionStateForm>
             </CardContent>

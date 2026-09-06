@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { NextRequest } from "next/server";
-import proxy from "../../src/proxy";
 import type { ToolDefinitionV1 } from "../../src/lib/conversation-contracts";
 import {
   getHostedVoiceBearerCredential,
@@ -17,6 +16,11 @@ import {
   type HostedVoiceToolGatewayRepository,
   HostedVoiceToolRequestError,
 } from "../../src/lib/hosted-voice-tool-gateway";
+import {
+  verifyHostedVoiceIntegrationSecretFreshness,
+  verifyHostedVoiceToolEndpoint,
+} from "../../src/lib/hosted-voice-tool-preflight";
+import proxy from "../../src/proxy";
 
 const COMMIT_SECRET = "phase-18-11-commit-secret-at-least-32-characters";
 const CREDENTIAL = "opaque-provider-binding-secret";
@@ -37,6 +41,49 @@ test("proxy lets hosted voice tools reach their bearer-authenticated route", asy
   await expect(protectedResponse.json()).resolves.toEqual({
     message: "Unauthorized",
   });
+});
+
+test("no-call preflight requires Lia bearer authentication and a current secret", async () => {
+  let request: { init?: RequestInit; url: string } | null = null;
+  await expect(
+    verifyHostedVoiceToolEndpoint({
+      fetchImpl: async (url, init) => {
+        request = { init, url: String(url) };
+        return Response.json(
+          {
+            error: "unauthorized",
+            message: "Hosted voice tool authentication failed.",
+          },
+          { status: 401 },
+        );
+      },
+      url: "https://staging.example.com/api/voice-tools/operation%3A85/read",
+    }),
+  ).resolves.toEqual({ status: "ready" });
+  expect(request).toMatchObject({
+    init: { body: "{}", method: "POST" },
+  });
+
+  await expect(
+    verifyHostedVoiceToolEndpoint({
+      fetchImpl: async () =>
+        Response.json({ message: "Unauthorized" }, { status: 401 }),
+      url: "https://staging.example.com/api/voice-tools/operation%3A85/read",
+    }),
+  ).rejects.toThrow("did not reach Lia bearer authentication");
+
+  expect(
+    verifyHostedVoiceIntegrationSecretFreshness({
+      bindingUpdatedAt: new Date("2026-09-06T11:09:20.000Z"),
+      integrationSecretUpdatedAt: "2026-09-06T11:10:00.000Z",
+    }),
+  ).toEqual({ status: "current" });
+  expect(() =>
+    verifyHostedVoiceIntegrationSecretFreshness({
+      bindingUpdatedAt: new Date("2026-09-06T11:09:20.000Z"),
+      integrationSecretUpdatedAt: "2026-09-06T11:09:00.000Z",
+    }),
+  ).toThrow("current binding credential");
 });
 
 function toolDefinition(

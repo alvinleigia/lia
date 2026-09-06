@@ -68,6 +68,26 @@ const telnyxIntegrationSecretIdentifierSchema = z
   .max(120)
   .regex(/^[a-zA-Z0-9._-]+$/);
 
+const telnyxIntegrationSecretListSchema = z
+  .object({
+    data: z.array(
+      z
+        .object({
+          id: z.string().trim().min(1),
+          identifier: z.string().trim().min(1),
+          updated_at: z.string().trim().min(1),
+        })
+        .passthrough(),
+    ),
+    meta: z
+      .object({
+        page_number: z.number().int().positive(),
+        total_pages: z.number().int().nonnegative(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
 const telnyxAssistantSchema = z
   .object({
     enabled_features: z.array(z.enum(["telephony", "messaging"])),
@@ -95,6 +115,9 @@ type TelnyxHostedVoiceToolSetupEntry = z.infer<
 
 export type TelnyxHostedVoiceAdapter =
   HostedVoiceProviderAdapter<TelnyxHostedAssistantManagedConfig> & {
+    inspectIntegrationSecret(input: {
+      identifier: string;
+    }): Promise<{ id: string; updatedAt: string }>;
     pushCandidateTools(input: {
       assistantId: string;
       candidateVersionId: string;
@@ -124,7 +147,7 @@ export function createTelnyxHostedVoiceAdapter(input: {
   const fetchImpl = input.fetchImpl ?? fetch;
   const compiler = createTelnyxHostedVoiceCompiler(input.settings);
 
-  async function request(path: string, init?: RequestInit) {
+  async function requestPayload(path: string, init?: RequestInit) {
     let response: Response;
     try {
       response = await fetchImpl(`${TELNYX_API_BASE_URL}${path}`, {
@@ -154,14 +177,24 @@ export function createTelnyxHostedVoiceAdapter(input: {
       );
     }
 
-    if (response.status === 204) return null;
-    const payload = await response.json().catch(() => null);
+    if (response.status === 204) {
+      return { payload: null, status: response.status };
+    }
+    return {
+      payload: await response.json().catch(() => null),
+      status: response.status,
+    };
+  }
+
+  async function request(path: string, init?: RequestInit) {
+    const { payload, status } = await requestPayload(path, init);
+    if (payload === null) return null;
     const parsed = telnyxAssistantSchema.safeParse(payload);
     if (!parsed.success) {
       throw new TelnyxHostedVoiceApiError(
         "Telnyx Assistant returned an invalid response.",
         false,
-        response.status,
+        status,
       );
     }
 
@@ -253,6 +286,29 @@ export function createTelnyxHostedVoiceAdapter(input: {
         managedConfig: selectManagedConfig(assistant),
         versionId: assistant.version_id,
       };
+    },
+    async inspectIntegrationSecret({ identifier }) {
+      const expected =
+        telnyxIntegrationSecretIdentifierSchema.parse(identifier);
+      for (let page = 1; ; page += 1) {
+        const { payload } = await requestPayload(
+          `/integration_secrets?page%5Bsize%5D=100&page%5Bnumber%5D=${page}`,
+        );
+        const parsed = telnyxIntegrationSecretListSchema.safeParse(payload);
+        if (!parsed.success) {
+          throw new TelnyxHostedVoiceApiError(
+            "Telnyx returned an invalid Integration Secret list.",
+            false,
+            200,
+          );
+        }
+        const secret = parsed.data.data.find(
+          ({ identifier: candidate }) => candidate === expected,
+        );
+        if (secret) return { id: secret.id, updatedAt: secret.updated_at };
+        if (page >= parsed.data.meta.total_pages) break;
+      }
+      throw new Error(`Telnyx Integration Secret "${expected}" was not found.`);
     },
     async pushCandidateTools({
       assistantId,
