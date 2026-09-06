@@ -282,9 +282,9 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
         },
       ],
       name: "lia_read_operation_85",
-      timeout_ms: 8_000,
     },
   });
+  expect(pushedTools[1]?.webhook).not.toHaveProperty("timeout_ms");
   expect(JSON.stringify(requests)).not.toContain("restricted-test-key");
   expect(JSON.stringify(pushedTools)).not.toContain("must-never-leak");
 });

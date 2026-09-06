@@ -47,7 +47,7 @@ const telnyxWebhookToolSchema = z
         ),
         method: z.literal("POST"),
         name: z.string(),
-        timeout_ms: z.number().int().positive(),
+        timeout_ms: z.number().int().positive().optional(),
         url: z.string().url(),
       })
       .passthrough(),
@@ -402,7 +402,7 @@ function buildTelnyxWebhookTool(
       ],
       method: tool.method,
       name: tool.name,
-      timeout_ms: tool.timeout_ms,
+      timeout_ms: tool.async ? undefined : tool.timeout_ms,
       url: tool.url,
     },
   });
@@ -453,7 +453,7 @@ function selectVerifiedWebhookFields(
     headers: tool.webhook.headers.map(({ name, value }) => ({ name, value })),
     method: tool.webhook.method,
     name: tool.webhook.name,
-    timeout_ms: tool.webhook.timeout_ms,
+    timeout_ms: tool.webhook.async ? null : (tool.webhook.timeout_ms ?? null),
     url: tool.webhook.url,
   };
 }
