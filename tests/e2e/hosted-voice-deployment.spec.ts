@@ -9,6 +9,7 @@ import {
   HostedVoiceDeploymentStateError,
   type HostedVoiceDeploymentVersionRecord,
   HostedVoiceDriftError,
+  inspectHostedVoiceDeployment,
   promoteHostedVoiceCandidate,
   publishHostedVoiceCandidate,
   resolveHostedVoiceDrift,
@@ -330,6 +331,44 @@ test("remote drift can be explicitly cancelled or imported as the new baseline",
   });
 });
 
+test("successful reinspection restores a drifted candidate deployment", async () => {
+  const adapter = new MemoryAdapter();
+  const repository = new MemoryRepository();
+  const published = await publishHostedVoiceCandidate({
+    adapter,
+    definition,
+    projectId: 10,
+    providerId: 20,
+    repository,
+  });
+  const originalMainVersionId = published.deployment.mainRemoteVersionId;
+  if (!originalMainVersionId) throw new Error("Missing original main version.");
+
+  adapter.changeMainDirectly("Portal edited name");
+  const drifted = await inspectHostedVoiceDeployment({
+    adapter,
+    deployment: published.deployment,
+    repository,
+  });
+  expect(drifted.deployment.status).toBe("drifted");
+
+  await adapter.promote({
+    assistantId: "assistant-1",
+    versionId: originalMainVersionId,
+  });
+  const restored = await inspectHostedVoiceDeployment({
+    adapter,
+    deployment: drifted.deployment,
+    repository,
+  });
+  expect(restored.status).toBe("in_sync");
+  expect(restored.deployment).toMatchObject({
+    candidateRemoteVersionId: "candidate-2",
+    mainRemoteVersionId: originalMainVersionId,
+    status: "candidate",
+  });
+});
+
 test("deployment lookups cannot cross the project boundary", async () => {
   const adapter = new MemoryAdapter();
   const repository = new MemoryRepository();
@@ -586,9 +625,13 @@ class MemoryRepository
   async recordInspection(input: {
     deployment: HostedVoiceDeploymentRecord;
     observedManagedHash: string;
+    status: HostedVoiceDeploymentRecord["status"];
   }) {
     this.events.push("inspected");
-    return this.update({ observedManagedHash: input.observedManagedHash });
+    return this.update({
+      observedManagedHash: input.observedManagedHash,
+      status: input.status,
+    });
   }
 
   private update(values: Partial<HostedVoiceDeploymentRecord>) {

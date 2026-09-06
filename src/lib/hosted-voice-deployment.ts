@@ -89,6 +89,7 @@ export interface HostedVoiceDeploymentRepository<TManagedConfig> {
   recordInspection(input: {
     deployment: HostedVoiceDeploymentRecord;
     observedManagedHash: string;
+    status: HostedVoiceDeploymentStatus;
   }): Promise<HostedVoiceDeploymentRecord>;
 }
 
@@ -149,6 +150,12 @@ export async function inspectHostedVoiceDeployment<TManagedConfig>(input: {
   const deployment = await input.repository.recordInspection({
     deployment: input.deployment,
     observedManagedHash,
+    status:
+      input.deployment.status === "drifted"
+        ? input.deployment.candidateRemoteVersionId
+          ? "candidate"
+          : "main"
+        : input.deployment.status,
   });
   return { deployment, inspection, report: null, status: "in_sync" as const };
 }

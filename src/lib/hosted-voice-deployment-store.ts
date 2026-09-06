@@ -281,11 +281,11 @@ export const telnyxHostedVoiceDeploymentRepository = {
     });
   },
 
-  async recordInspection({ deployment, observedManagedHash }) {
+  async recordInspection({ deployment, observedManagedHash, status }) {
     return db.transaction(async (tx) => {
       const updated = await updateDeployment(tx, {
         deployment,
-        values: { lastInspectedAt: new Date(), observedManagedHash },
+        values: { lastInspectedAt: new Date(), observedManagedHash, status },
       });
       await insertAudit(tx, updated, "hosted_voice.inspected", {
         managedHash: observedManagedHash,
