@@ -448,6 +448,27 @@ test("asynchronous reads acknowledge pending once without blocking the call", as
   expect(executor.queued).toEqual([{ callId: 1, projectId: 10 }]);
 });
 
+test("a verified no-call probe executes an asynchronous read synchronously", async () => {
+  const definition = toolDefinition("read", "asynchronous");
+  const repository = new MemoryRepository({ definition, provider: "telnyx" });
+  const executor = new MemoryExecutor();
+  const result = await executeHostedVoiceToolEnvelope({
+    commitSecret: COMMIT_SECRET,
+    credential: CREDENTIAL,
+    envelope: envelope(definition, "read", { phone: "+61412345678" }),
+    executor,
+    forceSynchronous: true,
+    repository,
+  });
+
+  expect(result).toEqual({
+    result: { status: "available" },
+    status: "completed",
+  });
+  expect(executor.calls).toHaveLength(1);
+  expect(executor.queued).toHaveLength(0);
+});
+
 test("an asynchronous committed write stays pending and cannot enqueue twice", async () => {
   const definition = toolDefinition("write", "asynchronous");
   const repository = new MemoryRepository({ definition, provider: "telnyx" });

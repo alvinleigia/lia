@@ -37,7 +37,7 @@ export async function sendTelnyxHostedVoiceContinuation(input: {
         body: JSON.stringify({
           command_id: deterministicUuid(input.requestId),
           messages: [{ content: message, role: "system" }],
-          trigger_response: false,
+          trigger_response: true,
         }),
         headers: {
           Authorization: `Bearer ${apiKey}`,

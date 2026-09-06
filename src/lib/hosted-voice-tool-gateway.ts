@@ -113,6 +113,7 @@ export async function executeHostedVoiceToolEnvelope(input: {
   credential: string;
   envelope: HostedVoiceToolEnvelope;
   executor: HostedVoiceToolExecutor;
+  forceSynchronous?: boolean;
   now?: Date;
   repository: HostedVoiceToolGatewayRepository;
 }) {
@@ -135,6 +136,9 @@ export async function executeHostedVoiceToolEnvelope(input: {
   }
 
   const definition = binding.definition;
+  const executionMode = input.forceSynchronous
+    ? "synchronous"
+    : definition.execution.mode;
   const expectedAccess = input.envelope.phase === "read" ? "read" : "write";
   if (definition.access !== expectedAccess) {
     throw new HostedVoiceToolRequestError(
@@ -144,7 +148,7 @@ export async function executeHostedVoiceToolEnvelope(input: {
     );
   }
   if (
-    definition.execution.mode === "synchronous" &&
+    executionMode === "synchronous" &&
     definition.execution.timeoutMs > 10_000
   ) {
     throw new HostedVoiceToolRequestError(
@@ -245,7 +249,7 @@ export async function executeHostedVoiceToolEnvelope(input: {
       return { result: reserved.call.result, status: "completed" as const };
     }
     if (
-      definition.execution.mode === "asynchronous" &&
+      executionMode === "asynchronous" &&
       ["pending", "executing"].includes(reserved.call.status)
     ) {
       return { status: "pending" as const };
@@ -257,7 +261,7 @@ export async function executeHostedVoiceToolEnvelope(input: {
     );
   }
 
-  if (definition.execution.mode === "asynchronous") {
+  if (executionMode === "asynchronous") {
     return queueAndAcknowledge({
       call: reserved.call,
       executor: input.executor,

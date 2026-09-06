@@ -45,6 +45,11 @@ export async function processProjectHostedVoiceToolQueue(input: {
     processed += 1;
     try {
       const { callId } = jobPayloadSchema.parse(job.payload);
+      console.info("Hosted voice tool worker claimed job.", {
+        callId,
+        jobId: job.id,
+        projectId: input.projectId,
+      });
       const work = await claimHostedVoiceAsyncToolWork({
         callId,
         projectId: input.projectId,
@@ -74,6 +79,11 @@ export async function processProjectHostedVoiceToolQueue(input: {
         throw new PermanentHostedVoiceToolError("provider_unavailable");
       }
       const outcome = getHostedVoiceToolOutcome(result);
+      console.info("Hosted voice tool execution completed.", {
+        callId,
+        outcome,
+        projectId: input.projectId,
+      });
       try {
         await sendTelnyxHostedVoiceContinuation({
           apiKey: runtime.apiKey,
@@ -90,6 +100,11 @@ export async function processProjectHostedVoiceToolQueue(input: {
           projectId: input.projectId,
           status: "sent",
         });
+        console.info("Hosted voice tool continuation sent.", {
+          callId,
+          outcome,
+          projectId: input.projectId,
+        });
       } catch (error) {
         if (
           error instanceof TelnyxHostedVoiceContinuationError &&
@@ -101,6 +116,14 @@ export async function processProjectHostedVoiceToolQueue(input: {
             projectId: input.projectId,
             status: "call_ended",
           });
+          console.info(
+            "Hosted voice tool continuation skipped after call end.",
+            {
+              callId,
+              outcome,
+              projectId: input.projectId,
+            },
+          );
         } else {
           await markHostedVoiceContinuation({
             callId: work.call.id,
@@ -127,17 +150,24 @@ export async function processProjectHostedVoiceToolQueue(input: {
         error instanceof PermanentHostedVoiceToolError ||
         (error instanceof TelnyxHostedVoiceContinuationError &&
           !error.retryable);
-      await failDurableJob({
-        errorMessage:
-          error instanceof PermanentHostedVoiceToolError
+      const errorCode =
+        error instanceof PermanentHostedVoiceToolError
+          ? error.code
+          : error instanceof TelnyxHostedVoiceContinuationError
             ? error.code
-            : error instanceof TelnyxHostedVoiceContinuationError
-              ? error.code
-              : "hosted_voice_tool_failed",
+            : "hosted_voice_tool_failed";
+      await failDurableJob({
+        errorMessage: errorCode,
         jobId: job.id,
         permanent,
         projectId: input.projectId,
         workerId: input.workerId,
+      });
+      console.error("Hosted voice tool worker failed job.", {
+        errorCode,
+        jobId: job.id,
+        permanent,
+        projectId: input.projectId,
       });
       failed += 1;
     }

@@ -94,7 +94,7 @@ test("truthful continuation wording covers every hosted tool outcome", () => {
   expect(getHostedVoiceToolOutcome({ status: "unexpected" })).toBe("ambiguous");
 });
 
-test("Telnyx continuation uses one idempotent non-interrupting Add Messages call", async () => {
+test("Telnyx continuation uses one idempotent immediate Add Messages call", async () => {
   const requests: Array<{ init?: RequestInit; url: string }> = [];
   await sendTelnyxHostedVoiceContinuation({
     apiKey: "secret-api-key",
@@ -119,7 +119,7 @@ test("Telnyx continuation uses one idempotent non-interrupting Add Messages call
   const body = JSON.parse(String(requests[0]?.init?.body));
   expect(body).toMatchObject({
     messages: [{ content: "Verified result", role: "system" }],
-    trigger_response: false,
+    trigger_response: true,
   });
   expect(body.command_id).toMatch(/^[0-9a-f-]{36}$/);
   expect(JSON.stringify(body)).not.toContain("secret-api-key");

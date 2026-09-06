@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   getHostedVoiceBearerCredential,
@@ -8,6 +8,7 @@ import {
 import { hostedVoiceToolExecutor } from "@/lib/hosted-voice-tool-executor";
 import {
   executeHostedVoiceToolEnvelope,
+  type HostedVoiceToolExecutor,
   HostedVoiceToolRequestError,
 } from "@/lib/hosted-voice-tool-gateway";
 import {
@@ -15,6 +16,7 @@ import {
   verifyHostedVoiceNoCallVerificationToken,
 } from "@/lib/hosted-voice-tool-preflight";
 import { hostedVoiceToolGatewayRepository } from "@/lib/hosted-voice-tool-store";
+import { processProjectHostedVoiceToolQueue } from "@/lib/hosted-voice-tool-worker";
 
 const MAX_BODY_CHARACTERS = 64_000;
 
@@ -43,9 +45,10 @@ export async function POST(
     } catch {
       return NextResponse.json({ error: "invalid_json" }, { status: 400 });
     }
-    const verifiedConversationId = request.headers
+    const callControlId = request.headers
       .get("x-telnyx-call-control-id")
-      ?.trim()
+      ?.trim();
+    const verifiedConversationId = callControlId
       ? undefined
       : (verifyHostedVoiceNoCallVerificationToken({
           phase: route.phase,
@@ -66,7 +69,10 @@ export async function POST(
         process.env.VOICE_TOOL_COMMIT_SECRET ?? process.env.AUTH_SECRET ?? "",
       credential,
       envelope,
-      executor: hostedVoiceToolExecutor,
+      executor: callControlId
+        ? createRequestHostedVoiceToolExecutor()
+        : hostedVoiceToolExecutor,
+      forceSynchronous: Boolean(verifiedConversationId),
       repository: hostedVoiceToolGatewayRepository,
     });
     return NextResponse.json(result);
@@ -85,4 +91,35 @@ export async function POST(
       { status: 500 },
     );
   }
+}
+
+function createRequestHostedVoiceToolExecutor(): HostedVoiceToolExecutor {
+  return {
+    execute: hostedVoiceToolExecutor.execute,
+    async enqueue(input) {
+      await hostedVoiceToolExecutor.enqueue(input);
+      console.info("Hosted voice tool queued.", {
+        callId: input.callId,
+        projectId: input.projectId,
+      });
+      after(async () => {
+        try {
+          const result = await processProjectHostedVoiceToolQueue({
+            maxJobs: 10,
+            projectId: input.projectId,
+            workerId: `hosted-voice-request:${crypto.randomUUID()}`,
+          });
+          console.info("Hosted voice tool queue processed.", {
+            ...result,
+            projectId: input.projectId,
+          });
+        } catch (error) {
+          console.error("Hosted voice tool queue processing failed.", {
+            errorName: error instanceof Error ? error.name : "UnknownError",
+            projectId: input.projectId,
+          });
+        }
+      });
+    },
+  };
 }
