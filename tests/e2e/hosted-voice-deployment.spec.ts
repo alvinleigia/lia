@@ -100,6 +100,18 @@ function telnyxWebhookSetup() {
   ];
 }
 
+function telnyxSharedToolResponse(
+  body: Record<string, unknown>,
+  id = "shared-lia-read-85",
+) {
+  return {
+    display_name: body.display_name,
+    id,
+    tool_definition: body.webhook,
+    type: "webhook",
+  };
+}
+
 test("Telnyx adapter creates a non-main candidate with idempotent API requests", async () => {
   const requests: Array<{ body: Record<string, unknown>; init?: RequestInit }> =
     [];
@@ -239,11 +251,18 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
   }> = [];
   const fetchImpl: typeof fetch = async (url, init) => {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
-    requests.push({
+    const request = {
       body,
       method: init?.method ?? "GET",
       url: String(url),
-    });
+    };
+    requests.push(request);
+    if (request.url.includes("/ai/tools?")) {
+      return Response.json({ data: [] });
+    }
+    if (request.url.endsWith("/ai/tools")) {
+      return Response.json(telnyxSharedToolResponse(body));
+    }
     return Response.json({
       ...telnyxResponse("candidate-2"),
       tools:
@@ -267,35 +286,45 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
   });
 
   expect(result).toEqual({ routingWasSuspended: false, toolCount: 1 });
-  expect(requests.map(({ method }) => method)).toEqual(["GET", "POST"]);
+  expect(requests.map(({ method }) => method)).toEqual([
+    "GET",
+    "GET",
+    "POST",
+    "POST",
+  ]);
   expect(
-    requests.every(({ url }) =>
-      url.endsWith("/ai/assistants/assistant-1/versions/candidate-2"),
+    requests[0]?.url.endsWith(
+      "/ai/assistants/assistant-1/versions/candidate-2",
     ),
   ).toBe(true);
-  const pushedTools = requests[1]?.body.tools as Array<Record<string, unknown>>;
-  expect(requests[1]?.body.name).toBe(definition.name);
-  expect(pushedTools).toHaveLength(2);
+  expect(requests[1]?.url).toContain(
+    "/ai/tools?filter%5Bname%5D=lia-phase18-candidate-1-lia_read_operation_85",
+  );
+  expect(requests[2]?.body).toMatchObject({
+    display_name: "lia-phase18-candidate-1-lia_read_operation_85",
+    type: "webhook",
+  });
+  const createdWebhook = requests[2]?.body.webhook as Record<string, unknown>;
+  expect(createdWebhook).toMatchObject({
+    async: true,
+    async_timeout_ms: 8_000,
+    headers: [
+      {
+        name: "Authorization",
+        value:
+          "Bearer {{#integration_secret}}lia-phase18-candidate-1{{/integration_secret}}",
+      },
+    ],
+    name: "lia_read_operation_85",
+  });
+  expect(createdWebhook).not.toHaveProperty("timeout_ms");
+  const pushedTools = requests[3]?.body.tools as Array<Record<string, unknown>>;
+  expect(requests[3]?.body.tool_ids).toEqual(["shared-lia-read-85"]);
+  expect(pushedTools).toHaveLength(1);
   expect(pushedTools[0]).toEqual({
     hangup: { description: "End the completed conversation." },
     type: "hangup",
   });
-  expect(pushedTools[1]).toMatchObject({
-    type: "webhook",
-    webhook: {
-      async: true,
-      async_timeout_ms: 8_000,
-      headers: [
-        {
-          name: "Authorization",
-          value:
-            "Bearer {{#integration_secret}}lia-phase18-candidate-1{{/integration_secret}}",
-        },
-      ],
-      name: "lia_read_operation_85",
-    },
-  });
-  expect(pushedTools[1]?.webhook).not.toHaveProperty("timeout_ms");
   expect(JSON.stringify(requests)).not.toContain("restricted-test-key");
   expect(JSON.stringify(pushedTools)).not.toContain("must-never-leak");
 });
@@ -330,6 +359,12 @@ test("Telnyx adapter restores canary routing after updating a locked live candid
     const request = { body, method, url: String(url) };
     requests.push(request);
 
+    if (request.url.includes("/ai/tools?")) {
+      return Response.json({ data: [] });
+    }
+    if (request.url.endsWith("/ai/tools")) {
+      return Response.json(telnyxSharedToolResponse(body));
+    }
     if (request.url.endsWith("/canary-deploys")) {
       if (method === "DELETE") return new Response(null, { status: 204 });
       return Response.json(canary);
@@ -363,14 +398,87 @@ test("Telnyx adapter restores canary routing after updating a locked live candid
   ).resolves.toEqual({ routingWasSuspended: true, toolCount: 1 });
   expect(requests.map(({ method }) => method)).toEqual([
     "GET",
+    "GET",
+    "POST",
     "POST",
     "GET",
     "DELETE",
     "POST",
     "POST",
   ]);
-  expect(requests[5]?.url).toContain("/canary-deploys");
-  expect(requests[5]?.body).toEqual({ rules: canary.rules });
+  expect(requests[7]?.url).toContain("/canary-deploys");
+  expect(requests[7]?.body).toEqual({ rules: canary.rules });
+});
+
+test("Telnyx adapter updates and reuses an existing Lia shared tool", async () => {
+  const requests: Array<{
+    body: Record<string, unknown>;
+    method: string;
+    url: string;
+  }> = [];
+  const fetchImpl: typeof fetch = async (url, init) => {
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    const request = {
+      body,
+      method: init?.method ?? "GET",
+      url: String(url),
+    };
+    requests.push(request);
+
+    if (request.url.includes("/ai/tools?")) {
+      return Response.json({
+        data: [
+          telnyxSharedToolResponse(
+            {
+              display_name: "lia-phase18-candidate-1-lia_read_operation_85",
+              webhook: {},
+            },
+            "shared-lia-read-85",
+          ),
+        ],
+      });
+    }
+    if (request.url.endsWith("/ai/tools/shared-lia-read-85")) {
+      return Response.json(telnyxSharedToolResponse(body));
+    }
+    if (request.method === "POST") {
+      return Response.json({
+        ...telnyxResponse("candidate-2"),
+        tool_ids: body.tool_ids as string[],
+        tools: body.tools as unknown[],
+      });
+    }
+    return Response.json({
+      ...telnyxResponse("candidate-2"),
+      tool_ids: ["existing-non-lia", "shared-lia-read-85"],
+      tools: [],
+    });
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  await expect(
+    adapter.pushCandidateTools({
+      assistantId: "assistant-1",
+      candidateVersionId: "candidate-2",
+      integrationSecretIdentifier: "lia-phase18-candidate-1",
+      mainVersionId: "main-1",
+      tools: telnyxWebhookSetup(),
+    }),
+  ).resolves.toEqual({ routingWasSuspended: false, toolCount: 1 });
+  expect(requests.map(({ method }) => method)).toEqual([
+    "GET",
+    "GET",
+    "PATCH",
+    "POST",
+  ]);
+  expect(requests[3]?.body.tool_ids).toEqual([
+    "existing-non-lia",
+    "shared-lia-read-85",
+  ]);
 });
 
 test("Telnyx adapter restores canary routing when the unlocked update still fails", async () => {
@@ -387,6 +495,13 @@ test("Telnyx adapter restores canary routing when the unlocked update still fail
     const request = { method, url: String(url) };
     requests.push(request);
 
+    if (request.url.includes("/ai/tools?")) {
+      return Response.json({ data: [] });
+    }
+    if (request.url.endsWith("/ai/tools")) {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      return Response.json(telnyxSharedToolResponse(body));
+    }
     if (request.url.endsWith("/canary-deploys")) {
       if (method === "DELETE") return new Response(null, { status: 204 });
       return Response.json(canary);

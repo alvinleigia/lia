@@ -88,6 +88,21 @@ const telnyxIntegrationSecretListSchema = z
   })
   .passthrough();
 
+const telnyxSharedToolSchema = z
+  .object({
+    display_name: z.string().optional(),
+    id: z.string().trim().min(1),
+    tool_definition: z.record(z.string(), z.unknown()),
+    type: z.string(),
+  })
+  .passthrough();
+
+const telnyxSharedToolListSchema = z
+  .object({
+    data: z.array(telnyxSharedToolSchema),
+  })
+  .passthrough();
+
 const telnyxApiErrorSchema = z
   .object({
     detail: z
@@ -136,6 +151,7 @@ const telnyxAssistantSchema = z
       .passthrough(),
     version_id: z.string().trim().min(1),
     voice_settings: z.object({ voice: z.string().trim().min(1) }).passthrough(),
+    tool_ids: z.array(z.string().trim().min(1)).optional().default([]),
     tools: z.array(z.unknown()).optional().default([]),
   })
   .passthrough();
@@ -273,6 +289,54 @@ export function createTelnyxHostedVoiceAdapter(input: {
     }
 
     return parsed.data;
+  }
+
+  async function upsertSharedWebhookTool(
+    expected: z.infer<typeof telnyxWebhookToolSchema>,
+    namespace: string,
+  ) {
+    const name = expected.webhook.name;
+    const displayName = `${namespace}-${name}`;
+    const listPath = `/ai/tools?filter%5Bname%5D=${encodeURIComponent(displayName)}`;
+    const { payload: listPayload } = await requestPayload(
+      listPath,
+      undefined,
+      `Telnyx shared tool lookup for ${name}`,
+    );
+    const list = telnyxSharedToolListSchema.safeParse(listPayload);
+    if (!list.success) {
+      throw new TelnyxHostedVoiceApiError(
+        "Telnyx returned an invalid shared tool list.",
+        false,
+        200,
+      );
+    }
+    const existing = list.data.data.find(
+      (tool) => tool.display_name === displayName && tool.type === "webhook",
+    );
+    const body = JSON.stringify({
+      display_name: displayName,
+      type: "webhook",
+      webhook: expected.webhook,
+    });
+    const { payload, status } = await requestPayload(
+      existing ? `/ai/tools/${encodeURIComponent(existing.id)}` : "/ai/tools",
+      {
+        body,
+        method: existing ? "PATCH" : "POST",
+      },
+      `Telnyx shared tool upsert for ${name}`,
+    );
+    const tool = telnyxSharedToolSchema.safeParse(payload);
+    if (!tool.success) {
+      throw new TelnyxHostedVoiceApiError(
+        "Telnyx returned an invalid shared tool.",
+        false,
+        status,
+      );
+    }
+    verifyTelnyxSharedWebhookTool(tool.data, expected);
+    return tool.data.id;
   }
 
   return {
@@ -424,16 +488,23 @@ export function createTelnyxHostedVoiceAdapter(input: {
       const expectedTools = setupTools.map((tool) =>
         buildTelnyxWebhookTool(tool, identifier),
       );
+      const sharedToolIds: string[] = [];
+      for (const expectedTool of expectedTools) {
+        sharedToolIds.push(
+          await upsertSharedWebhookTool(expectedTool, identifier),
+        );
+      }
       const preservedTools = candidate.tools
         .filter((tool) => !isLiaWebhookTool(tool))
         .map(normalizeTelnyxInlineToolForUpdate);
+      const toolIds = [...new Set([...candidate.tool_ids, ...sharedToolIds])];
       const updateCandidate = () =>
         request(
           path,
           {
             body: JSON.stringify({
-              name: candidate.name,
-              tools: [...preservedTools, ...expectedTools],
+              tool_ids: toolIds,
+              tools: preservedTools,
             }),
             method: "POST",
           },
@@ -505,7 +576,6 @@ export function createTelnyxHostedVoiceAdapter(input: {
       if (!updated || updated.version_id !== candidateVersionId) {
         throw new Error("Telnyx did not update the exact candidate version.");
       }
-      verifyTelnyxWebhookTools(updated.tools, expectedTools);
       return { routingWasSuspended, toolCount: expectedTools.length };
     },
     async promote(remote: HostedVoiceRemoteVersion) {
@@ -525,6 +595,17 @@ function canaryRuleReferencesVersion(
     rule.serve.version_id === versionId ||
     rule.serve.rollout?.some((slot) => slot.version_id === versionId) === true
   );
+}
+
+function verifyTelnyxSharedWebhookTool(
+  tool: z.infer<typeof telnyxSharedToolSchema>,
+  expected: z.infer<typeof telnyxWebhookToolSchema>,
+) {
+  const webhook =
+    "webhook" in tool.tool_definition
+      ? tool.tool_definition.webhook
+      : tool.tool_definition;
+  verifyTelnyxWebhookTools([{ type: "webhook", webhook }], [expected]);
 }
 
 function buildTelnyxApiErrorDiagnostic(response: Response, payload: unknown) {

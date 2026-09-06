@@ -411,14 +411,15 @@ export default async function TelnyxHostedVoicePage() {
                 <ActionFormError />
                 <ActionFormSuccessToast />
                 <p className="text-sm text-muted-foreground">
-                  After storing the current binding credential in Telnyx, push
-                  every generated Lia webhook to the exact non-main candidate.
-                  Lia first verifies that the Integration Secret is current and
-                  that the public webhook reaches bearer authentication without
-                  placing a call. Existing non-Lia tools are preserved. If
-                  Telnyx locks an actively routed candidate, Lia briefly falls
-                  back to main, updates the candidate, and restores the exact
-                  traffic rules.
+                  After storing the current binding credential in Telnyx, Lia
+                  creates or updates each webhook separately in the Telnyx Tools
+                  Library, verifies it, then attaches the tool IDs to the exact
+                  non-main candidate. Lia first verifies that the Integration
+                  Secret is current and that the public webhook reaches bearer
+                  authentication without placing a call. Existing non-Lia tools
+                  are preserved. If Telnyx locks an actively routed candidate,
+                  Lia briefly falls back to main, updates the candidate, and
+                  restores the exact traffic rules.
                 </p>
                 <Field
                   label="Telnyx Integration Secret identifier"
