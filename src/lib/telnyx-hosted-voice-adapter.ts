@@ -88,6 +88,34 @@ const telnyxIntegrationSecretListSchema = z
   })
   .passthrough();
 
+const telnyxApiErrorSchema = z
+  .object({
+    detail: z
+      .array(
+        z
+          .object({
+            loc: z.array(z.union([z.string(), z.number()])).optional(),
+            type: z.string().optional(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+    errors: z
+      .array(
+        z
+          .object({
+            code: z.union([z.string(), z.number()]).optional(),
+            source: z
+              .object({ pointer: z.string().optional() })
+              .passthrough()
+              .optional(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+  })
+  .passthrough();
+
 const telnyxAssistantSchema = z
   .object({
     enabled_features: z.array(z.enum(["telephony", "messaging"])),
@@ -172,8 +200,17 @@ export function createTelnyxHostedVoiceAdapter(input: {
     }
 
     if (!response.ok) {
+      const diagnostic = buildTelnyxApiErrorDiagnostic(
+        response,
+        await response.json().catch(() => null),
+      );
+      console.error("Telnyx provider request failed.", {
+        diagnostic: diagnostic || null,
+        operation,
+        status: response.status,
+      });
       throw new TelnyxHostedVoiceApiError(
-        `${operation} failed with status ${response.status}.`,
+        `${operation} failed with status ${response.status}${diagnostic}.`,
         response.status === 408 ||
           response.status === 429 ||
           response.status >= 500,
@@ -381,6 +418,48 @@ export function createTelnyxHostedVoiceAdapter(input: {
       );
     },
   };
+}
+
+function buildTelnyxApiErrorDiagnostic(response: Response, payload: unknown) {
+  const parts: string[] = [];
+  const requestId = toSafeTelnyxDiagnosticToken(
+    response.headers.get("x-request-id") ??
+      response.headers.get("telnyx-request-id"),
+  );
+  if (requestId) parts.push(`request ${requestId}`);
+
+  const parsed = telnyxApiErrorSchema.safeParse(payload);
+  if (parsed.success) {
+    const providerError = parsed.data.errors?.[0];
+    const code = toSafeTelnyxDiagnosticToken(providerError?.code);
+    if (code) parts.push(`code ${code}`);
+    const pointer = toSafeTelnyxDiagnosticPath(providerError?.source?.pointer);
+    if (pointer) parts.push(`field ${pointer}`);
+
+    const validationError = parsed.data.detail?.[0];
+    const location = toSafeTelnyxDiagnosticPath(validationError?.loc);
+    if (location && !pointer) parts.push(`field ${location}`);
+    const type = toSafeTelnyxDiagnosticToken(validationError?.type);
+    if (type) parts.push(`type ${type}`);
+  }
+
+  return parts.length > 0 ? ` [${parts.join("; ")}]` : "";
+}
+
+function toSafeTelnyxDiagnosticToken(value: unknown) {
+  const token = typeof value === "number" ? String(value) : value;
+  return typeof token === "string" && /^[a-zA-Z0-9_.:-]{1,64}$/.test(token)
+    ? token
+    : null;
+}
+
+function toSafeTelnyxDiagnosticPath(value: unknown) {
+  const path = Array.isArray(value)
+    ? value.join(".")
+    : typeof value === "string"
+      ? value.replace(/^\/+/, "").replaceAll("/", ".")
+      : "";
+  return /^[a-zA-Z0-9_.:-]{1,120}$/.test(path) ? path : null;
 }
 
 function buildTelnyxWebhookTool(

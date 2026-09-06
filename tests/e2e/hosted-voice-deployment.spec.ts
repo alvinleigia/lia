@@ -335,6 +335,49 @@ test("Telnyx adapter errors exclude credentials and provider response bodies", a
   expect(JSON.stringify(error)).not.toContain("raw provider body");
 });
 
+test("Telnyx adapter reports only secret-safe provider diagnostics", async () => {
+  const logged: unknown[] = [];
+  const originalConsoleError = console.error;
+  console.error = (...values) => logged.push(values);
+  try {
+    const adapter = createTelnyxHostedVoiceAdapter({
+      apiKey: "must-never-leak",
+      fetchImpl: async () =>
+        Response.json(
+          {
+            detail: [
+              {
+                input: "Bearer must-never-leak",
+                loc: ["body", "tools", 0, "webhook", "timeout_ms"],
+                msg: "raw provider body with must-never-leak",
+                type: "value_error",
+              },
+            ],
+          },
+          {
+            headers: { "x-request-id": "req-safe-123" },
+            status: 422,
+          },
+        ),
+      settings,
+    });
+
+    const error = await adapter
+      .inspect({ assistantId: "assistant-1" })
+      .catch((caught) => caught);
+
+    expect(error.message).toBe(
+      "Telnyx Assistant request failed with status 422 [request req-safe-123; field body.tools.0.webhook.timeout_ms; type value_error].",
+    );
+    expect(JSON.stringify({ error, logged })).not.toContain("must-never-leak");
+    expect(JSON.stringify({ error, logged })).not.toContain(
+      "raw provider body",
+    );
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
 test("Telnyx adapter identifies Integration Secret lookup failures", async () => {
   const adapter = createTelnyxHostedVoiceAdapter({
     apiKey: "must-never-leak",
