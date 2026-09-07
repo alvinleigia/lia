@@ -1619,6 +1619,17 @@ recorded. Calendar verification confirmed the synthetic appointment was
 deleted with no duplicate remaining. Availability, booking, find, reschedule,
 and cancel are now accepted for the isolated runtime lifecycle preflight.
 
+Phase 18.14 live hosted-assistant availability and booking passed on 2026-09-07.
+The deployed Telnyx Assistant received six structured, verified slots from
+`lia_read_operation_85`, preserved the caller's 11:30 am selection and
+synthetic identity details, and prepared `lia_prepare_operation_86`. It repeated
+the immutable booking summary and requested explicit confirmation before
+calling `lia_commit_operation_86`. The asynchronous continuation returned a
+verified success, the selected time, and an opaque appointment reference, which
+the Assistant spoke to the caller. The pending acknowledgement remained
+truthful and caller barge-in did not duplicate an operation. Live find,
+reschedule, cancel, and the remaining hosted-assistant call matrix are next.
+
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
 

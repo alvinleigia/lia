@@ -1341,8 +1341,10 @@ Use a dedicated test number, calendar, and transfer destination. Do not use real
 patient data or paste credentials or raw provider payloads into this record.
 The staging console and secret-safe setup procedure are implemented; follow
 [`TELNYX_HOSTED_STAGING_RUNBOOK.md`](TELNYX_HOSTED_STAGING_RUNBOOK.md).
-Live Telnyx call execution has not started, so every numbered result below
-remains unchecked.
+Live Telnyx call execution began on 2026-09-07. Availability and one confirmed
+booking have passed through the hosted Assistant. The numbered results below
+combine accepted staging preflight evidence with live-call evidence; unchecked
+results still require live proof.
 The shared Behavior policy and task Workflow language controls now use the same
 typo-safe selector; English is the only certified choice for this baseline, and
 existing legacy values remain preserved until intentionally changed.
@@ -1409,13 +1411,30 @@ Additional staging preflight evidence on 2026-08-31:
       recorded, and the synthetic appointment was removed from the dedicated
       staging calendar with no duplicate remaining.
 
+Live hosted-assistant evidence on 2026-09-07:
+
+- [x] The deployed Assistant called `lia_read_operation_85`, received six
+      structured availability slots for 10 September 2026, and spoke only
+      those verified slots after the bounded pending acknowledgement.
+- [x] The caller selected 11:30 am and supplied synthetic identity details.
+      `lia_prepare_operation_86` returned a prepared commit token, after which
+      the Assistant repeated the exact booking summary and requested explicit
+      confirmation.
+- [x] `lia_commit_operation_86` ran only after the caller confirmed. The async
+      continuation returned verified `success`, the selected time, and an
+      opaque appointment reference; the Assistant then spoke the confirmed
+      result. Ordinary caller barge-in did not duplicate either operation.
+- [ ] Complete live find, reschedule, and cancellation against this synthetic
+      appointment before accepting the complete appointment-lifecycle check.
+
 1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
        the staging number or approved test callers to it.
 2. [ ] Confirm greeting, ordinary conversation, interruption, transfer, and
        hangup remain Telnyx-native with no Lia turn processing.
-3. [x] Complete availability, booking, find, reschedule, and cancel through Lia
+3. [ ] Complete availability, booking, find, reschedule, and cancel through Lia
        tools; confirm availability and find require no write confirmation, and
-       every spoken success matches a verified operation result.
+       every spoken success matches a verified operation result. Live
+       availability and booking passed; live find, reschedule, and cancel remain.
 4. [x] Prove explicit confirmation precedes commit and duplicate delivery creates
        one appointment.
 5. [ ] Race two calls for one slot and confirm exactly one receives success.
@@ -1436,7 +1455,7 @@ Result: [ ] Pass [ ] Fail
 - Tested Lia voice version and tools: `<versions>`
 - Correlated call/conversation IDs: `<masked IDs>`
 - Latency/cost evidence: `<metrics or links>`
-- Defects/evidence: `Attempts #25, #28, and #30; booking, find, reschedule, cancel, and blank-task readiness verified`
+- Defects/evidence: `Attempts #25, #28, and #30; preflight lifecycle verified; live hosted availability and confirmed booking passed on 2026-09-07`
 - Tester/date: `<name/date>`
 
 # Final Release Record
