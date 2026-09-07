@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db-config";
 import { googleCalendarAppointments } from "@/lib/db-schema";
@@ -35,7 +35,14 @@ export const googleCalendarAppointmentStore = {
     return row ? mapAppointment(row) : null;
   },
 
-  async findByReference({ identityHash, projectId, providerId, reference }) {
+  async findByReference({
+    identityHash,
+    lookupIdentityHash,
+    lookupIdentityKey,
+    projectId,
+    providerId,
+    reference,
+  }) {
     const [row] = await db
       .select()
       .from(googleCalendarAppointments)
@@ -44,7 +51,22 @@ export const googleCalendarAppointmentStore = {
           eq(googleCalendarAppointments.projectId, projectId),
           eq(googleCalendarAppointments.providerId, providerId),
           eq(googleCalendarAppointments.reference, reference),
-          eq(googleCalendarAppointments.identityHash, identityHash),
+          or(
+            and(
+              eq(
+                googleCalendarAppointments.lookupIdentityKey,
+                lookupIdentityKey,
+              ),
+              eq(
+                googleCalendarAppointments.lookupIdentityHash,
+                lookupIdentityHash,
+              ),
+            ),
+            and(
+              isNull(googleCalendarAppointments.lookupIdentityHash),
+              eq(googleCalendarAppointments.identityHash, identityHash),
+            ),
+          ),
         ),
       )
       .limit(1);
@@ -53,6 +75,8 @@ export const googleCalendarAppointmentStore = {
 
   async listByIdentity({
     identityHash,
+    lookupIdentityHash,
+    lookupIdentityKey,
     limit,
     maxStart,
     minEnd,
@@ -66,7 +90,22 @@ export const googleCalendarAppointmentStore = {
         and(
           eq(googleCalendarAppointments.projectId, projectId),
           eq(googleCalendarAppointments.providerId, providerId),
-          eq(googleCalendarAppointments.identityHash, identityHash),
+          or(
+            and(
+              eq(
+                googleCalendarAppointments.lookupIdentityKey,
+                lookupIdentityKey,
+              ),
+              eq(
+                googleCalendarAppointments.lookupIdentityHash,
+                lookupIdentityHash,
+              ),
+            ),
+            and(
+              isNull(googleCalendarAppointments.lookupIdentityHash),
+              eq(googleCalendarAppointments.identityHash, identityHash),
+            ),
+          ),
           eq(googleCalendarAppointments.status, "active"),
           gte(googleCalendarAppointments.endAt, minEnd),
           lte(googleCalendarAppointments.startAt, maxStart),
@@ -98,9 +137,18 @@ export const googleCalendarAppointmentStore = {
       .update(googleCalendarAppointments)
       .set({
         ...(input.endAt ? { endAt: input.endAt } : {}),
+        ...(input.lookupIdentityHash
+          ? { lookupIdentityHash: input.lookupIdentityHash }
+          : {}),
+        ...(input.lookupIdentityKey
+          ? { lookupIdentityKey: input.lookupIdentityKey }
+          : {}),
         ...(input.remoteEtag ? { remoteEtag: input.remoteEtag } : {}),
         ...(input.startAt ? { startAt: input.startAt } : {}),
         ...(input.status ? { status: input.status } : {}),
+        ...(input.verificationIdentityHash
+          ? { verificationIdentityHash: input.verificationIdentityHash }
+          : {}),
         updatedAt: new Date(),
       })
       .where(
@@ -123,6 +171,8 @@ function mapAppointment(
     endAt: row.endAt,
     id: row.id,
     identityHash: row.identityHash,
+    lookupIdentityHash: row.lookupIdentityHash,
+    lookupIdentityKey: row.lookupIdentityKey,
     operationKeyHash: row.operationKeyHash,
     projectId: row.projectId,
     providerId: row.providerId,
@@ -133,5 +183,6 @@ function mapAppointment(
     status: z
       .enum(["active", "cancelled", "outcome_unknown"])
       .parse(row.status),
+    verificationIdentityHash: row.verificationIdentityHash,
   };
 }

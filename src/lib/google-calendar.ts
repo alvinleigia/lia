@@ -22,6 +22,8 @@ export type GoogleCalendarAppointment = {
   endAt: Date;
   id: number;
   identityHash: string;
+  lookupIdentityHash: string | null;
+  lookupIdentityKey: string | null;
   operationKeyHash: string;
   projectId: number;
   providerId: number;
@@ -30,6 +32,7 @@ export type GoogleCalendarAppointment = {
   remoteEventId: string;
   startAt: Date;
   status: "active" | "cancelled" | "outcome_unknown";
+  verificationIdentityHash: string | null;
 };
 
 export interface GoogleCalendarAppointmentStore {
@@ -40,12 +43,16 @@ export interface GoogleCalendarAppointmentStore {
   }): Promise<GoogleCalendarAppointment | null>;
   findByReference(input: {
     identityHash: string;
+    lookupIdentityHash: string;
+    lookupIdentityKey: string;
     projectId: number;
     providerId: number;
     reference: string;
   }): Promise<GoogleCalendarAppointment | null>;
   listByIdentity(input: {
     identityHash: string;
+    lookupIdentityHash: string;
+    lookupIdentityKey: string;
     limit: number;
     maxStart: Date;
     minEnd: Date;
@@ -58,11 +65,14 @@ export interface GoogleCalendarAppointmentStore {
   update(input: {
     endAt?: Date;
     id: number;
+    lookupIdentityHash?: string;
+    lookupIdentityKey?: string;
     projectId: number;
     providerId: number;
     remoteEtag?: string;
     startAt?: Date;
     status?: "active" | "cancelled" | "outcome_unknown";
+    verificationIdentityHash?: string;
   }): Promise<GoogleCalendarAppointment>;
   withLocks<T>(keys: string[], work: () => Promise<T>): Promise<T>;
 }
@@ -288,8 +298,11 @@ async function bookAppointment(
             end: interval.end,
             existing,
             identityHash: identity.value,
+            lookupIdentityHash: identity.lookupHash,
+            lookupIdentityKey: identity.lookupKey,
             operationKeyHash,
             start: interval.start,
+            verificationIdentityHash: identity.verificationHash,
             verified: reconciled,
           });
           return appointmentSuccess(context, appointment);
@@ -329,8 +342,11 @@ async function bookAppointment(
               eventId,
               existing,
               identityHash: identity.value,
+              lookupIdentityHash: identity.lookupHash,
+              lookupIdentityKey: identity.lookupKey,
               operationKeyHash,
               start: interval.start,
+              verificationIdentityHash: identity.verificationHash,
             });
             return outcomeUnknown();
           }
@@ -353,8 +369,11 @@ async function bookAppointment(
           eventId,
           existing,
           identityHash: identity.value,
+          lookupIdentityHash: identity.lookupHash,
+          lookupIdentityKey: identity.lookupKey,
           operationKeyHash,
           start: interval.start,
+          verificationIdentityHash: identity.verificationHash,
         });
         return outcomeUnknown();
       }
@@ -363,8 +382,11 @@ async function bookAppointment(
         end: interval.end,
         existing,
         identityHash: identity.value,
+        lookupIdentityHash: identity.lookupHash,
+        lookupIdentityKey: identity.lookupKey,
         operationKeyHash,
         start: interval.start,
+        verificationIdentityHash: identity.verificationHash,
         verified,
       });
       return appointmentSuccess(context, appointment);
@@ -382,14 +404,30 @@ async function lookupAppointments(
   );
   const appointments = await context.store.listByIdentity({
     identityHash: identity.value,
+    lookupIdentityHash: identity.lookupHash,
+    lookupIdentityKey: identity.lookupKey,
     limit: 10,
     maxStart,
     minEnd: context.now,
     projectId: context.projectId,
     providerId: context.providerId,
   });
+  const matchingAppointments = appointments.filter((appointment) =>
+    appointmentMatchesIdentity(appointment, identity),
+  );
+  if (matchingAppointments.length === 0) {
+    return completed("no_result", {
+      appointments: [],
+      ...(appointments.length > 0 ? { reason: "identity_mismatch" } : {}),
+    });
+  }
   const verified: GoogleCalendarAppointment[] = [];
-  for (const appointment of appointments) {
+  for (const candidate of matchingAppointments) {
+    const appointment = await upgradeLegacyIdentity(
+      context,
+      candidate,
+      identity,
+    );
     try {
       const event = await context.api.getEvent(appointment.remoteEventId);
       if (event.status === "cancelled") {
@@ -429,13 +467,22 @@ async function rescheduleAppointment(
   if (!parsed.success) return rejected("invalid_reschedule_request");
   const identity = identityHash(context, parsed.data);
   if (!identity.ok) return rejected(identity.reason);
-  const appointment = await context.store.findByReference({
+  let appointment = await context.store.findByReference({
     identityHash: identity.value,
+    lookupIdentityHash: identity.lookupHash,
+    lookupIdentityKey: identity.lookupKey,
     projectId: context.projectId,
     providerId: context.providerId,
     reference: parsed.data.appointmentRef,
   });
-  if (!appointment || appointment.status !== "active") {
+  if (!appointment) {
+    return completed("no_result", { reason: "appointment_not_found" });
+  }
+  if (!appointmentMatchesIdentity(appointment, identity)) {
+    return completed("no_result", { reason: "identity_mismatch" });
+  }
+  appointment = await upgradeLegacyIdentity(context, appointment, identity);
+  if (appointment.status !== "active") {
     return completed("no_result", { reason: "appointment_not_found" });
   }
   const interval = validateAppointmentStart(
@@ -539,14 +586,20 @@ async function cancelAppointment(
   if (!parsed.success) return rejected("invalid_cancel_request");
   const identity = identityHash(context, parsed.data);
   if (!identity.ok) return rejected(identity.reason);
-  const appointment = await context.store.findByReference({
+  let appointment = await context.store.findByReference({
     identityHash: identity.value,
+    lookupIdentityHash: identity.lookupHash,
+    lookupIdentityKey: identity.lookupKey,
     projectId: context.projectId,
     providerId: context.providerId,
     reference: parsed.data.appointmentRef,
   });
   if (!appointment)
     return completed("no_result", { reason: "appointment_not_found" });
+  if (!appointmentMatchesIdentity(appointment, identity)) {
+    return completed("no_result", { reason: "identity_mismatch" });
+  }
+  appointment = await upgradeLegacyIdentity(context, appointment, identity);
   if (appointment.status === "cancelled") {
     return completed("success", { appointmentRef: appointment.reference });
   }
@@ -620,13 +673,18 @@ async function saveUnknownBooking(input: {
   eventId: string;
   existing: GoogleCalendarAppointment | null;
   identityHash: string;
+  lookupIdentityHash: string;
+  lookupIdentityKey: string;
   operationKeyHash: string;
   start: Date;
+  verificationIdentityHash: string;
 }) {
   if (input.existing) return input.existing;
   return input.context.store.save({
     endAt: input.end,
     identityHash: input.identityHash,
+    lookupIdentityHash: input.lookupIdentityHash,
+    lookupIdentityKey: input.lookupIdentityKey,
     operationKeyHash: input.operationKeyHash,
     projectId: input.context.projectId,
     providerId: input.context.providerId,
@@ -635,6 +693,7 @@ async function saveUnknownBooking(input: {
     remoteEventId: input.eventId,
     startAt: input.start,
     status: "outcome_unknown",
+    verificationIdentityHash: input.verificationIdentityHash,
   });
 }
 
@@ -643,23 +702,31 @@ async function persistBooking(input: {
   end: Date;
   existing: GoogleCalendarAppointment | null;
   identityHash: string;
+  lookupIdentityHash: string;
+  lookupIdentityKey: string;
   operationKeyHash: string;
   start: Date;
+  verificationIdentityHash: string;
   verified: GoogleCalendarEvent;
 }) {
   return input.existing
     ? input.context.store.update({
         endAt: input.end,
         id: input.existing.id,
+        lookupIdentityHash: input.lookupIdentityHash,
+        lookupIdentityKey: input.lookupIdentityKey,
         projectId: input.context.projectId,
         providerId: input.context.providerId,
         remoteEtag: input.verified.etag,
         startAt: input.start,
         status: "active",
+        verificationIdentityHash: input.verificationIdentityHash,
       })
     : input.context.store.save({
         endAt: input.end,
         identityHash: input.identityHash,
+        lookupIdentityHash: input.lookupIdentityHash,
+        lookupIdentityKey: input.lookupIdentityKey,
         operationKeyHash: input.operationKeyHash,
         projectId: input.context.projectId,
         providerId: input.context.providerId,
@@ -668,6 +735,7 @@ async function persistBooking(input: {
         remoteEventId: input.verified.id,
         startAt: input.start,
         status: "active",
+        verificationIdentityHash: input.verificationIdentityHash,
       });
 }
 
@@ -737,21 +805,104 @@ function eventMatches(event: GoogleCalendarEvent, start: Date, end: Date) {
 function identityHash(
   context: OperationContext,
   payload: Record<string, unknown>,
-): { ok: true; value: string } | { ok: false; reason: string } {
+):
+  | {
+      lookupHash: string;
+      lookupKey: string;
+      ok: true;
+      value: string;
+      verificationHash: string;
+    }
+  | { ok: false; reason: string } {
   const values: string[] = [];
+  const lookupKey = getPrimaryIdentityFactor(context.config);
+  const verificationValues: string[] = [];
+  let lookupValue = "";
   for (const factor of context.config.identityFactors) {
     const value = payload[factor];
     if (typeof value !== "string" || !value.trim()) {
       return { ok: false, reason: "identity_required" };
     }
-    values.push(`${factor}:${normalizeIdentityValue(value)}`);
+    const normalized = normalizeIdentityValue(value);
+    values.push(`${factor}:${normalized}`);
+    if (factor === lookupKey) {
+      lookupValue = normalizeLookupIdentityValue(factor, value);
+    } else {
+      verificationValues.push(`${factor}:${normalized}`);
+    }
   }
+  if (!lookupValue) return { ok: false, reason: "identity_invalid" };
+  const scope = `${context.projectId}:${context.providerId}`;
   return {
+    lookupHash: createHmac("sha256", context.identitySecret)
+      .update(`${scope}:lookup:${lookupKey}:${lookupValue}`)
+      .digest("hex"),
+    lookupKey,
     ok: true,
     value: createHmac("sha256", context.identitySecret)
-      .update(`${context.projectId}:${context.providerId}:${values.join("|")}`)
+      .update(`${scope}:${values.join("|")}`)
+      .digest("hex"),
+    verificationHash: createHmac("sha256", context.identitySecret)
+      .update(`${scope}:verification:${verificationValues.join("|")}`)
       .digest("hex"),
   };
+}
+
+function getPrimaryIdentityFactor(config: GoogleCalendarConfig) {
+  if (config.primaryIdentityFactor) return config.primaryIdentityFactor;
+  return (
+    config.identityFactors.find((factor) =>
+      /phone|mobile|contactnumber|telephone/i.test(factor),
+    ) ?? config.identityFactors[0]
+  );
+}
+
+function normalizeLookupIdentityValue(factor: string, value: string) {
+  if (/phone|mobile|contactnumber|telephone/i.test(factor)) {
+    const digits = value.replace(/\D/g, "");
+    return digits.length >= 7 && digits.length <= 15 ? digits : "";
+  }
+  return normalizeIdentityValue(value);
+}
+
+function appointmentMatchesIdentity(
+  appointment: GoogleCalendarAppointment,
+  identity: Extract<ReturnType<typeof identityHash>, { ok: true }>,
+) {
+  if (
+    !appointment.lookupIdentityKey ||
+    !appointment.lookupIdentityHash ||
+    !appointment.verificationIdentityHash
+  ) {
+    return appointment.identityHash === identity.value;
+  }
+  return (
+    appointment.lookupIdentityKey === identity.lookupKey &&
+    appointment.lookupIdentityHash === identity.lookupHash &&
+    appointment.verificationIdentityHash === identity.verificationHash
+  );
+}
+
+async function upgradeLegacyIdentity(
+  context: OperationContext,
+  appointment: GoogleCalendarAppointment,
+  identity: Extract<ReturnType<typeof identityHash>, { ok: true }>,
+) {
+  if (
+    appointment.lookupIdentityKey &&
+    appointment.lookupIdentityHash &&
+    appointment.verificationIdentityHash
+  ) {
+    return appointment;
+  }
+  return context.store.update({
+    id: appointment.id,
+    lookupIdentityHash: identity.lookupHash,
+    lookupIdentityKey: identity.lookupKey,
+    projectId: context.projectId,
+    providerId: context.providerId,
+    verificationIdentityHash: identity.verificationHash,
+  });
 }
 
 type AppointmentInterval =

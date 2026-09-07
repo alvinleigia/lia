@@ -543,6 +543,9 @@ export const googleCalendarAppointments = pgTable(
     remoteEventId: text("remote_event_id").notNull(),
     remoteEtag: text("remote_etag").notNull(),
     identityHash: text("identity_hash").notNull(),
+    lookupIdentityKey: text("lookup_identity_key"),
+    lookupIdentityHash: text("lookup_identity_hash"),
+    verificationIdentityHash: text("verification_identity_hash"),
     operationKeyHash: text("operation_key_hash").notNull(),
     startAt: timestamp("start_at").notNull(),
     endAt: timestamp("end_at").notNull(),
@@ -556,6 +559,13 @@ export const googleCalendarAppointments = pgTable(
       table.projectId,
       table.providerId,
       table.identityHash,
+      table.status,
+    ),
+    index("google_calendar_appointments_lookup_identity_idx").on(
+      table.projectId,
+      table.providerId,
+      table.lookupIdentityKey,
+      table.lookupIdentityHash,
       table.status,
     ),
     index("google_calendar_appointments_start_idx").on(

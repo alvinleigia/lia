@@ -41,6 +41,12 @@ const config = {
   workingDays: [1, 2, 3, 4, 5],
 };
 
+const phoneIdentityConfig = {
+  ...config,
+  identityFactors: ["patientName", "contactNumber"],
+  primaryIdentityFactor: "contactNumber",
+};
+
 test("Google Calendar credentials are encrypted by the project provider boundary", () => {
   const prepared = prepareProviderConfig(config);
   expect(isProviderSecretReference(prepared.config.privateKey)).toBe(true);
@@ -332,6 +338,7 @@ test("lookup, reschedule, and cancel require identity and never expose Google ID
   );
   expect(wrongIdentity.responsePayload).toEqual({
     appointments: [],
+    reason: "identity_mismatch",
     status: "no_result",
   });
 
@@ -376,6 +383,63 @@ test("lookup, reschedule, and cancel require identity and never expose Google ID
   });
   expect(cancelReplay.responsePayload).toEqual(cancelled.responsePayload);
   expect(api.deleteCalls).toBe(1);
+});
+
+test("phone number selects appointment candidates before name verification", async () => {
+  const api = new MemoryGoogleCalendarApi();
+  const store = new MemoryAppointmentStore();
+  const context = {
+    ...fixture({ api, idempotencyKey: "phone-identity-book", store }),
+    config: phoneIdentityConfig,
+  };
+  const booked = await execute(context, "google_calendar.book", {
+    contactNumber: "+61 400 000 000",
+    patientName: "Ava Example",
+    start: MONDAY_NINE,
+  });
+  expect(booked.responsePayload.status).toBe("success");
+
+  const misheardName = await execute(
+    { ...context, idempotencyKey: "phone-identity-misheard-name" },
+    "google_calendar.lookup",
+    {
+      contactNumber: "+61 (400) 000-000",
+      patientName: "Eva Example",
+    },
+  );
+  expect(misheardName.responsePayload).toEqual({
+    appointments: [],
+    reason: "identity_mismatch",
+    status: "no_result",
+  });
+
+  const verified = await execute(
+    { ...context, idempotencyKey: "phone-identity-verified" },
+    "google_calendar.lookup",
+    {
+      contactNumber: "61400000000",
+      patientName: "  AVA   EXAMPLE ",
+    },
+  );
+  expect(verified.responsePayload).toMatchObject({
+    appointments: [{ appointmentRef: booked.responsePayload.appointmentRef }],
+    status: "success",
+  });
+
+  const refusedCancellation = await execute(
+    { ...context, idempotencyKey: "phone-identity-refused-cancel" },
+    "google_calendar.cancel",
+    {
+      appointmentRef: booked.responsePayload.appointmentRef,
+      contactNumber: "61400000000",
+      patientName: "Eva Example",
+    },
+  );
+  expect(refusedCancellation.responsePayload).toEqual({
+    reason: "identity_mismatch",
+    status: "no_result",
+  });
+  expect(api.deleteCalls).toBe(0);
 });
 
 test("an uncertain booking reconciles its deterministic event before retry", async () => {
@@ -600,6 +664,8 @@ class MemoryAppointmentStore implements GoogleCalendarAppointmentStore {
 
   async findByReference(input: {
     identityHash: string;
+    lookupIdentityHash: string;
+    lookupIdentityKey: string;
     projectId: number;
     providerId: number;
     reference: string;
@@ -607,16 +673,21 @@ class MemoryAppointmentStore implements GoogleCalendarAppointmentStore {
     return (
       this.appointments.find(
         (appointment) =>
-          appointment.identityHash === input.identityHash &&
           appointment.projectId === input.projectId &&
           appointment.providerId === input.providerId &&
-          appointment.reference === input.reference,
+          appointment.reference === input.reference &&
+          ((appointment.lookupIdentityKey === input.lookupIdentityKey &&
+            appointment.lookupIdentityHash === input.lookupIdentityHash) ||
+            (!appointment.lookupIdentityHash &&
+              appointment.identityHash === input.identityHash)),
       ) ?? null
     );
   }
 
   async listByIdentity(input: {
     identityHash: string;
+    lookupIdentityHash: string;
+    lookupIdentityKey: string;
     limit: number;
     maxStart: Date;
     minEnd: Date;
@@ -626,9 +697,12 @@ class MemoryAppointmentStore implements GoogleCalendarAppointmentStore {
     return this.appointments
       .filter(
         (appointment) =>
-          appointment.identityHash === input.identityHash &&
           appointment.projectId === input.projectId &&
           appointment.providerId === input.providerId &&
+          ((appointment.lookupIdentityKey === input.lookupIdentityKey &&
+            appointment.lookupIdentityHash === input.lookupIdentityHash) ||
+            (!appointment.lookupIdentityHash &&
+              appointment.identityHash === input.identityHash)) &&
           appointment.status === "active" &&
           appointment.endAt >= input.minEnd &&
           appointment.startAt <= input.maxStart,
@@ -650,11 +724,14 @@ class MemoryAppointmentStore implements GoogleCalendarAppointmentStore {
   async update(input: {
     endAt?: Date;
     id: number;
+    lookupIdentityHash?: string;
+    lookupIdentityKey?: string;
     projectId: number;
     providerId: number;
     remoteEtag?: string;
     startAt?: Date;
     status?: "active" | "cancelled" | "outcome_unknown";
+    verificationIdentityHash?: string;
   }) {
     const appointment = this.appointments.find(
       (candidate) =>
@@ -664,9 +741,15 @@ class MemoryAppointmentStore implements GoogleCalendarAppointmentStore {
     );
     if (!appointment) throw new Error("Appointment not found.");
     if (input.endAt) appointment.endAt = new Date(input.endAt);
+    if (input.lookupIdentityHash)
+      appointment.lookupIdentityHash = input.lookupIdentityHash;
+    if (input.lookupIdentityKey)
+      appointment.lookupIdentityKey = input.lookupIdentityKey;
     if (input.remoteEtag) appointment.remoteEtag = input.remoteEtag;
     if (input.startAt) appointment.startAt = new Date(input.startAt);
     if (input.status) appointment.status = input.status;
+    if (input.verificationIdentityHash)
+      appointment.verificationIdentityHash = input.verificationIdentityHash;
     return appointment;
   }
 }

@@ -218,6 +218,12 @@ test("one provider-neutral definition compiles through Telnyx and a second provi
     "clarify only that factor",
   );
   expect(telnyx.managedConfig.instructions).toContain(
+    "If a lookup returns identity_mismatch",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "repeat or spell only the remaining verification factor",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
     "configured transfer tool",
   );
   expect(JSON.stringify(telnyx.definition)).not.toContain("Telnyx");

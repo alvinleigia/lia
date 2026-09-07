@@ -27,6 +27,11 @@ export const googleCalendarConfigSchema = z
       )
       .min(1)
       .max(5),
+    primaryIdentityFactor: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-zA-Z0-9_]{0,79}$/)
+      .optional(),
     openTime: z
       .string()
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
@@ -51,6 +56,16 @@ export const googleCalendarConfigSchema = z
   })
   .strict()
   .superRefine((config, context) => {
+    if (
+      config.primaryIdentityFactor &&
+      !config.identityFactors.includes(config.primaryIdentityFactor)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Primary identity factor must be one of the identity factors.",
+        path: ["primaryIdentityFactor"],
+      });
+    }
     if (
       minutesSinceMidnight(config.openTime) >=
       minutesSinceMidnight(config.closeTime)
