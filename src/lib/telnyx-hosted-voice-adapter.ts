@@ -175,6 +175,18 @@ const telnyxAssistantSchema = z
   })
   .passthrough();
 
+const telnyxAssistantVersionListSchema = z
+  .object({
+    data: z.array(
+      z
+        .object({
+          version_id: z.string().trim().min(1),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
 const telnyxCanaryRuleSchema = z.object({
   match: z
     .array(
@@ -211,6 +223,10 @@ type TelnyxHostedVoiceToolSetupEntry = z.infer<
 
 export type TelnyxHostedVoiceAdapter =
   HostedVoiceProviderAdapter<TelnyxHostedAssistantManagedConfig> & {
+    cleanupObsoleteVersions(input: {
+      assistantId: string;
+      protectedVersionIds: string[];
+    }): Promise<{ deletedVersionIds: string[] }>;
     inspectIntegrationSecret(input: {
       identifier: string;
     }): Promise<{ id: string; updatedAt: string }>;
@@ -379,6 +395,42 @@ export function createTelnyxHostedVoiceAdapter(input: {
 
   return {
     ...compiler,
+    async cleanupObsoleteVersions({ assistantId, protectedVersionIds }) {
+      const encodedAssistantId = encodeURIComponent(assistantId);
+      const main = await request(`/ai/assistants/${encodedAssistantId}`);
+      if (!main) {
+        throw new TelnyxHostedVoiceApiError(
+          "Telnyx Assistant inspection returned no configuration.",
+          false,
+          null,
+        );
+      }
+      const { payload, status } = await requestPayload(
+        `/ai/assistants/${encodedAssistantId}/versions`,
+        undefined,
+        "Telnyx Assistant version list",
+      );
+      const versions = telnyxAssistantVersionListSchema.safeParse(payload);
+      if (!versions.success) {
+        throw new TelnyxHostedVoiceApiError(
+          "Telnyx returned an invalid Assistant version list.",
+          false,
+          status,
+        );
+      }
+      const protectedIds = new Set([main.version_id, ...protectedVersionIds]);
+      const deletedVersionIds: string[] = [];
+      for (const version of versions.data.data) {
+        if (protectedIds.has(version.version_id)) continue;
+        await requestPayload(
+          `/ai/assistants/${encodedAssistantId}/versions/${encodeURIComponent(version.version_id)}`,
+          { method: "DELETE" },
+          "Telnyx obsolete Assistant version cleanup",
+        );
+        deletedVersionIds.push(version.version_id);
+      }
+      return { deletedVersionIds };
+    },
     async createDraft({
       definitionHash,
       managedConfig,

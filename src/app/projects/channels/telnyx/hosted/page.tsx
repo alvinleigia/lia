@@ -30,6 +30,7 @@ import {
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
 import {
+  cleanupHostedVoiceVersionsAction,
   discardHostedVoiceCandidateAction,
   inspectHostedVoiceDeploymentAction,
   promoteHostedVoiceCandidateAction,
@@ -451,7 +452,7 @@ export default async function TelnyxHostedVoicePage() {
                 Drift, promotion, and rollback
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-5 lg:grid-cols-4">
+            <CardContent className="grid gap-5 lg:grid-cols-5">
               <LifecycleForm
                 action={inspectHostedVoiceDeploymentAction}
                 deploymentId={deployment.id}
@@ -480,6 +481,13 @@ export default async function TelnyxHostedVoicePage() {
                 deploymentId={deployment.id}
                 disabled={!deployment.rollbackRemoteVersionId}
                 label="Promote rollback target"
+              />
+              <LifecycleForm
+                action={cleanupHostedVoiceVersionsAction}
+                confirmLabel="Delete every version except remote MAIN and the Lia candidate"
+                confirmValue="cleanup"
+                deploymentId={deployment.id}
+                label="Delete obsolete versions"
               />
             </CardContent>
           </Card>

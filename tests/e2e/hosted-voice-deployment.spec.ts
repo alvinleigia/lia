@@ -212,6 +212,56 @@ test("Telnyx adapter uses version inspection and promotion endpoints", async () 
   expect(methods).toEqual(["GET", "POST"]);
 });
 
+test("Telnyx adapter deletes only versions outside the protected keep-set", async () => {
+  const requests: Array<{ method: string; url: string }> = [];
+  const fetchImpl: typeof fetch = async (url, init) => {
+    const request = {
+      method: init?.method ?? "GET",
+      url: String(url),
+    };
+    requests.push(request);
+    if (request.url.endsWith("/versions")) {
+      return Response.json({
+        data: [
+          { version_id: "candidate-2" },
+          { version_id: "main-1" },
+          { version_id: "obsolete-3" },
+        ],
+      });
+    }
+    if (request.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    return Response.json(telnyxResponse("main-1"));
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  await expect(
+    adapter.cleanupObsoleteVersions({
+      assistantId: "assistant-1",
+      protectedVersionIds: ["candidate-2"],
+    }),
+  ).resolves.toEqual({ deletedVersionIds: ["obsolete-3"] });
+  expect(requests).toEqual([
+    {
+      method: "GET",
+      url: "https://api.telnyx.com/v2/ai/assistants/assistant-1",
+    },
+    {
+      method: "GET",
+      url: "https://api.telnyx.com/v2/ai/assistants/assistant-1/versions",
+    },
+    {
+      method: "DELETE",
+      url: "https://api.telnyx.com/v2/ai/assistants/assistant-1/versions/obsolete-3",
+    },
+  ]);
+});
+
 test("Telnyx adapter finds the exact Integration Secret without exposing its value", async () => {
   const urls: string[] = [];
   const fetchImpl: typeof fetch = async (url) => {

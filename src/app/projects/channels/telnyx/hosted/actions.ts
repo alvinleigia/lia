@@ -459,6 +459,52 @@ export async function discardHostedVoiceCandidateAction(
   );
 }
 
+export async function cleanupHostedVoiceVersionsAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  if (formData.get("confirm") !== "cleanup") {
+    return {
+      error:
+        "Confirm that only remote MAIN and the Lia candidate should remain.",
+    };
+  }
+  return runDeploymentAction(
+    formData,
+    async ({ adapter, context, deploymentId, projectId }) => {
+      const deployment =
+        await telnyxHostedVoiceDeploymentRepository.findDeploymentById({
+          deploymentId,
+          projectId,
+        });
+      if (!deployment?.remoteAssistantId) {
+        throw new Error("Hosted voice deployment was not found.");
+      }
+      const protectedVersionIds = [
+        deployment.mainRemoteVersionId,
+        deployment.candidateRemoteVersionId,
+      ].filter((value): value is string => Boolean(value));
+      const result = await adapter.cleanupObsoleteVersions({
+        assistantId: deployment.remoteAssistantId,
+        protectedVersionIds,
+      });
+      await writeAuditLog({
+        ...context,
+        action: "hosted_voice.obsolete_versions_deleted",
+        metadata: {
+          deletedVersionIds: result.deletedVersionIds,
+          protectedVersionIds,
+        },
+        targetId: String(deployment.id),
+        targetType: "hosted_voice_deployment",
+      });
+      return result.deletedVersionIds.length === 0
+        ? "No obsolete Telnyx Assistant versions were found."
+        : `${result.deletedVersionIds.length} obsolete Telnyx Assistant version(s) were deleted. MAIN and the Lia candidate were preserved.`;
+    },
+  );
+}
+
 export async function rollbackHostedVoiceDeploymentAction(
   _previousState: ActionFormState,
   formData: FormData,
@@ -486,6 +532,7 @@ async function runDeploymentAction(
     adapter: Awaited<
       ReturnType<typeof getProjectTelnyxHostedVoiceProvider>
     >["adapter"];
+    context: Awaited<ReturnType<typeof resolveUserAndProject>>;
     deploymentId: number;
     projectId: number;
   }) => Promise<string>,
@@ -509,6 +556,7 @@ async function runDeploymentAction(
     });
     const success = await execute({
       adapter,
+      context,
       deploymentId: deploymentId.data,
       projectId: context.project.id,
     });
