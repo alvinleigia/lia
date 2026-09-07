@@ -384,7 +384,7 @@ function buildToolSetupEntries(baseUrl: string, tool: ToolDefinitionV1) {
         async: tool.execution.mode === "asynchronous",
         baseUrl,
         bodyParameters: buildBodyParameters(tool),
-        description: `${tool.description} Reuse every required verification value already supplied unambiguously or confirmed in this conversation; do not ask the caller to repeat it. If one value conflicts or is uncertain, clarify only that value.`,
+        description: `${tool.description} This tool's successful result is the only approved source for the operational records or availability it describes. When the caller asks for that data, call this tool after its required inputs are known; never substitute memory, examples, retrieval content, model inference, or caller claims. If it does not return a matching result, do not invent or reveal one. Reuse every required verification value already supplied unambiguously or confirmed in this conversation; do not ask the caller to repeat it. If one value conflicts or is uncertain, clarify only that value.`,
         phase: "read",
         timeoutMs: tool.execution.timeoutMs,
         tool,

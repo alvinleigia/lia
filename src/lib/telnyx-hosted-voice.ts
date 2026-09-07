@@ -90,6 +90,10 @@ function compileGreeting(definition: VoiceAgentDefinitionV1) {
 }
 
 function compileInstructions(definition: VoiceAgentDefinitionV1) {
+  const appointmentDataPolicy =
+    "- Appointment data boundary (mandatory): For every request to find, view, list, verify, reschedule, or cancel an existing appointment, call an approved appointment lookup tool after collecting only that tool's required inputs. The most recent successful approved lookup result is the only source of truth for appointment existence, name, date, time, service, location, status, or reference. Never use memory, prior examples, general knowledge, retrieval or knowledge-base content, model inference, or caller-supplied claims as appointment data. If no approved lookup tool returns a matching appointment, say that you cannot verify an appointment and reveal no appointment details. Do not present, summarize, reschedule, or cancel an appointment without that successful result.";
+  const callerContactPolicy =
+    "- Caller contact: On a phone call, use {{telnyx_end_user_target}} as contactNumber when it is a valid phone number. Ask for a contact number only when that value is missing or invalid, or the caller says the appointment used a different number. Treat the number only as a lookup input; every configured verification factor and a successful approved lookup are still required.";
   const identityPolicy =
     definition.identity.defaultRequirement === "verified"
       ? `- Identity: Before using a tool that accesses or changes an existing appointment, collect every configured verification factor: ${definition.identity.verificationFactors.join(", ")}. Reuse unambiguous verification values already supplied or confirmed in this conversation, including the latest prepared or verified appointment action; do not ask for them again. If speech recognition produces a conflicting or uncertain value, clarify only that factor and preserve the prior confirmed value until the caller corrects it. If a lookup returns identity_mismatch, the primary lookup matched but another verification factor did not; do not say that no appointment exists, reveal any appointment details, or repeat every question. Ask the caller to repeat or spell only the remaining verification factor, then retry the lookup. Treat the caller as verified only after an approved lookup tool returns a matching appointment. Do not reveal appointment details or prepare or commit a change before verification succeeds.`
@@ -106,8 +110,10 @@ function compileInstructions(definition: VoiceAgentDefinitionV1) {
     definition.instructions,
     "Lia managed policies:",
     `- Locale: Speak ${definition.locale.language} and interpret dates and times in ${definition.locale.timezone}.`,
+    callerContactPolicy,
+    appointmentDataPolicy,
     identityPolicy,
-    "- Writes: Once all required inputs are known, call the prepare tool immediately; do not recap or ask for confirmation first. After prepare returns, give one concise summary of that exact action, ask exactly one explicit caller confirmation, and stop. Call commit only after a later caller message explicitly confirms the prepared action. Confirmation given before prepare is invalid. If the caller corrects a field, prepare the corrected action and ask one new confirmation. Copy the returned short commit token exactly; never type, edit, reconstruct, or reuse it. Never claim success unless the approved tool returns verified success.",
+    "- Writes: Once all required inputs are known, call the prepare tool immediately; do not recap or ask for confirmation first. A request to cancel or reschedule is not confirmation. Never present a cancellation or reschedule summary or ask for confirmation until the prepare tool returns. After prepare returns, give one concise summary of that exact action, ask exactly one explicit caller confirmation, and stop. Call commit only after a later caller message explicitly confirms the prepared action. Confirmation given before prepare is invalid. If the caller corrects a field, prepare the corrected action and ask one new confirmation. Copy the returned short commit token exactly; never type, edit, reconstruct, or reuse it. Never claim success unless the approved tool returns verified success.",
     handoffPolicy,
   ].join("\\n\\n");
 }

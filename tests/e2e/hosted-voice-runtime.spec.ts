@@ -308,6 +308,15 @@ test("Telnyx candidate setup preserves Lia's read and two-phase write boundary",
     "do not ask the caller to repeat it",
   );
   expect(manifest.tools[0]?.description).toContain("clarify only that value");
+  expect(manifest.tools[0]?.description).toContain(
+    "only approved source for the operational records or availability",
+  );
+  expect(manifest.tools[0]?.description).toContain(
+    "never substitute memory, examples, retrieval content, model inference, or caller claims",
+  );
+  expect(manifest.tools[0]?.description).toContain(
+    "do not invent or reveal one",
+  );
   const serialized = JSON.stringify(manifest);
   expect(serialized).not.toContain("private-calendar");
   expect(serialized).not.toContain("Bearer ");

@@ -195,7 +195,22 @@ test("one provider-neutral definition compiles through Telnyx and a second provi
     "dateOfBirth, patientName",
   );
   expect(telnyx.managedConfig.instructions).toContain(
+    "use {{telnyx_end_user_target}} as contactNumber",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "Ask for a contact number only when that value is missing or invalid",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
     "only after an approved lookup tool returns a matching appointment",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "most recent successful approved lookup result is the only source of truth",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "retrieval or knowledge-base content",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "If no approved lookup tool returns a matching appointment",
   );
   expect(telnyx.managedConfig.instructions).toContain(
     "ask exactly one explicit caller confirmation",
@@ -211,6 +226,12 @@ test("one provider-neutral definition compiles through Telnyx and a second provi
   );
   expect(telnyx.managedConfig.instructions).toContain(
     "Confirmation given before prepare is invalid",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "A request to cancel or reschedule is not confirmation",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "Never present a cancellation or reschedule summary or ask for confirmation until the prepare tool returns",
   );
   expect(telnyx.managedConfig.instructions).toContain(
     "Reuse unambiguous verification values already supplied or confirmed",
