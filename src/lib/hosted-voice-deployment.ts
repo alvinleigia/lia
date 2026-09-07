@@ -503,5 +503,14 @@ async function requireDeployment<TManagedConfig>(input: {
 }
 
 function buildVersionName(definitionKey: string, definitionHash: string) {
-  return `Lia ${definitionKey} ${definitionHash.slice(0, 8)}`.slice(0, 50);
+  const hashSuffix = ` ${definitionHash.slice(0, 8)}`;
+  const definitionLabel = definitionKey
+    .replace(/^lia[_\-\s]+/i, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((word) => `${word[0]?.toUpperCase()}${word.slice(1).toLowerCase()}`)
+    .join(" ");
+  const name = `Lia ${definitionLabel || "Hosted Voice"}`;
+  return `${name.slice(0, 50 - hashSuffix.length)}${hashSuffix}`;
 }

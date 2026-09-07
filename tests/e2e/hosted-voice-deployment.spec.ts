@@ -870,6 +870,9 @@ test("candidate deployment, promotion, and rollback preserve verified versions",
     "main",
     "candidate",
   ]);
+  expect(adapter.lastVersionName).toMatch(
+    /^Lia Dental Receptionist [a-f0-9]{8}$/,
+  );
 
   const promoted = await promoteHostedVoiceCandidate({
     adapter,
@@ -1104,6 +1107,7 @@ class MemoryAdapter
   readonly versions = new Map<string, TelnyxHostedAssistantManagedConfig>();
   createCount = 0;
   currentVersionId: string | null = null;
+  lastVersionName: string | null = null;
   nextVersion = 1;
 
   compile = this.compiler.compile;
@@ -1115,6 +1119,7 @@ class MemoryAdapter
     versionName: string;
   }) {
     this.createCount += 1;
+    this.lastVersionName = input.versionName;
     let previousMainVersionId: string | null = null;
     if (!input.remoteAssistantId) {
       previousMainVersionId = `main-${this.nextVersion++}`;
