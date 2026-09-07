@@ -442,7 +442,10 @@ test("asynchronous reads acknowledge pending once without blocking the call", as
     executor,
     repository,
   });
-  expect(first).toEqual({ status: "pending" });
+  expect(first).toEqual({
+    assistantInstruction: 'Say only "One moment."',
+    status: "pending",
+  });
   expect(replay).toEqual(first);
   expect(executor.calls).toHaveLength(0);
   expect(executor.queued).toEqual([{ callId: 1, projectId: 10 }]);
@@ -498,7 +501,10 @@ test("an asynchronous committed write stays pending and cannot enqueue twice", a
     executor,
     repository,
   });
-  expect(first).toEqual({ status: "pending" });
+  expect(first).toEqual({
+    assistantInstruction: 'Say only "One moment."',
+    status: "pending",
+  });
   expect(replay).toEqual(first);
   expect(executor.calls).toHaveLength(0);
   expect(executor.queued).toEqual([{ callId: 1, projectId: 10 }]);

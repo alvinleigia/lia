@@ -16,6 +16,10 @@ import {
 export { HostedVoiceToolRequestError } from "@/lib/hosted-voice-tool-contract";
 
 const COMMIT_TOKEN_TTL_MS = 5 * 60 * 1000;
+const PENDING_RESPONSE = {
+  assistantInstruction: 'Say only "One moment."',
+  status: "pending" as const,
+};
 const FORBIDDEN_SCOPE_KEYS = new Set([
   "calendarid",
   "companyid",
@@ -252,7 +256,7 @@ export async function executeHostedVoiceToolEnvelope(input: {
       executionMode === "asynchronous" &&
       ["pending", "executing"].includes(reserved.call.status)
     ) {
-      return { status: "pending" as const };
+      return PENDING_RESPONSE;
     }
     throw new HostedVoiceToolRequestError(
       "tool_call_in_progress",
@@ -347,7 +351,7 @@ async function commitHostedVoiceTool(input: {
   if (claimed.state === "completed" && claimed.call.result) {
     return { result: claimed.call.result, status: "completed" as const };
   }
-  if (claimed.state === "pending") return { status: "pending" as const };
+  if (claimed.state === "pending") return PENDING_RESPONSE;
   if (input.binding.definition.execution.mode === "asynchronous") {
     return queueAndAcknowledge({
       call: claimed.call,
@@ -435,7 +439,7 @@ async function queueAndAcknowledge(input: {
       callId: input.call.id,
       projectId: input.call.projectId,
     });
-    return { status: "pending" as const };
+    return PENDING_RESPONSE;
   } catch {
     await input.repository.fail({
       call: input.call,
