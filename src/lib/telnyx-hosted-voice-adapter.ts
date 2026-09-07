@@ -853,6 +853,24 @@ export function createTelnyxHostedVoiceAdapter(input: {
         );
       }
 
+      if (assistantId && verificationToolId) {
+        try {
+          await requestPayload(
+            `/ai/assistants/${encodeURIComponent(assistantId)}/tools/${encodeURIComponent(verificationToolId)}`,
+            { method: "DELETE" },
+            "Telnyx no-call verification tool detachment",
+          );
+          steps.push(
+            `Detached temporary signed tool …${shortTelnyxId(verificationToolId)} from temporary assistant …${shortTelnyxId(assistantId)}.`,
+          );
+        } catch (error) {
+          steps.push(
+            `Detach temporary signed tool …${shortTelnyxId(verificationToolId)} from temporary assistant …${shortTelnyxId(assistantId)} failed (${getSafeVerificationFailure(error)}).`,
+          );
+          failure ??= error;
+        }
+      }
+
       if (assistantId) {
         try {
           await requestPayload(

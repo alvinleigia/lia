@@ -562,6 +562,7 @@ test("Telnyx adapter executes a shared webhook without a call and removes the te
     method: string;
     url: string;
   }> = [];
+  let verificationToolDetached = false;
   const fetchImpl: typeof fetch = async (url, init) => {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     const request = {
@@ -587,6 +588,15 @@ test("Telnyx adapter executes a shared webhook without a call and removes the te
       });
     }
     if (
+      request.url.endsWith(
+        "/ai/assistants/temporary-assistant/tools/temporary-verification-tool",
+      ) &&
+      request.method === "DELETE"
+    ) {
+      verificationToolDetached = true;
+      return Response.json({});
+    }
+    if (
       request.url.endsWith("/ai/assistants/temporary-assistant") &&
       request.method === "DELETE"
     ) {
@@ -596,6 +606,9 @@ test("Telnyx adapter executes a shared webhook without a call and removes the te
       request.url.endsWith("/ai/tools/temporary-verification-tool") &&
       request.method === "DELETE"
     ) {
+      if (!verificationToolDetached) {
+        return Response.json({ code: 10015 }, { status: 400 });
+      }
       return Response.json({
         deleted: true,
         id: "temporary-verification-tool",
@@ -626,6 +639,7 @@ test("Telnyx adapter executes a shared webhook without a call and removes the te
     "POST",
     "DELETE",
     "DELETE",
+    "DELETE",
   ]);
   expect(requests[1]?.body).toMatchObject({
     type: "webhook",
@@ -649,6 +663,9 @@ test("Telnyx adapter executes a shared webhook without a call and removes the te
   expect(requests[3]?.body.arguments).toMatchObject({
     date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
   });
+  expect(requests[4]?.url).toContain(
+    "/ai/assistants/temporary-assistant/tools/temporary-verification-tool",
+  );
   expect(requests.at(-1)?.url).toContain(
     "/ai/tools/temporary-verification-tool",
   );
@@ -714,12 +731,17 @@ test("Telnyx adapter removes temporary resources after a failed no-call webhook 
     expect.arrayContaining([
       "Generated synthetic arguments: date (string).",
       "Execute the webhook through Telnyx failed (HTTP 400; Lia error missing_provider_conversation; request headers: content-type, x-request-id).",
+      "Detached temporary signed tool …ion-tool from temporary assistant …ssistant.",
       "Deleted temporary assistant …ssistant.",
       "Deleted temporary signed tool …ion-tool.",
     ]),
   );
   expect(JSON.stringify(error.steps)).not.toContain("must-never-be-rendered");
-  expect(requests.slice(-2)).toEqual([
+  expect(requests.slice(-3)).toEqual([
+    {
+      method: "DELETE",
+      url: "https://api.telnyx.com/v2/ai/assistants/temporary-assistant/tools/temporary-verification-tool",
+    },
     {
       method: "DELETE",
       url: "https://api.telnyx.com/v2/ai/assistants/temporary-assistant",
