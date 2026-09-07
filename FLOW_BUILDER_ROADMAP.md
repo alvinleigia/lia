@@ -1630,6 +1630,19 @@ the Assistant spoke to the caller. The pending acknowledgement remained
 truthful and caller barge-in did not duplicate an operation. Live find,
 reschedule, cancel, and the remaining hosted-assistant call matrix are next.
 
+The first live find/reschedule/cancel attempt on 2026-09-07 exposed three
+hosted-provider defects before that lifecycle could be accepted: confirmation
+was requested before prepare, a long commit token was altered by the model, and
+an identical lookup later in the same conversation replayed the pre-cancellation
+11:30 result. The trace used one masked caller identity and one opaque
+appointment reference; cancellation itself returned verified success. Commit
+`cd2062a` replaces embedded commit payloads with short opaque handles, instructs
+prepare to stop until a later caller confirmation, and gives identical reads a
+bounded provider-delivery replay window so a later lookup executes fresh. All
+302 channel-certification tests, TypeScript, focused lint, and the production
+build pass, and both hosted deployments are ready. A single live lifecycle
+retest remains next; the failed call is not accepted as UAT evidence.
+
 Priority 3 exit gate: new channels, models, and tools extend Lia without
 weakening deterministic business control.
 

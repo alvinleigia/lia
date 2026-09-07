@@ -1427,6 +1427,19 @@ Live hosted-assistant evidence on 2026-09-07:
 - [ ] Complete live find, reschedule, and cancellation against this synthetic
       appointment before accepting the complete appointment-lifecycle check.
 
+The first live find/reschedule/cancel attempt did not pass the lifecycle gate.
+The exported Telnyx conversation used the same masked caller identity and the
+same opaque appointment reference throughout. Reschedule and cancellation each
+reached a verified provider result, but the Assistant requested confirmation
+before prepare, one long commit token was altered in transit, and the final
+same-conversation lookup replayed the earlier 11:30 appointment after verified
+cancellation. Commit `cd2062a` bounds identical Telnyx read replay to the
+provider-delivery window, replaces embedded write tokens with short opaque
+handles, and makes prepare explicitly stop for a later caller confirmation
+before commit. All 302 channel-certification tests, TypeScript, focused lint,
+and the production build pass; staging and production deployments are ready.
+Live lifecycle retest remains required before checking the item above.
+
 1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
        the staging number or approved test callers to it.
 2. [ ] Confirm greeting, ordinary conversation, interruption, transfer, and
