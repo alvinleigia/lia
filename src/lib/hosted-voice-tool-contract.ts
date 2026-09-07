@@ -30,8 +30,11 @@ export interface HostedVoiceToolProviderAdapter<TRawRequest> {
 export type TelnyxHostedVoiceToolRequest = {
   body: unknown;
   headers: Headers;
+  receivedAt?: Date;
   verifiedConversationId?: string;
 };
+
+const TELNYX_READ_REPLAY_WINDOW_MS = 5_000;
 
 export const telnyxHostedVoiceToolAdapter: HostedVoiceToolProviderAdapter<TelnyxHostedVoiceToolRequest> =
   {
@@ -57,6 +60,14 @@ export const telnyxHostedVoiceToolAdapter: HostedVoiceToolProviderAdapter<Telnyx
           conversationId,
           input,
           phase,
+          ...(phase === "read"
+            ? {
+                replayWindow: Math.floor(
+                  (raw.receivedAt ?? new Date()).getTime() /
+                    TELNYX_READ_REPLAY_WINDOW_MS,
+                ),
+              }
+            : {}),
           toolId,
         }),
         toolId,

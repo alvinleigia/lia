@@ -107,7 +107,7 @@ function compileInstructions(definition: VoiceAgentDefinitionV1) {
     "Lia managed policies:",
     `- Locale: Speak ${definition.locale.language} and interpret dates and times in ${definition.locale.timezone}.`,
     identityPolicy,
-    "- Writes: Prepare the exact action, summarize it, obtain explicit caller confirmation, and then commit using the returned commit token unchanged. Never claim success unless the approved tool returns verified success.",
+    "- Writes: Call the prepare tool before asking for confirmation. After prepare returns, summarize that exact action, ask for explicit caller confirmation, and stop. Call commit only after a later caller message explicitly confirms the prepared action. Confirmation given before prepare is invalid. Copy the returned short commit token exactly; never type, edit, reconstruct, or reuse it. Never claim success unless the approved tool returns verified success.",
     handoffPolicy,
   ].join("\\n\\n");
 }

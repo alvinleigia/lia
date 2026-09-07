@@ -155,8 +155,9 @@ export const hostedVoiceToolGatewayRepository = {
     executionStatus,
     now,
     projectId,
-    providerCallId,
     tokenHash,
+    toolId,
+    toolVersion,
   }) {
     const [claimed] = await db
       .update(hostedVoiceToolCalls)
@@ -169,7 +170,8 @@ export const hostedVoiceToolGatewayRepository = {
         and(
           eq(hostedVoiceToolCalls.projectId, projectId),
           eq(hostedVoiceToolCalls.bindingId, bindingId),
-          eq(hostedVoiceToolCalls.providerCallId, providerCallId),
+          eq(hostedVoiceToolCalls.toolId, toolId),
+          eq(hostedVoiceToolCalls.toolVersion, toolVersion),
           eq(hostedVoiceToolCalls.phase, "prepare"),
           eq(hostedVoiceToolCalls.status, "prepared"),
           eq(hostedVoiceToolCalls.commitTokenHash, tokenHash),
@@ -185,24 +187,24 @@ export const hostedVoiceToolGatewayRepository = {
         and(
           eq(hostedVoiceToolCalls.projectId, projectId),
           eq(hostedVoiceToolCalls.bindingId, bindingId),
-          eq(hostedVoiceToolCalls.providerCallId, providerCallId),
+          eq(hostedVoiceToolCalls.toolId, toolId),
+          eq(hostedVoiceToolCalls.toolVersion, toolVersion),
+          eq(hostedVoiceToolCalls.phase, "prepare"),
           eq(hostedVoiceToolCalls.commitTokenHash, tokenHash),
-          inArray(hostedVoiceToolCalls.status, [
-            "completed",
-            "executing",
-            "pending",
-          ]),
         ),
       )
       .limit(1);
     if (!existing) return null;
-    return {
-      call: mapCall(existing),
-      state:
-        existing.status === "completed"
-          ? ("completed" as const)
-          : ("pending" as const),
-    };
+    if (existing.status === "completed") {
+      return { call: mapCall(existing), state: "completed" as const };
+    }
+    if (["executing", "pending"].includes(existing.status)) {
+      return { call: mapCall(existing), state: "pending" as const };
+    }
+    if (existing.commitExpiresAt && existing.commitExpiresAt <= now) {
+      return { call: mapCall(existing), state: "expired" as const };
+    }
+    return { call: mapCall(existing), state: "consumed" as const };
   },
 
   async complete({ call, committedAt, result }) {

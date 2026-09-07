@@ -181,6 +181,65 @@ test("Telnyx normalization accepts only a server-verified no-call identity fallb
   ).toThrow(HostedVoiceToolRequestError);
 });
 
+test("Telnyx read retries share only a bounded delivery window", () => {
+  const raw = {
+    body: { date: "2026-09-10" },
+    headers: new Headers({
+      "x-telnyx-call-control-id": "real-call-control-id",
+    }),
+  };
+  const first = telnyxHostedVoiceToolAdapter.normalize({
+    phase: "read",
+    raw: { ...raw, receivedAt: new Date("2026-09-07T00:00:00.000Z") },
+    toolId: "operation:87",
+  });
+  const retry = telnyxHostedVoiceToolAdapter.normalize({
+    phase: "read",
+    raw: { ...raw, receivedAt: new Date("2026-09-07T00:00:04.999Z") },
+    toolId: "operation:87",
+  });
+  const laterRead = telnyxHostedVoiceToolAdapter.normalize({
+    phase: "read",
+    raw: { ...raw, receivedAt: new Date("2026-09-07T00:00:05.000Z") },
+    toolId: "operation:87",
+  });
+
+  expect(retry.providerCallId).toBe(first.providerCallId);
+  expect(laterRead.providerCallId).not.toBe(first.providerCallId);
+});
+
+test("the same Telnyx read executes fresh after the replay window", async () => {
+  const definition = toolDefinition("read");
+  const repository = new MemoryRepository({ definition, provider: "telnyx" });
+  const executor = new MemoryExecutor();
+  const raw = {
+    body: { phone: "+61 412 345 678" },
+    headers: new Headers({
+      "x-telnyx-call-control-id": "real-call-control-id",
+    }),
+  };
+
+  for (const receivedAt of [
+    new Date("2026-09-07T00:00:00.000Z"),
+    new Date("2026-09-07T00:00:05.000Z"),
+  ]) {
+    await executeHostedVoiceToolEnvelope({
+      commitSecret: COMMIT_SECRET,
+      credential: CREDENTIAL,
+      envelope: telnyxHostedVoiceToolAdapter.normalize({
+        phase: "read",
+        raw: { ...raw, receivedAt },
+        toolId: definition.id,
+      }),
+      executor,
+      repository,
+    });
+  }
+
+  expect(repository.calls).toHaveLength(2);
+  expect(executor.calls).toHaveLength(2);
+});
+
 function toolDefinition(
   access: "read" | "write",
   mode: "asynchronous" | "synchronous" = "synchronous",
@@ -350,9 +409,28 @@ test("writes require an expiring single-use token bound to exact canonical input
   });
   expect(prepared.status).toBe("prepared");
   if (prepared.status !== "prepared") throw new Error("Expected preparation.");
-  expect(prepared.commitToken).toBeTruthy();
+  expect(prepared.commitToken).toMatch(/^ct_[A-Za-z0-9_-]{24}$/);
+  expect(prepared.assistantInstruction).toContain(
+    "until a later caller message explicitly confirms",
+  );
   expect(executor.calls).toHaveLength(0);
   expect(JSON.stringify(repository.calls)).not.toContain(prepared.commitToken);
+
+  const mutatedToken = `${prepared.commitToken.slice(0, -1)}${
+    prepared.commitToken.endsWith("A") ? "B" : "A"
+  }`;
+  const mutated = await executeHostedVoiceToolEnvelope({
+    commitSecret: COMMIT_SECRET,
+    credential: CREDENTIAL,
+    envelope: envelope(definition, "commit", {
+      commitToken: mutatedToken,
+    }),
+    executor,
+    now: new Date("2026-08-24T10:00:30.000Z"),
+    repository,
+  }).catch((caught) => caught);
+  expect(mutated.code).toBe("invalid_commit_token");
+  expect(executor.calls).toHaveLength(0);
 
   const commitEnvelope = envelope(definition, "commit", {
     commitToken: prepared.commitToken,
@@ -633,15 +711,17 @@ class MemoryRepository implements HostedVoiceToolGatewayRepository {
     executionStatus: "executing" | "pending";
     now: Date;
     projectId: number;
-    providerCallId: string;
     tokenHash: string;
+    toolId: string;
+    toolVersion: number;
   }) {
     const call = this.calls.find(
       (candidate) =>
         candidate.bindingId === input.bindingId &&
         candidate.projectId === input.projectId &&
-        candidate.providerCallId === input.providerCallId &&
-        candidate.commitTokenHash === input.tokenHash,
+        candidate.commitTokenHash === input.tokenHash &&
+        candidate.toolId === input.toolId &&
+        candidate.toolVersion === input.toolVersion,
     );
     if (!call) return null;
     if (call.status === "completed") {
@@ -650,12 +730,11 @@ class MemoryRepository implements HostedVoiceToolGatewayRepository {
     if (["executing", "pending"].includes(call.status)) {
       return { call, state: "pending" as const };
     }
-    if (
-      call.status !== "prepared" ||
-      !call.commitExpiresAt ||
-      call.commitExpiresAt <= input.now
-    ) {
-      return null;
+    if (call.commitExpiresAt && call.commitExpiresAt <= input.now) {
+      return { call, state: "expired" as const };
+    }
+    if (call.status !== "prepared" || !call.commitExpiresAt) {
+      return { call, state: "consumed" as const };
     }
     call.status = input.executionStatus;
     call.startedAt = input.executionStatus === "executing" ? input.now : null;

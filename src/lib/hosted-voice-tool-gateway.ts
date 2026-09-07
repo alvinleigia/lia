@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { z } from "zod";
 import type { ToolDefinitionV1 } from "@/lib/conversation-contracts";
 import {
@@ -16,10 +16,13 @@ import {
 export { HostedVoiceToolRequestError } from "@/lib/hosted-voice-tool-contract";
 
 const COMMIT_TOKEN_TTL_MS = 5 * 60 * 1000;
+const COMMIT_TOKEN_BYTES = 18;
 const PENDING_RESPONSE = {
   assistantInstruction: 'Say only "One moment."',
   status: "pending" as const,
 };
+const PREPARED_RESPONSE_INSTRUCTION =
+  "Summarize the prepared action and ask the caller for explicit confirmation. Stop after asking. Do not call the commit tool until a later caller message explicitly confirms this prepared action.";
 const FORBIDDEN_SCOPE_KEYS = new Set([
   "calendarid",
   "companyid",
@@ -75,11 +78,12 @@ export interface HostedVoiceToolGatewayRepository {
     executionStatus: "executing" | "pending";
     now: Date;
     projectId: number;
-    providerCallId: string;
     tokenHash: string;
+    toolId: string;
+    toolVersion: number;
   }): Promise<{
     call: HostedVoiceToolCall;
-    state: "claimed" | "completed" | "pending";
+    state: "claimed" | "completed" | "consumed" | "expired" | "pending";
   } | null>;
   complete(input: {
     call: HostedVoiceToolCall;
@@ -222,6 +226,7 @@ export async function executeHostedVoiceToolEnvelope(input: {
       input.commitSecret,
     );
     return {
+      assistantInstruction: PREPARED_RESPONSE_INSTRUCTION,
       commitToken: replayToken,
       expiresAt: expiresAt.toISOString(),
       status: "prepared" as const,
@@ -288,7 +293,6 @@ export async function executeHostedVoiceToolEnvelope(input: {
 
 async function commitHostedVoiceTool(input: {
   binding: HostedVoiceToolBinding;
-  commitSecret: string;
   envelope: HostedVoiceToolEnvelope;
   executor: HostedVoiceToolExecutor;
   now: Date;
@@ -305,53 +309,36 @@ async function commitHostedVoiceTool(input: {
       400,
     );
   }
-  const payload = verifyCommitToken(
-    parsed.data.commitToken,
-    input.commitSecret,
-  );
-  if (
-    payload.bindingId !== input.binding.id ||
-    payload.projectId !== input.binding.projectId ||
-    payload.toolId !== input.binding.definition.id ||
-    payload.toolVersion !== input.binding.definition.version
-  ) {
-    throw new HostedVoiceToolRequestError(
-      "invalid_commit_token",
-      "The prepared-write token does not match this tool.",
-      403,
-    );
-  }
   const claimed = await input.repository.claimCommit({
-    bindingId: payload.bindingId,
+    bindingId: input.binding.id,
     executionStatus:
       input.binding.definition.execution.mode === "asynchronous"
         ? "pending"
         : "executing",
     now: input.now,
-    projectId: payload.projectId,
-    providerCallId: payload.providerCallId,
+    projectId: input.binding.projectId,
     tokenHash: hashHostedVoiceToolValue(parsed.data.commitToken),
+    toolId: input.binding.definition.id,
+    toolVersion: input.binding.definition.version,
   });
   if (!claimed) {
-    if (new Date(payload.expiresAt) <= input.now) {
-      throw new HostedVoiceToolRequestError(
-        "commit_token_expired",
-        "The prepared write expired. Prepare it again.",
-        409,
-      );
-    }
+    return invalidCommitToken();
+  }
+  assertCommitCall(claimed.call, input.binding);
+  if (claimed.state === "expired") {
     throw new HostedVoiceToolRequestError(
-      "commit_token_consumed",
-      "The prepared-write token is invalid, expired, or already consumed.",
+      "commit_token_expired",
+      "The prepared write expired. Prepare it again.",
       409,
     );
   }
-  assertMatchingCall(claimed.call, {
-    binding: input.binding,
-    canonicalInputHash: payload.inputHash,
-    definition: input.binding.definition,
-    phase: "prepare",
-  });
+  if (claimed.state === "consumed") {
+    throw new HostedVoiceToolRequestError(
+      "commit_token_consumed",
+      "The prepared-write token was already consumed.",
+      409,
+    );
+  }
   if (claimed.state === "completed" && claimed.call.result) {
     return { result: claimed.call.result, status: "completed" as const };
   }
@@ -572,6 +559,21 @@ function assertMatchingCall(
   }
 }
 
+function assertCommitCall(
+  call: HostedVoiceToolCall,
+  binding: HostedVoiceToolBinding,
+) {
+  if (
+    call.bindingId !== binding.id ||
+    call.projectId !== binding.projectId ||
+    call.toolId !== binding.definition.id ||
+    call.toolVersion !== binding.definition.version ||
+    call.phase !== "prepare"
+  ) {
+    return invalidCommitToken();
+  }
+}
+
 const commitTokenPayloadSchema = z.object({
   bindingId: z.number().int().positive(),
   expiresAt: z.string().datetime({ offset: true }),
@@ -586,34 +588,12 @@ type CommitTokenPayload = z.infer<typeof commitTokenPayloadSchema>;
 
 function signCommitToken(payload: CommitTokenPayload, secret: string) {
   const valid = commitTokenPayloadSchema.parse(payload);
-  const encoded = Buffer.from(JSON.stringify(valid)).toString("base64url");
   const signature = createHmac("sha256", requireCommitSecret(secret))
-    .update(encoded)
-    .digest("base64url");
-  return `${encoded}.${signature}`;
-}
-
-function verifyCommitToken(token: string, secret: string) {
-  const [encoded, suppliedSignature, extra] = token.split(".");
-  if (!encoded || !suppliedSignature || extra) return invalidCommitToken();
-  const expectedSignature = createHmac("sha256", requireCommitSecret(secret))
-    .update(encoded)
-    .digest("base64url");
-  const supplied = Buffer.from(suppliedSignature);
-  const expected = Buffer.from(expectedSignature);
-  if (
-    supplied.length !== expected.length ||
-    !timingSafeEqual(supplied, expected)
-  ) {
-    return invalidCommitToken();
-  }
-  try {
-    return commitTokenPayloadSchema.parse(
-      JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")),
-    );
-  } catch {
-    return invalidCommitToken();
-  }
+    .update(JSON.stringify(valid))
+    .digest()
+    .subarray(0, COMMIT_TOKEN_BYTES)
+    .toString("base64url");
+  return `ct_${signature}`;
 }
 
 function invalidCommitToken(): never {

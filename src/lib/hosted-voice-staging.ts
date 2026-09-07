@@ -396,7 +396,7 @@ function buildToolSetupEntries(baseUrl: string, tool: ToolDefinitionV1) {
       async: false,
       baseUrl,
       bodyParameters: buildBodyParameters(tool),
-      description: `${tool.description} This prepares a write without changing the calendar.`,
+      description: `${tool.description} Call this prepare tool before asking the caller for confirmation. It does not change the calendar. After it returns, summarize the prepared action, ask for explicit confirmation, and stop until a later caller message.`,
       phase: "prepare",
       timeoutMs: Math.min(tool.execution.timeoutMs, 10_000),
       tool,
@@ -408,14 +408,14 @@ function buildToolSetupEntries(baseUrl: string, tool: ToolDefinitionV1) {
         properties: {
           commitToken: {
             description:
-              "The unmodified commitToken returned by the matching prepare tool.",
+              "Copy the short commitToken returned by the matching prepare tool exactly. Never type, edit, reconstruct, or reuse it.",
             type: "string",
           },
         },
         required: ["commitToken"],
         type: "object",
       },
-      description: `Commit ${tool.name} only after the caller explicitly confirms the prepared change.`,
+      description: `Commit ${tool.name} only in a later turn after the matching prepare tool returned and the caller then explicitly confirmed that prepared change. Confirmation given before prepare is not valid.`,
       phase: "commit",
       timeoutMs: Math.min(tool.execution.timeoutMs, 10_000),
       tool,

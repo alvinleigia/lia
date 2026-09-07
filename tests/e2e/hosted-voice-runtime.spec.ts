@@ -287,10 +287,20 @@ test("Telnyx candidate setup preserves Lia's read and two-phase write boundary",
     required: ["startsAt"],
   });
   expect(manifest.tools[1]?.timeout_ms).toBe(10_000);
+  expect(manifest.tools[1]?.description).toContain(
+    "before asking the caller for confirmation",
+  );
+  expect(manifest.tools[1]?.description).toContain(
+    "stop until a later caller message",
+  );
   expect(manifest.tools[2]?.body_parameters).toMatchObject({
     properties: { commitToken: { type: "string" } },
     required: ["commitToken"],
   });
+  expect(manifest.tools[2]?.description).toContain("only in a later turn");
+  expect(manifest.tools[2]?.description).toContain(
+    "Confirmation given before prepare is not valid",
+  );
   const serialized = JSON.stringify(manifest);
   expect(serialized).not.toContain("private-calendar");
   expect(serialized).not.toContain("Bearer ");
