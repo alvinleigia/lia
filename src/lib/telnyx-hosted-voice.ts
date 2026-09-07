@@ -92,7 +92,7 @@ function compileGreeting(definition: VoiceAgentDefinitionV1) {
 function compileInstructions(definition: VoiceAgentDefinitionV1) {
   const identityPolicy =
     definition.identity.defaultRequirement === "verified"
-      ? `- Identity: Before using a tool that accesses or changes an existing appointment, collect every configured verification factor: ${definition.identity.verificationFactors.join(", ")}. Treat the caller as verified only after an approved lookup tool returns a matching appointment. Do not reveal appointment details or prepare or commit a change before verification succeeds.`
+      ? `- Identity: Before using a tool that accesses or changes an existing appointment, collect every configured verification factor: ${definition.identity.verificationFactors.join(", ")}. Reuse unambiguous verification values already supplied or confirmed in this conversation, including the latest prepared or verified appointment action; do not ask for them again. If speech recognition produces a conflicting or uncertain value, clarify only that factor and preserve the prior confirmed value until the caller corrects it. Treat the caller as verified only after an approved lookup tool returns a matching appointment. Do not reveal appointment details or prepare or commit a change before verification succeeds.`
       : "- Identity: No additional hosted-voice verification factors are configured. Continue to follow every approved tool's required inputs.";
   const handoffPolicy = {
     available:
@@ -107,7 +107,7 @@ function compileInstructions(definition: VoiceAgentDefinitionV1) {
     "Lia managed policies:",
     `- Locale: Speak ${definition.locale.language} and interpret dates and times in ${definition.locale.timezone}.`,
     identityPolicy,
-    "- Writes: Call the prepare tool before asking for confirmation. After prepare returns, summarize that exact action, ask for explicit caller confirmation, and stop. Call commit only after a later caller message explicitly confirms the prepared action. Confirmation given before prepare is invalid. Copy the returned short commit token exactly; never type, edit, reconstruct, or reuse it. Never claim success unless the approved tool returns verified success.",
+    "- Writes: Once all required inputs are known, call the prepare tool immediately; do not recap or ask for confirmation first. After prepare returns, give one concise summary of that exact action, ask exactly one explicit caller confirmation, and stop. Call commit only after a later caller message explicitly confirms the prepared action. Confirmation given before prepare is invalid. If the caller corrects a field, prepare the corrected action and ask one new confirmation. Copy the returned short commit token exactly; never type, edit, reconstruct, or reuse it. Never claim success unless the approved tool returns verified success.",
     handoffPolicy,
   ].join("\\n\\n");
 }

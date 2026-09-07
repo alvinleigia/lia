@@ -197,16 +197,25 @@ test("one provider-neutral definition compiles through Telnyx and a second provi
     "only after an approved lookup tool returns a matching appointment",
   );
   expect(telnyx.managedConfig.instructions).toContain(
-    "ask for explicit caller confirmation",
+    "ask exactly one explicit caller confirmation",
   );
   expect(telnyx.managedConfig.instructions).toContain(
-    "Call the prepare tool before asking for confirmation",
+    "call the prepare tool immediately",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "do not recap or ask for confirmation first",
   );
   expect(telnyx.managedConfig.instructions).toContain(
     "only after a later caller message explicitly confirms",
   );
   expect(telnyx.managedConfig.instructions).toContain(
     "Confirmation given before prepare is invalid",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "Reuse unambiguous verification values already supplied or confirmed",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
+    "clarify only that factor",
   );
   expect(telnyx.managedConfig.instructions).toContain(
     "configured transfer tool",

@@ -413,6 +413,12 @@ test("writes require an expiring single-use token bound to exact canonical input
   expect(prepared.assistantInstruction).toContain(
     "until a later caller message explicitly confirms",
   );
+  expect(prepared.assistantInstruction).toContain(
+    "ask exactly one explicit confirmation",
+  );
+  expect(prepared.assistantInstruction).toContain(
+    "Do not re-collect or reconfirm known fields",
+  );
   expect(executor.calls).toHaveLength(0);
   expect(JSON.stringify(repository.calls)).not.toContain(prepared.commitToken);
 

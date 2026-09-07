@@ -288,10 +288,13 @@ test("Telnyx candidate setup preserves Lia's read and two-phase write boundary",
   });
   expect(manifest.tools[1]?.timeout_ms).toBe(10_000);
   expect(manifest.tools[1]?.description).toContain(
-    "before asking the caller for confirmation",
+    "immediately once all required inputs are known",
   );
   expect(manifest.tools[1]?.description).toContain(
-    "stop until a later caller message",
+    "Do not recap or ask for confirmation first",
+  );
+  expect(manifest.tools[1]?.description).toContain(
+    "ask exactly one explicit confirmation",
   );
   expect(manifest.tools[2]?.body_parameters).toMatchObject({
     properties: { commitToken: { type: "string" } },
@@ -301,6 +304,10 @@ test("Telnyx candidate setup preserves Lia's read and two-phase write boundary",
   expect(manifest.tools[2]?.description).toContain(
     "Confirmation given before prepare is not valid",
   );
+  expect(manifest.tools[0]?.description).toContain(
+    "do not ask the caller to repeat it",
+  );
+  expect(manifest.tools[0]?.description).toContain("clarify only that value");
   const serialized = JSON.stringify(manifest);
   expect(serialized).not.toContain("private-calendar");
   expect(serialized).not.toContain("Bearer ");
