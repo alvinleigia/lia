@@ -484,10 +484,10 @@ export default async function TelnyxHostedVoicePage() {
               />
               <LifecycleForm
                 action={cleanupHostedVoiceVersionsAction}
-                confirmLabel="Delete every version except remote MAIN and the Lia candidate"
+                confirmLabel="Delete only superseded Lia-owned versions"
                 confirmValue="cleanup"
                 deploymentId={deployment.id}
-                label="Delete obsolete versions"
+                label="Delete obsolete Lia versions"
               />
             </CardContent>
           </Card>

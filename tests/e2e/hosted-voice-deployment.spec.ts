@@ -212,7 +212,54 @@ test("Telnyx adapter uses version inspection and promotion endpoints", async () 
   expect(methods).toEqual(["GET", "POST"]);
 });
 
-test("Telnyx adapter deletes only versions outside the protected keep-set", async () => {
+test("Telnyx adapter deletes only an exact non-main candidate version", async () => {
+  const requests: Array<{ method: string; url: string }> = [];
+  const fetchImpl: typeof fetch = async (url, init) => {
+    const request = {
+      method: init?.method ?? "GET",
+      url: String(url),
+    };
+    requests.push(request);
+    if (request.method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    return Response.json(telnyxResponse("main-1"));
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  await adapter.deleteDraft({
+    assistantId: "assistant-1",
+    versionId: "candidate-2",
+  });
+
+  expect(requests).toEqual([
+    {
+      method: "GET",
+      url: "https://api.telnyx.com/v2/ai/assistants/assistant-1",
+    },
+    {
+      method: "DELETE",
+      url: "https://api.telnyx.com/v2/ai/assistants/assistant-1/versions/candidate-2",
+    },
+  ]);
+
+  await expect(
+    adapter.deleteDraft({
+      assistantId: "assistant-1",
+      versionId: "main-1",
+    }),
+  ).rejects.toThrow("The Telnyx MAIN version cannot be deleted.");
+  expect(requests.at(-1)).toEqual({
+    method: "GET",
+    url: "https://api.telnyx.com/v2/ai/assistants/assistant-1",
+  });
+});
+
+test("Telnyx adapter deletes only allow-listed versions outside the protected set", async () => {
   const requests: Array<{ method: string; url: string }> = [];
   const fetchImpl: typeof fetch = async (url, init) => {
     const request = {
@@ -226,6 +273,7 @@ test("Telnyx adapter deletes only versions outside the protected keep-set", asyn
           { version_id: "candidate-2" },
           { version_id: "main-1" },
           { version_id: "obsolete-3" },
+          { version_id: "unrelated-4" },
         ],
       });
     }
@@ -243,6 +291,7 @@ test("Telnyx adapter deletes only versions outside the protected keep-set", asyn
   await expect(
     adapter.cleanupObsoleteVersions({
       assistantId: "assistant-1",
+      obsoleteVersionIds: ["main-1", "obsolete-3"],
       protectedVersionIds: ["candidate-2"],
     }),
   ).resolves.toEqual({ deletedVersionIds: ["obsolete-3"] });
@@ -1135,6 +1184,7 @@ test("a failed candidate can be discarded without changing main", async () => {
   });
 
   expect(adapter.currentVersionId).toBe("main-1");
+  expect(adapter.versions.has("candidate-2")).toBe(false);
   expect(discarded).toMatchObject({
     candidateManagedHash: null,
     candidateRemoteVersionId: null,
@@ -1211,6 +1261,15 @@ class MemoryAdapter
   }
 
   async deactivate() {}
+
+  async deleteDraft(input: { assistantId: string; versionId: string }) {
+    if (input.versionId === this.currentVersionId) {
+      throw new Error("Cannot delete the active fake version.");
+    }
+    if (!this.versions.delete(input.versionId)) {
+      throw new Error("Missing fake remote version.");
+    }
+  }
 
   async inspect(input: { assistantId: string; versionId?: string }) {
     const versionId = input.versionId ?? this.currentVersionId;

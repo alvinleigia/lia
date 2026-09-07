@@ -225,6 +225,7 @@ export type TelnyxHostedVoiceAdapter =
   HostedVoiceProviderAdapter<TelnyxHostedAssistantManagedConfig> & {
     cleanupObsoleteVersions(input: {
       assistantId: string;
+      obsoleteVersionIds: string[];
       protectedVersionIds: string[];
     }): Promise<{ deletedVersionIds: string[] }>;
     inspectIntegrationSecret(input: {
@@ -395,7 +396,11 @@ export function createTelnyxHostedVoiceAdapter(input: {
 
   return {
     ...compiler,
-    async cleanupObsoleteVersions({ assistantId, protectedVersionIds }) {
+    async cleanupObsoleteVersions({
+      assistantId,
+      obsoleteVersionIds,
+      protectedVersionIds,
+    }) {
       const encodedAssistantId = encodeURIComponent(assistantId);
       const main = await request(`/ai/assistants/${encodedAssistantId}`);
       if (!main) {
@@ -419,9 +424,15 @@ export function createTelnyxHostedVoiceAdapter(input: {
         );
       }
       const protectedIds = new Set([main.version_id, ...protectedVersionIds]);
+      const obsoleteIds = new Set(obsoleteVersionIds);
       const deletedVersionIds: string[] = [];
       for (const version of versions.data.data) {
-        if (protectedIds.has(version.version_id)) continue;
+        if (
+          protectedIds.has(version.version_id) ||
+          !obsoleteIds.has(version.version_id)
+        ) {
+          continue;
+        }
         await requestPayload(
           `/ai/assistants/${encodedAssistantId}/versions/${encodeURIComponent(version.version_id)}`,
           { method: "DELETE" },
@@ -489,6 +500,25 @@ export function createTelnyxHostedVoiceAdapter(input: {
         previousMainVersionId,
         versionId: candidate.version_id,
       };
+    },
+    async deleteDraft({ assistantId, versionId }) {
+      const encodedAssistantId = encodeURIComponent(assistantId);
+      const main = await request(`/ai/assistants/${encodedAssistantId}`);
+      if (!main) {
+        throw new TelnyxHostedVoiceApiError(
+          "Telnyx Assistant inspection returned no configuration.",
+          false,
+          null,
+        );
+      }
+      if (main.version_id === versionId) {
+        throw new Error("The Telnyx MAIN version cannot be deleted.");
+      }
+      await requestPayload(
+        `/ai/assistants/${encodedAssistantId}/versions/${encodeURIComponent(versionId)}`,
+        { method: "DELETE" },
+        "Telnyx candidate version deletion",
+      );
     },
     async deactivate({ assistantId }) {
       await request(`/ai/assistants/${encodeURIComponent(assistantId)}`, {

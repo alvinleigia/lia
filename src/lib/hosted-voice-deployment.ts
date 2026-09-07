@@ -279,6 +279,10 @@ export async function discardHostedVoiceCandidate<TManagedConfig>(input: {
       "Hosted voice candidate changed during inspection.",
     );
   }
+  await input.adapter.deleteDraft({
+    assistantId: requireRemoteAssistantId(deployment),
+    versionId: deployment.candidateRemoteVersionId,
+  });
   return input.repository.discardCandidate({ deployment });
 }
 

@@ -93,6 +93,7 @@ const referenceAdapter: HostedVoiceProviderAdapter<ReferenceManagedConfig> = {
     };
   },
   async deactivate() {},
+  async deleteDraft() {},
   async inspect(_input) {
     return {
       activeVersionId: "version-1",

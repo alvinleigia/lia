@@ -14,7 +14,10 @@ import {
   publishHostedVoiceCandidate,
   rollbackHostedVoiceDeployment,
 } from "@/lib/hosted-voice-deployment";
-import { telnyxHostedVoiceDeploymentRepository } from "@/lib/hosted-voice-deployment-store";
+import {
+  listSupersededLiaHostedVoiceVersionIds,
+  telnyxHostedVoiceDeploymentRepository,
+} from "@/lib/hosted-voice-deployment-store";
 import {
   buildHostedVoiceStagingDefinition,
   buildTelnyxHostedVoiceToolSetup,
@@ -454,7 +457,7 @@ export async function discardHostedVoiceCandidateAction(
         projectId,
         repository: telnyxHostedVoiceDeploymentRepository,
       });
-      return "Failed candidate discarded and its Lia tool binding revoked. The remote version remains non-main.";
+      return "Failed candidate deleted from Telnyx and its Lia tool binding revoked.";
     },
   );
 }
@@ -465,8 +468,7 @@ export async function cleanupHostedVoiceVersionsAction(
 ): Promise<ActionFormState> {
   if (formData.get("confirm") !== "cleanup") {
     return {
-      error:
-        "Confirm that only remote MAIN and the Lia candidate should remain.",
+      error: "Confirm that superseded Lia-owned versions should be deleted.",
     };
   }
   return runDeploymentAction(
@@ -483,9 +485,15 @@ export async function cleanupHostedVoiceVersionsAction(
       const protectedVersionIds = [
         deployment.mainRemoteVersionId,
         deployment.candidateRemoteVersionId,
+        deployment.rollbackRemoteVersionId,
       ].filter((value): value is string => Boolean(value));
+      const obsoleteVersionIds = await listSupersededLiaHostedVoiceVersionIds({
+        deploymentId,
+        projectId,
+      });
       const result = await adapter.cleanupObsoleteVersions({
         assistantId: deployment.remoteAssistantId,
+        obsoleteVersionIds,
         protectedVersionIds,
       });
       await writeAuditLog({
@@ -493,14 +501,15 @@ export async function cleanupHostedVoiceVersionsAction(
         action: "hosted_voice.obsolete_versions_deleted",
         metadata: {
           deletedVersionIds: result.deletedVersionIds,
+          obsoleteVersionIds,
           protectedVersionIds,
         },
         targetId: String(deployment.id),
         targetType: "hosted_voice_deployment",
       });
       return result.deletedVersionIds.length === 0
-        ? "No obsolete Telnyx Assistant versions were found."
-        : `${result.deletedVersionIds.length} obsolete Telnyx Assistant version(s) were deleted. MAIN and the Lia candidate were preserved.`;
+        ? "No superseded Lia-owned Telnyx Assistant versions were found."
+        : `${result.deletedVersionIds.length} superseded Lia-owned Telnyx Assistant version(s) were deleted. MAIN, the current Lia candidate, rollback targets, and unrelated versions were preserved.`;
     },
   );
 }

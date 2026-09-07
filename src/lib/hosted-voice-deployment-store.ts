@@ -348,6 +348,24 @@ export const telnyxHostedVoiceDeploymentRepository = {
   },
 } satisfies HostedVoiceDeploymentRepository<TelnyxHostedAssistantManagedConfig>;
 
+export async function listSupersededLiaHostedVoiceVersionIds(input: {
+  deploymentId: number;
+  projectId: number;
+}) {
+  const rows = await db
+    .select({ remoteVersionId: hostedVoiceDeploymentVersions.remoteVersionId })
+    .from(hostedVoiceDeploymentVersions)
+    .where(
+      and(
+        eq(hostedVoiceDeploymentVersions.deploymentId, input.deploymentId),
+        eq(hostedVoiceDeploymentVersions.projectId, input.projectId),
+        eq(hostedVoiceDeploymentVersions.source, "lia"),
+        eq(hostedVoiceDeploymentVersions.status, "superseded"),
+      ),
+    );
+  return rows.map(({ remoteVersionId }) => remoteVersionId);
+}
+
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function insertDeployment(

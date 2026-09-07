@@ -171,6 +171,7 @@ export interface HostedVoiceProviderAdapter<TManagedConfig>
     versionName: string;
   }): Promise<HostedVoiceRemoteVersion>;
   deactivate(input: { assistantId: string }): Promise<void>;
+  deleteDraft(input: { assistantId: string; versionId: string }): Promise<void>;
   inspect(input: {
     assistantId: string;
     versionId?: string;
