@@ -73,6 +73,58 @@ export type GoogleCalendarProviderResult = {
   status: "completed" | "failed" | "outcome_unknown";
 };
 
+const hostedVoiceAppointmentSchema = z.object({
+  appointmentRef: z.string().trim().min(1).max(200),
+  end: z.string().datetime({ offset: true }),
+  spoken: z.string().trim().min(1).max(240),
+  start: z.string().datetime({ offset: true }),
+});
+
+export function getGoogleCalendarHostedVoiceResult(
+  value: Record<string, unknown>,
+) {
+  const result: Record<string, unknown> = {};
+  const status = z
+    .enum([
+      "success",
+      "no_result",
+      "rejected",
+      "provider_failure",
+      "outcome_unknown",
+    ])
+    .safeParse(value.status);
+  if (status.success) result.status = status.data;
+
+  const reason = z
+    .string()
+    .regex(/^[a-z0-9_]{1,80}$/)
+    .safeParse(value.reason);
+  if (reason.success) result.reason = reason.data;
+
+  const date = z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .safeParse(value.date);
+  if (date.success) result.date = date.data;
+
+  const appointment = hostedVoiceAppointmentSchema.partial().safeParse(value);
+  if (appointment.success) Object.assign(result, appointment.data);
+
+  const slots = z
+    .array(hostedVoiceAppointmentSchema.omit({ appointmentRef: true }))
+    .max(16)
+    .safeParse(value.slots);
+  if (slots.success) result.slots = slots.data;
+
+  const appointments = z
+    .array(hostedVoiceAppointmentSchema)
+    .max(20)
+    .safeParse(value.appointments);
+  if (appointments.success) result.appointments = appointments.data;
+
+  return result;
+}
+
 export async function executeGoogleCalendarProviderOperation(input: {
   api?: GoogleCalendarApi;
   config: Record<string, unknown>;

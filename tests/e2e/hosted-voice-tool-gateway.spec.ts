@@ -472,6 +472,25 @@ test("a verified no-call probe executes an asynchronous read synchronously", asy
   expect(executor.queued).toHaveLength(0);
 });
 
+test("trusted hosted result details survive an older declared output contract", async () => {
+  const definition = toolDefinition("read", "synchronous");
+  const repository = new MemoryRepository({ definition, provider: "telnyx" });
+  const executor = new MemoryExecutor();
+  executor.trustedResult = { reason: "slot_taken", status: "rejected" };
+  const result = await executeHostedVoiceToolEnvelope({
+    commitSecret: COMMIT_SECRET,
+    credential: CREDENTIAL,
+    envelope: envelope(definition, "read", { phone: "+61412345678" }),
+    executor,
+    repository,
+  });
+
+  expect(result).toEqual({
+    result: { reason: "slot_taken", status: "rejected" },
+    status: "completed",
+  });
+});
+
 test("an asynchronous committed write stays pending and cannot enqueue twice", async () => {
   const definition = toolDefinition("write", "asynchronous");
   const repository = new MemoryRepository({ definition, provider: "telnyx" });
@@ -534,6 +553,7 @@ class MemoryExecutor implements HostedVoiceToolExecutor {
     payload: Record<string, unknown>;
   }> = [];
   readonly queued: Array<{ callId: number; projectId: number }> = [];
+  trustedResult: Record<string, unknown> = {};
 
   async enqueue(input: { callId: number; projectId: number }) {
     this.queued.push(input);
@@ -548,6 +568,10 @@ class MemoryExecutor implements HostedVoiceToolExecutor {
       payload: structuredClone(input.payload),
     });
     return { ignored: "not in output contract", status: "available" };
+  }
+
+  getTrustedResult() {
+    return structuredClone(this.trustedResult);
   }
 }
 

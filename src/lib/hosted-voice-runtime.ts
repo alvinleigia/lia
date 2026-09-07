@@ -17,7 +17,7 @@ export function getHostedVoiceToolOutcome(
   value: Record<string, unknown>,
 ): HostedVoiceToolOutcome {
   const status = readStatus(value);
-  const reason = typeof value.reason === "string" ? value.reason : "";
+  const reason = readDiagnosticToken(value.reason);
 
   if (status === "pending") return "pending";
   if (status === "outcome_unknown") return "outcome_unknown";
@@ -33,7 +33,13 @@ export function getHostedVoiceToolOutcome(
   if (
     status === "conflict" ||
     reason === "slot_taken" ||
-    reason === "appointment_changed"
+    reason === "appointment_changed" ||
+    reason === "appointment_cancelled" ||
+    reason === "invalid_time" ||
+    reason === "outside_booking_rules" ||
+    reason === "outside_horizon" ||
+    reason === "clinic_closed" ||
+    reason === "date_in_past"
   ) {
     return "conflict";
   }
@@ -47,6 +53,13 @@ export function getHostedVoiceToolOutcome(
   if (status === "ambiguous" || status === "rejected") return "ambiguous";
   if (["available", "completed", "success"].includes(status)) return "success";
   return "ambiguous";
+}
+
+export function getHostedVoiceToolDiagnostic(value: Record<string, unknown>) {
+  return {
+    reason: readDiagnosticToken(value.reason) || null,
+    status: readStatus(value) || null,
+  };
 }
 
 export function createHostedVoiceContinuationMessage(input: {
@@ -181,15 +194,22 @@ const OUTCOME_INSTRUCTIONS: Record<HostedVoiceToolOutcome, string> = {
     "The operation completed and was verified. Share the verified result.",
 };
 
+const continuationScalarSchema = z.union([
+  z.string().max(1_000),
+  z.number().finite(),
+  z.boolean(),
+  z.null(),
+]);
+const continuationObjectSchema = z.record(
+  z.string().max(120),
+  continuationScalarSchema,
+);
 const continuationResultSchema = z.record(
   z.string().max(120),
   z.union([
-    z.string().max(1_000),
-    z.number().finite(),
-    z.boolean(),
-    z.null(),
+    continuationScalarSchema,
     z
-      .array(z.union([z.string().max(1_000), z.number().finite(), z.boolean()]))
+      .array(z.union([continuationScalarSchema, continuationObjectSchema]))
       .max(20),
   ]),
 );
@@ -201,9 +221,16 @@ function safeContinuationResult(value: Record<string, unknown>) {
 
 function readStatus(value: Record<string, unknown>) {
   for (const candidate of [value.status, value.outcome]) {
-    if (typeof candidate === "string") return candidate.toLowerCase();
+    const token = readDiagnosticToken(candidate);
+    if (token) return token;
   }
   return "";
+}
+
+function readDiagnosticToken(value: unknown) {
+  if (typeof value !== "string") return "";
+  const token = value.trim().toLowerCase();
+  return /^[a-z0-9_]{1,80}$/.test(token) ? token : "";
 }
 
 function percentile(sorted: number[], quantile: number) {

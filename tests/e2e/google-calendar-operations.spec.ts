@@ -4,6 +4,7 @@ import {
   executeGoogleCalendarProviderOperation,
   type GoogleCalendarAppointment,
   type GoogleCalendarAppointmentStore,
+  getGoogleCalendarHostedVoiceResult,
 } from "../../src/lib/google-calendar";
 import type {
   GoogleBusyPeriod,
@@ -47,6 +48,42 @@ test("Google Calendar credentials are encrypted by the project provider boundary
     "privateKey",
   ]);
   expect(JSON.stringify(prepared.config)).not.toContain("BEGIN PRIVATE KEY");
+});
+
+test("hosted voice receives only bounded public calendar result fields", () => {
+  expect(
+    getGoogleCalendarHostedVoiceResult({
+      providerSecret: "must-not-cross-boundary",
+      reason: "slot_taken",
+      remoteEventId: "private-google-id",
+      status: "rejected",
+    }),
+  ).toEqual({ reason: "slot_taken", status: "rejected" });
+
+  expect(
+    getGoogleCalendarHostedVoiceResult({
+      date: "2026-09-10",
+      slots: [
+        {
+          end: "2026-09-09T23:00:00.000Z",
+          remoteEventId: "private-google-id",
+          spoken: "Thursday, 10 September 2026 at 8:00 AM",
+          start: "2026-09-09T22:00:00.000Z",
+        },
+      ],
+      status: "success",
+    }),
+  ).toEqual({
+    date: "2026-09-10",
+    slots: [
+      {
+        end: "2026-09-09T23:00:00.000Z",
+        spoken: "Thursday, 10 September 2026 at 8:00 AM",
+        start: "2026-09-09T22:00:00.000Z",
+      },
+    ],
+    status: "success",
+  });
 });
 
 test("the direct Google client signs once and calls the v3 freebusy endpoint", async () => {

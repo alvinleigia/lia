@@ -110,6 +110,10 @@ export interface HostedVoiceToolExecutor {
     payload: Record<string, unknown>;
     projectId: number;
   }): Promise<Record<string, unknown>>;
+  getTrustedResult?(input: {
+    definition: ToolDefinitionV1;
+    result: Record<string, unknown>;
+  }): Record<string, unknown>;
 }
 
 export async function executeHostedVoiceToolEnvelope(input: {
@@ -397,10 +401,15 @@ export async function executeAndCompleteHostedVoiceTool(input: {
         502,
       );
     }
+    const trustedResult =
+      input.executor.getTrustedResult?.({
+        definition: input.binding.definition,
+        result,
+      }) ?? {};
     const completed = await input.repository.complete({
       call: input.call,
       committedAt: input.call.access === "write" ? input.now : undefined,
-      result: validated.result,
+      result: { ...validated.result, ...trustedResult },
     });
     return { result: completed.result ?? {}, status: "completed" as const };
   } catch (error) {

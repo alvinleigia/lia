@@ -6,6 +6,7 @@ import {
 } from "@/lib/durable-jobs";
 import {
   createHostedVoiceContinuationMessage,
+  getHostedVoiceToolDiagnostic,
   getHostedVoiceToolOutcome,
 } from "@/lib/hosted-voice-runtime";
 import { hostedVoiceToolExecutor } from "@/lib/hosted-voice-tool-executor";
@@ -79,10 +80,13 @@ export async function processProjectHostedVoiceToolQueue(input: {
         throw new PermanentHostedVoiceToolError("provider_unavailable");
       }
       const outcome = getHostedVoiceToolOutcome(result);
+      const diagnostic = getHostedVoiceToolDiagnostic(result);
       console.info("Hosted voice tool execution completed.", {
         callId,
         outcome,
         projectId: input.projectId,
+        reason: diagnostic.reason,
+        status: diagnostic.status,
       });
       try {
         await sendTelnyxHostedVoiceContinuation({

@@ -1,4 +1,5 @@
 import { enqueueDurableJob } from "@/lib/durable-jobs";
+import { getGoogleCalendarHostedVoiceResult } from "@/lib/google-calendar";
 import type { HostedVoiceToolExecutor } from "@/lib/hosted-voice-tool-gateway";
 import { runOperationForHostedVoiceTool } from "@/lib/operations";
 
@@ -29,5 +30,8 @@ export const hostedVoiceToolExecutor = {
       throw new Error("The hosted voice operation did not complete.");
     }
     return result;
+  },
+  getTrustedResult({ result }) {
+    return getGoogleCalendarHostedVoiceResult(result);
   },
 } satisfies HostedVoiceToolExecutor;

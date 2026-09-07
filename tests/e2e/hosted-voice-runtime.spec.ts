@@ -92,6 +92,29 @@ test("truthful continuation wording covers every hosted tool outcome", () => {
       expect(message).not.toContain("completed and was verified");
   }
   expect(getHostedVoiceToolOutcome({ status: "unexpected" })).toBe("ambiguous");
+  expect(
+    getHostedVoiceToolOutcome({
+      reason: "outside_booking_rules",
+      status: "rejected",
+    }),
+  ).toBe("conflict");
+  expect(
+    createHostedVoiceContinuationMessage({
+      outcome: "success",
+      requestId: "availability-request",
+      result: {
+        date: "2026-09-10",
+        slots: [
+          {
+            end: "2026-09-09T23:00:00.000Z",
+            spoken: "Thursday, 10 September 2026 at 8:00 AM",
+            start: "2026-09-09T22:00:00.000Z",
+          },
+        ],
+        status: "success",
+      },
+    }),
+  ).toContain('"spoken":"Thursday, 10 September 2026 at 8:00 AM"');
 });
 
 test("Telnyx continuation uses one idempotent immediate Add Messages call", async () => {

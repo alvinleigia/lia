@@ -19,7 +19,11 @@ import {
   failDurableJob,
 } from "@/lib/durable-jobs";
 import { resolveTraceId } from "@/lib/execution-trace";
-import { executeGoogleCalendarProviderOperation } from "@/lib/google-calendar";
+import {
+  executeGoogleCalendarProviderOperation,
+  GOOGLE_CALENDAR_OPERATION_TYPES,
+  getGoogleCalendarHostedVoiceResult,
+} from "@/lib/google-calendar";
 import { googleCalendarAppointmentStore } from "@/lib/google-calendar-store";
 import { HTTP_METHODS, type HttpMethod } from "@/lib/operation-contracts";
 import {
@@ -328,6 +332,24 @@ export function getOperationAttemptToolResult(input: {
     setMappedValue(result, sourcePath, getOutputMappingValue(context, source));
   }
   return result;
+}
+
+function getHostedVoiceOperationAttemptToolResult(input: {
+  attempt: SelectOperationAttempt;
+  operation: SelectOperation;
+}) {
+  const result = getOperationAttemptToolResult(input);
+  if (
+    !GOOGLE_CALENDAR_OPERATION_TYPES.some(
+      (operationType) => operationType === input.operation.operationType,
+    )
+  ) {
+    return result;
+  }
+  return {
+    ...result,
+    ...getGoogleCalendarHostedVoiceResult(input.attempt.responsePayload),
+  };
 }
 
 export async function createIntegrationProvider(
@@ -1538,6 +1560,13 @@ export type OperationToolRunInput = {
 };
 
 export async function runOperationForTool(input: OperationToolRunInput) {
+  return runOperationForToolInternal(input, false);
+}
+
+async function runOperationForToolInternal(
+  input: OperationToolRunInput,
+  hostedVoice: boolean,
+) {
   const operationContext = await getProjectOperation(
     input.projectId,
     input.operationId,
@@ -1583,7 +1612,12 @@ export async function runOperationForTool(input: OperationToolRunInput) {
     if (!existing || existing.status === "pending") {
       throw new Error("This operation tool call is already being processed.");
     }
-    return getOperationAttemptToolResult({ attempt: existing, operation });
+    return hostedVoice
+      ? getHostedVoiceOperationAttemptToolResult({
+          attempt: existing,
+          operation,
+        })
+      : getOperationAttemptToolResult({ attempt: existing, operation });
   }
 
   const result = await executeConfiguredProvider({
@@ -1611,13 +1645,15 @@ export async function runOperationForTool(input: OperationToolRunInput) {
     )
     .returning();
   const attempt = completed ?? created;
-  return getOperationAttemptToolResult({ attempt, operation });
+  return hostedVoice
+    ? getHostedVoiceOperationAttemptToolResult({ attempt, operation })
+    : getOperationAttemptToolResult({ attempt, operation });
 }
 
 export async function runOperationForHostedVoiceTool(
   input: OperationToolRunInput,
 ) {
-  return runOperationForTool(input);
+  return runOperationForToolInternal(input, true);
 }
 
 export async function runOperationForSubmission(input: {
