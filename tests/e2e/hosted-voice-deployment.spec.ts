@@ -509,6 +509,56 @@ test("Telnyx adapter rejects an update that did not persist the candidate tool a
   );
 });
 
+test("Telnyx adapter verifies expanded candidate tools when tool IDs are omitted", async () => {
+  const expectedSharedTool = expectedTelnyxSharedToolResponse();
+  let candidateWasUpdated = false;
+  const fetchImpl: typeof fetch = async (url, init) => {
+    const path = String(url);
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    if (path.includes("/ai/tools?")) {
+      return Response.json({ data: [] });
+    }
+    if (path.endsWith("/ai/tools")) {
+      return Response.json(telnyxSharedToolResponse(body));
+    }
+    if (init?.method === "POST") {
+      candidateWasUpdated = true;
+      return Response.json({
+        ...telnyxResponse("candidate-2"),
+        tool_ids: body.tool_ids as string[],
+        tools: body.tools as unknown[],
+      });
+    }
+    return Response.json({
+      ...telnyxResponse("candidate-2"),
+      tool_ids: [],
+      tools: candidateWasUpdated
+        ? [
+            {
+              type: "webhook",
+              webhook: expectedSharedTool.tool_definition,
+            },
+          ]
+        : [],
+    });
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  await expect(
+    adapter.pushCandidateTools({
+      assistantId: "assistant-1",
+      candidateVersionId: "candidate-2",
+      integrationSecretIdentifier: "lia-phase18-candidate-1",
+      mainVersionId: "main-1",
+      tools: telnyxWebhookSetup(),
+    }),
+  ).resolves.toEqual({ routingWasSuspended: false, toolCount: 1 });
+});
+
 test("Telnyx adapter restores canary routing after updating a locked live candidate", async () => {
   const canary = {
     assistant_id: "assistant-1",

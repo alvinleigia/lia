@@ -713,7 +713,10 @@ export function createTelnyxHostedVoiceAdapter(input: {
       const missingToolIds = sharedToolIds.filter(
         (toolId) => !attachedToolIds.has(toolId),
       );
-      if (missingToolIds.length > 0) {
+      if (
+        missingToolIds.length > 0 &&
+        !hasMatchingTelnyxWebhookTools(verifiedCandidate.tools, expectedTools)
+      ) {
         throw new Error(
           `Telnyx did not persist ${missingToolIds.length} Lia webhook tool attachment(s) on the exact candidate.`,
         );
@@ -1183,6 +1186,30 @@ function verifyTelnyxWebhookTools(
   tools: unknown[],
   expectedTools: Array<z.infer<typeof telnyxWebhookToolSchema>>,
 ) {
+  const missingOrChanged = getMissingOrChangedTelnyxWebhookTools(
+    tools,
+    expectedTools,
+  );
+  if (missingOrChanged.length > 0) {
+    throw new Error(
+      `Telnyx did not verify the candidate webhook tools: ${missingOrChanged.join(", ")}.`,
+    );
+  }
+}
+
+function hasMatchingTelnyxWebhookTools(
+  tools: unknown[],
+  expectedTools: Array<z.infer<typeof telnyxWebhookToolSchema>>,
+) {
+  return (
+    getMissingOrChangedTelnyxWebhookTools(tools, expectedTools).length === 0
+  );
+}
+
+function getMissingOrChangedTelnyxWebhookTools(
+  tools: unknown[],
+  expectedTools: Array<z.infer<typeof telnyxWebhookToolSchema>>,
+) {
   const actualByName = new Map(
     tools.flatMap((tool) => {
       const parsed = telnyxWebhookToolSchema.safeParse(tool);
@@ -1201,11 +1228,7 @@ function verifyTelnyxWebhookTools(
       );
     })
     .map(({ webhook }) => webhook.name);
-  if (missingOrChanged.length > 0) {
-    throw new Error(
-      `Telnyx did not verify the candidate webhook tools: ${missingOrChanged.join(", ")}.`,
-    );
-  }
+  return missingOrChanged;
 }
 
 function selectVerifiedWebhookFields(
