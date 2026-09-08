@@ -28,6 +28,7 @@ import type {
   HostedVoiceToolCall,
   HostedVoiceToolGatewayRepository,
 } from "@/lib/hosted-voice-tool-gateway";
+import { evaluateHostedVoiceCandidateUat } from "@/lib/hosted-voice-uat";
 
 export async function createHostedVoiceToolBinding(input: {
   deploymentVersionId: number;
@@ -99,6 +100,93 @@ export async function createHostedVoiceToolBinding(input: {
     targetType: "hosted_voice_tool_binding",
   });
   return { binding, credential };
+}
+
+export async function requireHostedVoiceCandidateUat(input: {
+  deploymentId: number;
+  projectId: number;
+  provider: string;
+  remoteVersionId: string;
+}) {
+  const [version] = await db
+    .select({
+      definition: hostedVoiceDeploymentVersions.definition,
+      id: hostedVoiceDeploymentVersions.id,
+    })
+    .from(hostedVoiceDeploymentVersions)
+    .where(
+      and(
+        eq(hostedVoiceDeploymentVersions.deploymentId, input.deploymentId),
+        eq(hostedVoiceDeploymentVersions.projectId, input.projectId),
+        eq(
+          hostedVoiceDeploymentVersions.remoteVersionId,
+          input.remoteVersionId,
+        ),
+        eq(hostedVoiceDeploymentVersions.source, "lia"),
+        eq(hostedVoiceDeploymentVersions.status, "candidate"),
+      ),
+    )
+    .limit(1);
+  if (!version?.definition) {
+    throw new Error("The Lia candidate version was not found for UAT.");
+  }
+  const definition = voiceAgentDefinitionV1Schema.parse(version.definition);
+  const [binding] = await db
+    .select({ id: hostedVoiceToolBindings.id })
+    .from(hostedVoiceToolBindings)
+    .where(
+      and(
+        eq(hostedVoiceToolBindings.deploymentId, input.deploymentId),
+        eq(hostedVoiceToolBindings.deploymentVersionId, version.id),
+        eq(hostedVoiceToolBindings.projectId, input.projectId),
+        eq(hostedVoiceToolBindings.provider, input.provider),
+        eq(hostedVoiceToolBindings.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (!binding) {
+    throw new Error(
+      "The candidate has no active Lia tool binding. Rotate the binding and push its tools before UAT.",
+    );
+  }
+  const rows = await db
+    .select({
+      access: hostedVoiceToolCalls.access,
+      committedAt: hostedVoiceToolCalls.committedAt,
+      outcome: hostedVoiceToolCalls.outcome,
+      providerConversation: hostedVoiceToolCalls.providerConversation,
+      status: hostedVoiceToolCalls.status,
+      toolId: hostedVoiceToolCalls.toolId,
+      toolVersion: hostedVoiceToolCalls.toolVersion,
+    })
+    .from(hostedVoiceToolCalls)
+    .where(
+      and(
+        eq(hostedVoiceToolCalls.projectId, input.projectId),
+        eq(hostedVoiceToolCalls.bindingId, binding.id),
+      ),
+    );
+  const evidence = evaluateHostedVoiceCandidateUat({
+    calls: rows.map((row) => ({
+      access: z.enum(["read", "write"]).parse(row.access),
+      committedAt: row.committedAt,
+      outcome: row.outcome,
+      providerConversationId: decryptSecretValue(row.providerConversation),
+      status: row.status,
+      toolId: row.toolId,
+      toolVersion: row.toolVersion,
+    })),
+    requiredTools: definition.tools,
+  });
+  if (!evidence.passed) {
+    const missing = evidence.missingTools
+      .map((tool) => `${tool.id}@${tool.version}`)
+      .join(", ");
+    throw new Error(
+      `Candidate UAT is incomplete. Successful real Telnyx tool evidence is missing for: ${missing}. Synthetic no-call probes and prepared-but-uncommitted writes do not count. Test every selected flow on this non-main candidate, then try promotion again.`,
+    );
+  }
+  return evidence;
 }
 
 export const hostedVoiceToolGatewayRepository = {

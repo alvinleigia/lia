@@ -696,6 +696,28 @@ export function createTelnyxHostedVoiceAdapter(input: {
       if (!updated || updated.version_id !== candidateVersionId) {
         throw new Error("Telnyx did not update the exact candidate version.");
       }
+      const verifiedCandidate = await request(
+        path,
+        undefined,
+        "Telnyx candidate tool attachment verification",
+      );
+      if (
+        !verifiedCandidate ||
+        verifiedCandidate.version_id !== candidateVersionId
+      ) {
+        throw new Error(
+          "The exact Telnyx candidate version could not be re-verified after its tool update.",
+        );
+      }
+      const attachedToolIds = new Set(verifiedCandidate.tool_ids);
+      const missingToolIds = sharedToolIds.filter(
+        (toolId) => !attachedToolIds.has(toolId),
+      );
+      if (missingToolIds.length > 0) {
+        throw new Error(
+          `Telnyx did not persist ${missingToolIds.length} Lia webhook tool attachment(s) on the exact candidate.`,
+        );
+      }
       return { routingWasSuspended, toolCount: expectedTools.length };
     },
     async testWebhookToolWithoutCall({

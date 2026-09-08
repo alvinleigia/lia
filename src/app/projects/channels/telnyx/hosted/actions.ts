@@ -22,6 +22,7 @@ import {
   buildHostedVoiceStagingDefinition,
   buildTelnyxHostedVoiceToolSetup,
   getHostedVoiceStagingState,
+  getTelnyxHostedVoiceCandidateSecretIdentifier,
   hostedVoiceStagingDefinitionInputSchema,
 } from "@/lib/hosted-voice-staging";
 import {
@@ -29,7 +30,10 @@ import {
   verifyHostedVoiceIntegrationSecretFreshness,
   verifyHostedVoiceToolEndpoint,
 } from "@/lib/hosted-voice-tool-preflight";
-import { createHostedVoiceToolBinding } from "@/lib/hosted-voice-tool-store";
+import {
+  createHostedVoiceToolBinding,
+  requireHostedVoiceCandidateUat,
+} from "@/lib/hosted-voice-tool-store";
 import { TelnyxHostedVoiceVerificationError } from "@/lib/telnyx-hosted-voice-adapter";
 import {
   getProjectTelnyxHostedVoiceProvider,
@@ -266,6 +270,15 @@ export async function pushHostedVoiceCandidateToolsAction(
         "Webhook tools can only be pushed to a non-main candidate.",
       );
     }
+    const expectedSecretIdentifier =
+      getTelnyxHostedVoiceCandidateSecretIdentifier(
+        deployment.candidateDeploymentVersionId,
+      );
+    if (parsed.data.integrationSecretIdentifier !== expectedSecretIdentifier) {
+      throw new Error(
+        `Use the candidate-specific Telnyx Integration Secret identifier "${expectedSecretIdentifier}". Reusing a prior candidate's identifier can change the tool credential used by MAIN.`,
+      );
+    }
     diagnosticSteps.push(
       `Validated candidate version …${deployment.candidateRemoteVersionId.slice(-8)} and active binding.`,
     );
@@ -294,17 +307,17 @@ export async function pushHostedVoiceCandidateToolsAction(
     diagnosticSteps.push(
       "Resolved the named Integration Secret and verified that it is current.",
     );
-    const probeTool =
-      setup.tools.find(({ phase }) => phase === "read") ??
-      setup.tools.find(({ phase }) => phase === "prepare");
-    if (!probeTool) {
+    const probeTools = setup.tools.filter(({ phase }) => phase !== "commit");
+    if (probeTools.length === 0) {
       throw new Error(
         "The candidate has no safe Lia webhook tool for no-call verification.",
       );
     }
-    await verifyHostedVoiceToolEndpoint({ url: probeTool.url });
+    for (const probeTool of probeTools) {
+      await verifyHostedVoiceToolEndpoint({ url: probeTool.url });
+    }
     diagnosticSteps.push(
-      "Reached the public Lia webhook and confirmed its bearer-authentication boundary.",
+      `Reached ${probeTools.length} public Lia webhook routes and confirmed their bearer-authentication boundaries.`,
     );
     const result = await adapter.pushCandidateTools({
       assistantId: deployment.remoteAssistantId,
@@ -316,23 +329,30 @@ export async function pushHostedVoiceCandidateToolsAction(
     diagnosticSteps.push(
       `Attached ${result.toolCount} shared tools to the exact candidate${result.routingWasSuspended ? " and restored its routing" : ""}.`,
     );
-    const verificationRoute = getHostedVoiceToolRoute(probeTool.url);
-    if (verificationRoute.phase !== probeTool.phase) {
-      throw new Error(
-        "The no-call verification route does not match the selected tool.",
+    const verifications = [];
+    for (const probeTool of probeTools) {
+      const verificationRoute = getHostedVoiceToolRoute(probeTool.url);
+      if (verificationRoute.phase !== probeTool.phase) {
+        throw new Error(
+          "The no-call verification route does not match the selected tool.",
+        );
+      }
+      const verificationToken = createHostedVoiceNoCallVerificationToken({
+        phase: verificationRoute.phase,
+        secret:
+          process.env.VOICE_TOOL_COMMIT_SECRET ?? process.env.AUTH_SECRET ?? "",
+        toolId: verificationRoute.toolId,
+      });
+      const verification = await adapter.testWebhookToolWithoutCall({
+        integrationSecretIdentifier: parsed.data.integrationSecretIdentifier,
+        tool: probeTool,
+        verificationToken,
+      });
+      verifications.push(verification);
+      diagnosticSteps.push(
+        `${verification.toolName} passed an authenticated no-call execution test (HTTP ${verification.statusCode}).`,
       );
     }
-    const verificationToken = createHostedVoiceNoCallVerificationToken({
-      phase: verificationRoute.phase,
-      secret:
-        process.env.VOICE_TOOL_COMMIT_SECRET ?? process.env.AUTH_SECRET ?? "",
-      toolId: verificationRoute.toolId,
-    });
-    const verification = await adapter.testWebhookToolWithoutCall({
-      integrationSecretIdentifier: parsed.data.integrationSecretIdentifier,
-      tool: probeTool,
-      verificationToken,
-    });
     await writeAuditLog({
       ...context,
       action: "hosted_voice.candidate_tools_pushed",
@@ -342,8 +362,11 @@ export async function pushHostedVoiceCandidateToolsAction(
         noCallVerification: "passed",
         routingWasSuspended: result.routingWasSuspended,
         toolCount: result.toolCount,
-        verifiedStatusCode: verification.statusCode,
-        verifiedToolName: verification.toolName,
+        verifiedSafeToolCount: verifications.length,
+        verifiedTools: verifications.map((verification) => ({
+          name: verification.toolName,
+          statusCode: verification.statusCode,
+        })),
       },
       targetId: String(deployment.candidateDeploymentVersionId),
       targetType: "hosted_voice_deployment_version",
@@ -353,7 +376,7 @@ export async function pushHostedVoiceCandidateToolsAction(
       ? " Candidate routing was restored."
       : "";
     return {
-      success: `${result.toolCount} Lia webhook tools were pushed.${routingMessage} ${verification.toolName} passed an authenticated no-call execution test (HTTP ${verification.statusCode}).`,
+      success: `${result.toolCount} Lia webhook tools were pushed and persisted on the exact candidate.${routingMessage} All ${verifications.length} safe read/prepare tools passed authenticated no-call execution tests.`,
     };
   } catch (error) {
     const verificationSteps =
@@ -428,13 +451,27 @@ export async function promoteHostedVoiceCandidateAction(
   return runDeploymentAction(
     formData,
     async ({ adapter, deploymentId, projectId }) => {
+      const deployment =
+        await telnyxHostedVoiceDeploymentRepository.findDeploymentById({
+          deploymentId,
+          projectId,
+        });
+      if (!deployment?.candidateRemoteVersionId) {
+        throw new Error("Hosted voice deployment has no candidate to promote.");
+      }
+      await requireHostedVoiceCandidateUat({
+        deploymentId,
+        projectId,
+        provider: "telnyx",
+        remoteVersionId: deployment.candidateRemoteVersionId,
+      });
       await promoteHostedVoiceCandidate({
         adapter,
         deploymentId,
         projectId,
         repository: telnyxHostedVoiceDeploymentRepository,
       });
-      return "The tested Telnyx candidate is now the main version.";
+      return "The fully evidenced Telnyx candidate is now the main version.";
     },
   );
 }

@@ -24,7 +24,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { assertPermission } from "@/lib/access-control";
 import { listPublishedConversationalTaskOptions } from "@/lib/conversational-tasks";
-import { getHostedVoiceStagingState } from "@/lib/hosted-voice-staging";
+import {
+  getHostedVoiceStagingState,
+  getTelnyxHostedVoiceCandidateSecretIdentifier,
+} from "@/lib/hosted-voice-staging";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
@@ -421,6 +424,8 @@ export default async function TelnyxHostedVoicePage() {
                   Existing non-Lia tools are preserved. If Telnyx locks an
                   actively routed candidate, Lia briefly falls back to main,
                   updates the candidate, and restores the exact traffic rules.
+                  Each candidate uses a unique Integration Secret identifier so
+                  updating staging cannot replace the credential used by MAIN.
                 </p>
                 <Field
                   label="Telnyx Integration Secret identifier"
@@ -429,7 +434,9 @@ export default async function TelnyxHostedVoicePage() {
                   <Input
                     id="integrationSecretIdentifier"
                     name="integrationSecretIdentifier"
-                    defaultValue={`lia-phase18-candidate-${deployment.id}`}
+                    defaultValue={getTelnyxHostedVoiceCandidateSecretIdentifier(
+                      deployment.candidateDeploymentVersionId,
+                    )}
                     required
                   />
                 </Field>
@@ -460,7 +467,7 @@ export default async function TelnyxHostedVoicePage() {
               />
               <LifecycleForm
                 action={promoteHostedVoiceCandidateAction}
-                confirmLabel="Candidate passed staging UAT"
+                confirmLabel="Every selected Lia tool passed staging UAT"
                 confirmValue="promote"
                 deploymentId={deployment.id}
                 disabled={!deployment.candidateRemoteVersionId}

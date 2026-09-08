@@ -387,8 +387,21 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
     if (request.url.endsWith("/ai/tools")) {
       return Response.json(telnyxSharedToolResponse(body));
     }
+    const candidateWasUpdated = requests.some(
+      (candidateRequest) =>
+        candidateRequest.method === "POST" &&
+        candidateRequest.url.endsWith(
+          "/ai/assistants/assistant-1/versions/candidate-2",
+        ),
+    );
     return Response.json({
       ...telnyxResponse("candidate-2"),
+      tool_ids:
+        init?.method === "POST"
+          ? (body.tool_ids as string[])
+          : candidateWasUpdated
+            ? ["shared-lia-read-85"]
+            : [],
       tools:
         init?.method === "POST"
           ? (body.tools as unknown[])
@@ -415,6 +428,7 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
     "GET",
     "POST",
     "POST",
+    "GET",
   ]);
   expect(
     requests[0]?.url.endsWith(
@@ -453,6 +467,48 @@ test("Telnyx adapter replaces Lia webhooks on only the verified non-main candida
   expect(JSON.stringify(pushedTools)).not.toContain("must-never-leak");
 });
 
+test("Telnyx adapter rejects an update that did not persist the candidate tool attachment", async () => {
+  const fetchImpl: typeof fetch = async (url, init) => {
+    const path = String(url);
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    if (path.includes("/ai/tools?")) {
+      return Response.json({ data: [] });
+    }
+    if (path.endsWith("/ai/tools")) {
+      return Response.json(telnyxSharedToolResponse(body));
+    }
+    if (init?.method === "POST") {
+      return Response.json({
+        ...telnyxResponse("candidate-2"),
+        tool_ids: body.tool_ids as string[],
+        tools: body.tools as unknown[],
+      });
+    }
+    return Response.json({
+      ...telnyxResponse("candidate-2"),
+      tool_ids: [],
+      tools: [],
+    });
+  };
+  const adapter = createTelnyxHostedVoiceAdapter({
+    apiKey: "restricted-test-key",
+    fetchImpl,
+    settings,
+  });
+
+  await expect(
+    adapter.pushCandidateTools({
+      assistantId: "assistant-1",
+      candidateVersionId: "candidate-2",
+      integrationSecretIdentifier: "lia-phase18-candidate-1",
+      mainVersionId: "main-1",
+      tools: telnyxWebhookSetup(),
+    }),
+  ).rejects.toThrow(
+    "Telnyx did not persist 1 Lia webhook tool attachment(s) on the exact candidate.",
+  );
+});
+
 test("Telnyx adapter restores canary routing after updating a locked live candidate", async () => {
   const canary = {
     assistant_id: "assistant-1",
@@ -477,6 +533,7 @@ test("Telnyx adapter restores canary routing after updating a locked live candid
     url: string;
   }> = [];
   let updateAttempts = 0;
+  let candidateToolIds: string[] = [];
   const fetchImpl: typeof fetch = async (url, init) => {
     const method = init?.method ?? "GET";
     const body = init?.body ? JSON.parse(String(init.body)) : {};
@@ -498,12 +555,18 @@ test("Telnyx adapter restores canary routing after updating a locked live candid
       if (updateAttempts === 1) {
         return Response.json({ errors: [{ code: "10015" }] }, { status: 400 });
       }
+      candidateToolIds = body.tool_ids as string[];
       return Response.json({
         ...telnyxResponse("candidate-2"),
+        tool_ids: candidateToolIds,
         tools: body.tools as unknown[],
       });
     }
-    return Response.json({ ...telnyxResponse("candidate-2"), tools: [] });
+    return Response.json({
+      ...telnyxResponse("candidate-2"),
+      tool_ids: candidateToolIds,
+      tools: [],
+    });
   };
   const adapter = createTelnyxHostedVoiceAdapter({
     apiKey: "restricted-test-key",
@@ -529,6 +592,7 @@ test("Telnyx adapter restores canary routing after updating a locked live candid
     "DELETE",
     "POST",
     "POST",
+    "GET",
   ]);
   expect(requests[7]?.url).toContain("/canary-deploys");
   expect(requests[7]?.body).toEqual({ rules: canary.rules });
@@ -598,6 +662,7 @@ test("Telnyx adapter updates and reuses an existing Lia shared tool", async () =
     "GET",
     "PATCH",
     "POST",
+    "GET",
   ]);
   expect(requests[3]?.body.tool_ids).toEqual([
     "existing-non-lia",

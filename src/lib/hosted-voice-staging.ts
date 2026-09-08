@@ -331,6 +331,13 @@ export function getHostedVoicePublicBaseUrl() {
   return url.origin;
 }
 
+export function getTelnyxHostedVoiceCandidateSecretIdentifier(
+  deploymentVersionId: number,
+) {
+  const id = z.number().int().positive().parse(deploymentVersionId);
+  return `lia-phase18-candidate-${id}`;
+}
+
 async function loadPinnedToolDefinitions(
   projectId: number,
   definition: VoiceAgentDefinitionV1,
