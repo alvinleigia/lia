@@ -12,6 +12,7 @@ import {
   inspectHostedVoiceDeployment,
   promoteHostedVoiceCandidate,
   publishHostedVoiceCandidate,
+  resolveHostedVoiceDrift,
   rollbackHostedVoiceDeployment,
 } from "@/lib/hosted-voice-deployment";
 import {
@@ -437,6 +438,30 @@ export async function inspectHostedVoiceDeploymentAction(
       return result.status === "drifted"
         ? "Remote drift detected. Promotion remains blocked."
         : "Telnyx main version is in sync with Lia.";
+    },
+  );
+}
+
+export async function adoptHostedVoiceRemoteMainAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  if (formData.get("confirm") !== "import") {
+    return { error: "Confirm that the current Telnyx MAIN should be adopted." };
+  }
+  return runDeploymentAction(
+    formData,
+    async ({ adapter, deploymentId, projectId }) => {
+      const result = await resolveHostedVoiceDrift({
+        adapter,
+        deploymentId,
+        projectId,
+        repository: telnyxHostedVoiceDeploymentRepository,
+        resolution: "import",
+      });
+      return result.status === "imported"
+        ? "The current Telnyx MAIN was adopted as Lia's baseline. Telnyx was not changed."
+        : "Telnyx MAIN is already in sync with Lia.";
     },
   );
 }
