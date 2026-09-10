@@ -466,15 +466,14 @@ export default async function TelnyxHostedVoicePage() {
                 deploymentId={deployment.id}
                 label="Inspect remote main"
               />
-              {deployment.status === "drifted" && (
-                <LifecycleForm
-                  action={adoptHostedVoiceRemoteMainAction}
-                  confirmLabel="Adopt the currently inspected Telnyx MAIN as Lia's baseline without changing Telnyx"
-                  confirmValue="import"
-                  deploymentId={deployment.id}
-                  label="Adopt remote MAIN"
-                />
-              )}
+              <LifecycleForm
+                action={adoptHostedVoiceRemoteMainAction}
+                confirmLabel="Adopt the currently inspected Telnyx MAIN as Lia's baseline without changing Telnyx"
+                confirmValue="import"
+                deploymentId={deployment.id}
+                disabled={deployment.status !== "drifted"}
+                label="Adopt remote MAIN"
+              />
               <LifecycleForm
                 action={promoteHostedVoiceCandidateAction}
                 confirmLabel="Every selected Lia tool passed staging UAT"
