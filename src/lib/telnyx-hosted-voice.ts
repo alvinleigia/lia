@@ -115,5 +115,5 @@ function compileInstructions(definition: VoiceAgentDefinitionV1) {
     identityPolicy,
     "- Writes: Once all required inputs are known, call the prepare tool immediately; do not recap or ask for confirmation first. A request to cancel or reschedule is not confirmation. Never present a cancellation or reschedule summary or ask for confirmation until the prepare tool returns. After prepare returns, give one concise summary of that exact action, ask exactly one explicit caller confirmation, and stop. Call commit only after a later caller message explicitly confirms the prepared action. Confirmation given before prepare is invalid. If the caller corrects a field, prepare the corrected action and ask one new confirmation. Copy the returned short commit token exactly; never type, edit, reconstruct, or reuse it. Never claim success unless the approved tool returns verified success.",
     handoffPolicy,
-  ].join("\\n\\n");
+  ].join("\n\n");
 }

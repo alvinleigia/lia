@@ -192,6 +192,12 @@ test("one provider-neutral definition compiles through Telnyx and a second provi
     voiceDefinition.instructions,
   );
   expect(telnyx.managedConfig.instructions).toContain(
+    `${voiceDefinition.instructions}\n\nLia managed policies:\n\n- Locale`,
+  );
+  expect(telnyx.managedConfig.instructions).not.toContain(
+    "\\n\\nLia managed policies:",
+  );
+  expect(telnyx.managedConfig.instructions).toContain(
     "dateOfBirth, patientName",
   );
   expect(telnyx.managedConfig.instructions).toContain(

@@ -367,6 +367,11 @@ export default async function TelnyxHostedVoicePage() {
                   placeholder="Paste the reviewed hosted voice instructions."
                   required
                 />
+                <p className="text-sm text-muted-foreground">
+                  This is the approved source. Lia appends mandatory locale,
+                  identity, lookup, confirmation, and handoff policies when it
+                  compiles the Telnyx version.
+                </p>
               </Field>
               <fieldset className="space-y-3 rounded-md border p-4">
                 <legend className="px-1 text-sm font-medium">
