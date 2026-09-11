@@ -13,6 +13,7 @@ import {
 } from "@/lib/telnyx-hosted-voice";
 
 const TELNYX_API_BASE_URL = "https://api.telnyx.com/v2";
+const TELNYX_CLEANUP_RETRY_DELAY_MS = 250;
 
 const telnyxToolBodyParametersSchema = z
   .object({
@@ -340,6 +341,34 @@ export function createTelnyxHostedVoiceAdapter(input: {
     }
 
     return parsed.data;
+  }
+
+  async function deleteTemporaryResource(path: string, operation: string) {
+    let retryCount = 0;
+    for (;;) {
+      try {
+        await requestPayload(path, { method: "DELETE" }, operation);
+        return retryCount;
+      } catch (error) {
+        if (
+          error instanceof TelnyxHostedVoiceApiError &&
+          error.status === 404
+        ) {
+          return retryCount;
+        }
+        if (
+          !(error instanceof TelnyxHostedVoiceApiError) ||
+          !error.retryable ||
+          retryCount >= 1
+        ) {
+          throw error;
+        }
+        retryCount += 1;
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, TELNYX_CLEANUP_RETRY_DELAY_MS),
+        );
+      }
+    }
   }
 
   async function upsertSharedWebhookTool(
@@ -910,11 +939,15 @@ export function createTelnyxHostedVoiceAdapter(input: {
 
       if (assistantId && verificationToolId) {
         try {
-          await requestPayload(
+          const retryCount = await deleteTemporaryResource(
             `/ai/assistants/${encodeURIComponent(assistantId)}/tools/${encodeURIComponent(verificationToolId)}`,
-            { method: "DELETE" },
             "Telnyx no-call verification tool detachment",
           );
+          if (retryCount > 0) {
+            steps.push(
+              "Retried temporary tool detachment after a transient Telnyx failure.",
+            );
+          }
           steps.push(
             `Detached temporary signed tool …${shortTelnyxId(verificationToolId)} from temporary assistant …${shortTelnyxId(assistantId)}.`,
           );
@@ -928,11 +961,15 @@ export function createTelnyxHostedVoiceAdapter(input: {
 
       if (assistantId) {
         try {
-          await requestPayload(
+          const retryCount = await deleteTemporaryResource(
             `/ai/assistants/${encodeURIComponent(assistantId)}`,
-            { method: "DELETE" },
             "Telnyx no-call verification assistant cleanup",
           );
+          if (retryCount > 0) {
+            steps.push(
+              "Retried temporary assistant cleanup after a transient Telnyx failure.",
+            );
+          }
           steps.push(
             `Deleted temporary assistant …${shortTelnyxId(assistantId)}.`,
           );
@@ -946,11 +983,15 @@ export function createTelnyxHostedVoiceAdapter(input: {
 
       if (verificationToolId) {
         try {
-          await requestPayload(
+          const retryCount = await deleteTemporaryResource(
             `/ai/tools/${encodeURIComponent(verificationToolId)}`,
-            { method: "DELETE" },
             "Telnyx no-call verification tool cleanup",
           );
+          if (retryCount > 0) {
+            steps.push(
+              "Retried temporary signed tool cleanup after a transient Telnyx failure.",
+            );
+          }
           steps.push(
             `Deleted temporary signed tool …${shortTelnyxId(verificationToolId)}.`,
           );

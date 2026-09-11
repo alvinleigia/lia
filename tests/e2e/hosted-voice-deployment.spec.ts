@@ -727,6 +727,7 @@ test("Telnyx adapter executes a shared webhook without a call and removes the te
     url: string;
   }> = [];
   let verificationToolDetached = false;
+  let verificationToolCleanupAttempts = 0;
   const fetchImpl: typeof fetch = async (url, init) => {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     const request = {
@@ -770,8 +771,12 @@ test("Telnyx adapter executes a shared webhook without a call and removes the te
       request.url.endsWith("/ai/tools/temporary-verification-tool") &&
       request.method === "DELETE"
     ) {
+      verificationToolCleanupAttempts += 1;
       if (!verificationToolDetached) {
         return Response.json({ code: 10015 }, { status: 400 });
+      }
+      if (verificationToolCleanupAttempts === 1) {
+        return Response.json({ errors: [{ code: 10007 }] }, { status: 503 });
       }
       return Response.json({
         deleted: true,
@@ -804,7 +809,9 @@ test("Telnyx adapter executes a shared webhook without a call and removes the te
     "DELETE",
     "DELETE",
     "DELETE",
+    "DELETE",
   ]);
+  expect(verificationToolCleanupAttempts).toBe(2);
   expect(requests[1]?.body).toMatchObject({
     type: "webhook",
     webhook: {
