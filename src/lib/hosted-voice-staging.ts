@@ -199,12 +199,15 @@ export async function getHostedVoiceStagingState(projectId: number) {
       },
     };
   }
-  const [candidateVersion] = deployment.candidateRemoteVersionId
+  const editableRemoteVersionId =
+    deployment.candidateRemoteVersionId ?? deployment.mainRemoteVersionId;
+  const [editableVersion] = editableRemoteVersionId
     ? await db
         .select({
           definition: hostedVoiceDeploymentVersions.definition,
           definitionHash: hostedVoiceDeploymentVersions.definitionHash,
           id: hostedVoiceDeploymentVersions.id,
+          remoteVersionId: hostedVoiceDeploymentVersions.remoteVersionId,
         })
         .from(hostedVoiceDeploymentVersions)
         .where(
@@ -213,12 +216,19 @@ export async function getHostedVoiceStagingState(projectId: number) {
             eq(hostedVoiceDeploymentVersions.deploymentId, deployment.id),
             eq(
               hostedVoiceDeploymentVersions.remoteVersionId,
-              deployment.candidateRemoteVersionId,
+              editableRemoteVersionId,
             ),
           ),
         )
         .limit(1)
     : [];
+  const candidateVersion =
+    editableVersion?.remoteVersionId === deployment.candidateRemoteVersionId
+      ? editableVersion
+      : null;
+  const definition = editableVersion?.definition
+    ? voiceAgentDefinitionV1Schema.parse(editableVersion.definition)
+    : null;
   const [binding] = candidateVersion
     ? await db
         .select({
@@ -247,6 +257,7 @@ export async function getHostedVoiceStagingState(projectId: number) {
       candidateDefinitionHash: candidateVersion?.definitionHash ?? null,
       candidateDeploymentVersionId: candidateVersion?.id ?? null,
       candidateRemoteVersionId: deployment.candidateRemoteVersionId,
+      definition,
       definitionKey: deployment.definitionKey,
       id: deployment.id,
       mainRemoteVersionId: deployment.mainRemoteVersionId,

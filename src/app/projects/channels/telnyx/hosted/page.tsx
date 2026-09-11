@@ -62,6 +62,12 @@ export default async function TelnyxHostedVoicePage() {
   ]);
   const config = state.provider?.config;
   const deployment = state.deployment;
+  const definition = deployment?.definition;
+  const exactGreeting =
+    definition?.greeting.strategy === "exact" ? definition.greeting.text : "";
+  const selectedTaskVersionIds = new Set(
+    definition?.publishedTaskVersions.map(({ taskVersionId }) => taskVersionId),
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">
@@ -240,10 +246,15 @@ export default async function TelnyxHostedVoicePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bot className="size-5" />
-              Publish a non-main candidate
+              Publish a non-main candidate version
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <p className="mb-5 text-sm text-muted-foreground">
+              Telnyx lists MAIN, the candidate, and rollback history as
+              immutable versions of one Assistant. Their hash suffixes identify
+              different definitions; they are not duplicate Assistants.
+            </p>
             <ActionStateForm
               action={publishHostedVoiceCandidateAction}
               className="space-y-5"
@@ -265,7 +276,9 @@ export default async function TelnyxHostedVoicePage() {
                   <Input
                     id="agentName"
                     name="name"
-                    defaultValue={`${project.name} Voice Assistant`}
+                    defaultValue={
+                      definition?.name ?? `${project.name} Voice Assistant`
+                    }
                     required
                   />
                 </Field>
@@ -273,7 +286,7 @@ export default async function TelnyxHostedVoicePage() {
                   <Input
                     id="language"
                     name="language"
-                    defaultValue="en-AU"
+                    defaultValue={definition?.locale.language ?? "en-AU"}
                     required
                   />
                 </Field>
@@ -281,14 +294,18 @@ export default async function TelnyxHostedVoicePage() {
                   <Input
                     id="timezone"
                     name="timezone"
-                    defaultValue="Australia/Sydney"
+                    defaultValue={
+                      definition?.locale.timezone ?? "Australia/Sydney"
+                    }
                     required
                   />
                 </Field>
                 <Field label="Identity requirement" name="identityRequirement">
                   <select
                     className={selectClassName}
-                    defaultValue="verified"
+                    defaultValue={
+                      definition?.identity.defaultRequirement ?? "verified"
+                    }
                     id="identityRequirement"
                     name="identityRequirement"
                   >
@@ -300,14 +317,17 @@ export default async function TelnyxHostedVoicePage() {
                   <Input
                     id="verificationFactors"
                     name="verificationFactors"
-                    defaultValue="patientName,contactNumber"
+                    defaultValue={
+                      definition?.identity.verificationFactors.join(",") ??
+                      "patientName,contactNumber"
+                    }
                     placeholder="Canonical task input keys, comma-separated"
                   />
                 </Field>
                 <Field label="Handoff mode" name="handoffMode">
                   <select
                     className={selectClassName}
-                    defaultValue="available"
+                    defaultValue={definition?.handoff.mode ?? "available"}
                     id="handoffMode"
                     name="handoffMode"
                   >
@@ -323,7 +343,7 @@ export default async function TelnyxHostedVoicePage() {
                     type="number"
                     min={1}
                     max={365}
-                    defaultValue={30}
+                    defaultValue={definition?.retention.days ?? 30}
                     required
                   />
                 </Field>
@@ -333,6 +353,7 @@ export default async function TelnyxHostedVoicePage() {
                   id="greeting"
                   name="greeting"
                   rows={3}
+                  defaultValue={exactGreeting}
                   placeholder="Use synthetic staging identity only."
                   required
                 />
@@ -342,6 +363,7 @@ export default async function TelnyxHostedVoicePage() {
                   id="instructions"
                   name="instructions"
                   rows={14}
+                  defaultValue={definition?.instructions ?? ""}
                   placeholder="Paste the reviewed hosted voice instructions."
                   required
                 />
@@ -362,6 +384,9 @@ export default async function TelnyxHostedVoicePage() {
                     >
                       <input
                         className="mt-1"
+                        defaultChecked={selectedTaskVersionIds.has(
+                          task.taskVersionId,
+                        )}
                         name="taskVersionIds"
                         type="checkbox"
                         value={task.taskVersionId}
