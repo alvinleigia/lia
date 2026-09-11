@@ -137,13 +137,15 @@ export function bindRequestedTaskTextAnswer(input: {
   if (
     !input.requestedFieldKey ||
     !value ||
-    input.proposal.fieldCandidates.length > 0 ||
     input.proposal.safety.decision !== "allow" ||
     (input.proposal.turnKind !== "field_answer" &&
       input.proposal.turnKind !== "field_correction")
   ) {
     return input.proposal;
   }
+
+  // The current channel message is authoritative for a requested free-text
+  // field; a model candidate must never replace its caller provenance.
 
   return {
     ...input.proposal,

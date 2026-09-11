@@ -1318,7 +1318,7 @@ test("explicit task selections override model-rewritten resource IDs", () => {
   ]);
 });
 
-test("direct answers fill the requested text field when extraction returns no candidate", () => {
+test("direct answers bind the requested text field to the exact visitor message", () => {
   const proposal = {
     ambiguity: { question: null, requiresClarification: false },
     decisionSummary: "The visitor answered the requested field.",
@@ -1346,6 +1346,30 @@ test("direct answers fill the requested text field when extraction returns no ca
       confidence: 1,
       fieldKey: "guestName",
       naturalValue: "Phase 14 Release Guest",
+      source: "visitor",
+    },
+  ]);
+  expect(
+    bindRequestedTaskTextAnswer({
+      proposal: {
+        ...proposal,
+        fieldCandidates: [
+          {
+            confidence: 0.99,
+            fieldKey: "reason",
+            naturalValue: "General appointment",
+            source: "visitor" as const,
+          },
+        ],
+      },
+      requestedFieldKey: "reason",
+      text: "I need to discuss knee pain",
+    }).fieldCandidates,
+  ).toEqual([
+    {
+      confidence: 1,
+      fieldKey: "reason",
+      naturalValue: "I need to discuss knee pain",
       source: "visitor",
     },
   ]);

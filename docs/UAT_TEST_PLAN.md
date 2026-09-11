@@ -1440,6 +1440,26 @@ before commit. All 302 channel-certification tests, TypeScript, focused lint,
 and the production build pass; staging and production deployments are ready.
 Live lifecycle retest remains required before checking the item above.
 
+Architecture correction on 2026-09-12:
+
+- A later browser test proved the provider-hosted model could invent the
+  required booking reason `General appointment` and submit it as a tool
+  argument even though the caller never supplied it.
+- JSON Schema `required` validates presence, not caller provenance, so prompt
+  wording and hosted webhook schemas cannot provide the required hard fence.
+- The failed Telnyx candidate and Lia binding were removed, the safe prior
+  Telnyx MAIN was restored, and the synthetic calendar entry was deleted.
+- Provenance-sensitive lifecycle workflows now use Lia Flow Builder and the
+  Lia-managed Telnyx Voice channel. Telnyx supplies signed transcription,
+  speech, and call control; Lia owns state, validation, tools, and confirmation.
+- Lia binds a requested free-text field to the exact current caller transcript
+  and discards model-generated alternatives before field validation.
+
+The checklist below is retained as historical provider-managed UAT evidence.
+It is not an accepted release path for appointment writes or identity-protected
+lookups. Replacement browser UAT runs in Flow Builder or Project Chat; live
+voice transport UAT resumes after a Telnyx Voice API connection is assigned.
+
 1. [ ] Publish a Lia draft to a non-main Telnyx Assistant version and route only
        the staging number or approved test callers to it.
 2. [ ] Confirm greeting, ordinary conversation, interruption, transfer, and
@@ -1461,14 +1481,16 @@ Live lifecycle retest remains required before checking the item above.
 10. [ ] Record normal-turn and tool P50/P95/P99 latency, actual call cost, and
         estimated cost per verified booking against the approved release targets.
 
-Result: [ ] Pass [ ] Fail
+Result: [ ] Pass [x] Fail
 
 - Telnyx test number: `<masked number>`
 - Assistant/candidate/main version IDs: `<masked IDs>`
 - Tested Lia voice version and tools: `<versions>`
 - Correlated call/conversation IDs: `<masked IDs>`
 - Latency/cost evidence: `<metrics or links>`
-- Defects/evidence: `Attempts #25, #28, and #30; preflight lifecycle verified; live hosted availability and confirmed booking passed on 2026-09-07`
+- Defects/evidence: `Attempts #25, #28, and #30; preflight lifecycle verified;
+  live hosted availability and confirmed booking passed on 2026-09-07;
+  provider-hosted model fabricated required booking reason on 2026-09-11`
 - Tester/date: `<name/date>`
 
 # Final Release Record

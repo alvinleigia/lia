@@ -1,5 +1,6 @@
 import {
   Activity,
+  AlertTriangle,
   ArrowLeft,
   Bot,
   CloudUpload,
@@ -76,16 +77,34 @@ export default async function TelnyxHostedVoicePage() {
           <div>
             <p className="text-sm text-muted-foreground">Phase 18.14 staging</p>
             <h1 className="text-3xl font-semibold">
-              Telnyx Hosted Assistant: {project.name}
+              Provider-managed Telnyx Assistant: {project.name}
             </h1>
           </div>
           <Button asChild variant="outline">
             <Link href="/projects/channels/telnyx">
               <ArrowLeft className="size-4" />
-              Legacy Voice settings
+              Lia-managed Voice settings
             </Link>
           </Button>
         </div>
+
+        <Card className="border-amber-300 bg-amber-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-5" />
+              This is not the Lia Flow Builder runtime
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-amber-950">
+            <p>
+              The Telnyx-hosted model controls turn decisions and webhook
+              arguments here. Workflows requiring deterministic field
+              collection, caller-input provenance, identity checks, or write
+              confirmation must be built and tested in Lia Flow Builder, then
+              delivered through the Lia-managed Telnyx Voice channel.
+            </p>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

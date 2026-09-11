@@ -1,4 +1,13 @@
-import { Bot, KeyRound, PhoneCall, Save, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  Bot,
+  FlaskConical,
+  KeyRound,
+  PhoneCall,
+  Save,
+  ShieldCheck,
+  Workflow,
+} from "lucide-react";
 import Link from "next/link";
 import { NoProjectState } from "@/components/no-project-state";
 import {
@@ -65,18 +74,50 @@ export default async function TelnyxVoiceChannelPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
-              <Bot className="h-5 w-5" />
-              Telnyx Hosted Assistant
+              <Workflow className="h-5 w-5" />
+              Lia-managed voice workflows
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Build collection, validation, routing, confirmation, and tool
+              execution in Lia Flow Builder. Telnyx remains the signed voice
+              transport for transcription, speech, and call control.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <Link href="/projects/actions">
+                  <Workflow className="h-4 w-4" />
+                  Build in Flow Builder
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/projects/chat">
+                  <FlaskConical className="h-4 w-4" />
+                  Test in browser
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <AlertTriangle className="h-5 w-5" />
+              Legacy provider-managed Assistant
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              Use the provider-native low-latency architecture for Phase 18.14
-              staging, candidate deployment, Lia tools, drift, and rollback.
+              The Telnyx-hosted model owns turn decisions and tool arguments on
+              this path. Do not use it for workflows that require deterministic
+              caller-input provenance or Lia-managed write confirmation.
             </p>
-            <Button asChild>
+            <Button asChild variant="outline">
               <Link href="/projects/channels/telnyx/hosted">
-                Open hosted staging
+                <Bot className="h-4 w-4" />
+                Open legacy staging
               </Link>
             </Button>
           </CardContent>
