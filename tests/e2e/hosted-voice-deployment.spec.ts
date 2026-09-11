@@ -837,9 +837,7 @@ test("Telnyx adapter executes a shared webhook without a call and removes the te
   expect(requests[4]?.url).toContain(
     "/ai/assistants/temporary-assistant/tools/temporary-verification-tool",
   );
-  expect(requests.at(-1)?.url).toContain(
-    "/ai/tools/temporary-verification-tool",
-  );
+  expect(requests.at(-1)?.url).toContain("/ai/assistants/temporary-assistant");
   expect(JSON.stringify(requests)).not.toContain("restricted-test-key");
 });
 
@@ -915,11 +913,11 @@ test("Telnyx adapter removes temporary resources after a failed no-call webhook 
     },
     {
       method: "DELETE",
-      url: "https://api.telnyx.com/v2/ai/assistants/temporary-assistant",
+      url: "https://api.telnyx.com/v2/ai/tools/temporary-verification-tool",
     },
     {
       method: "DELETE",
-      url: "https://api.telnyx.com/v2/ai/tools/temporary-verification-tool",
+      url: "https://api.telnyx.com/v2/ai/assistants/temporary-assistant",
     },
   ]);
 });

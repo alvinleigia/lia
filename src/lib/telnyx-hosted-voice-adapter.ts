@@ -959,28 +959,6 @@ export function createTelnyxHostedVoiceAdapter(input: {
         }
       }
 
-      if (assistantId) {
-        try {
-          const retryCount = await deleteTemporaryResource(
-            `/ai/assistants/${encodeURIComponent(assistantId)}`,
-            "Telnyx no-call verification assistant cleanup",
-          );
-          if (retryCount > 0) {
-            steps.push(
-              "Retried temporary assistant cleanup after a transient Telnyx failure.",
-            );
-          }
-          steps.push(
-            `Deleted temporary assistant …${shortTelnyxId(assistantId)}.`,
-          );
-        } catch (error) {
-          steps.push(
-            `Delete temporary assistant …${shortTelnyxId(assistantId)} failed (${getSafeVerificationFailure(error)}).`,
-          );
-          failure ??= error;
-        }
-      }
-
       if (verificationToolId) {
         try {
           const retryCount = await deleteTemporaryResource(
@@ -998,6 +976,28 @@ export function createTelnyxHostedVoiceAdapter(input: {
         } catch (error) {
           steps.push(
             `Delete temporary signed tool …${shortTelnyxId(verificationToolId)} failed (${getSafeVerificationFailure(error)}).`,
+          );
+          failure ??= error;
+        }
+      }
+
+      if (assistantId) {
+        try {
+          const retryCount = await deleteTemporaryResource(
+            `/ai/assistants/${encodeURIComponent(assistantId)}`,
+            "Telnyx no-call verification assistant cleanup",
+          );
+          if (retryCount > 0) {
+            steps.push(
+              "Retried temporary assistant cleanup after a transient Telnyx failure.",
+            );
+          }
+          steps.push(
+            `Deleted temporary assistant …${shortTelnyxId(assistantId)}.`,
+          );
+        } catch (error) {
+          steps.push(
+            `Delete temporary assistant …${shortTelnyxId(assistantId)} failed (${getSafeVerificationFailure(error)}).`,
           );
           failure ??= error;
         }
