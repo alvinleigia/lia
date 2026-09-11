@@ -62,6 +62,9 @@ test("ordinary hosted speech remains entirely inside the Telnyx native config", 
   expect(compiled.managedConfig.instructions).toContain(
     "No additional hosted-voice verification factors are configured.",
   );
+  expect(compiled.managedConfig.instructions).toContain(
+    "Never infer, synthesize, assume, default, or use a placeholder",
+  );
   expect(JSON.stringify(compiled.managedConfig)).not.toContain("/api/chat");
   expect(JSON.stringify(compiled.managedConfig)).not.toContain(
     "/api/conversation/turn",
@@ -251,6 +254,12 @@ test("Telnyx candidate setup preserves Lia's read and two-phase write boundary",
           type: "text" as const,
         },
         {
+          key: "reason",
+          required: true,
+          source: { key: "reason", kind: "field" as const },
+          type: "text" as const,
+        },
+        {
           key: "calendarId",
           required: true,
           source: { kind: "literal" as const, value: "private-calendar" },
@@ -283,8 +292,16 @@ test("Telnyx candidate setup preserves Lia's read and two-phase write boundary",
     "commit",
   ]);
   expect(manifest.tools[0]?.body_parameters).toMatchObject({
-    properties: { startsAt: { type: "string" } },
-    required: ["startsAt"],
+    properties: {
+      reason: {
+        description: expect.stringContaining(
+          "Never infer, synthesize, assume, default, or use a placeholder",
+        ),
+        type: "string",
+      },
+      startsAt: { type: "string" },
+    },
+    required: ["startsAt", "reason"],
   });
   expect(manifest.tools[1]?.timeout_ms).toBe(10_000);
   expect(manifest.tools[1]?.description).toContain(
@@ -295,6 +312,12 @@ test("Telnyx candidate setup preserves Lia's read and two-phase write boundary",
   );
   expect(manifest.tools[1]?.description).toContain(
     "ask exactly one explicit confirmation",
+  );
+  expect(manifest.tools[1]?.description).toContain(
+    "Never infer, synthesize, assume, default, or use a placeholder",
+  );
+  expect(manifest.tools[1]?.description).toContain(
+    "every prepared caller-visible input",
   );
   expect(manifest.tools[2]?.body_parameters).toMatchObject({
     properties: { commitToken: { type: "string" } },

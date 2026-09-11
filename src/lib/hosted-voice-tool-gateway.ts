@@ -22,7 +22,7 @@ const PENDING_RESPONSE = {
   status: "pending" as const,
 };
 const PREPARED_RESPONSE_INSTRUCTION =
-  "Give one concise summary of the prepared action and ask exactly one explicit confirmation. Do not re-collect or reconfirm known fields. Stop after asking. Do not call the commit tool until a later caller message explicitly confirms this prepared action.";
+  "Give one concise summary of the prepared action containing every prepared caller-visible input, then ask exactly one explicit confirmation. Do not omit, replace, or generalize a prepared value. Do not re-collect or reconfirm known fields. Stop after asking. Do not call the commit tool until a later caller message explicitly confirms this prepared action.";
 const FORBIDDEN_SCOPE_KEYS = new Set([
   "calendarid",
   "companyid",

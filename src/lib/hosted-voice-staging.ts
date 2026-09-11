@@ -414,7 +414,7 @@ function buildToolSetupEntries(baseUrl: string, tool: ToolDefinitionV1) {
       async: false,
       baseUrl,
       bodyParameters: buildBodyParameters(tool),
-      description: `${tool.description} Call this prepare tool immediately once all required inputs are known. Do not recap or ask for confirmation first. It does not change the calendar. After it returns, give one concise summary, ask exactly one explicit confirmation, and stop until a later caller message.`,
+      description: `${tool.description} Call this prepare tool immediately once all required inputs are known. A required input is known only when it was explicitly supplied or confirmed by the caller, provided by an approved Telnyx system value permitted by policy, or returned by an authoritative Lia tool. Never infer, synthesize, assume, default, or use a placeholder for a required input. If one is unavailable, ask the caller for it and do not call this tool. Do not recap or ask for confirmation first. It does not change the calendar. After it returns, give one concise summary containing every prepared caller-visible input, ask exactly one explicit confirmation, and stop until a later caller message.`,
       phase: "prepare",
       timeoutMs: Math.min(tool.execution.timeoutMs, 10_000),
       tool,
@@ -473,7 +473,9 @@ function buildBodyParameters(tool: ToolDefinitionV1) {
       fields.map((field) => [
         field.key,
         {
-          description: `Canonical Lia input: ${field.key}`,
+          description: field.required
+            ? `Required Lia input: ${field.key}. Use only an exact value explicitly supplied or confirmed by the caller, an approved Telnyx system value permitted by policy, or an authoritative Lia tool result. Never infer, synthesize, assume, default, or use a placeholder. If unavailable, ask the caller for it and do not call this tool.`
+            : `Optional Lia input: ${field.key}. Omit it unless its exact value was explicitly supplied or confirmed by the caller, provided by an approved Telnyx system value permitted by policy, or returned by an authoritative Lia tool. Never infer, synthesize, assume, default, or use a placeholder.`,
           type: getJsonSchemaType(field.type),
         },
       ]),

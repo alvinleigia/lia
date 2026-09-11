@@ -419,6 +419,12 @@ test("writes require an expiring single-use token bound to exact canonical input
   expect(prepared.assistantInstruction).toContain(
     "Do not re-collect or reconfirm known fields",
   );
+  expect(prepared.assistantInstruction).toContain(
+    "every prepared caller-visible input",
+  );
+  expect(prepared.assistantInstruction).toContain(
+    "Do not omit, replace, or generalize a prepared value",
+  );
   expect(executor.calls).toHaveLength(0);
   expect(JSON.stringify(repository.calls)).not.toContain(prepared.commitToken);
 
