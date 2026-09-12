@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
   appointmentChoiceOptions,
+  appointmentReviewItems,
+  appointmentReviewLines,
   appointmentSlotOptions,
   isReadOnlyCalendarOperation,
   resolveAppointmentChoice,
@@ -143,4 +145,19 @@ test("generic calendar adapters require explicit business outcomes and bounded s
   expect(
     appointmentSlotOptions({ slots: [{ ...first, end: first.start }] }),
   ).toEqual([]);
+});
+
+test("confirmation shows both zoned times and the stored reason, with an explicit missing-reason fallback", () => {
+  const items = appointmentReviewItems({
+    ...first,
+    timezone: "Australia/Sydney",
+    appointmentReason: "Persistent knee pain",
+  });
+  expect(items[0].value).toContain("10:00 am (Australia/Sydney)");
+  expect(items[1].value).toContain("10:30 am (Australia/Sydney)");
+  expect(appointmentReviewLines({ items })).toContain(
+    "- Appointment Reason: Persistent knee pain",
+  );
+  expect(appointmentReviewItems(first)[2].value).toBe("Not recorded");
+  expect(appointmentReviewItems(first)[0].value).toContain("(UTC)");
 });

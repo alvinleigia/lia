@@ -1715,6 +1715,8 @@ Verification includes scoped durable-ledger tests for missing identity, a single
 
 Next manual staging test: use a fresh Project Chat session with the action published and its reschedule step pinned to task version 2. Request rescheduling, enter Alex Test and the test contact number, and verify that the existing booking is found without asking for its reference. Select a new time, confirm, and verify the same calendar event moved with its reason retained. Then test two upcoming appointments, cancellation, and record turn/tool latency. Do not create another assistant for this test. This code change does not require republishing an unchanged task or action.
 
+Cancellation review follow-up: the manual staging reschedule showed the Alex Test event at 06:00-06:30 in the user's calendar display, with the appointment reason retained. The cancellation review then exposed only collected identity/reference fields. The runtime now includes provider-verified start/end with timezone and the recorded reason in both the displayed review and saved confirmation, retaining the reference. Google lookup reads the actual event times and supports reasons from existing Lia event titles and new private event metadata. The automated regression checks cancellation review text and invalidation when the reason changes after approval. Live cancellation and duplicate-event checks remain pending.
+
 Phase 18 remains **IN PROGRESS**. Booking success and unlisted-slot rejection
 have staging evidence above. Remaining checks include stale-slot rejection,
 no-result/failure handling, reschedule/cancel routing and writes, measured

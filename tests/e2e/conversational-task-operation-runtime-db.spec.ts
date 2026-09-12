@@ -2352,6 +2352,102 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
         newStart: newSlot.start,
       },
     ]);
+    const cancelOperation = await createOperation({
+      projectId,
+      providerId: genericProvider.id,
+      name: "Cancel Calendar Appointment",
+      operationType: "appointment.cancel",
+      inputMapping: {
+        appointmentRef: "fields.appointmentRef",
+        patientName: "fields.guestName",
+        patientEmail: "fields.guestEmail",
+      },
+      outputMapping: {},
+      status: "active",
+    });
+    const cancelTask = await createPublishedTask({
+      name: "Cancel appointment review",
+      projectId,
+      operationId: cancelOperation.id,
+      definition: {
+        ...lookupSnapshot.task.definition,
+        fields: lookupSnapshot.task.definition.fields.slice(0, 3),
+        tools: [
+          {
+            access: "read",
+            allowedStages: ["lookup"],
+            tool: { id: `operation:${genericLookup.id}`, version: 1 },
+          },
+          {
+            access: "write",
+            allowedStages: ["operation"],
+            tool: { id: `operation:${cancelOperation.id}`, version: 1 },
+          },
+        ],
+      },
+    });
+    const cancelSnapshot = conversationalTaskSnapshotV1Schema.parse(
+      cancelTask.version.snapshot,
+    );
+    const cancelRun = await startReadyRun(cancelTask.task.id);
+    adapterAppointments = adapterAppointments.map((item) => ({
+      ...item,
+      appointmentReason: "Persistent knee pain",
+      timezone: "Australia/Sydney",
+    }));
+    await executeRequiredTaskFieldLookup({
+      projectId,
+      taskRunId: cancelRun.taskRunId,
+      snapshot: cancelSnapshot,
+      requestId: "cancel-review-lookup",
+    });
+    const cancelReplies = await buildHybridChannelResumeReplies({
+      projectId,
+      channelType: "project_chat",
+      externalConversationId: cancelRun.externalConversationId,
+    });
+    expect(cancelReplies[0].text).toContain("Appointment Start:");
+    expect(cancelReplies[0].text).toContain("Appointment End:");
+    expect(cancelReplies[0].text).toContain("(Australia/Sydney)");
+    expect(cancelReplies[0].text).toContain(
+      "Appointment Reason: Persistent knee pain",
+    );
+    expect(cancelReplies[0].text).toContain(
+      adapterAppointments[0].appointmentRef,
+    );
+    const cancellation = (
+      await getConversationalTaskRuntime({
+        projectId,
+        taskRunId: cancelRun.taskRunId,
+      })
+    )?.confirmations[0];
+    if (!cancellation) throw new Error("Cancellation confirmation missing");
+    expect(cancellation.summary).toMatchObject({
+      items: expect.arrayContaining([
+        expect.objectContaining({
+          key: "appointment.reason",
+          value: "Persistent knee pain",
+        }),
+      ]),
+    });
+    await confirmTaskOperation({
+      projectId,
+      taskRunId: cancelRun.taskRunId,
+      confirmationId: cancellation.id,
+      principal,
+    });
+    adapterAppointments = adapterAppointments.map((item) => ({
+      ...item,
+      appointmentReason: "Changed reason",
+    }));
+    await expect(
+      executeConfirmedTaskOperation({
+        projectId,
+        taskRunId: cancelRun.taskRunId,
+        confirmationId: cancellation.id,
+        principal,
+      }),
+    ).rejects.toThrow("Review and confirm again");
   } finally {
     globalThis.fetch = originalFetch;
   }

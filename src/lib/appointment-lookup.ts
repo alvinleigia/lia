@@ -7,6 +7,20 @@ export const appointmentMatchSchema = z.object({
   start: z.string().datetime({ offset: true }),
   end: z.string().datetime({ offset: true }),
   spoken: z.string().trim().min(1).max(240),
+  appointmentReason: z.string().trim().min(1).max(240).nullable().optional(),
+  timezone: z
+    .string()
+    .min(1)
+    .max(120)
+    .refine((value) => {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone: value });
+        return true;
+      } catch {
+        return false;
+      }
+    })
+    .optional(),
 });
 export type AppointmentMatch = z.infer<typeof appointmentMatchSchema>;
 
@@ -157,4 +171,55 @@ export function appointmentSlotOptions(value: unknown) {
     label: slot.spoken,
     value: slot.start,
   }));
+}
+
+export function appointmentReviewItems(appointment: AppointmentMatch) {
+  const timezone = appointment.timezone ?? "UTC";
+  const format = new Intl.DateTimeFormat("en-AU", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: timezone,
+  });
+  return [
+    {
+      key: "appointment.start",
+      label: "Appointment Start",
+      source: "tool" as const,
+      value: `${format.format(new Date(appointment.start))} (${timezone})`,
+    },
+    {
+      key: "appointment.end",
+      label: "Appointment End",
+      source: "tool" as const,
+      value: `${format.format(new Date(appointment.end))} (${timezone})`,
+    },
+    {
+      key: "appointment.reason",
+      label: "Appointment Reason",
+      source: "tool" as const,
+      value: appointment.appointmentReason ?? "Not recorded",
+    },
+  ];
+}
+
+export function appointmentReviewLines(summary: unknown) {
+  const parsed = z
+    .object({
+      items: z.array(
+        z.object({ key: z.string(), label: z.string(), value: z.unknown() }),
+      ),
+    })
+    .safeParse(summary);
+  return parsed.success
+    ? parsed.data.items
+        .filter(
+          (item) =>
+            [
+              "appointment.start",
+              "appointment.end",
+              "appointment.reason",
+            ].includes(item.key) && typeof item.value === "string",
+        )
+        .map((item) => `- ${item.label}: ${item.value}`)
+    : [];
 }

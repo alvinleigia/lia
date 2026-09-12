@@ -81,6 +81,8 @@ export const googleCalendarConfigSchema = z
 export type GoogleCalendarConfig = z.infer<typeof googleCalendarConfigSchema>;
 
 export type GoogleCalendarEvent = {
+  summary?: string;
+  appointmentReason?: string;
   end: string;
   etag: string;
   id: string;
@@ -329,6 +331,10 @@ const freeBusyResponseSchema = z.object({
 });
 
 const eventResponseSchema = z.object({
+  summary: z.string().optional(),
+  extendedProperties: z
+    .object({ private: z.record(z.string(), z.string()).optional() })
+    .optional(),
   end: z.object({ dateTime: z.string().datetime({ offset: true }) }),
   etag: z.string().min(1),
   id: z.string().min(1),
@@ -339,6 +345,8 @@ const eventResponseSchema = z.object({
 function parseEvent(value: unknown): GoogleCalendarEvent {
   const event = eventResponseSchema.parse(value);
   return {
+    summary: event.summary,
+    appointmentReason: event.extendedProperties?.private?.liaAppointmentReason,
     end: event.end.dateTime,
     etag: event.etag,
     id: event.id,

@@ -1,6 +1,9 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { z } from "zod";
-import { appointmentMatchSchema } from "@/lib/appointment-lookup";
+import {
+  type AppointmentMatch,
+  appointmentMatchSchema,
+} from "@/lib/appointment-lookup";
 import {
   createGoogleCalendarApi,
   type GoogleBusyPeriod,
@@ -314,6 +317,9 @@ async function bookAppointment(
           end: interval.end,
           eventId,
           privateProperties: {
+            ...(parsed.data.reason
+              ? { liaAppointmentReason: parsed.data.reason }
+              : {}),
             liaIdentityHash: identity.value,
             liaOperationKey: operationKeyHash,
           },
@@ -415,7 +421,7 @@ async function lookupAppointments(
       ...(appointments.length > 0 ? { reason: "identity_mismatch" } : {}),
     });
   }
-  const verified: GoogleCalendarAppointment[] = [];
+  const verified: ReturnType<typeof publicAppointment>[] = [];
   for (const candidate of matchingAppointments) {
     const appointment = await upgradeLegacyIdentity(
       context,
@@ -432,7 +438,30 @@ async function lookupAppointments(
           status: "cancelled",
         });
       } else {
-        verified.push(appointment);
+        const prefix = `${String(context.payload.patientName ?? "")
+          .trim()
+          .slice(0, 120)} \u2014 `;
+        const legacyReason =
+          prefix.trim() !== "\u2014" &&
+          event.summary
+            ?.toLocaleLowerCase("en-US")
+            .startsWith(prefix.toLocaleLowerCase("en-US"))
+            ? event.summary.slice(prefix.length).trim()
+            : null;
+        verified.push({
+          ...publicAppointment(context, appointment),
+          start: event.start,
+          end: event.end,
+          spoken: spokenDateTime(
+            new Date(event.start),
+            context.config.timezone,
+          ),
+          appointmentReason:
+            (
+              event.appointmentReason?.trim() ||
+              (legacyReason === "Appointment" ? null : legacyReason)
+            )?.slice(0, 240) ?? null,
+        });
       }
     } catch (error) {
       if (isMissingEvent(error)) {
@@ -448,9 +477,7 @@ async function lookupAppointments(
     }
   }
   return completed(verified.length ? "success" : "no_result", {
-    appointments: verified.map((appointment) =>
-      publicAppointment(context, appointment),
-    ),
+    appointments: verified,
   });
 }
 
@@ -756,9 +783,10 @@ function appointmentSuccess(
 function publicAppointment(
   context: OperationContext,
   appointment: GoogleCalendarAppointment,
-) {
+): AppointmentMatch {
   return {
     appointmentRef: appointment.reference,
+    timezone: context.config.timezone,
     end: appointment.endAt.toISOString(),
     spoken: spokenDateTime(appointment.startAt, context.config.timezone),
     start: appointment.startAt.toISOString(),

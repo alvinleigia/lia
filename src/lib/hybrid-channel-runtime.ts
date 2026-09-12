@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
-import { resolveAppointmentChoice } from "@/lib/appointment-lookup";
+import {
+  appointmentReviewLines,
+  resolveAppointmentChoice,
+} from "@/lib/appointment-lookup";
 import {
   cancelChannelFlowAfterHybridEnd,
   completeChannelFlowAfterHybridEnd,
@@ -222,6 +225,7 @@ function formatConfirmationValue(value: unknown) {
 }
 
 async function buildTaskConfirmationText(input: {
+  confirmationSummary: unknown;
   operationName: string;
   projectId: number;
   runtime: NonNullable<
@@ -282,6 +286,7 @@ async function buildTaskConfirmationText(input: {
   return [
     "Please review these details:",
     ...lines,
+    ...appointmentReviewLines(input.confirmationSummary),
     "",
     `Confirm to submit this request through ${input.operationName}, or Cancel to stop.`,
   ].join("\n");
@@ -297,13 +302,14 @@ async function prepareRequiredTaskConfirmation(input: {
   const definition = getRequiredCompletionOperationDefinition(input.snapshot);
   if (!definition) return null;
 
-  await prepareTaskOperationConfirmation({
+  const confirmation = await prepareTaskOperationConfirmation({
     projectId: input.projectId,
     taskRunId: input.runtime.run.id,
     toolId: definition.id,
   });
   return {
     text: await buildTaskConfirmationText({
+      confirmationSummary: confirmation.summary,
       operationName: definition.name,
       projectId: input.projectId,
       runtime: input.runtime,

@@ -6,7 +6,10 @@ import {
   resolveAppointmentChoice,
   upcomingAppointmentMatches,
 } from "@/lib/appointment-lookup";
-import type { ConversationalTaskSnapshotV1 } from "@/lib/conversation-contracts";
+import type {
+  ConversationalTaskSnapshotV1,
+  ToolDefinitionV1,
+} from "@/lib/conversation-contracts";
 import { executeTaskReadOperation } from "@/lib/conversational-task-calendar-availability";
 import { getConversationalTaskRuntime } from "@/lib/conversational-task-runtime";
 import { buildCanonicalToolInput } from "@/lib/conversational-task-tool-runtime";
@@ -222,4 +225,119 @@ export async function executeRequiredTaskFieldLookup(
       reply: `The lookup did not supply the required verified details. The team needs to review Lia attempt #${result.attempt.id}.`,
     };
   return { status: "success" };
+}
+
+// Confirmation details come from the selected, identity-scoped provider result,
+// even when the published task only maps the reference into a field.
+export async function getTaskAppointmentReview(
+  input: LookupInput & { definition: ToolDefinitionV1; refresh?: boolean },
+) {
+  const referenceInput = input.definition.inputSchema.fields.find(
+    (field) => field.key === "appointmentRef",
+  );
+  if (referenceInput?.source.kind !== "field") return null;
+  const referenceKey = referenceInput.source.key;
+  const runtime = await getConversationalTaskRuntime(input);
+  const reference = runtime?.fields.find(
+    (field) =>
+      field.fieldKey === referenceKey &&
+      ["valid", "confirmed"].includes(field.state),
+  )?.canonicalValue;
+  if (typeof reference !== "string" || !runtime) return null;
+  const write = await getProjectOperation(
+    input.projectId,
+    Number(input.definition.execution.handler),
+  );
+  if (
+    !write ||
+    ![
+      "google_calendar.cancel",
+      "google_calendar.reschedule",
+      "appointment.cancel",
+      "appointment.reschedule",
+    ].includes(write.operation.operationType)
+  )
+    return null;
+  for (const definition of input.snapshot.toolDefinitions) {
+    if (
+      definition.access !== "read" ||
+      definition.execution.adapter !== "operation" ||
+      !definition.resultMappings.some(
+        (mapping) =>
+          mapping.target === "field" &&
+          mapping.targetKey === referenceKey &&
+          mapping.sourcePath === "appointments.0.appointmentRef",
+      )
+    )
+      continue;
+    const binding = input.snapshot.task.definition.tools.find(
+      (item) =>
+        item.tool.id === definition.id &&
+        item.tool.version === definition.version,
+    );
+    if (binding?.access !== "read" || !binding.allowedStages.includes("lookup"))
+      continue;
+    const lookup = await getProjectOperation(
+      input.projectId,
+      Number(definition.execution.handler),
+    );
+    if (
+      !lookup ||
+      lookup.provider.id !== write.provider.id ||
+      !isAppointmentLookup(lookup.operation.operationType)
+    )
+      continue;
+    const canonical = buildCanonicalToolInput({
+      definition,
+      fields: new Map(runtime.fields.map((field) => [field.fieldKey, field])),
+      context: new Map(runtime.context.map((item) => [item.key, item])),
+      now: new Date(),
+      proposedInput: {},
+    });
+    const [attempt] = await db
+      .select()
+      .from(operationAttempts)
+      .where(
+        and(
+          eq(operationAttempts.projectId, input.projectId),
+          eq(operationAttempts.taskRunId, input.taskRunId),
+          eq(operationAttempts.operationId, lookup.operation.id),
+        ),
+      )
+      .orderBy(desc(operationAttempts.id))
+      .limit(1);
+    if (
+      !canonical.ok ||
+      !attempt?.finishedAt ||
+      !isDeepStrictEqual(canonical.input, attempt.requestPayload.payload) ||
+      getTaskOperationOutcome(attempt, lookup.operation) !== "success"
+    )
+      throw new Error(
+        "Find the appointment again before reviewing this change.",
+      );
+    const appointment = upcomingAppointmentMatches(
+      attempt.responsePayload,
+      attempt.finishedAt,
+    )?.find((item) => item.appointmentRef === reference);
+    if (!appointment)
+      throw new Error("The selected appointment could not be verified.");
+    if (input.refresh) {
+      const refreshed = await executeTaskReadOperation({
+        ...input,
+        definition,
+        selectedAppointment: appointment,
+      });
+      if (refreshed.taskOutcome !== "success")
+        throw new Error(
+          "The appointment changed or could not be verified. Find it again before confirming.",
+        );
+      return (
+        upcomingAppointmentMatches(refreshed.attempt.responsePayload)?.find(
+          (item) => item.appointmentRef === reference,
+        ) ?? null
+      );
+    }
+    return appointment;
+  }
+  return null;
 }

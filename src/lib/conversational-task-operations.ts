@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { appointmentReviewItems } from "@/lib/appointment-lookup";
 import {
   type ConversationalTaskSnapshotV1,
   conversationalTaskSnapshotV1Schema,
@@ -10,6 +11,7 @@ import {
   readCanonicalAvailability,
 } from "@/lib/conversational-task-availability";
 import { assertTaskCalendarSlot } from "@/lib/conversational-task-calendar-availability";
+import { getTaskAppointmentReview } from "@/lib/conversational-task-field-lookups";
 import {
   applyConversationalTaskEvent,
   getConversationalTaskRuntime,
@@ -198,6 +200,13 @@ async function loadTaskOperationContext(input: {
 async function refreshVolatileFacts(
   context: Awaited<ReturnType<typeof loadTaskOperationContext>>,
 ) {
+  await getTaskAppointmentReview({
+    definition: context.definition,
+    projectId: context.runtime.run.projectId,
+    taskRunId: context.runtime.run.id,
+    snapshot: context.snapshot,
+    refresh: true,
+  });
   await assertTaskCalendarSlot({
     definition: context.definition,
     projectId: context.runtime.run.projectId,
@@ -261,7 +270,7 @@ async function refreshVolatileFacts(
   }
 }
 
-function buildConfirmationState(input: {
+async function buildConfirmationState(input: {
   definition: ToolDefinitionV1;
   runtime: NonNullable<
     Awaited<ReturnType<typeof getConversationalTaskRuntime>>
@@ -359,6 +368,13 @@ function buildConfirmationState(input: {
     });
   }
 
+  const appointment = await getTaskAppointmentReview({
+    definition: input.definition,
+    projectId: input.runtime.run.projectId,
+    taskRunId: input.runtime.run.id,
+    snapshot: input.snapshot,
+  });
+  if (appointment) items.push(...appointmentReviewItems(appointment));
   const summary: ConfirmationSummary = {
     items,
     operationName: input.definition.name,
@@ -418,7 +434,7 @@ export async function prepareTaskOperationConfirmation(input: {
   let context = await loadTaskOperationContext(input);
   await refreshVolatileFacts(context);
   context = await loadTaskOperationContext(input);
-  const state = buildConfirmationState(context);
+  const state = await buildConfirmationState(context);
   const now = new Date();
   const active = await db
     .select()
@@ -559,7 +575,7 @@ export async function confirmTaskOperation(input: {
     taskRunId: input.taskRunId,
     refresh: false,
   });
-  const state = buildConfirmationState(context);
+  const state = await buildConfirmationState(context);
   if (state.canonicalHash !== confirmation.canonicalHash) {
     await db
       .update(conversationalTaskConfirmations)
@@ -698,7 +714,7 @@ export async function executeConfirmedTaskOperation(input: {
     taskRunId: input.taskRunId,
     toolId: confirmation.toolId,
   });
-  const state = buildConfirmationState(context);
+  const state = await buildConfirmationState(context);
   const now = new Date();
   if (
     confirmation.expiresAt <= now ||

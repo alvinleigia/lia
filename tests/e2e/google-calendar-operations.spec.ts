@@ -291,7 +291,9 @@ test("booking rechecks the slot, verifies the event, and replays one opaque refe
   expect(replay.responsePayload).toEqual(first.responsePayload);
   expect(api.insertCalls).toBe(1);
   expect(api.getCalls).toBe(2);
-  expect(JSON.stringify(first)).not.toContain("lia");
+  expect(JSON.stringify(first)).not.toContain(
+    store.appointments[0].remoteEventId,
+  );
   expect(JSON.stringify(store.appointments)).not.toContain("Ava Example");
   expect(JSON.stringify(store.appointments)).not.toContain("1990-01-01");
 });
@@ -504,6 +506,43 @@ test("a retry recovers a deterministic event created before local persistence", 
   expect(store.appointments).toHaveLength(1);
 });
 
+test("lookup carries the stored reason and current calendar times, including legacy bookings", async () => {
+  const api = new MemoryGoogleCalendarApi();
+  const store = new MemoryAppointmentStore();
+  const context = fixture({ api, store });
+  await execute(
+    context,
+    "google_calendar.book",
+    identity({ start: MONDAY_NINE, reason: "Persistent knee pain" }),
+  );
+  const event = [...api.events.values()][0];
+  expect(event.appointmentReason).toBe("Persistent knee pain");
+  event.start = TUESDAY_TEN;
+  event.end = "2026-08-25T00:30:00.000Z";
+  const found = await execute(context, "google_calendar.lookup", identity());
+  expect(found.responsePayload).toMatchObject({
+    appointments: [
+      {
+        start: TUESDAY_TEN,
+        end: event.end,
+        appointmentReason: "Persistent knee pain",
+        timezone: "Australia/Sydney",
+      },
+    ],
+  });
+  // Existing events have the reason in their Lia-generated calendar title.
+  delete event.appointmentReason;
+  const legacy = await execute(context, "google_calendar.lookup", identity());
+  expect(legacy.responsePayload).toMatchObject({
+    appointments: [{ appointmentReason: "Persistent knee pain" }],
+  });
+  event.summary = "Ava Example \u2014 Appointment";
+  expect(
+    (await execute(context, "google_calendar.lookup", identity()))
+      .responsePayload,
+  ).toMatchObject({ appointments: [{ appointmentReason: null }] });
+});
+
 function fixture(input?: {
   api?: MemoryGoogleCalendarApi;
   idempotencyKey?: string;
@@ -566,12 +605,22 @@ class MemoryGoogleCalendarApi implements GoogleCalendarApi {
     ].filter((period) => start < period.end && end > period.start);
   }
 
-  async insertEvent(input: { end: Date; eventId: string; start: Date }) {
+  async insertEvent(input: {
+    end: Date;
+    eventId: string;
+    start: Date;
+    summary: string;
+    privateProperties: Record<string, string>;
+  }) {
     this.insertCalls += 1;
     if (this.events.has(input.eventId)) {
       throw new GoogleCalendarApiError("duplicate", 409);
     }
-    const event = eventValue(input.eventId, input.start, input.end, 1);
+    const event = {
+      ...eventValue(input.eventId, input.start, input.end, 1),
+      summary: input.summary,
+      appointmentReason: input.privateProperties.liaAppointmentReason,
+    };
     this.events.set(input.eventId, event);
     if (this.insertUnknownAfterCreate) {
       this.insertUnknownAfterCreate = false;
