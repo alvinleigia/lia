@@ -1502,6 +1502,31 @@ Local remediation verification on 2026-09-12:
   database has no project #94. These automated results are not a fresh live
   staging lifecycle pass; no live provider write was used as local evidence.
 
+Lia-managed Telnyx reason-collection follow-up on 2026-09-12:
+
+- Remediation commit `369c4d6` was pushed to `origin/main` at the user's request.
+- All 106 Telnyx Voice, structured-turn, and hybrid-flow tests passed, including
+  a focused `telnyx_voice` regression with a required `reason` field: the final
+  caller text `Persistent knee pain` is retained exactly, no model is called,
+  and the turn does not request a tool operation. Existing tests also cover
+  ignoring partial/blank transcripts and replacing model-invented reasons.
+- These are automated local checks, not a live call or staging configuration
+  verification. The local database still has no project #94.
+- Staging targets supplied by the user: `https://lia-staging.leigia.com/`
+  and `https://portal.telnyx.com/#/home`. Browser selection still reported no
+  connected browser after the user opened both sites.
+- Pending live configuration review: project #94's booking task must require
+  caller-supplied `reason`, prompt for it, map it into the Calendar write, and
+  include it in confirmation. Verify the pinned task version used by action
+  #60. Verify the staging number uses the Lia-managed Voice API application
+  with callback `/api/telnyx/voice/webhook`, an active Lia channel, and signed
+  final transcription delivery.
+- Pending live negative case: provide every booking field except reason and
+  verify Lia asks for it without preparing/executing a booking. Then provide
+  the exact reason and explicitly confirm; verify the linked Lia attempt's
+  business result and safe Calendar evidence. Do not substitute a default
+  such as `General appointment` for an omitted caller answer.
+
 Phase 18 remains **IN PROGRESS**. A fresh approved staging run must prove
 available-slot selection, stale-slot rejection, confirmed provider success,
 no-result/failure handling, deterministic intent routing, and correlated Lia

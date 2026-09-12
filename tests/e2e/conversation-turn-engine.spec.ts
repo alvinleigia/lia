@@ -664,6 +664,60 @@ test("the specifically requested text field bypasses the model", async () => {
   ]);
 });
 
+test("Telnyx booking collects the caller's exact required reason without a model", async () => {
+  const provider = new QueueProvider([]);
+  const engine = new StructuredTurnEngine({ provider });
+  const voiceSnapshot = conversationalTaskSnapshotV1Schema.parse({
+    ...snapshot,
+    task: {
+      ...snapshot.task,
+      definition: {
+        ...snapshot.task.definition,
+        fields: snapshot.task.definition.fields.map((field) =>
+          field.key === "guestName"
+            ? {
+                ...field,
+                key: "reason",
+                label: "Appointment Reason",
+                required: true,
+                prompt: "What is the reason for your appointment?",
+              }
+            : field,
+        ),
+      },
+    },
+  });
+  const result = await engine.execute({
+    ...engineInput(),
+    activeTask: voiceSnapshot,
+    channel: "telnyx_voice",
+    fieldState: [
+      {
+        fieldKey: "reason",
+        label: "Appointment Reason",
+        required: true,
+        sensitivity: "personal",
+        state: "missing",
+        value: null,
+      },
+    ],
+    requestedFieldKey: "reason",
+    visitorMessage: "Persistent knee pain",
+  });
+
+  expect(result.source).toBe("deterministic");
+  expect(provider.calls).toHaveLength(0);
+  expect(result.proposal.fieldCandidates).toEqual([
+    {
+      fieldKey: "reason",
+      naturalValue: "Persistent knee pain",
+      confidence: 1,
+      source: "visitor",
+    },
+  ]);
+  expect(result.proposal.toolRequest).toBeNull();
+});
+
 test("a question at a requested text field still escalates to the model", async () => {
   const provider = new QueueProvider([
     baseTurn({
