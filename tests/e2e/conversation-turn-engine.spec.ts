@@ -1214,6 +1214,7 @@ test("appointment requests route through graph aliases without a model", async (
     ["I want to book an appointment.", 1],
     ["I want to cancel my appointment.", 2],
     ["I need to reschedule my appointment.", 3],
+    ["I want to reschedule my appointment.", 3],
   ] as const) {
     const provider = new QueueProvider([]);
     const result = await new StructuredTurnEngine({ provider }).execute({
@@ -1221,6 +1222,13 @@ test("appointment requests route through graph aliases without a model", async (
       activeTask: null,
       stage: "knowledge",
       publishedTasks,
+      history: [
+        { role: "user", content: "Confirm" },
+        {
+          role: "assistant",
+          content: "Your booking was submitted successfully. Lia attempt #85.",
+        },
+      ],
       visitorMessage,
     });
     expect(result.proposal.taskRecommendation?.taskId).toBe(taskId);

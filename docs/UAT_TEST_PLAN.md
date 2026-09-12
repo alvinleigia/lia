@@ -1527,11 +1527,80 @@ Lia-managed Telnyx reason-collection follow-up on 2026-09-12:
   business result and safe Calendar evidence. Do not substitute a default
   such as `General appointment` for an omitted caller answer.
 
-Phase 18 remains **IN PROGRESS**. A fresh approved staging run must prove
-available-slot selection, stale-slot rejection, confirmed provider success,
-no-result/failure handling, deterministic intent routing, and correlated Lia
-attempt evidence before release. No action or application was republished as
-part of this local work.
+User-operated staging booking retest on 2026-09-12:
+
+- Evidence source: screenshots and transcribed prompts supplied by the user
+  while testing project #94 in Project Chat and inspecting Lia Operations.
+  The agent did not control a browser or independently query staging.
+- The user selected `Phase 18 Appointment Lifecycle UAT`. Lia asked for the
+  date without the previous generic reliability error. Turn duration was not
+  measured; this does not establish natural-language routing latency.
+- Date `2026-09-21` produced six selectable slots, 09:00 through 11:30 at
+  thirty-minute intervals. Unlisted `12:15 pm` was rejected and the task
+  remained at time selection. The user selected the displayed 10:00 slot.
+- Lia collected synthetic patient Alex Test and the synthetic UAT contact,
+  then explicitly asked for the missing appointment reason. The user entered
+  `Persistent knee pain`. The confirmation summary retained the exact reason,
+  patient, contact, date, and displayed 10:00 appointment time.
+- After the user clicked Confirm, Lia reported successful submission and
+  identified attempt #85. The Operations record showed `google_calendar.book`
+  via `Google Calendar - Phase 18 Staging`, transport `completed`, business
+  `success`, original attempt, task run #64, and tool request #179. Started
+  timestamp shown: 12 September 2026, 12:16:34 PM IST.
+- The read-only preview for attempt #85 showed task version #22 and request
+  start `2026-09-21T00:00:00.000Z`, the synthetic patient/contact, and exact
+  reason `Persistent knee pain`. Its sanitized response contained `success`,
+  an opaque appointment reference, the same start, end
+  `2026-09-21T00:30:00.000Z`, and spoken 21 September at 10:00 am.
+- Result: the booking retest has correlated Lia provider-success evidence;
+  required-reason prompting, exact-reason submission, selectable slots, and
+  unlisted-time rejection passed in this run. The user's supplementary
+  Calendar screenshot confirms an event titled `Alex Test - Persistent knee
+  pain` on September 21 in `Lia Staging Voice UAT`, with description `Booked
+  by Lia.` and creation attributed to the staging service account.
+- Calendar displayed 05:30-06:00, whereas Lia displayed 10:00-10:30. The saved
+  00:00-00:30 UTC interval converts to exactly those times in Asia/Kolkata
+  and Australia/Sydney respectively. Conversion verified using Node Intl;
+  the user confirmed Calendar displays India time. The difference is expected,
+  and the booking/event-creation retest passed. Full lifecycle and voice UAT
+  remain open.
+- Preview usability observation: `Status: Unavailable` refers to an absent
+  generic HTTP response status, while the separately displayed business
+  outcome and Calendar response both say `success`. It is not evidence of
+  a failed appointment. The response preview currently requires a query URL
+  rather than an obvious read-only link from the recent-attempt card.
+
+User-operated reschedule failure after successful booking on 2026-09-12:
+
+- In the same conversation after attempt #85, the user sent `I want to
+  reschedule my appointment.` They reported noticeable delay, without a
+  measured duration. Lia restarted the action, returned `I could not prepare
+  a reliable answer. Please try again.`, and asked for Preferred Appointment
+  Date instead of identifying the existing appointment. Result: **FAILED**.
+- Code inspection found `startChannelFlow` began with stored step index zero
+  and did not use the published hybrid graph's normal/channel entry policy.
+  This bypassed the intent router when the booking node was stored first.
+  The earlier model-free task alias routing cannot help a turn already sent
+  into an active booking task.
+- A scoped database regression reproduced a post-booking reschedule request
+  reaching the booking date prompt instead of the configured knowledge entry.
+  Shared channel startup now uses the existing entry-policy selector and
+  persists the selected step in both the submission and flow-start audit.
+  Explicit start-step overrides and legacy non-hybrid entry behavior remain.
+- Six database regressions passed across Project Chat, widget, Telnyx Voice,
+  WhatsApp, restart after a submitted booking, explicit overrides, and legacy
+  flow startup. All 106 hybrid-flow, turn-engine, and Telnyx Voice checks
+  passed; the alias test now includes the exact failed reschedule phrase and
+  prior successful-booking history without calling the model. TypeScript,
+  focused lint, and the production build passed. Staging deployment and a
+  timed reschedule retest remain
+  required; no reschedule write has been verified from this failed turn.
+
+Phase 18 remains **IN PROGRESS**. Booking success and unlisted-slot rejection
+have staging evidence above. Remaining checks include stale-slot rejection,
+no-result/failure handling, reschedule/cancel routing and writes, measured
+latency, and live Lia-managed voice. No action or Telnyx application was
+republished as part of this local work.
 
 The checklist below is retained as historical provider-managed UAT evidence.
 It is not an accepted release path for appointment writes or identity-protected
@@ -1579,8 +1648,8 @@ Result: [ ] Pass [x] Fail
 - Phase 17: [x] Pass [ ] Fail [ ] In progress
 - Phase 17A: [x] Pass [ ] Fail [ ] In progress
 - Phase 18: [ ] Pass [ ] Fail [x] In progress [ ] Not started
-- Critical defects open: `1: Phase 18 false success; local fix awaits staging verification`
-- High defects open: `2: Phase 18 slot enforcement and routing latency; local fixes await staging verification`
+- Critical defects open: `1: Phase 18 false-success rejection/unknown-result cases still require staging evidence; successful booking verified in attempt #85`
+- High defects open: `2: Phase 18 stale-slot enforcement still requires staging evidence; reschedule routing/latency failed and the entry-policy fix awaits staging retest`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 - Phase 16 approver/date: `Single tester / release owner - 2026-08-16`
 - Phase 17 approver/date: `Single tester / release owner - 2026-08-20`

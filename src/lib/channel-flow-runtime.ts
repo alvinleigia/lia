@@ -89,6 +89,7 @@ import {
 } from "@/lib/flow-media-values";
 import { getFlowWaitDurationMs } from "@/lib/flow-wait";
 import { buildHandoffMetadata, runHandoffNotification } from "@/lib/handoff";
+import { selectHybridFlowEntryNode } from "@/lib/hybrid-flow-runtime";
 import { runOperationForSubmission } from "@/lib/operations";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 import {
@@ -1392,10 +1393,23 @@ export async function startChannelFlow(input: {
   traceId?: string | null;
 }) {
   const steps = getRunnableActionSteps(input.action);
+  let startStepId = input.startStepId;
+  const graph = input.action.hybridGraph;
+  if (startStepId == null && graph) {
+    const entryNodeId = selectHybridFlowEntryNode({
+      channelType: getChannelTypeForFlowSource(input.source),
+      graph,
+    });
+    startStepId = graph.nodes.find(
+      (node) => node.id === entryNodeId,
+    )?.sourceStepId;
+  }
   const stepIndex =
-    input.startStepId === undefined || input.startStepId === null
-      ? 0
-      : steps.findIndex((step) => step.id === input.startStepId);
+    startStepId == null
+      ? graph
+        ? -1
+        : 0
+      : steps.findIndex((step) => step.id === startStepId);
 
   if (steps.length === 0 || stepIndex < 0) {
     return {
@@ -1414,7 +1428,7 @@ export async function startChannelFlow(input: {
     contactId: input.contactId ?? null,
     conversationId: input.conversationId,
     source: input.source,
-    startStepId: input.startStepId,
+    startStepId: steps[stepIndex].id,
     traceId: input.traceId,
   });
 
