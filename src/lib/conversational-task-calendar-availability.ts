@@ -302,7 +302,26 @@ export async function executeTaskReadOperation(input: {
     queued.attempt.id,
   );
   if (!details) throw new Error("The lookup attempt was not found.");
-  const status = getTaskOperationOutcome(details.attempt, details.operation);
+  let status = getTaskOperationOutcome(details.attempt, details.operation);
+  let reason = getTaskOperationReason(details.attempt);
+  if (
+    status === "success" &&
+    details.operation.operationType === "google_calendar.lookup"
+  ) {
+    const result = getGoogleCalendarHostedVoiceResult(
+      details.attempt.responsePayload,
+    );
+    const appointments = Array.isArray(result.appointments)
+      ? result.appointments
+      : [];
+    // A scalar field mapping must never silently select the first of several matches.
+    if (appointments.length !== 1) {
+      status = appointments.length ? "rejected" : "no_result";
+      reason = appointments.length
+        ? "multiple_appointments"
+        : "appointment_not_found";
+    }
+  }
   if (
     status !== "pending" &&
     ["pending", "outcome_unknown"].includes(request.status)
@@ -315,10 +334,7 @@ export async function executeTaskReadOperation(input: {
       eventId: `${requestId}:result:${status}`,
       requestId,
       status,
-      errorCode:
-        status === "success"
-          ? null
-          : (getTaskOperationReason(details.attempt) ?? status),
+      errorCode: status === "success" ? null : (reason ?? status),
       result:
         status === "success" ? getOperationAttemptToolResult(details) : null,
       type: "tool.result",
@@ -331,7 +347,7 @@ export async function executeTaskReadOperation(input: {
         applied.reason ?? "The lookup result could not be applied.",
       );
   }
-  return details;
+  return { ...details, taskOutcome: status, taskReason: reason };
 }
 
 export async function assertTaskCalendarSlot(input: {

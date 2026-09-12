@@ -44,6 +44,7 @@ import {
   readTaskCalendarAvailability,
   refreshExpiredTaskCalendarAvailability,
 } from "@/lib/conversational-task-calendar-availability";
+import { executeRequiredTaskFieldLookup } from "@/lib/conversational-task-field-lookups";
 import {
   confirmTaskOperation,
   executeConfirmedTaskOperation,
@@ -1360,7 +1361,28 @@ async function executeTaskBoundary(input: {
     revision = fieldResult.revision;
   }
 
-  if (proposal.toolRequest?.stage === "lookup") {
+  const fieldLookup = ["cancel", "handoff", "fail"].includes(
+    proposal.nextAction,
+  )
+    ? { status: "not_needed" as const }
+    : await executeRequiredTaskFieldLookup({
+        excludeToolId: calendar?.definition.id,
+        projectId: input.runtimeInput.projectId,
+        requestId: `field-lookup:${input.runtimeInput.inboundMessageId}:${runtime.run.id}`,
+        snapshot,
+        taskRunId: runtime.run.id,
+      });
+  if (fieldLookup.status === "blocked")
+    return {
+      inputRequest: null,
+      output: operationTurn({ nextAction: "ask", reply: fieldLookup.reply }),
+      signals: [],
+    };
+
+  if (
+    fieldLookup.status !== "success" &&
+    proposal.toolRequest?.stage === "lookup"
+  ) {
     const lookup = snapshot.toolDefinitions.find(
       ({ id, access, execution }) =>
         id === proposal.toolRequest?.toolId &&
@@ -1375,10 +1397,7 @@ async function executeTaskBoundary(input: {
         snapshot,
         taskRunId: runtime.run.id,
       });
-      const outcome = getTaskOperationOutcome(
-        lookupResult.attempt,
-        lookupResult.operation,
-      );
+      const outcome = lookupResult.taskOutcome;
       if (outcome !== "success")
         return {
           output: operationTurn({

@@ -1668,6 +1668,43 @@ User-operated task-order and sandbox lookup follow-up on 2026-09-12:
   identity-first rescheduling against the existing event. Expiry recovery and
   the complete reschedule write still need fresh staging evidence.
 
+Identity-first reschedule task lookup follow-up on 2026-09-12:
+
+- Sandbox attempt #90 passed after `3dd751a` deployed to staging and production.
+  User screenshots show populated synthetic identity inputs, lookup business
+  success, exactly one September 21 10:00 appointment, and mapped reference,
+  start, end, and spoken values matching the earlier booking. This verifies
+  the sandbox fix and read-only lookup, not a reschedule write.
+- The user published reschedule task #21 version 2, then found the action still
+  on published v1 with unpublished step changes. After the action publication
+  step, Project Chat requested Patient Name first, then Contact Number, but
+  next asked the user for Appointment Reference. Result: identity-first field
+  order passed; automatic lookup before scheduling failed.
+- Cause: deterministic name/phone extraction produces no model tool request.
+  The channel runtime only executed the lookup when the model requested it,
+  then its required-field reconciliation asked for the reference as user input.
+- Remediation: before requesting the next required field, run its single bound
+  read operation when allowed at lookup and its canonical inputs are ready.
+  Use the existing durable request/attempt/result path and pinned mappings.
+  A successful result must actually populate the required field before the
+  task continues. Explicit cancellation/handoff/failure bypasses this step;
+  Calendar slot lookup retains its existing dedicated behavior.
+- Calendar lookup results with more than one match cannot populate a scalar
+  appointment reference by taking the first array element. The task records
+  `rejected/multiple_appointments`, leaves the reference unset, and directs the
+  caller to the team. Interactive multiple-appointment selection remains a
+  limitation of this task; it is not claimed as implemented. Provider lookup
+  success and the task's ambiguity rejection remain distinct audit outcomes.
+- Verification: the scoped database regression covers missing identity (no
+  lookup), one matching appointment (tool-populated reference and next date
+  prompt), no match and multiple matches (no reference/no write), and no repeat
+  lookup for an already resolved field. Positive cases run under Project Chat
+  and Telnyx Voice task runtimes with mocked Calendar HTTP only. Existing
+  stale-slot, expiry-refresh, provider-failure, confirmation, and booking
+  assertions in that regression passed, as did 126 Calendar and conversation
+  regressions, TypeScript, focused lint, and the production build. Fresh
+  staging automatic lookup, the reschedule write, and live voice UAT remain pending.
+
 Phase 18 remains **IN PROGRESS**. Booking success and unlisted-slot rejection
 have staging evidence above. Remaining checks include stale-slot rejection,
 no-result/failure handling, reschedule/cancel routing and writes, measured

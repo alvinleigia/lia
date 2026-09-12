@@ -16,6 +16,7 @@ import {
   readTaskCalendarAvailability,
   refreshExpiredTaskCalendarAvailability,
 } from "../../src/lib/conversational-task-calendar-availability";
+import { executeRequiredTaskFieldLookup } from "../../src/lib/conversational-task-field-lookups";
 import {
   confirmTaskOperation,
   executeConfirmedTaskOperation,
@@ -1505,7 +1506,7 @@ test("operation sandbox resolves prefixed and bare field mappings without losing
 });
 
 test("Calendar slots use the task ledger and block arbitrary, empty, failed and stale selections", async () => {
-  test.setTimeout(240_000);
+  test.setTimeout(360_000);
   if (!fixture) throw new Error("The operation fixture is not ready.");
   const projectId = fixture.projectId;
   const privateKey = generateKeyPairSync("rsa", { modulusLength: 2048 })
@@ -1800,6 +1801,189 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
       "completed",
     );
     expect(insertedEvent).not.toBeNull();
+
+    const find = await createOperation({
+      name: "Find fixture appointment",
+      projectId,
+      providerId: provider.id,
+      operationType: "google_calendar.lookup",
+      inputMapping: {
+        patientName: "fields.guestName",
+        patientEmail: "fields.guestEmail",
+      },
+      outputMapping: {
+        "fields.appointmentRef":
+          "responsePayload.appointments.0.appointmentRef",
+      },
+    });
+    const reschedule = await createOperation({
+      name: "Reschedule fixture appointment",
+      projectId,
+      providerId: provider.id,
+      operationType: "google_calendar.reschedule",
+      inputMapping: {
+        patientName: "fields.guestName",
+        appointmentRef: "fields.appointmentRef",
+        newStart: "fields.appointmentStart",
+      },
+      outputMapping: {},
+    });
+    const rescheduleTask = await createPublishedTask({
+      name: "Identity first fixture",
+      projectId,
+      operationId: reschedule.id,
+      definition: {
+        ...definition,
+        fields: [
+          ...base.fields,
+          {
+            ...base.fields[0],
+            id: "10000000-0000-4000-8000-000000000098",
+            key: "appointmentRef",
+            label: "Appointment reference",
+            dependsOn: ["guestName", "guestEmail"],
+          },
+          ...definition.fields.slice(base.fields.length),
+        ],
+        tools: [
+          {
+            access: "read",
+            allowedStages: ["lookup"],
+            tool: { id: `operation:${find.id}`, version: 1 },
+          },
+          {
+            access: "write",
+            allowedStages: ["operation"],
+            tool: { id: `operation:${reschedule.id}`, version: 1 },
+          },
+        ],
+      },
+    });
+    const lookupSnapshot = conversationalTaskSnapshotV1Schema.parse(
+      rescheduleTask.version.snapshot,
+    );
+    const findForRun = (taskRunId: number) =>
+      executeRequiredTaskFieldLookup({
+        projectId,
+        taskRunId,
+        requestId: `automatic-lookup-${taskRunId}`,
+        snapshot: lookupSnapshot,
+      });
+    for (const channel of ["project_chat", "telnyx_voice"] as const) {
+      const identityRun = await startReadyRun(rescheduleTask.task.id, channel);
+      await db
+        .update(conversationalTaskFieldValues)
+        .set({ state: "cleared" })
+        .where(
+          and(
+            eq(conversationalTaskFieldValues.taskRunId, identityRun.taskRunId),
+            eq(conversationalTaskFieldValues.fieldKey, "guestEmail"),
+          ),
+        );
+      expect(await findForRun(identityRun.taskRunId)).toEqual({
+        status: "not_needed",
+      });
+      expect(
+        (
+          await getConversationalTaskRuntime({
+            projectId,
+            taskRunId: identityRun.taskRunId,
+          })
+        )?.tools,
+      ).toHaveLength(0);
+      await db
+        .update(conversationalTaskFieldValues)
+        .set({ state: "valid" })
+        .where(
+          and(
+            eq(conversationalTaskFieldValues.taskRunId, identityRun.taskRunId),
+            eq(conversationalTaskFieldValues.fieldKey, "guestEmail"),
+          ),
+        );
+      expect(await findForRun(identityRun.taskRunId)).toEqual({
+        status: "success",
+      });
+      const found = await getConversationalTaskRuntime({
+        projectId,
+        taskRunId: identityRun.taskRunId,
+      });
+      expect(found?.fields).toContainEqual(
+        expect.objectContaining({
+          fieldKey: "appointmentRef",
+          state: "valid",
+          canonicalValue: completed.attempt.responsePayload.appointmentRef,
+        }),
+      );
+      const next = await buildHybridChannelResumeReplies({
+        projectId,
+        channelType: channel,
+        externalConversationId: identityRun.externalConversationId,
+      });
+      expect(next[0].payload).toMatchObject({
+        inputRequest: { fieldKey: "preferredDate" },
+      });
+      expect(await findForRun(identityRun.taskRunId)).toEqual({
+        status: "not_needed",
+      });
+      expect(
+        (
+          await getConversationalTaskRuntime({
+            projectId,
+            taskRunId: identityRun.taskRunId,
+          })
+        )?.tools,
+      ).toHaveLength(1);
+    }
+    const missingRun = await startReadyRun(rescheduleTask.task.id);
+    await db
+      .update(conversationalTaskFieldValues)
+      .set({ canonicalValue: "No Matching Patient" })
+      .where(
+        and(
+          eq(conversationalTaskFieldValues.taskRunId, missingRun.taskRunId),
+          eq(conversationalTaskFieldValues.fieldKey, "guestName"),
+        ),
+      );
+    expect(await findForRun(missingRun.taskRunId)).toMatchObject({
+      status: "blocked",
+      reply: expect.stringContaining("could not find a matching appointment"),
+    });
+    const [stored] = await db
+      .select()
+      .from(googleCalendarAppointments)
+      .where(
+        and(
+          eq(googleCalendarAppointments.projectId, projectId),
+          eq(googleCalendarAppointments.providerId, provider.id),
+        ),
+      );
+    await db.insert(googleCalendarAppointments).values({
+      ...stored,
+      id: undefined,
+      reference: "apt_fixture_multiple",
+      remoteEventId: "fixture-multiple",
+      operationKeyHash: "fixture-multiple",
+    });
+    const multipleRun = await startReadyRun(rescheduleTask.task.id);
+    expect(await findForRun(multipleRun.taskRunId)).toMatchObject({
+      status: "blocked",
+      reply: expect.stringContaining("More than one appointment"),
+    });
+    for (const blockedRun of [missingRun, multipleRun]) {
+      const blocked = await getConversationalTaskRuntime({
+        projectId,
+        taskRunId: blockedRun.taskRunId,
+      });
+      expect(
+        blocked?.fields.find(({ fieldKey }) => fieldKey === "appointmentRef")
+          ?.state,
+      ).toBe("missing");
+      const attempts = await db
+        .select()
+        .from(operationAttempts)
+        .where(eq(operationAttempts.taskRunId, blockedRun.taskRunId));
+      expect(attempts.map(({ operationId }) => operationId)).toEqual([find.id]);
+    }
   } finally {
     globalThis.fetch = originalFetch;
   }
