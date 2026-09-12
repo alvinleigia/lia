@@ -664,6 +664,33 @@ test("the specifically requested text field bypasses the model", async () => {
   ]);
 });
 
+test("a full booking answer at a text prompt goes through multi-field extraction", async () => {
+  const fieldCandidates = [
+    {
+      fieldKey: "guestName",
+      naturalValue: "Alex Test",
+      confidence: 1,
+      source: "visitor" as const,
+    },
+    {
+      fieldKey: "guestEmail",
+      naturalValue: "alex@example.com",
+      confidence: 1,
+      source: "visitor" as const,
+    },
+  ];
+  const provider = new QueueProvider([baseTurn({ fieldCandidates })]);
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    requestedFieldKey: "guestName",
+    visitorMessage:
+      "My name is Alex Test, email alex@example.com. Book on 2026-09-22 at 10:00.",
+  });
+  expect(result.source).toBe("model");
+  expect(provider.calls).toHaveLength(1);
+  expect(result.proposal.fieldCandidates).toEqual(fieldCandidates);
+});
+
 test("Telnyx booking collects the caller's exact required reason without a model", async () => {
   const provider = new QueueProvider([]);
   const engine = new StructuredTurnEngine({ provider });

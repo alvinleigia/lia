@@ -443,7 +443,8 @@ function directFieldProposal(
     requestedField.optionSource?.kind !== "project_resource" &&
     !(
       ["address", "text"].includes(requestedField.type) &&
-      isPotentialKnowledgeSideQuestion(value)
+      (isPotentialKnowledgeSideQuestion(value) ||
+        hasDirectUnresolvedFieldEvidence(input))
     )
   ) {
     const contextValues = new Map(

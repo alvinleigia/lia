@@ -1382,6 +1382,52 @@ test("direct answers bind the requested text field to the exact visitor message"
   ).toEqual({ ...proposal, turnKind: "side_question" });
 });
 
+test("multi-field answers preserve extracted values while waiting for text", () => {
+  const proposal = createRequestedTaskSelectionProposal({
+    requestedFieldKey: "guestName",
+    selectionValue: "Alex Test",
+  });
+  if (!proposal) throw new Error("Missing fixture");
+  proposal.fieldCandidates.push({
+    fieldKey: "guestEmail",
+    naturalValue: "alex@example.com",
+    confidence: 1,
+    source: "visitor",
+  });
+  expect(
+    bindRequestedTaskTextAnswer({
+      proposal,
+      requestedFieldKey: "guestName",
+      text: "My name is Alex Test and email alex@example.com",
+    }).fieldCandidates,
+  ).toEqual(proposal.fieldCandidates);
+});
+
+test("candidate-bearing task answers do not remain ordinary conversation", () => {
+  const proposal = createRequestedTaskSelectionProposal({
+    requestedFieldKey: "guestName",
+    selectionValue: "Alex Test",
+  });
+  if (!proposal) throw new Error("Missing fixture");
+  for (const turnKind of [
+    "ordinary_question",
+    "task_recommendation",
+  ] as const) {
+    expect(
+      normalizeActiveTaskQuestion({ ...proposal, turnKind }).turnKind,
+    ).toBe("field_answer");
+  }
+  for (const turnKind of [
+    "side_question",
+    "task_switch",
+    "cancellation",
+  ] as const) {
+    expect(
+      normalizeActiveTaskQuestion({ ...proposal, turnKind }).turnKind,
+    ).toBe(turnKind);
+  }
+});
+
 test("requested project-resource selections can skip the model", () => {
   expect(
     createRequestedTaskSelectionProposal({

@@ -2,6 +2,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { and, eq, inArray } from "drizzle-orm";
 import type { RuntimeActionStep } from "../../src/lib/action-runtime";
+import { runBrowserFlowText } from "../../src/lib/browser-flow-runtime";
 import { startChannelFlow } from "../../src/lib/channel-flow-runtime";
 import type { ChannelType } from "../../src/lib/channels";
 import {
@@ -48,7 +49,10 @@ import {
   channelConversations,
   channelMessages,
   companies,
+  contactAttributes,
+  contacts,
   conversationalTaskAuditEvents,
+  conversationalTaskConfirmations,
   conversationalTaskFieldValues,
   conversationalTasks,
   conversationalTaskToolRequests,
@@ -438,6 +442,10 @@ test.afterAll(async () => {
   await db
     .delete(integrationProviders)
     .where(eq(integrationProviders.projectId, fixture.projectId));
+  await db
+    .delete(contactAttributes)
+    .where(eq(contactAttributes.projectId, fixture.projectId));
+  await db.delete(contacts).where(eq(contacts.projectId, fixture.projectId));
   await db
     .delete(projects)
     .where(
@@ -1828,15 +1836,18 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
     if (!action) throw new Error("Opening action missing");
     const originalExecute = StructuredTurnEngine.prototype.execute;
     try {
-      for (const [channelType, clock] of [
-        ["project_chat", "10:00 am"],
-        ["telnyx_voice", "10:00 am"],
-        ["project_chat", "8:00 pm"],
+      for (const [channelType, clock, fromPrompt] of [
+        ["project_chat", "10:00 am", false],
+        ["telnyx_voice", "10:00 am", false],
+        ["project_chat", "8:00 pm", false],
+        ["project_chat", "10:00 am", true],
       ] as const) {
         const text = `Book on ${date} at ${clock} UTC. My name is Alex Test, email alex@example.com, phone +61491570006, reason persistent knee pain.`;
         const stages: string[] = [];
         StructuredTurnEngine.prototype.execute = async (input) => {
-          expect(input.visitorMessage).toBe(text);
+          const starting =
+            fromPrompt && input.visitorMessage === "Book an appointment";
+          if (!starting) expect(input.visitorMessage).toBe(text);
           stages.push(input.stage);
           const routing = input.stage === "knowledge";
           if (!routing)
@@ -1848,24 +1859,30 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
             usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
             proposal: {
               schemaVersion: 1,
-              turnKind: routing ? "task_recommendation" : "field_answer",
-              reply: "What date?",
+              turnKind: routing
+                ? "task_recommendation"
+                : fromPrompt && !starting
+                  ? "ordinary_question"
+                  : "field_answer",
+              reply:
+                "I have noted your details. How would you like to proceed with confirmation?",
               grounding: { status: "not_needed", excerptIds: [] },
-              fieldCandidates: routing
-                ? []
-                : Object.entries({
-                    guestName: "Alex Test",
-                    guestEmail: "alex@example.com",
-                    contactNumber: "+61491570006",
-                    reason: "persistent knee pain",
-                    preferredDate: date,
-                    appointmentStart: clock,
-                  }).map(([fieldKey, naturalValue]) => ({
-                    fieldKey,
-                    naturalValue,
-                    confidence: 1,
-                    source: "visitor" as const,
-                  })),
+              fieldCandidates:
+                routing || starting
+                  ? []
+                  : Object.entries({
+                      guestName: "Alex Test",
+                      guestEmail: "alex@example.com",
+                      contactNumber: "+61491570006",
+                      reason: "persistent knee pain",
+                      preferredDate: date,
+                      appointmentStart: clock,
+                    }).map(([fieldKey, naturalValue]) => ({
+                      fieldKey,
+                      naturalValue,
+                      confidence: 1,
+                      source: "visitor" as const,
+                    })),
               taskRecommendation: routing
                 ? {
                     taskId: entryTask.task.id,
@@ -1888,49 +1905,72 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
             },
           };
         };
-        const externalConversationId = `opening-${channelType}-${clock}-${suffix}`;
+        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${suffix}`;
         const [conversation] = await db
           .insert(channelConversations)
           .values({ channelType, externalConversationId, projectId })
           .returning();
         conversationIds.push(conversation.id);
-        const [message] = await db
-          .insert(channelMessages)
-          .values({
-            conversationId: conversation.id,
-            direction: "inbound",
-            messageType: "text",
-            projectId,
-            text,
-          })
-          .returning();
-        const started = await startChannelFlow({
-          action,
+        const browserInput = {
+          actionId: entryAction.id,
+          channelType,
           conversationId: externalConversationId,
           projectId,
           source: channelType,
-        });
-        const [submission] = await db
-          .select()
-          .from(actionSubmissions)
-          .where(
-            and(
-              eq(actionSubmissions.projectId, projectId),
-              eq(actionSubmissions.conversationId, externalConversationId),
-            ),
-          );
-        const result = await runHybridChannelBoundary({
-          action,
-          boundaryNodeId: started.boundaryNodeId ?? "missing",
-          channelConversationId: conversation.id,
-          channelType,
-          externalConversationId,
-          inboundMessageId: message.id,
-          projectId,
-          submission,
-          text,
-        });
-        expect(stages).toEqual(["knowledge", "extraction"]);
+        };
+        let result: Awaited<ReturnType<typeof runHybridChannelBoundary>>;
+        if (fromPrompt) {
+          const started = await runBrowserFlowText({
+            ...browserInput,
+            text: "Book an appointment",
+          });
+          expect(started.replies.at(-1)?.payload).toMatchObject({
+            inputRequest: { fieldKey: "guestName" },
+          });
+          result = await runBrowserFlowText({ ...browserInput, text });
+        } else {
+          const [message] = await db
+            .insert(channelMessages)
+            .values({
+              conversationId: conversation.id,
+              direction: "inbound",
+              messageType: "text",
+              projectId,
+              text,
+            })
+            .returning();
+          const started = await startChannelFlow({
+            action,
+            conversationId: externalConversationId,
+            projectId,
+            source: channelType,
+          });
+          const [submission] = await db
+            .select()
+            .from(actionSubmissions)
+            .where(
+              and(
+                eq(actionSubmissions.projectId, projectId),
+                eq(actionSubmissions.conversationId, externalConversationId),
+              ),
+            );
+          result = await runHybridChannelBoundary({
+            action,
+            boundaryNodeId: started.boundaryNodeId ?? "missing",
+            channelConversationId: conversation.id,
+            channelType,
+            externalConversationId,
+            inboundMessageId: message.id,
+            projectId,
+            submission,
+            text,
+          });
+        }
+        expect(stages).toEqual(
+          fromPrompt
+            ? ["knowledge", "extraction", "extraction"]
+            : ["knowledge", "extraction"],
+        );
         const session = await getConversationTaskRuntimeSession({
           channelType,
           externalConversationId,
@@ -1966,6 +2006,56 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
           });
         }
         expect(insertedEvent).toBeNull();
+        if (fromPrompt) {
+          expect(result.replies.at(-1)?.payload).toMatchObject({
+            inputRequest: { fieldKey: "lia_confirmation" },
+          });
+          if (!session.runtime) throw new Error("Missing task runtime");
+          // Simulate a previous conversational confirmation that had no saved review.
+          await db
+            .delete(conversationalTaskConfirmations)
+            .where(
+              and(
+                eq(conversationalTaskConfirmations.projectId, projectId),
+                eq(
+                  conversationalTaskConfirmations.taskRunId,
+                  session.runtime.run.id,
+                ),
+              ),
+            );
+          StructuredTurnEngine.prototype.execute = async () => {
+            throw new Error("Confirmation must not require the model");
+          };
+          const recovered = await runBrowserFlowText({
+            ...browserInput,
+            text: "yes",
+          });
+          expect(recovered.replies.at(-1)?.payload).toMatchObject({
+            inputRequest: { fieldKey: "lia_confirmation" },
+          });
+          expect(insertedEvent).toBeNull();
+          const confirmed = await runBrowserFlowText({
+            ...browserInput,
+            text: "yes",
+          });
+          expect(
+            confirmed.replies.map((reply) => reply.text).join(" "),
+          ).toContain("submitted successfully");
+          expect(insertedEvent).not.toBeNull();
+          expect(confirmed.activeFlow).toBeNull();
+          const writes = await db
+            .select()
+            .from(operationAttempts)
+            .where(
+              and(
+                eq(operationAttempts.projectId, projectId),
+                eq(operationAttempts.taskRunId, session.runtime.run.id),
+                eq(operationAttempts.operationId, booking.id),
+              ),
+            );
+          expect(writes).toHaveLength(1);
+          insertedEvent = null;
+        }
       }
     } finally {
       StructuredTurnEngine.prototype.execute = originalExecute;
@@ -2241,6 +2331,10 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
         and(
           eq(googleCalendarAppointments.projectId, projectId),
           eq(googleCalendarAppointments.providerId, provider.id),
+          eq(
+            googleCalendarAppointments.reference,
+            String(completed.attempt.responsePayload.appointmentRef),
+          ),
         ),
       );
     await db.insert(googleCalendarAppointments).values({

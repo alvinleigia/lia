@@ -1106,6 +1106,29 @@ async function executeTaskBoundary(input: {
   });
   if (confirmationExecution) return confirmationExecution;
 
+  // "Yes" cannot authorize a write without a saved review. Recover the review
+  // from validated state instead of asking the model to interpret confirmation.
+  if (
+    isExplicitConfirmationRequest(appointmentAnswer) &&
+    !getResumedTaskRuntimeInputRequest({
+      fields: runtime.fields,
+      requestedFieldKey: runtime.run.lastRequestedFieldKey,
+      snapshot,
+    })
+  ) {
+    const prepared = await prepareRequiredTaskConfirmation({
+      projectId: input.runtimeInput.projectId,
+      runtime,
+      snapshot,
+    });
+    if (prepared)
+      return {
+        inputRequest: null,
+        output: operationTurn({ nextAction: "confirm", reply: prepared.text }),
+        signals: [],
+      };
+  }
+
   const requestedField = session.snapshot.task.definition.fields.find(
     (field) => field.key === session.runtime?.run.lastRequestedFieldKey,
   );

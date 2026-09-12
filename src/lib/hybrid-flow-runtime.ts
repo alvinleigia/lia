@@ -144,6 +144,16 @@ export function bindRequestedTaskTextAnswer(input: {
     return input.proposal;
   }
 
+  // A multi-field answer has already been split into task candidates. Do not
+  // collapse the entire message into the requested text field and lose the rest.
+  if (
+    input.proposal.fieldCandidates.some(
+      ({ fieldKey }) => fieldKey !== input.requestedFieldKey,
+    )
+  ) {
+    return input.proposal;
+  }
+
   // The current channel message is authoritative for a requested free-text
   // field; a model candidate must never replace its caller provenance.
 
@@ -163,6 +173,16 @@ export function bindRequestedTaskTextAnswer(input: {
 export function normalizeActiveTaskQuestion(
   proposal: TurnResultV1,
 ): TurnResultV1 {
+  if (
+    (proposal.turnKind === "ordinary_question" ||
+      proposal.turnKind === "task_recommendation") &&
+    proposal.fieldCandidates.length > 0 &&
+    proposal.safety.decision === "allow" &&
+    !proposal.ambiguity.requiresClarification &&
+    !["cancel", "handoff", "fail"].includes(proposal.nextAction)
+  ) {
+    return { ...proposal, turnKind: "field_answer" };
+  }
   return proposal.turnKind === "ordinary_question" &&
     proposal.fieldCandidates.length === 0 &&
     proposal.safety.decision === "allow"
