@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
@@ -21,6 +22,8 @@ import {
 import {
   isExplicitCancellationRequest,
   isExplicitConfirmationRequest,
+  isExplicitHumanHandoffRequest,
+  isPotentialKnowledgeSideQuestion,
 } from "@/lib/conversation-control-intents";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import type {
@@ -34,6 +37,12 @@ import {
   getBoundAvailabilityDefinition,
   readCanonicalAvailability,
 } from "@/lib/conversational-task-availability";
+import {
+  CalendarSlotValidationError,
+  executeTaskReadOperation,
+  getTaskCalendarAvailability,
+  readTaskCalendarAvailability,
+} from "@/lib/conversational-task-calendar-availability";
 import {
   confirmTaskOperation,
   executeConfirmedTaskOperation,
@@ -96,12 +105,36 @@ import {
   measureRuntimeStage,
   type RuntimeTimingRecorder,
 } from "@/lib/runtime-stage-timing";
+import { getTaskOperationOutcome } from "@/lib/task-operation-outcome";
 
 export type HybridChannelBoundaryResult = {
   replies: RuntimeReply[];
 };
 
 export async function buildHybridChannelResumeReplies(input: {
+  channelType: ChannelType;
+  externalConversationId: string;
+  projectId: number;
+}) {
+  try {
+    return await buildHybridChannelResumeRepliesInternal(input);
+  } catch (error) {
+    const recovered = await recoverCalendarSlot({
+      error,
+      projectId: input.projectId,
+      session: await getConversationTaskRuntimeSession(input),
+    });
+    return [
+      createTaskRuntimeReply({
+        inputRequest: recovered.inputRequest,
+        nextAction: recovered.output.nextAction,
+        text: recovered.output.reply,
+      }),
+    ];
+  }
+}
+
+async function buildHybridChannelResumeRepliesInternal(input: {
   channelType: ChannelType;
   externalConversationId: string;
   projectId: number;
@@ -118,6 +151,7 @@ export async function buildHybridChannelResumeReplies(input: {
 
   const inputRequest = await hydrateProjectResourceInputRequest({
     fields: session.runtime.fields,
+    taskRunId: session.runtime.run.id,
     inputRequest: getResumedTaskRuntimeInputRequest({
       fields: session.runtime.fields,
       requestedFieldKey: session.runtime.run.lastRequestedFieldKey,
@@ -183,11 +217,25 @@ async function buildTaskConfirmationText(input: {
     }
   }
 
+  const calendar = await getTaskCalendarAvailability(input.snapshot);
+  const calendarOptions = calendar
+    ? (
+        await readTaskCalendarAvailability({
+          binding: calendar,
+          projectId: input.projectId,
+          taskRunId: input.runtime.run.id,
+        })
+      ).options
+    : [];
   const lines: string[] = [];
   for (const definition of input.snapshot.task.definition.fields) {
     if (!fieldValues.has(definition.key)) continue;
     const value = fieldValues.get(definition.key);
-    let displayValue = formatConfirmationValue(value);
+    let displayValue =
+      definition.key === calendar?.startFieldKey
+        ? (calendarOptions.find((option) => option.value === value)?.label ??
+          formatConfirmationValue(value))
+        : formatConfirmationValue(value);
     if (
       definition.type === "project_resource" ||
       definition.optionSource?.kind === "project_resource"
@@ -374,9 +422,27 @@ async function hydrateProjectResourceInputRequest(input: {
   >["fields"];
   inputRequest: RuntimeInputRequest | null;
   projectId: number;
+  taskRunId: number;
   snapshot: ConversationalTaskSnapshotV1;
 }) {
   if (!input.inputRequest) return null;
+  const calendar = await getTaskCalendarAvailability(input.snapshot);
+  if (calendar && input.inputRequest.fieldKey === calendar.startFieldKey) {
+    const availability = await readTaskCalendarAvailability({
+      binding: calendar,
+      projectId: input.projectId,
+      taskRunId: input.taskRunId,
+    });
+    if (!availability.options.length)
+      throw new CalendarSlotValidationError(
+        "Available appointment times could not be verified.",
+      );
+    return {
+      ...input.inputRequest,
+      inputKind: "choice" as const,
+      options: availability.options,
+    };
+  }
 
   const field = input.snapshot.task.definition.fields.find(
     (candidate) => candidate.key === input.inputRequest?.fieldKey,
@@ -523,6 +589,7 @@ async function listGraphTaskOptions(input: {
     return snapshot
       ? [
           {
+            aliases: [node.label],
             candidateFieldKeys: node.settings.transferFieldKeys,
             id: snapshot.task.id,
             name: snapshot.task.name,
@@ -711,7 +778,8 @@ async function executeTaskConfirmation(input: {
   );
   const operationName = definition?.name ?? "The operation";
 
-  if (result.attempt.status === "completed") {
+  const businessOutcome = result.businessOutcome;
+  if (businessOutcome === "success") {
     const outcome = input.session.snapshot.task.definition.outcomes.find(
       (candidate) => candidate.type === "completed",
     );
@@ -719,14 +787,14 @@ async function executeTaskConfirmation(input: {
       output: operationTurn({
         nextAction: "complete",
         outcomeKey: outcome?.key,
-        reply: `${operationName} completed. Your request was submitted successfully.`,
+        reply: `${operationName} completed. Your request was submitted successfully. Lia attempt #${result.attempt.id}.`,
       }),
       signals: outcome
         ? [{ kind: "task_outcome", triggerKey: outcome.outputPort }]
         : [],
     };
   }
-  if (result.attempt.status === "failed") {
+  if (businessOutcome !== "pending" && businessOutcome !== "outcome_unknown") {
     const outcome =
       input.session.snapshot.task.definition.outcomes.find(
         (candidate) => candidate.type === "failed",
@@ -738,7 +806,7 @@ async function executeTaskConfirmation(input: {
       output: operationTurn({
         nextAction: outcome?.type === "handoff" ? "handoff" : "fail",
         outcomeKey: outcome?.key,
-        reply: `${operationName} could not be completed. The team needs to review this request.`,
+        reply: `${operationName} could not be completed. The team needs to review Lia attempt #${result.attempt.id} (${businessOutcome}).`,
       }),
       signals: outcome
         ? [{ kind: "task_outcome", triggerKey: outcome.outputPort }]
@@ -750,9 +818,91 @@ async function executeTaskConfirmation(input: {
     output: operationTurn({
       nextAction: "lookup",
       reply:
-        result.attempt.status === "outcome_unknown"
-          ? `${operationName} needs reconciliation before its result can be confirmed.`
+        businessOutcome === "outcome_unknown"
+          ? `${operationName} needs reconciliation before its result can be confirmed. Lia attempt #${result.attempt.id}.`
           : `${operationName} is being processed.`,
+    }),
+    signals: [],
+  };
+}
+
+async function recoverCalendarSlot(input: {
+  error: unknown;
+  projectId: number;
+  session: Awaited<ReturnType<typeof getConversationTaskRuntimeSession>>;
+}): Promise<HybridBoundaryExecution<TurnResultV1>> {
+  if (
+    !(input.error instanceof CalendarSlotValidationError) ||
+    !input.session.runtime ||
+    !input.session.snapshot ||
+    !input.session.conversation
+  )
+    throw input.error;
+  const { runtime, snapshot } = input.session;
+  const binding = await getTaskCalendarAvailability(snapshot);
+  if (!binding) throw input.error;
+  const availability = await readTaskCalendarAvailability({
+    binding,
+    projectId: input.projectId,
+    taskRunId: runtime.run.id,
+  });
+  const fieldKey = availability.options.length
+    ? binding.startFieldKey
+    : binding.dateFieldKey;
+  const field = snapshot.task.definition.fields.find(
+    ({ key }) => key === fieldKey,
+  );
+  if (!field) throw input.error;
+  const now = new Date().toISOString();
+  const envelope = {
+    authentication: null,
+    channelIdentity: {},
+    channelType: input.session.conversation.channelType,
+    conversationId: runtime.run.conversationId,
+    expectedRevision: null,
+    occurredAt: now,
+    receivedAt: now,
+    projectId: input.projectId,
+    providerSequence: null,
+    schemaVersion: 1 as const,
+    taskRunId: runtime.run.id,
+  };
+  await applyConversationalTaskEvent({
+    ...envelope,
+    eventId: `calendar-invalid:${randomUUID()}`,
+    type: "field.clear",
+    fieldKey: binding.startFieldKey,
+    reason: "upstream_change",
+  });
+  await applyConversationalTaskEvent({
+    ...envelope,
+    eventId: `calendar-request:${randomUUID()}`,
+    type: "field.requested",
+    fieldKey,
+  });
+  const inputRequest: RuntimeInputRequest = {
+    fieldKey,
+    inputKind: availability.options.length ? "choice" : "date",
+    label: field.label,
+    required: field.required,
+    options: availability.options.length ? availability.options : [],
+  };
+  const outcome = availability.attempt
+    ? getTaskOperationOutcome(availability.attempt)
+    : null;
+  const message = !availability.options.length
+    ? outcome === "no_result"
+      ? `There are no available appointment times for that date. Please choose another date. Lia attempt #${availability.attempt?.id}.`
+      : `I could not verify available appointment times. Please try another date or ask the team for help.${availability.attempt ? ` Lia attempt #${availability.attempt.id} (${outcome}).` : ""}`
+    : input.error.message;
+  return {
+    inputRequest,
+    output: operationTurn({
+      nextAction: "ask",
+      reply: [
+        message,
+        ...inputRequest.options.map(({ label }) => `- ${label}`),
+      ].join("\n"),
     }),
     signals: [],
   };
@@ -901,6 +1051,7 @@ async function executeTaskBoundary(input: {
   const rejectMismatchedSelection = async () => ({
     inputRequest: await hydrateProjectResourceInputRequest({
       fields: runtime.fields,
+      taskRunId: runtime.run.id,
       inputRequest: getResumedTaskRuntimeInputRequest({
         fields: runtime.fields,
         requestedFieldKey: runtime.run.lastRequestedFieldKey,
@@ -919,8 +1070,39 @@ async function executeTaskBoundary(input: {
     }),
     signals: [],
   });
+  const calendar = await getTaskCalendarAvailability(snapshot);
+  const calendarAnswer =
+    calendar &&
+    requestedField?.key === calendar.startFieldKey &&
+    !isExplicitCancellationRequest(requestedAnswer) &&
+    !isExplicitHumanHandoffRequest(requestedAnswer) &&
+    !isPotentialKnowledgeSideQuestion(requestedAnswer);
   let selectionValue: string | null = null;
-  if (requestedAnswerKind === "project_resource" && requestedField) {
+  if (calendarAnswer) {
+    const availability = await readTaskCalendarAvailability({
+      binding: calendar,
+      projectId: input.runtimeInput.projectId,
+      taskRunId: runtime.run.id,
+    });
+    const option = availability.options.find(
+      ({ value, label }) =>
+        value === requestedAnswer ||
+        label.toLowerCase() === requestedAnswer.trim().toLowerCase(),
+    );
+    if (!option) {
+      if (!availability.options.length)
+        throw new CalendarSlotValidationError(
+          "Available times could not be verified. Please choose another date.",
+        );
+      return rejectMismatchedSelection();
+    }
+    selectionValue = option.value;
+  }
+  if (
+    !calendarAnswer &&
+    requestedAnswerKind === "project_resource" &&
+    requestedField
+  ) {
     const fieldValues = new Map<string, unknown>();
     for (const field of session.runtime.fields) {
       if (field.state !== "valid" && field.state !== "confirmed") continue;
@@ -941,6 +1123,7 @@ async function executeTaskBoundary(input: {
       return rejectMismatchedSelection();
     }
   } else if (
+    !calendarAnswer &&
     requestedAnswerKind === "static_selection" &&
     input.runtimeInput.selection
   ) {
@@ -993,13 +1176,20 @@ async function executeTaskBoundary(input: {
       });
   const normalizedProposal = normalizeActiveTaskQuestion(extractedProposal);
   const proposal =
-    requestedField?.type === "text" && !requestedField.optionSource
+    !calendarAnswer &&
+    requestedField?.type === "text" &&
+    !requestedField.optionSource
       ? bindRequestedTaskTextAnswer({
           proposal: normalizedProposal,
           requestedFieldKey: requestedField.key,
           text: input.runtimeInput.text,
         })
       : normalizedProposal;
+  if (calendar && !calendarAnswer) {
+    proposal.fieldCandidates = proposal.fieldCandidates.filter(
+      ({ fieldKey }) => fieldKey !== calendar.startFieldKey,
+    );
+  }
   let revision = session.execution.revision;
 
   if (proposal.turnKind === "side_question") {
@@ -1101,6 +1291,7 @@ async function executeTaskBoundary(input: {
     });
     const inputRequest = await hydrateProjectResourceInputRequest({
       fields: resumedSession.runtime.fields,
+      taskRunId: resumedSession.runtime.run.id,
       inputRequest: getResumedTaskRuntimeInputRequest({
         fields: resumedSession.runtime.fields,
         requestedFieldKey: resumedSession.runtime.run.lastRequestedFieldKey,
@@ -1167,6 +1358,38 @@ async function executeTaskBoundary(input: {
     revision = fieldResult.revision;
   }
 
+  if (proposal.toolRequest?.stage === "lookup") {
+    const lookup = snapshot.toolDefinitions.find(
+      ({ id, access, execution }) =>
+        id === proposal.toolRequest?.toolId &&
+        access === "read" &&
+        execution.adapter === "operation",
+    );
+    if (lookup && lookup.id !== calendar?.definition.id) {
+      const lookupResult = await executeTaskReadOperation({
+        definition: lookup,
+        projectId: input.runtimeInput.projectId,
+        requestId: `lookup:${input.runtimeInput.inboundMessageId}:${runtime.run.id}`,
+        snapshot,
+        taskRunId: runtime.run.id,
+      });
+      const outcome = getTaskOperationOutcome(
+        lookupResult.attempt,
+        lookupResult.operation,
+      );
+      if (outcome !== "success")
+        return {
+          output: operationTurn({
+            nextAction: "ask",
+            reply:
+              outcome === "no_result"
+                ? `No matching result was found. Please check your details and try again. Lia attempt #${lookupResult.attempt.id}.`
+                : `The lookup could not be verified. Please try again or ask the team for help. Lia attempt #${lookupResult.attempt.id} (${outcome}).`,
+          }),
+          signals: [],
+        };
+    }
+  }
   let canonicalSession = await getConversationTaskRuntimeSession({
     channelType: input.runtimeInput.channelType,
     externalConversationId: input.runtimeInput.externalConversationId,
@@ -1180,6 +1403,64 @@ async function executeTaskBoundary(input: {
           snapshot: canonicalSession.snapshot,
         })
       : proposal;
+  if (
+    calendar &&
+    canonicalSession.runtime &&
+    canonicalSession.snapshot &&
+    !["cancel", "handoff", "fail"].includes(reconciledProposal.nextAction)
+  ) {
+    const date = canonicalSession.runtime.fields.find(
+      ({ fieldKey, state }) =>
+        fieldKey === calendar.dateFieldKey &&
+        (state === "valid" || state === "confirmed"),
+    )?.canonicalValue;
+    if (date) {
+      const previous = await readTaskCalendarAvailability({
+        binding: calendar,
+        projectId: input.runtimeInput.projectId,
+        taskRunId: runtime.run.id,
+      });
+      if (
+        proposal.fieldCandidates.some(
+          ({ fieldKey }) => fieldKey === calendar.dateFieldKey,
+        ) ||
+        !previous.attempt
+      ) {
+        await executeTaskReadOperation({
+          definition: calendar.definition,
+          projectId: input.runtimeInput.projectId,
+          requestId: `calendar:${input.runtimeInput.inboundMessageId}:${runtime.run.id}`,
+          snapshot,
+          taskRunId: runtime.run.id,
+        });
+      }
+      const availability = await readTaskCalendarAvailability({
+        binding: calendar,
+        projectId: input.runtimeInput.projectId,
+        taskRunId: runtime.run.id,
+      });
+      const selected = canonicalSession.runtime.fields.find(
+        ({ fieldKey }) => fieldKey === calendar.startFieldKey,
+      )?.canonicalValue;
+      if (
+        !availability.options.length ||
+        (selected &&
+          !availability.options.some(({ value }) => value === selected))
+      ) {
+        throw new CalendarSlotValidationError(
+          availability.options.length
+            ? "That time is no longer available. Choose one of the verified times."
+            : `No available times could be verified for that date. Please choose another date. Lia attempt #${availability.attempt?.id}.`,
+        );
+      }
+      canonicalSession = await getConversationTaskRuntimeSession({
+        channelType: input.runtimeInput.channelType,
+        externalConversationId: input.runtimeInput.externalConversationId,
+        projectId: input.runtimeInput.projectId,
+      });
+      revision = canonicalSession.execution?.revision ?? revision;
+    }
+  }
   const availabilityDefinition = canonicalSession.snapshot
     ? getBoundAvailabilityDefinition(canonicalSession.snapshot)
     : null;
@@ -1268,6 +1549,7 @@ async function executeTaskBoundary(input: {
       canonicalSession.runtime && canonicalSession.snapshot
         ? await hydrateProjectResourceInputRequest({
             fields: canonicalSession.runtime.fields,
+            taskRunId: canonicalSession.runtime.run.id,
             inputRequest: baseInputRequest,
             projectId: input.runtimeInput.projectId,
             snapshot: canonicalSession.snapshot,
@@ -1288,7 +1570,15 @@ async function executeTaskBoundary(input: {
     }
     return {
       inputRequest,
-      output: reconciledProposal,
+      output:
+        inputRequest?.inputKind === "choice" &&
+        calendar &&
+        inputRequest.fieldKey === calendar.startFieldKey
+          ? {
+              ...reconciledProposal,
+              reply: `${reconciledProposal.reply}\n${inputRequest.options.map(({ label }) => `- ${label}`).join("\n")}`,
+            }
+          : reconciledProposal,
       signals: [],
     };
   }
@@ -1386,6 +1676,29 @@ async function executeKnowledgeBoundary(input: {
 export async function runHybridChannelBoundary(
   input: HybridChannelRuntimeInput,
 ): Promise<HybridChannelBoundaryResult> {
+  try {
+    return await runHybridChannelBoundaryInternal(input);
+  } catch (error) {
+    const recovered = await recoverCalendarSlot({
+      error,
+      projectId: input.projectId,
+      session: await getConversationTaskRuntimeSession(input),
+    });
+    return {
+      replies: [
+        createTaskRuntimeReply({
+          inputRequest: recovered.inputRequest,
+          nextAction: recovered.output.nextAction,
+          text: recovered.output.reply,
+        }),
+      ],
+    };
+  }
+}
+
+async function runHybridChannelBoundaryInternal(
+  input: HybridChannelRuntimeInput,
+): Promise<HybridChannelBoundaryResult> {
   const graph = input.action.hybridGraph;
   if (!graph || !input.action.versionId || !input.text.trim()) {
     return { replies: [] };
@@ -1465,6 +1778,7 @@ export async function runHybridChannelBoundary(
       () =>
         hydrateProjectResourceInputRequest({
           fields: runtime.fields,
+          taskRunId: runtime.run.id,
           inputRequest: getResumedTaskRuntimeInputRequest({
             fields: runtime.fields,
             requestedFieldKey: runtime.run.lastRequestedFieldKey,
@@ -1520,7 +1834,13 @@ export async function runHybridChannelBoundary(
             node,
             project,
             runtimeInput: input,
-          }),
+          }).catch(async (error) =>
+            recoverCalendarSlot({
+              error,
+              projectId: input.projectId,
+              session: await getConversationTaskRuntimeSession(input),
+            }),
+          ),
     graph,
     responseOwner: resolveHybridRuntimeResponseOwner({
       executionStatus: session.execution?.status,
@@ -1566,6 +1886,7 @@ export async function runHybridChannelBoundary(
       });
       inputRequest = await hydrateProjectResourceInputRequest({
         fields: taskSession.runtime.fields,
+        taskRunId: taskSession.runtime.run.id,
         inputRequest: getTaskRuntimeInputRequest({
           fields: taskSession.runtime.fields,
           proposal: replyProposal,

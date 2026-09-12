@@ -1772,10 +1772,62 @@ export async function applyConversationalTaskEvent(
 
     switch (event.type) {
       case "field.candidates": {
+        let fieldDefinition = snapshot.task.definition;
+        if (
+          event.candidates.some(
+            (candidate) =>
+              typeof candidate.naturalValue === "string" &&
+              /^\d{4}-\d{2}-\d{2}T/.test(candidate.naturalValue) &&
+              fieldDefinition.fields.some(
+                ({ key, type }) =>
+                  key === candidate.fieldKey && type === "time",
+              ),
+          )
+        ) {
+          // Only a provider-verified Calendar start may retain an ISO instant
+          // in a published time field. All ordinary field rules still apply.
+          const { getTaskCalendarAvailability, readTaskCalendarAvailability } =
+            await import("@/lib/conversational-task-calendar-availability");
+          const binding = await getTaskCalendarAvailability(snapshot);
+          if (
+            binding &&
+            !event.candidates.some(
+              ({ fieldKey }) => fieldKey === binding.dateFieldKey,
+            )
+          ) {
+            const availability = await readTaskCalendarAvailability({
+              binding,
+              projectId: event.projectId,
+              taskRunId: run.id,
+            });
+            const starts = event.candidates.filter(
+              ({ fieldKey }) => fieldKey === binding.startFieldKey,
+            );
+            if (
+              starts.length &&
+              starts.every(
+                (candidate) =>
+                  candidate.provenance.source === "visitor" &&
+                  availability.options.some(
+                    ({ value }) => value === candidate.naturalValue,
+                  ),
+              )
+            ) {
+              fieldDefinition = {
+                ...fieldDefinition,
+                fields: fieldDefinition.fields.map((field) =>
+                  field.key === binding.startFieldKey
+                    ? { ...field, type: "text" as const }
+                    : field,
+                ),
+              };
+            }
+          }
+        }
         const canonicalCandidates = await canonicalizeFieldCandidates({
           candidates: event.candidates,
           contextValues,
-          definition: snapshot.task.definition,
+          definition: fieldDefinition,
           fieldValues,
           projectId: event.projectId,
           referenceDate: occurredAt,

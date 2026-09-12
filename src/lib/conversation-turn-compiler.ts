@@ -18,6 +18,7 @@ import { selectBoundedTurnHistory } from "@/lib/conversation-turn-safety";
 import type { ProjectAiSettings } from "@/lib/project-ai-settings";
 
 export type PublishedTaskOption = {
+  aliases?: string[];
   candidateFieldKeys?: string[];
   id: number;
   name: string;

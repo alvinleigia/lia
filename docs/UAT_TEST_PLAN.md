@@ -1455,6 +1455,59 @@ Architecture correction on 2026-09-12:
 - Lia binds a requested free-text field to the exact current caller transcript
   and discards model-generated alternatives before field validation.
 
+Lia-managed Project Chat failure reported on 2026-09-12 (commit `642e208`):
+
+- Project `Phase 16 Lifecycle UAT` (#94), action `Phase 18 Appointment
+  Lifecycle UAT` (#60), published version 1. Its four enabled nodes and eleven
+  routes passed structural checks; that did not verify Calendar operations.
+- `I want to book an appointment.` took more than 30 seconds and produced
+  `I could not prepare a reliable answer. Please try again.` before asking
+  for a preferred date. No provider-verified slots were displayed.
+- The conversation accepted 2026-09-21, 10:00 AM, synthetic patient Alex Test,
+  a synthetic contact number, and `Persistent knee pain`. After explicit
+  confirmation, it claimed the operation completed and was submitted
+  successfully. No matching September 21 event was found. Calendar search
+  found only an older September 10 Alex Test event and no matching reason.
+- Result: **FAILED**. The supplied browser evidence did not include a Lia
+  attempt ID, so this record does not invent one. Calendar search is
+  supplementary staging evidence; `/projects/operations` must provide the
+  primary project-scoped verification record.
+- Confirmed code causes: transport `completed` was treated as task success
+  despite a rejected business payload; graph labels were omitted from task
+  aliases and model retries each got the full timeout; operation-backed
+  availability was not executed or offered as validated slot choices.
+
+Local remediation verification on 2026-09-12:
+
+- Reproduced the three routing failures and completed-transport/rejected-result
+  false success with focused tests before implementation.
+- 142 focused routing, hybrid-flow, field-runtime, turn-contract, slot-safety,
+  and Calendar provider tests passed. All 15 operation-runtime and 17 field-runtime
+  database tests passed, including real task/attempt/tool-request persistence,
+  project isolation, and a mocked Calendar transport.
+- TypeScript, lint for all changed code, and the production build passed.
+- The slot tests cover lookup after date collection, empty output mappings,
+  ISO choice values, arbitrary-time rejection, no results, provider failure,
+  and availability refresh rejecting a stale selection before a write. The
+  expanded database regression also passed resume recovery and a subsequent
+  explicitly confirmed booking with verified provider success and one recorded
+  appointment, using mocked Calendar HTTP responses only. This passed for both
+  text fields and existing published time fields; ordinary time validation
+  remains unchanged outside provider-verified Calendar starts.
+- `/projects/operations` now distinguishes transport status from business
+  outcome, displays task/tool-request identifiers and safe rejection reasons, and
+  exposes bounded Calendar results. Channel operation replies identify the
+  Lia attempt.
+- Browser discovery returned no available browser. The connected development
+  database has no project #94. These automated results are not a fresh live
+  staging lifecycle pass; no live provider write was used as local evidence.
+
+Phase 18 remains **IN PROGRESS**. A fresh approved staging run must prove
+available-slot selection, stale-slot rejection, confirmed provider success,
+no-result/failure handling, deterministic intent routing, and correlated Lia
+attempt evidence before release. No action or application was republished as
+part of this local work.
+
 The checklist below is retained as historical provider-managed UAT evidence.
 It is not an accepted release path for appointment writes or identity-protected
 lookups. Replacement browser UAT runs in Flow Builder or Project Chat; live
@@ -1501,8 +1554,8 @@ Result: [ ] Pass [x] Fail
 - Phase 17: [x] Pass [ ] Fail [ ] In progress
 - Phase 17A: [x] Pass [ ] Fail [ ] In progress
 - Phase 18: [ ] Pass [ ] Fail [x] In progress [ ] Not started
-- Critical defects open: `0`
-- High defects open: `0`
+- Critical defects open: `1: Phase 18 false success; local fix awaits staging verification`
+- High defects open: `2: Phase 18 slot enforcement and routing latency; local fixes await staging verification`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 - Phase 16 approver/date: `Single tester / release owner - 2026-08-16`
 - Phase 17 approver/date: `Single tester / release owner - 2026-08-20`

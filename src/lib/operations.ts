@@ -32,6 +32,7 @@ import {
   listMissingProviderSecretNames,
   prepareProviderConfig,
 } from "@/lib/provider-secrets";
+import { getTaskOperationOutcome } from "@/lib/task-operation-outcome";
 
 export const INTEGRATION_PROVIDER_TYPES = [
   "manual_review",
@@ -217,6 +218,12 @@ export function getOperationResultOutcome(input: {
   attempt: SelectOperationAttempt;
   operation: SelectOperation;
 }) {
+  if (
+    input.operation.operationType?.startsWith("google_calendar.") ||
+    typeof input.attempt.responsePayload.status === "string"
+  ) {
+    return getTaskOperationOutcome(input.attempt, input.operation);
+  }
   const response = getRecordValue(input.attempt.responsePayload, "response");
   const status = response?.status;
   if (
@@ -305,7 +312,9 @@ export function getSanitizedOperationAttemptPreview(input: {
   const response = getRecordValue(input.attempt.responsePayload, "response");
 
   return {
-    body: sanitizeOperationValue(response?.body ?? null),
+    body: input.operation.operationType?.startsWith("google_calendar.")
+      ? getGoogleCalendarHostedVoiceResult(input.attempt.responsePayload)
+      : sanitizeOperationValue(response?.body ?? null),
     outcome: getOperationResultOutcome(input),
     status: typeof response?.status === "number" ? response.status : null,
     statusText:
@@ -1931,7 +1940,7 @@ export async function queueOperationForSubmission(input: {
 }
 
 export async function queueOperationForConversationalTask(input: {
-  confirmationId: number;
+  confirmationId: number | null;
   idempotencyKey: string;
   operationId: number;
   payload: Record<string, unknown>;
@@ -1950,6 +1959,18 @@ export async function queueOperationForConversationalTask(input: {
   const { operation, provider } = operationContext;
   if (operation.status !== "active" || provider.status !== "active") {
     return null;
+  }
+
+  if (
+    input.confirmationId === null &&
+    (provider.providerType !== "google_calendar" ||
+      !["google_calendar.availability", "google_calendar.lookup"].includes(
+        operation.operationType,
+      ))
+  ) {
+    throw new Error(
+      "Only read-only Calendar operations may run without confirmation.",
+    );
   }
 
   const traceId = resolveTraceId(input.traceId);

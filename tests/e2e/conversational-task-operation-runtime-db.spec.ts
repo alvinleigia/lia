@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { and, eq, inArray } from "drizzle-orm";
 import type { ChannelType } from "../../src/lib/channels";
@@ -9,6 +10,11 @@ import {
   type ConversationalTaskDefinitionV1,
   conversationalTaskSnapshotV1Schema,
 } from "../../src/lib/conversation-contracts";
+import {
+  executeTaskReadOperation,
+  getTaskCalendarAvailability,
+  readTaskCalendarAvailability,
+} from "../../src/lib/conversational-task-calendar-availability";
 import {
   confirmTaskOperation,
   executeConfirmedTaskOperation,
@@ -38,11 +44,13 @@ import {
   conversationExecutionStates,
   conversationInboundEvents,
   durableJobs,
+  googleCalendarAppointments,
   integrationProviders,
   operationAttempts,
   operations,
   outboxMessages,
   projects,
+  providerSecrets,
   users,
   workspaces,
 } from "../../src/lib/db-schema";
@@ -50,6 +58,7 @@ import {
   claimNextDurableJob,
   failDurableJob,
 } from "../../src/lib/durable-jobs";
+import { buildHybridChannelResumeReplies } from "../../src/lib/hybrid-channel-runtime";
 import {
   createIntegrationProvider,
   createOperation,
@@ -117,11 +126,13 @@ function operationTaskDefinition(
 }
 
 async function createPublishedTask(input: {
+  definition?: ConversationalTaskDefinitionV1;
   name: string;
   operationId: number;
   projectId: number;
 }) {
-  const definition = operationTaskDefinition(input.operationId);
+  const definition =
+    input.definition ?? operationTaskDefinition(input.operationId);
   const [task] = await db
     .insert(conversationalTasks)
     .values({
@@ -131,15 +142,19 @@ async function createPublishedTask(input: {
       projectId: input.projectId,
     })
     .returning();
-  const toolDefinition = await resolveProjectTaskToolDefinition({
-    definition,
-    projectId: input.projectId,
-    toolId: `operation:${input.operationId}`,
-    version: 1,
-  });
-  if (!toolDefinition) {
-    throw new Error("Could not build the operation tool definition.");
-  }
+  const toolDefinitions = await Promise.all(
+    definition.tools.map(async (binding) => {
+      const tool = await resolveProjectTaskToolDefinition({
+        definition,
+        projectId: input.projectId,
+        toolId: binding.tool.id,
+        version: binding.tool.version,
+      });
+      if (!tool)
+        throw new Error("Could not build the operation tool definition.");
+      return tool;
+    }),
+  );
   const snapshot = conversationalTaskSnapshotV1Schema.parse({
     assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
     assistantPolicy: REFERENCE_BOOKING_PROJECT_POLICY.assistant,
@@ -153,7 +168,7 @@ async function createPublishedTask(input: {
       objective: task.objective,
       schemaVersion: 1,
     },
-    toolDefinitions: [toolDefinition],
+    toolDefinitions,
   });
   const [version] = await db
     .insert(conversationalTaskVersions)
@@ -238,6 +253,7 @@ async function startReadyRun(
   expect(fields.disposition).toBe("applied");
   return {
     conversationId: conversation.id,
+    externalConversationId: conversation.externalConversationId,
     taskRunId: started.taskRunId,
   };
 }
@@ -380,8 +396,14 @@ test.afterAll(async () => {
     .delete(conversationalTasks)
     .where(eq(conversationalTasks.projectId, fixture.projectId));
   await db
+    .delete(googleCalendarAppointments)
+    .where(eq(googleCalendarAppointments.projectId, fixture.projectId));
+  await db
     .delete(operations)
     .where(eq(operations.projectId, fixture.projectId));
+  await db
+    .delete(providerSecrets)
+    .where(eq(providerSecrets.projectId, fixture.projectId));
   await db
     .delete(integrationProviders)
     .where(eq(integrationProviders.projectId, fixture.projectId));
@@ -1352,4 +1374,360 @@ test("routes a reconciled operation failure through the published handoff policy
     result: null,
     status: "provider_failure",
   });
+});
+
+test("completed delivery with rejected business result cannot complete a task", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const run = await startReadyRun(fixture.manualTaskId);
+  const pending = await prepareTaskOperationConfirmation({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+    toolId: fixture.manualToolId,
+  });
+  await confirmTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  const queued = await executeConfirmedTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  await processProjectDurableOperationQueue({
+    maxJobs: 25,
+    projectId: fixture.projectId,
+    workerId: `business-rejection-${suffix}`,
+  });
+  await db
+    .update(operationAttempts)
+    .set({
+      status: "completed",
+      responsePayload: { status: "rejected", reason: "slot_taken" },
+    })
+    .where(
+      and(
+        eq(operationAttempts.id, queued.attempt.id),
+        eq(operationAttempts.projectId, fixture.projectId),
+      ),
+    );
+  await processAndReconcileTaskOperation({
+    confirmationId: pending.id,
+    principal,
+    projectId: fixture.projectId,
+    workerId: `reconcile-rejection-${suffix}`,
+  });
+  const runtime = await getConversationalTaskRuntime({
+    projectId: fixture.projectId,
+    taskRunId: run.taskRunId,
+  });
+  expect(runtime?.run.status).not.toBe("completed");
+  expect(runtime?.tools[0]).toMatchObject({
+    status: "rejected",
+    errorCode: "slot_taken",
+  });
+  const exported = await exportConversationRuntimeData({
+    conversationId: run.conversationId,
+    projectId: fixture.projectId,
+  });
+  expect(exported.confirmations).toContainEqual(
+    expect.objectContaining({ id: pending.id, status: "failed" }),
+  );
+  const audit = await db
+    .select()
+    .from(conversationalTaskAuditEvents)
+    .where(
+      and(
+        eq(conversationalTaskAuditEvents.projectId, fixture.projectId),
+        eq(conversationalTaskAuditEvents.taskRunId, run.taskRunId),
+      ),
+    );
+  expect(audit).toContainEqual(
+    expect.objectContaining({
+      eventType: "operation.failed",
+      summary: expect.objectContaining({
+        attemptId: queued.attempt.id,
+        businessOutcome: "rejected",
+        reason: "slot_taken",
+      }),
+    }),
+  );
+});
+
+test("Calendar slots use the task ledger and block arbitrary, empty, failed and stale selections", async () => {
+  test.setTimeout(240_000);
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const projectId = fixture.projectId;
+  const privateKey = generateKeyPairSync("rsa", { modulusLength: 2048 })
+    .privateKey.export({ format: "pem", type: "pkcs8" })
+    .toString();
+  const provider = await createIntegrationProvider({
+    name: "Fixture Calendar",
+    projectId,
+    providerType: "google_calendar",
+    config: {
+      calendarId: "fixture@example.test",
+      clientEmail: "lia@example.test",
+      privateKey,
+      timezone: "UTC",
+      identityFactors: ["patientName"],
+      workingDays: [1, 2, 3, 4, 5, 6, 7],
+      schedulingHorizonDays: 60,
+    },
+  });
+  const availabilityOperation = await createOperation({
+    name: "Fixture availability",
+    projectId,
+    providerId: provider.id,
+    operationType: "google_calendar.availability",
+    inputMapping: { date: "fields.preferredDate" },
+    outputMapping: {},
+  });
+  const booking = await createOperation({
+    name: "Fixture booking",
+    projectId,
+    providerId: provider.id,
+    operationType: "google_calendar.book",
+    inputMapping: {
+      patientName: "fields.guestName",
+      start: "fields.appointmentStart",
+    },
+    outputMapping: {},
+  });
+  const base = operationTaskDefinition(booking.id);
+  const dateField = REFERENCE_BOOKING_TASK_DEFINITION.fields.find(
+    ({ key }) => key === "preferredDate",
+  );
+  if (!dateField) throw new Error("Date fixture missing.");
+  const definition: ConversationalTaskDefinitionV1 = {
+    ...base,
+    fields: [
+      ...base.fields,
+      { ...dateField, dependsOn: [] },
+      {
+        ...base.fields[0],
+        id: "10000000-0000-4000-8000-000000000099",
+        key: "appointmentStart",
+        label: "Appointment time",
+        type: "time",
+        dependsOn: ["preferredDate"],
+      },
+    ],
+    tools: [
+      {
+        access: "read",
+        allowedStages: ["lookup"],
+        tool: { id: `operation:${availabilityOperation.id}`, version: 1 },
+      },
+      ...base.tools,
+    ],
+  };
+  const published = await createPublishedTask({
+    definition,
+    name: "Calendar ledger UAT",
+    operationId: booking.id,
+    projectId,
+  });
+  const snapshot = conversationalTaskSnapshotV1Schema.parse(
+    published.version.snapshot,
+  );
+  const binding = await getTaskCalendarAvailability(snapshot);
+  if (!binding) throw new Error("Calendar availability binding missing.");
+  const run = await startReadyRun(published.task.id);
+  const scope = { binding, projectId, taskRunId: run.taskRunId };
+  const date = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+  const setField = async (fieldKey: string, value: string) => {
+    const now = new Date().toISOString();
+    const result = await applyConversationalTaskEvent({
+      authentication: null,
+      candidates: [
+        {
+          fieldKey,
+          naturalValue: value,
+          provenance: { source: "visitor", sourceReference: null },
+          state: "candidate",
+          validation: { code: null, message: null, valid: false },
+        },
+      ],
+      channelIdentity: {},
+      channelType: "project_chat",
+      conversationId: run.conversationId,
+      correction: true,
+      eventId: `calendar-field-${Date.now()}-${fieldKey}`,
+      expectedRevision: null,
+      occurredAt: now,
+      receivedAt: now,
+      projectId,
+      providerSequence: null,
+      schemaVersion: 1,
+      taskRunId: run.taskRunId,
+      type: "field.candidates",
+    });
+    expect(result.disposition).toBe("applied");
+  };
+  const lookup = () =>
+    executeTaskReadOperation({
+      definition: binding.definition,
+      projectId,
+      snapshot,
+      taskRunId: run.taskRunId,
+    });
+  const prepare = () =>
+    prepareTaskOperationConfirmation({
+      projectId,
+      taskRunId: run.taskRunId,
+      toolId: `operation:${booking.id}`,
+    });
+  let mode: "available" | "busy" | "failed" = "available";
+  let freeBusyCalls = 0;
+  const originalFetch = globalThis.fetch;
+  let insertedEvent: Record<string, unknown> | null = null;
+  globalThis.fetch = async (url, init) => {
+    if (String(url) === "https://oauth2.googleapis.com/token")
+      return Response.json({ access_token: "fixture-token", expires_in: 3600 });
+    if (String(url).endsWith("/freeBusy")) {
+      freeBusyCalls += 1;
+      if (mode === "failed")
+        return new Response("unavailable", { status: 503 });
+      return Response.json({
+        calendars: {
+          "fixture@example.test": {
+            busy:
+              mode === "busy"
+                ? [{ start: `${date}T00:00:00Z`, end: `${date}T23:59:59Z` }]
+                : [],
+          },
+        },
+      });
+    }
+    if (String(url).includes("/events") && init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      insertedEvent = {
+        id: body.id,
+        etag: "fixture-etag",
+        status: "confirmed",
+        start: body.start,
+        end: body.end,
+      };
+      return Response.json(insertedEvent);
+    }
+    if (
+      String(url).includes("/events/") &&
+      init?.method === "GET" &&
+      insertedEvent
+    )
+      return Response.json(insertedEvent);
+    throw new Error("Unexpected fixture network request.");
+  };
+  try {
+    await expect(lookup()).rejects.toThrow("not ready");
+    expect(freeBusyCalls).toBe(0);
+    await setField("preferredDate", date);
+    const first = await lookup();
+    expect(first.attempt).toMatchObject({
+      status: "completed",
+      taskRunId: run.taskRunId,
+      taskVersionId: published.version.id,
+    });
+    expect(first.attempt.taskToolRequestId).toBeTruthy();
+    expect(first.attempt.traceId).toBeTruthy();
+    const available = await readTaskCalendarAvailability(scope);
+    expect(available.options.length).toBeGreaterThan(0);
+    const resumeInput = {
+      channelType: "project_chat" as const,
+      externalConversationId: run.externalConversationId,
+      projectId,
+    };
+    const resumed = await buildHybridChannelResumeReplies(resumeInput);
+    expect(resumed[0].payload).toMatchObject({
+      inputRequest: { inputKind: "choice", options: available.options },
+    });
+    await setField("appointmentStart", "10:00 AM");
+    await expect(prepare()).rejects.toThrow("provider-verified");
+    await setField("appointmentStart", available.options[0].value);
+    const beforeRefresh = freeBusyCalls;
+    const confirmation = await prepare();
+    expect(freeBusyCalls).toBeGreaterThan(beforeRefresh);
+    expect(confirmation.canonicalInput.start).toBe(available.options[0].value);
+    await confirmTaskOperation({
+      confirmationId: confirmation.id,
+      principal,
+      projectId,
+      taskRunId: run.taskRunId,
+    });
+    mode = "busy";
+    await expect(
+      executeConfirmedTaskOperation({
+        confirmationId: confirmation.id,
+        principal,
+        projectId,
+        taskRunId: run.taskRunId,
+      }),
+    ).rejects.toThrow("no longer available");
+    expect((await readTaskCalendarAvailability(scope)).options).toEqual([]);
+    const writes = await db
+      .select()
+      .from(operationAttempts)
+      .where(
+        and(
+          eq(operationAttempts.projectId, projectId),
+          eq(operationAttempts.taskRunId, run.taskRunId),
+          eq(operationAttempts.operationId, booking.id),
+        ),
+      );
+    expect(writes).toEqual([]);
+    mode = "failed";
+    const failure = await lookup();
+    expect(failure.attempt.status).toBe("failed");
+    expect((await readTaskCalendarAvailability(scope)).options).toEqual([]);
+    const runtime = await getConversationalTaskRuntime(scope);
+    expect(runtime?.tools).toContainEqual(
+      expect.objectContaining({
+        id: failure.attempt.taskToolRequestId,
+        status: "provider_failure",
+      }),
+    );
+    await expect(prepare()).rejects.toThrow("provider-verified");
+    const recovered = await buildHybridChannelResumeReplies(resumeInput);
+    expect(recovered[0].payload).toMatchObject({
+      inputRequest: {
+        fieldKey: "preferredDate",
+        inputKind: "date",
+        options: [],
+      },
+    });
+    mode = "available";
+    await lookup();
+    const fresh = await readTaskCalendarAvailability(scope);
+    await setField("appointmentStart", fresh.options[0].value);
+    const ready = await prepare();
+    await confirmTaskOperation({
+      confirmationId: ready.id,
+      principal,
+      projectId,
+      taskRunId: run.taskRunId,
+    });
+    await executeConfirmedTaskOperation({
+      confirmationId: ready.id,
+      principal,
+      projectId,
+      taskRunId: run.taskRunId,
+    });
+    const completed = await processAndReconcileTaskOperation({
+      confirmationId: ready.id,
+      principal,
+      projectId,
+      workerId: `calendar-success-${suffix}`,
+    });
+    expect(completed.businessOutcome).toBe("success");
+    expect(completed.attempt.responsePayload.status).toBe("success");
+    expect((await getConversationalTaskRuntime(scope))?.run.status).toBe(
+      "completed",
+    );
+    expect(insertedEvent).not.toBeNull();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

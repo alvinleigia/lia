@@ -191,15 +191,28 @@ function findExplicitTaskIntent(input: ExecuteStructuredTurnInput) {
     return null;
   }
 
-  const visitorIntent = normalizeTaskIntent(input.visitorMessage);
-  const matches = input.publishedTasks.filter((task) => {
-    const taskIntent = normalizeTaskIntent(task.name);
-    return (
-      taskIntent.split(" ").length >= 2 &&
-      (visitorIntent === taskIntent ||
-        visitorIntent.startsWith(`${taskIntent} `))
-    );
-  });
+  const message = input.visitorMessage.trim();
+  // Semantic aliases apply only to explicit action requests, never informational questions.
+  const action = message
+    .match(
+      /^(?:(?:i|we)\s+(?:want|need|would like)\s+to\s+|please\s+|(?:can|could|would)\s+you\s+)?(book|cancel|reschedule)\s+(?:(?:a|an|the|my|our)\s+)?appointment[.!?]?$/i,
+    )?.[1]
+    ?.toLowerCase();
+  if (!action && isPotentialKnowledgeSideQuestion(message)) return null;
+  const visitorIntent = normalizeTaskIntent(message);
+  const matches = input.publishedTasks.filter((task) =>
+    [task.name, ...(task.aliases ?? [])].some((alias) => {
+      const taskIntent = normalizeTaskIntent(alias);
+      if (action && task.aliases?.includes(alias)) {
+        return taskIntent.split(" ").includes(action);
+      }
+      return (
+        taskIntent.split(" ").length >= 2 &&
+        (visitorIntent === taskIntent ||
+          visitorIntent.startsWith(`${taskIntent} `))
+      );
+    }),
+  );
 
   return matches.length === 1 ? matches[0] : null;
 }
@@ -359,6 +372,21 @@ function asValidatedDeterministic(
 }
 
 function modelFailureProposal(input: ExecuteStructuredTurnInput) {
+  if (
+    !input.activeTask &&
+    input.projectPolicy.entry.allowTaskRecommendation &&
+    input.publishedTasks.length
+  ) {
+    const choices = input.publishedTasks.map(
+      (task) => task.aliases?.[0] ?? task.name,
+    );
+    const question = `Which task would you like help with: ${choices.join(", ")}?`;
+    return deterministicProposal({
+      nextAction: "clarify",
+      reasonCode: "model_unavailable",
+      reply: question,
+    });
+  }
   const mode =
     input.activeTask?.task.definition.degradedMode.model ??
     "deterministic_fallback";
@@ -798,23 +826,35 @@ export class StructuredTurnEngine {
       totalTokens: null,
     };
 
-    for (const modelId of models) {
+    const deadline = Date.now() + modelPolicy.timeoutMs;
+    modelAttempts: for (const modelId of models) {
       let repair = "";
       for (
         let repairAttempt = 0;
         repairAttempt <= modelPolicy.maxRepairAttempts;
         repairAttempt += 1
       ) {
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 0) break modelAttempts;
         attempts += 1;
         try {
-          const generated = await this.provider.generateTurn({
-            maxOutputTokens: modelPolicy.maxOutputTokens,
-            maxRetries: modelPolicy.maxRetries,
-            messages: compiled.messages,
-            modelId,
-            system: compiled.system + repair,
-            timeoutMs: modelPolicy.timeoutMs,
-          });
+          let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+          const generated = await Promise.race([
+            this.provider.generateTurn({
+              maxOutputTokens: modelPolicy.maxOutputTokens,
+              maxRetries: modelPolicy.maxRetries,
+              messages: compiled.messages,
+              modelId,
+              system: compiled.system + repair,
+              timeoutMs: remainingMs,
+            }),
+            new Promise<never>((_, reject) => {
+              deadlineTimer = setTimeout(
+                () => reject(new Error("Turn deadline exceeded.")),
+                remainingMs,
+              );
+            }),
+          ]).finally(() => clearTimeout(deadlineTimer));
           lastUsage = generated.usage;
           const proposal = applyIntentRoutingPolicy(
             validateStructuredTurnProposal(

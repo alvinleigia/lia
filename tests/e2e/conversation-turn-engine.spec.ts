@@ -1134,3 +1134,111 @@ test("platform-default extraction uses the low-latency structured model", async 
   expect(provider.calls).toHaveLength(1);
   expect(provider.calls[0]?.modelId).toBe("gpt-4.1-mini");
 });
+
+test("appointment requests route through graph aliases without a model", async () => {
+  const publishedTasks = [
+    {
+      id: 1,
+      name: "Phase 18 Booking UAT",
+      aliases: ["Check Availability and Book"],
+      objective: "Book an appointment",
+    },
+    {
+      id: 2,
+      name: "Phase 18 Cancel UAT",
+      aliases: ["Find and Cancel Appointment"],
+      objective: "Cancel an appointment",
+    },
+    {
+      id: 3,
+      name: "Phase 18 Reschedule UAT",
+      aliases: ["Find and Reschedule Appointment"],
+      objective: "Reschedule an appointment",
+    },
+  ];
+  for (const [visitorMessage, taskId] of [
+    ["I want to book an appointment.", 1],
+    ["I want to cancel my appointment.", 2],
+    ["I need to reschedule my appointment.", 3],
+  ] as const) {
+    const provider = new QueueProvider([]);
+    const result = await new StructuredTurnEngine({ provider }).execute({
+      ...engineInput(),
+      activeTask: null,
+      stage: "knowledge",
+      publishedTasks,
+      visitorMessage,
+    });
+    expect(result.proposal.taskRecommendation?.taskId).toBe(taskId);
+    expect(provider.calls).toHaveLength(0);
+  }
+});
+test("routing failures offer deterministic task clarification", async () => {
+  const result = await new StructuredTurnEngine({
+    provider: new QueueProvider([]),
+  }).execute({
+    ...engineInput(),
+    activeTask: null,
+    stage: "knowledge",
+    visitorMessage: "I need help with an appointment",
+  });
+  expect(result.proposal.nextAction).toBe("clarify");
+  expect(result.proposal.reply).toContain("Book a Spa Service");
+  expect(result.proposal.reply).not.toContain("reliable answer");
+});
+test("model retries share one total deadline", async () => {
+  const timeouts: number[] = [];
+  const provider: StructuredTurnProvider = {
+    async generateTurn(input) {
+      timeouts.push(input.timeoutMs);
+      await new Promise((resolve) => setTimeout(resolve, 70));
+      throw new Error("provider unavailable");
+    },
+  };
+  const input = engineInput();
+  const started = Date.now();
+  await new StructuredTurnEngine({ provider }).execute({
+    ...input,
+    projectPolicy: {
+      ...input.projectPolicy,
+      assistant: {
+        ...input.projectPolicy.assistant,
+        modelPolicy: {
+          ...input.projectPolicy.assistant.modelPolicy,
+          timeoutMs: 100,
+        },
+      },
+    },
+  });
+  expect(timeouts.length).toBeLessThanOrEqual(2);
+  expect(timeouts[1] ?? 0).toBeLessThan(70);
+  expect(Date.now() - started).toBeLessThan(250);
+});
+
+test("informational appointment questions and negations never route deterministically", async () => {
+  for (const visitorMessage of [
+    "How do I book an appointment?",
+    "Can I cancel my appointment?",
+    "I do not want to book an appointment.",
+    "What happens if I reschedule my appointment?",
+    "Check Availability and Book: what does it cost?",
+  ]) {
+    const result = await new StructuredTurnEngine({
+      provider: new QueueProvider([]),
+    }).execute({
+      ...engineInput(),
+      activeTask: null,
+      stage: "knowledge",
+      visitorMessage,
+      publishedTasks: [
+        {
+          id: 1,
+          name: "Phase 18 Booking UAT",
+          aliases: ["Check Availability and Book"],
+          objective: "Book an appointment",
+        },
+      ],
+    });
+    expect(result.proposal.taskRecommendation).toBeNull();
+  }
+});

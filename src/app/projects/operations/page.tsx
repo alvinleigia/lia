@@ -31,6 +31,10 @@ import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
+import {
+  getTaskOperationOutcome,
+  getTaskOperationReason,
+} from "@/lib/task-operation-outcome";
 import { formatDateTimeInTimeZone } from "@/lib/time-zones";
 import {
   createIntegrationProviderAction,
@@ -621,7 +625,11 @@ export default async function OperationsPage({
                           Attempt #{attempt.id}
                         </span>
                         <span className="rounded-md border px-2 py-1 text-xs capitalize">
-                          {attempt.status}
+                          Transport: {attempt.status}
+                        </span>
+                        <span className="rounded-md border px-2 py-1 text-xs">
+                          Business:{" "}
+                          {getTaskOperationOutcome(attempt, operation)}
                         </span>
                         {getAttemptReplaySource(attempt.requestPayload) ? (
                           <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700">
@@ -649,6 +657,20 @@ export default async function OperationsPage({
                         ) : (
                           "Not linked"
                         )}
+                      </p>
+                      {attempt.taskRunId && (
+                        <p className="text-xs text-muted-foreground">
+                          Task run #{attempt.taskRunId}; tool request #
+                          {attempt.taskToolRequestId}
+                        </p>
+                      )}
+                      {getTaskOperationReason(attempt) && (
+                        <p className="text-xs text-muted-foreground">
+                          Reason: {getTaskOperationReason(attempt)}
+                        </p>
+                      )}
+                      <p className="break-all text-xs text-muted-foreground">
+                        Idempotency: {attempt.idempotencyKey}
                       </p>
                       {getAttemptDeliverySummary(attempt.responsePayload) && (
                         <p className="text-xs text-muted-foreground">

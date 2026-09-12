@@ -9,6 +9,7 @@ import {
   getBoundAvailabilityDefinition,
   readCanonicalAvailability,
 } from "@/lib/conversational-task-availability";
+import { assertTaskCalendarSlot } from "@/lib/conversational-task-calendar-availability";
 import {
   applyConversationalTaskEvent,
   getConversationalTaskRuntime,
@@ -33,6 +34,10 @@ import {
   queueOperationForConversationalTask,
   reconcileOperationAttemptOutcome,
 } from "@/lib/operations";
+import {
+  getTaskOperationOutcome,
+  getTaskOperationReason,
+} from "@/lib/task-operation-outcome";
 
 const CONFIRMATION_TTL_MINUTES = 15;
 const ACTIVE_CONFIRMATION_STATUSES = [
@@ -193,6 +198,13 @@ async function loadTaskOperationContext(input: {
 async function refreshVolatileFacts(
   context: Awaited<ReturnType<typeof loadTaskOperationContext>>,
 ) {
+  await assertTaskCalendarSlot({
+    definition: context.definition,
+    projectId: context.runtime.run.projectId,
+    snapshot: context.snapshot,
+    taskRunId: context.runtime.run.id,
+    refresh: true,
+  });
   for (const binding of context.snapshot.task.definition.tools) {
     if (
       binding.access !== "read" ||
@@ -539,6 +551,13 @@ export async function confirmTaskOperation(input: {
     projectId: input.projectId,
     taskRunId: input.taskRunId,
     toolId: confirmation.toolId,
+  });
+  await assertTaskCalendarSlot({
+    definition: context.definition,
+    projectId: input.projectId,
+    snapshot: context.snapshot,
+    taskRunId: input.taskRunId,
+    refresh: false,
   });
   const state = buildConfirmationState(context);
   if (state.canonicalHash !== confirmation.canonicalHash) {
@@ -925,7 +944,11 @@ async function applyOperationResult(input: {
   if (!attemptDetails) throw new Error("The operation attempt was not found.");
   const { attempt: attemptContext, operation } = attemptDetails;
   if (attemptContext.status === "pending") {
-    return { attempt: attemptContext, reconciled: false };
+    return {
+      attempt: attemptContext,
+      businessOutcome: "pending" as const,
+      reconciled: false,
+    };
   }
   if (!attemptContext.taskToolRequestId) {
     throw new Error("The operation attempt is not linked to its task request.");
@@ -948,23 +971,22 @@ async function applyOperationResult(input: {
   if (!request) throw new Error("The operation tool request was not found.");
 
   const now = new Date();
-  const eventStatus =
-    attemptContext.status === "completed"
-      ? "success"
-      : attemptContext.status === "outcome_unknown"
-        ? "outcome_unknown"
-        : "provider_failure";
-  if (
-    !(attemptContext.status === "completed" && request.status === "success")
-  ) {
+  let eventStatus = getTaskOperationOutcome(attemptContext, operation);
+  let reason = getTaskOperationReason(attemptContext);
+  if (eventStatus === "pending")
+    return {
+      attempt: attemptContext,
+      businessOutcome: "pending" as const,
+      reconciled: false,
+    };
+  if (!(eventStatus === "success" && request.status === "success")) {
     const result = await applyConversationalTaskEvent({
       authentication: authentication(input.principal, now),
       channelIdentity: context.conversation.metadata,
       channelType: context.conversation.channelType,
       conversationId: context.runtime.run.conversationId,
-      errorCode:
-        attemptContext.status === "completed" ? null : attemptContext.status,
-      eventId: `operation:${attemptContext.id}:result:${attemptContext.status}`,
+      errorCode: eventStatus === "success" ? null : (reason ?? eventStatus),
+      eventId: `operation:${attemptContext.id}:result:${eventStatus}`,
       expectedRevision: null,
       occurredAt: now.toISOString(),
       projectId: input.projectId,
@@ -972,7 +994,7 @@ async function applyOperationResult(input: {
       receivedAt: now.toISOString(),
       requestId: request.requestId,
       result:
-        attemptContext.status === "completed"
+        eventStatus === "success"
           ? getOperationAttemptToolResult({
               attempt: attemptContext,
               operation,
@@ -988,7 +1010,21 @@ async function applyOperationResult(input: {
     }
   }
 
-  if (attemptContext.status === "outcome_unknown") {
+  if (eventStatus === "success") {
+    const reconciledRuntime = await getConversationalTaskRuntime({
+      projectId: input.projectId,
+      taskRunId: context.runtime.run.id,
+    });
+    const toolResult = reconciledRuntime?.tools.find(
+      ({ id }) => id === request.id,
+    );
+    if (toolResult?.status !== "success") {
+      eventStatus = "rejected";
+      reason = toolResult?.errorCode ?? "tool_output_rejected";
+    }
+  }
+
+  if (eventStatus === "outcome_unknown") {
     await db
       .update(conversationalTaskConfirmations)
       .set({ status: "outcome_unknown", updatedAt: now })
@@ -998,24 +1034,32 @@ async function applyOperationResult(input: {
       eventType: "operation.outcome_unknown",
       projectId: input.projectId,
       run: context.runtime.run,
-      summary: { attemptId: attemptContext.id },
+      summary: {
+        attemptId: attemptContext.id,
+        businessOutcome: eventStatus,
+        reason,
+      },
     });
-    return { attempt: attemptContext, reconciled: true };
+    return {
+      attempt: attemptContext,
+      businessOutcome: eventStatus,
+      reconciled: true,
+    };
   }
 
   const terminalOutcome =
-    attemptContext.status === "completed"
+    eventStatus === "success"
       ? matchingOutcome(context.snapshot, "completed")
       : matchingOutcome(context.snapshot, "failed");
   const handoffOutcome =
-    attemptContext.status === "failed"
+    eventStatus !== "success"
       ? matchingOutcome(context.snapshot, "handoff")
       : null;
   let outcomeKey: string | null = terminalOutcome?.key ?? null;
-  if (attemptContext.status === "completed" && !terminalOutcome) {
+  if (eventStatus === "success" && !terminalOutcome) {
     throw new Error("The published task has no completed outcome.");
   }
-  if (attemptContext.status === "completed" && terminalOutcome) {
+  if (eventStatus === "success" && terminalOutcome) {
     await restoreConfirmedOperationFields({
       confirmation: input.confirmation,
       now,
@@ -1100,7 +1144,7 @@ async function applyOperationResult(input: {
       .update(conversationalTaskConfirmations)
       .set({
         consumedAt: now,
-        status: attemptContext.status === "completed" ? "consumed" : "failed",
+        status: eventStatus === "success" ? "consumed" : "failed",
         updatedAt: now,
       })
       .where(eq(conversationalTaskConfirmations.id, input.confirmation.id));
@@ -1108,14 +1152,21 @@ async function applyOperationResult(input: {
   await audit({
     confirmationId: input.confirmation.id,
     eventType:
-      attemptContext.status === "completed"
-        ? "operation.completed"
-        : "operation.failed",
+      eventStatus === "success" ? "operation.completed" : "operation.failed",
     projectId: input.projectId,
     run: context.runtime.run,
-    summary: { attemptId: attemptContext.id, outcomeKey },
+    summary: {
+      attemptId: attemptContext.id,
+      outcomeKey,
+      businessOutcome: eventStatus,
+      reason,
+    },
   });
-  return { attempt: attemptContext, reconciled: true };
+  return {
+    attempt: attemptContext,
+    businessOutcome: eventStatus,
+    reconciled: true,
+  };
 }
 
 export async function processAndReconcileTaskOperation(input: {
