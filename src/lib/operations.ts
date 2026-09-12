@@ -2441,10 +2441,17 @@ export async function runOperationPreview(input: {
     return null;
   }
 
+  // Sandbox values are flat, while task operations may use fields.* sources.
+  const previewInputMapping = Object.fromEntries(
+    Object.entries(operation.inputMapping).map(([target, source]) => [
+      target,
+      typeof source === "string" ? source.replace(/^fields\./, "") : source,
+    ]),
+  );
   const requestPayload = {
     operationType: operation.operationType,
     preview: true,
-    payload: buildInputPayload(input.fields, operation.inputMapping),
+    payload: buildInputPayload(input.fields, previewInputMapping),
   };
   const startedAt = new Date();
   const idempotencyKey = `preview:${input.projectId}:${operation.id}:${startedAt.getTime()}`;

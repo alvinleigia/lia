@@ -42,6 +42,7 @@ import {
   executeTaskReadOperation,
   getTaskCalendarAvailability,
   readTaskCalendarAvailability,
+  refreshExpiredTaskCalendarAvailability,
 } from "@/lib/conversational-task-calendar-availability";
 import {
   confirmTaskOperation,
@@ -841,9 +842,10 @@ async function recoverCalendarSlot(input: {
   const { runtime, snapshot } = input.session;
   const binding = await getTaskCalendarAvailability(snapshot);
   if (!binding) throw input.error;
-  const availability = await readTaskCalendarAvailability({
+  const availability = await refreshExpiredTaskCalendarAvailability({
     binding,
     projectId: input.projectId,
+    snapshot,
     taskRunId: runtime.run.id,
   });
   const fieldKey = availability.options.length
@@ -893,8 +895,8 @@ async function recoverCalendarSlot(input: {
   const message = !availability.options.length
     ? outcome === "no_result"
       ? `There are no available appointment times for that date. Please choose another date. Lia attempt #${availability.attempt?.id}.`
-      : `I could not verify available appointment times. Please try another date or ask the team for help.${availability.attempt ? ` Lia attempt #${availability.attempt.id} (${outcome}).` : ""}`
-    : input.error.message;
+      : `I could not verify available appointment times. Please try another date or ask the team for help.${availability.attempt ? ` Lia attempt #${availability.attempt.id}.` : ""}`
+    : "Please choose one of these currently available appointment times.";
   return {
     inputRequest,
     output: operationTurn({
@@ -1434,9 +1436,10 @@ async function executeTaskBoundary(input: {
           taskRunId: runtime.run.id,
         });
       }
-      const availability = await readTaskCalendarAvailability({
+      const availability = await refreshExpiredTaskCalendarAvailability({
         binding: calendar,
         projectId: input.runtimeInput.projectId,
+        snapshot,
         taskRunId: runtime.run.id,
       });
       const selected = canonicalSession.runtime.fields.find(

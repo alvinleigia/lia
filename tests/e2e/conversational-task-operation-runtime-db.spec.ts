@@ -14,6 +14,7 @@ import {
   executeTaskReadOperation,
   getTaskCalendarAvailability,
   readTaskCalendarAvailability,
+  refreshExpiredTaskCalendarAvailability,
 } from "../../src/lib/conversational-task-calendar-availability";
 import {
   confirmTaskOperation,
@@ -65,6 +66,7 @@ import {
   getOperationAttemptToolResult,
   getProjectOperationAttemptWithDetails,
   processProjectDurableOperationQueue,
+  runOperationPreview,
 } from "../../src/lib/operations";
 import {
   cancelPendingWhatsAppReplies,
@@ -1456,6 +1458,52 @@ test("completed delivery with rejected business result cannot complete a task", 
   );
 });
 
+test("operation sandbox resolves prefixed and bare field mappings without losing values", async () => {
+  if (!fixture) throw new Error("The operation fixture is not ready.");
+  const projectId = fixture.projectId;
+  const provider = await createIntegrationProvider({
+    name: "Preview mapping fixture",
+    projectId,
+    providerType: "manual_review",
+    config: {},
+  });
+  const operation = await createOperation({
+    name: "Preview identity mapping",
+    projectId,
+    providerId: provider.id,
+    operationType: "manual_review",
+    inputMapping: {
+      patientName: "fields.patientName",
+      contactNumber: "fields.contactNumber",
+      legacyName: "patientName",
+      city: "fields.address.city",
+      missing: "fields.absent",
+      literal: 2,
+    },
+    outputMapping: {},
+  });
+  const result = await runOperationPreview({
+    fields: {
+      patientName: "Alex Test",
+      contactNumber: "+61491570006",
+      address: { city: "Test City" },
+    },
+    operationId: operation.id,
+    projectId,
+  });
+  expect(result?.attempt.requestPayload).toMatchObject({
+    preview: true,
+    payload: {
+      patientName: "Alex Test",
+      contactNumber: "+61491570006",
+      legacyName: "Alex Test",
+      city: "Test City",
+      missing: null,
+      literal: 2,
+    },
+  });
+});
+
 test("Calendar slots use the task ledger and block arbitrary, empty, failed and stale selections", async () => {
   test.setTimeout(240_000);
   if (!fixture) throw new Error("The operation fixture is not ready.");
@@ -1647,9 +1695,34 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
     await setField("appointmentStart", "10:00 AM");
     await expect(prepare()).rejects.toThrow("provider-verified");
     await setField("appointmentStart", available.options[0].value);
+    // A pause while collecting identity must not discard a previously offered slot.
+    await db
+      .update(operationAttempts)
+      .set({ finishedAt: new Date(Date.now() - 301_000) })
+      .where(eq(operationAttempts.id, first.attempt.id));
+    expect((await readTaskCalendarAvailability(scope)).options).toEqual([]);
+    const fieldsBeforeRefresh = (await getConversationalTaskRuntime(scope))
+      ?.fields;
+    const beforeExpiredRefresh = freeBusyCalls;
+    const refreshed = await refreshExpiredTaskCalendarAvailability({
+      ...scope,
+      snapshot,
+    });
+    expect(freeBusyCalls).toBe(beforeExpiredRefresh + 1);
+    expect(refreshed.options).toEqual(available.options);
+    expect((await getConversationalTaskRuntime(scope))?.fields).toEqual(
+      fieldsBeforeRefresh,
+    );
+    await refreshExpiredTaskCalendarAvailability({ ...scope, snapshot });
+    expect(freeBusyCalls).toBe(beforeExpiredRefresh + 1);
+    if (!refreshed.attempt) throw new Error("Refreshed lookup missing.");
+    await db
+      .update(operationAttempts)
+      .set({ finishedAt: new Date(Date.now() - 301_000) })
+      .where(eq(operationAttempts.id, refreshed.attempt.id));
     const beforeRefresh = freeBusyCalls;
     const confirmation = await prepare();
-    expect(freeBusyCalls).toBeGreaterThan(beforeRefresh);
+    expect(freeBusyCalls).toBe(beforeRefresh + 1);
     expect(confirmation.canonicalInput.start).toBe(available.options[0].value);
     await confirmTaskOperation({
       confirmationId: confirmation.id,

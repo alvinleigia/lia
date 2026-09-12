@@ -1596,6 +1596,78 @@ User-operated reschedule failure after successful booking on 2026-09-12:
   timed reschedule retest remain
   required; no reschedule write has been verified from this failed turn.
 
+User-operated reschedule retest and identity-first follow-up on 2026-09-12:
+
+- After entry-policy fix `815f93f` deployed, a fresh Project Chat session routed
+  `I want to reschedule my appointment.` to Preferred Date and then New
+  Appointment Time. The user selected September 21 at 10:30, then entered
+  synthetic patient Alex Test. Lia returned to date collection with an
+  availability verification error and `Lia attempt #86 (success)`.
+- User-provided attempt #86 preview confirms `google_calendar.availability`,
+  task run #66, task version #20, tool request #180, date `2026-09-21`, and
+  business `success` with valid slots including the selected 10:30 time.
+  This is read-only availability evidence, not a reschedule write. The preview
+  does not establish the elapsed interval between lookup and the failed turn.
+- Code inspection and a failing database regression reproduced expiry handling:
+  slot offers older than five minutes were discarded while later fields were
+  collected, without first refreshing the successful lookup. Local remediation
+  refreshes expired successful offers through the durable ledger, retains
+  collected fields, and rechecks offered slots before confirmation/execution.
+  Failed, empty, malformed, and date-mismatched offers remain unusable; expiry
+  never authorizes a write without a fresh successful check. Recovery wording
+  no longer appends a misleading `(success)` label to an availability failure.
+- Local verification: the expiry regression failed before the fix and passed
+  afterward. All 15 operation-runtime database tests and 126 Calendar,
+  hybrid-flow, structured-turn, and voice regressions passed. The expiry test
+  verifies one refresh, preserved field values, no extra refresh for fresh
+  results, and a fresh check before confirmation. Existing busy-slot and
+  provider-failure cases still block writes. TypeScript, focused lint, diff
+  checks, and the production build passed. These local changes are not yet
+  deployed; live expiry recovery and a reschedule write remain unverified.
+- The user requested identity-first rescheduling. Required staging task change:
+  collect configured identity inputs, run the approved existing-appointment
+  lookup, resolve/select the matching appointment reference, then collect the
+  new date and provider-verified time. Show the existing and proposed booking
+  before explicit confirmation; use `google_calendar.reschedule` to update the
+  same event. No match must stop the change; multiple matches must require a
+  selection. Name/contact matching is the current identity policy, not proof
+  of phone ownership. This does not introduce an OTP mechanism.
+- The local database has no project #94 and the user operates staging manually.
+  Therefore task version #20's order, lookup mappings, and action pin still
+  need inspection in Flow Builder; this local code change does not reorder or
+  republish the live task or modify the Telnyx Assistant.
+
+User-operated task-order and sandbox lookup follow-up on 2026-09-12:
+
+- The user opened reschedule task #21 (`Phase 18 Reschedule UAT`) and reordered
+  its draft fields to Patient Name, Contact Number, Appointment Reference,
+  Preferred Date, New Appointment Time. Allowed tools are Find Calendar
+  Appointment and Check Calendar Availability at lookup, and Reschedule
+  Calendar Appointment at completion. No booking/cancellation tool is bound.
+  This is draft configuration evidence, not a new published task/action pin.
+- Lookup sandbox attempts #87 and #89 returned `rejected/identity_required`.
+  The #89 before/after screenshots show Find Calendar Appointment selected,
+  synthetic patient/contact entered, but both request identity values null.
+  The output contains lookupStatus rejected and null appointment reference,
+  start, end, and spoken fields. No existing-appointment match was verified.
+- A local database regression reproduced this when mappings use
+  `fields.patientName`/`fields.contactNumber`: the sandbox passed flat values
+  to a path resolver expecting the fields prefix. Task input construction
+  already interprets that prefix separately. The sandbox now resolves the
+  prefix against its flat test values, preserving bare and nested paths,
+  non-string literals, and missing-value behavior. The regression failed
+  before the fix and passed afterward with an isolated manual-review provider;
+  it sent no external Calendar request.
+- Existing Operations cards only show status, not editable input/output
+  mappings. The sandbox is being used to inspect the effective payload and
+  mapped result. A successful sandbox lookup will not by itself verify that
+  the task automatically looks up/selects an appointment before new dates.
+- Next live gates: repeat the corrected sandbox lookup, verify a matching
+  reference, inspect how it populates the task, publish the tested task draft
+  and update the action's task-version pin, then start a new chat and verify
+  identity-first rescheduling against the existing event. Expiry recovery and
+  the complete reschedule write still need fresh staging evidence.
+
 Phase 18 remains **IN PROGRESS**. Booking success and unlisted-slot rejection
 have staging evidence above. Remaining checks include stale-slot rejection,
 no-result/failure handling, reschedule/cancel routing and writes, measured
@@ -1649,7 +1721,7 @@ Result: [ ] Pass [x] Fail
 - Phase 17A: [x] Pass [ ] Fail [ ] In progress
 - Phase 18: [ ] Pass [ ] Fail [x] In progress [ ] Not started
 - Critical defects open: `1: Phase 18 false-success rejection/unknown-result cases still require staging evidence; successful booking verified in attempt #85`
-- High defects open: `2: Phase 18 stale-slot enforcement still requires staging evidence; reschedule routing/latency failed and the entry-policy fix awaits staging retest`
+- High defects open: `2: Calendar expiry recovery and stale-slot enforcement need staging verification; identity-first rescheduling and measured latency remain pending after the entry-policy retest`
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 - Phase 16 approver/date: `Single tester / release owner - 2026-08-16`
 - Phase 17 approver/date: `Single tester / release owner - 2026-08-20`

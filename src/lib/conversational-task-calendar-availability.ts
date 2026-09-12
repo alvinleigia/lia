@@ -157,6 +157,32 @@ export async function readTaskCalendarAvailability(input: {
   };
 }
 
+// Refresh an expired successful lookup without clearing the caller's collected fields.
+export async function refreshExpiredTaskCalendarAvailability(input: {
+  binding: CalendarAvailabilityBinding;
+  projectId: number;
+  snapshot: ConversationalTaskSnapshotV1;
+  taskRunId: number;
+}) {
+  const availability = await readTaskCalendarAvailability(input);
+  const attempt = availability.attempt;
+  if (
+    !attempt?.finishedAt ||
+    Date.now() - attempt.finishedAt.getTime() <= 5 * 60_000 ||
+    !verifiedCalendarSlots({
+      attempt,
+      date: availability.date,
+      now: attempt.finishedAt,
+    }).length
+  )
+    return availability;
+  await executeTaskReadOperation({
+    ...input,
+    definition: input.binding.definition,
+  });
+  return readTaskCalendarAvailability(input);
+}
+
 // Both availability and identity lookups use the same durable operation ledger as writes.
 export async function executeTaskReadOperation(input: {
   definition: ToolDefinitionV1;
@@ -336,7 +362,15 @@ export async function assertTaskCalendarSlot(input: {
     ({ fieldKey }) => fieldKey === binding.startFieldKey,
   )?.canonicalValue;
   let availability = await readTaskCalendarAvailability({ ...input, binding });
-  if (!availability.options.some(({ value }) => value === selected))
+  // An expired offer can only proceed when a fresh lookup below verifies it again.
+  const offeredOptions = input.refresh
+    ? verifiedCalendarSlots({
+        attempt: availability.attempt,
+        date: availability.date,
+        now: availability.attempt?.finishedAt ?? undefined,
+      })
+    : availability.options;
+  if (!offeredOptions.some(({ value }) => value === selected))
     throw new CalendarSlotValidationError(
       "Choose a provider-verified available appointment time before confirmation.",
     );
