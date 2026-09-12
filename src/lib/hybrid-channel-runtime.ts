@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
+import { resolveAppointmentChoice } from "@/lib/appointment-lookup";
 import {
   cancelChannelFlowAfterHybridEnd,
   completeChannelFlowAfterHybridEnd,
@@ -44,7 +45,10 @@ import {
   readTaskCalendarAvailability,
   refreshExpiredTaskCalendarAvailability,
 } from "@/lib/conversational-task-calendar-availability";
-import { executeRequiredTaskFieldLookup } from "@/lib/conversational-task-field-lookups";
+import {
+  executeRequiredTaskFieldLookup,
+  readPendingTaskAppointmentChoice,
+} from "@/lib/conversational-task-field-lookups";
 import {
   confirmTaskOperation,
   executeConfirmedTaskOperation,
@@ -150,6 +154,21 @@ async function buildHybridChannelResumeRepliesInternal(input: {
   ) {
     return [];
   }
+
+  const appointmentChoice = await readPendingTaskAppointmentChoice({
+    runtime: session.runtime,
+    projectId: input.projectId,
+    taskRunId: session.runtime.run.id,
+    snapshot: session.snapshot,
+  });
+  if (appointmentChoice)
+    return [
+      createTaskRuntimeReply({
+        inputRequest: appointmentChoice.inputRequest,
+        nextAction: "ask",
+        text: appointmentChoice.reply,
+      }),
+    ];
 
   const inputRequest = await hydrateProjectResourceInputRequest({
     fields: session.runtime.fields,
@@ -1016,7 +1035,7 @@ async function executeTaskBoundary(input: {
   project: ProjectTurnContext;
   runtimeInput: HybridChannelRuntimeInput;
 }): Promise<HybridBoundaryExecution<TurnResultV1>> {
-  const session = await ensureDirectTaskEntry({
+  let session = await ensureDirectTaskEntry({
     node: input.node,
     project: input.project,
     runtimeInput: input.runtimeInput,
@@ -1028,6 +1047,48 @@ async function executeTaskBoundary(input: {
     session.execution.activeNodeId !== input.node.id
   ) {
     throw new Error("The pinned conversational task runtime is unavailable.");
+  }
+  let appointmentSelected = false;
+  const appointmentAnswer =
+    input.runtimeInput.selection?.value ?? input.runtimeInput.text;
+  const pendingAppointment = await readPendingTaskAppointmentChoice({
+    runtime: session.runtime,
+    projectId: input.runtimeInput.projectId,
+    taskRunId: session.runtime.run.id,
+    snapshot: session.snapshot,
+  });
+  if (
+    pendingAppointment &&
+    (input.runtimeInput.selection ||
+      resolveAppointmentChoice(
+        pendingAppointment.appointments,
+        appointmentAnswer,
+      )) &&
+    !isExplicitCancellationRequest(appointmentAnswer) &&
+    !isExplicitHumanHandoffRequest(appointmentAnswer) &&
+    !isPotentialKnowledgeSideQuestion(appointmentAnswer)
+  ) {
+    const selected = await executeRequiredTaskFieldLookup({
+      projectId: input.runtimeInput.projectId,
+      taskRunId: session.runtime.run.id,
+      snapshot: session.snapshot,
+      requestId: `appointment-choice:${input.runtimeInput.inboundMessageId}:${session.runtime.run.id}`,
+      selection: {
+        fieldKey: pendingAppointment.inputRequest.fieldKey,
+        answer: appointmentAnswer,
+      },
+    });
+    if (selected.status === "choice" || selected.status === "blocked")
+      return {
+        inputRequest:
+          selected.status === "choice" ? selected.inputRequest : null,
+        output: operationTurn({ nextAction: "ask", reply: selected.reply }),
+        signals: [],
+      };
+    appointmentSelected = selected.status === "success";
+    session = await getConversationTaskRuntimeSession(input.runtimeInput);
+    if (!session.runtime || !session.snapshot || !session.execution)
+      throw new Error("The appointment task is unavailable.");
   }
   const runtime = session.runtime;
   const snapshot = session.snapshot;
@@ -1081,7 +1142,7 @@ async function executeTaskBoundary(input: {
     !isExplicitHumanHandoffRequest(requestedAnswer) &&
     !isPotentialKnowledgeSideQuestion(requestedAnswer);
   let selectionValue: string | null = null;
-  if (calendarAnswer) {
+  if (calendarAnswer && !appointmentSelected) {
     const availability = await readTaskCalendarAvailability({
       binding: calendar,
       projectId: input.runtimeInput.projectId,
@@ -1102,6 +1163,7 @@ async function executeTaskBoundary(input: {
     selectionValue = option.value;
   }
   if (
+    !appointmentSelected &&
     !calendarAnswer &&
     requestedAnswerKind === "project_resource" &&
     requestedField
@@ -1126,6 +1188,7 @@ async function executeTaskBoundary(input: {
       return rejectMismatchedSelection();
     }
   } else if (
+    !appointmentSelected &&
     !calendarAnswer &&
     requestedAnswerKind === "static_selection" &&
     input.runtimeInput.selection
@@ -1143,42 +1206,48 @@ async function executeTaskBoundary(input: {
     requestedFieldKey: selectionValue ? (requestedField?.key ?? null) : null,
     selectionValue,
   });
-  const extractedProposal = selectionProposal
-    ? selectionProposal
-    : bindRequestedTaskSelection({
-        proposal: (
-          await executeConfiguredStructuredTurn({
-            activeTask: session.snapshot,
-            assistantBehavior: normalizeProjectAiSettings(
-              session.snapshot.assistantBehavior,
-            ),
-            assistantIntroduced: input.history.some(
-              (message) => message.role === "assistant",
-            ),
-            channel: input.runtimeInput.channelType,
-            companyName: input.project.companyName,
-            context: toRuntimeContext(session.runtime),
-            fieldState: toRuntimeFieldState({
-              runtime: session.runtime,
-              snapshot: session.snapshot,
-            }),
-            history: input.history,
-            projectId: input.runtimeInput.projectId,
-            projectName: input.project.projectName,
-            projectPolicy: session.snapshot.conversationPolicy,
-            publishedTasks: [],
-            requestedFieldKey: requestedField?.key ?? null,
-            stage: "extraction",
-            visitorMessage: requestedAnswer,
-          })
-        ).proposal,
-        requestedFieldKey: selectionValue
-          ? (requestedField?.key ?? null)
-          : null,
-        selectionValue,
-      });
+  const extractedProposal = appointmentSelected
+    ? operationTurn({
+        nextAction: "ask",
+        reply: "I found the appointment. Let us choose the new time.",
+      })
+    : selectionProposal
+      ? selectionProposal
+      : bindRequestedTaskSelection({
+          proposal: (
+            await executeConfiguredStructuredTurn({
+              activeTask: session.snapshot,
+              assistantBehavior: normalizeProjectAiSettings(
+                session.snapshot.assistantBehavior,
+              ),
+              assistantIntroduced: input.history.some(
+                (message) => message.role === "assistant",
+              ),
+              channel: input.runtimeInput.channelType,
+              companyName: input.project.companyName,
+              context: toRuntimeContext(session.runtime),
+              fieldState: toRuntimeFieldState({
+                runtime: session.runtime,
+                snapshot: session.snapshot,
+              }),
+              history: input.history,
+              projectId: input.runtimeInput.projectId,
+              projectName: input.project.projectName,
+              projectPolicy: session.snapshot.conversationPolicy,
+              publishedTasks: [],
+              requestedFieldKey: requestedField?.key ?? null,
+              stage: "extraction",
+              visitorMessage: requestedAnswer,
+            })
+          ).proposal,
+          requestedFieldKey: selectionValue
+            ? (requestedField?.key ?? null)
+            : null,
+          selectionValue,
+        });
   const normalizedProposal = normalizeActiveTaskQuestion(extractedProposal);
   const proposal =
+    !appointmentSelected &&
     !calendarAnswer &&
     requestedField?.type === "text" &&
     !requestedField.optionSource
@@ -1372,12 +1441,24 @@ async function executeTaskBoundary(input: {
         snapshot,
         taskRunId: runtime.run.id,
       });
-  if (fieldLookup.status === "blocked")
+  if (fieldLookup.status === "blocked" || fieldLookup.status === "choice") {
+    const inputRequest =
+      fieldLookup.status === "choice" ? fieldLookup.inputRequest : null;
+    const current = await getConversationTaskRuntimeSession(input.runtimeInput);
+    if (inputRequest && current.runtime && current.execution)
+      await recordTaskFieldRequest({
+        conversationId: current.runtime.run.conversationId,
+        inputRequest,
+        revision: current.execution.revision,
+        runtimeInput: input.runtimeInput,
+        taskRunId: runtime.run.id,
+      });
     return {
-      inputRequest: null,
+      inputRequest,
       output: operationTurn({ nextAction: "ask", reply: fieldLookup.reply }),
       signals: [],
     };
+  }
 
   if (
     fieldLookup.status !== "success" &&

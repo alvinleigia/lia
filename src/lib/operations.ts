@@ -1,5 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
+import { isReadOnlyCalendarOperation } from "@/lib/appointment-lookup";
 import { db } from "@/lib/db-config";
 import {
   actionFlowSteps,
@@ -902,11 +903,46 @@ async function executeProvider(input: {
     input.providerType === "webhook" ||
     input.providerType === "n8n_webhook"
   ) {
-    return executeWebhookProvider(
+    const result = await executeWebhookProvider(
       input.config,
       input.payload,
       input.idempotencyKey,
     );
+    if (
+      ![
+        "appointment.lookup",
+        "appointment.availability",
+        "appointment.book",
+        "appointment.reschedule",
+        "appointment.cancel",
+      ].includes(input.operationType) ||
+      result.status !== "completed"
+    )
+      return result;
+    const response = result.responsePayload.response as
+      | Record<string, unknown>
+      | undefined;
+    const body = response?.body;
+    let contract: unknown = body;
+    if (typeof body === "string") {
+      try {
+        contract = JSON.parse(body);
+      } catch {
+        contract = null;
+      }
+    }
+    return {
+      ...result,
+      responsePayload: {
+        ...(contract && typeof contract === "object" && !Array.isArray(contract)
+          ? (contract as Record<string, unknown>)
+          : {
+              status: "provider_failure",
+              reason: "invalid_appointment_result",
+            }),
+        transport: result.responsePayload,
+      },
+    };
   }
 
   if (input.providerType === "meta_conversions_api") {
@@ -1963,10 +1999,10 @@ export async function queueOperationForConversationalTask(input: {
 
   if (
     input.confirmationId === null &&
-    (provider.providerType !== "google_calendar" ||
-      !["google_calendar.availability", "google_calendar.lookup"].includes(
-        operation.operationType,
-      ))
+    !isReadOnlyCalendarOperation({
+      providerType: provider.providerType,
+      operationType: operation.operationType,
+    })
   ) {
     throw new Error(
       "Only read-only Calendar operations may run without confirmation.",

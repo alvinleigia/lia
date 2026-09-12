@@ -22,7 +22,8 @@ export function getTaskOperationOutcome(
     default:
       // Legacy adapters use delivery success; Calendar requires its business contract.
       return typeof status === "string" ||
-        operation?.operationType.startsWith("google_calendar.")
+        operation?.operationType.startsWith("google_calendar.") ||
+        operation?.operationType.startsWith("appointment.")
         ? "outcome_unknown"
         : "success";
   }

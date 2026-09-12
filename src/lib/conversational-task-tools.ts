@@ -1,3 +1,4 @@
+import { isReadOnlyCalendarOperation } from "@/lib/appointment-lookup";
 import type {
   ConversationalTaskDefinitionV1,
   ToolDefinitionV1,
@@ -346,12 +347,7 @@ export function getOperationToolSemantics(input: {
   operationType: string;
   providerType: string;
 }): OperationToolSemantics {
-  const isGoogleCalendarRead =
-    input.providerType === "google_calendar" &&
-    (input.operationType === "google_calendar.availability" ||
-      input.operationType === "google_calendar.lookup");
-
-  return isGoogleCalendarRead
+  return isReadOnlyCalendarOperation(input)
     ? { access: "read", requiredForCompletion: false }
     : { access: "write", requiredForCompletion: true };
 }

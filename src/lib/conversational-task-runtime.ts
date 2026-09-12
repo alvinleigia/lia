@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import {
+  appointmentIdentityDefinition,
+  appointmentReferenceFields,
+} from "@/lib/appointment-lookup";
+import {
   type ConversationalTaskDefinitionV1,
   conversationalTaskSnapshotV1Schema,
   type ToolDefinitionV1,
@@ -1825,7 +1829,12 @@ export async function applyConversationalTaskEvent(
           }
         }
         const canonicalCandidates = await canonicalizeFieldCandidates({
-          candidates: event.candidates,
+          candidates: event.candidates.filter(
+            (candidate) =>
+              !appointmentReferenceFields(snapshot).some(
+                (field) => field.key === candidate.fieldKey,
+              ),
+          ),
           contextValues,
           definition: fieldDefinition,
           fieldValues,
@@ -1835,7 +1844,7 @@ export async function applyConversationalTaskEvent(
         });
         const result = applyFieldCandidates({
           candidates: canonicalCandidates,
-          definition: snapshot.task.definition,
+          definition: appointmentIdentityDefinition(snapshot),
           eventId: event.eventId,
           fields,
           now: receivedAt,
@@ -1845,7 +1854,7 @@ export async function applyConversationalTaskEvent(
       }
       case "field.clear": {
         const result = clearRuntimeField({
-          definition: snapshot.task.definition,
+          definition: appointmentIdentityDefinition(snapshot),
           eventId: event.eventId,
           fieldKey: event.fieldKey,
           fields,

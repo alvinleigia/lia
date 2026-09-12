@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { z } from "zod";
+import { appointmentMatchSchema } from "@/lib/appointment-lookup";
 import {
   createGoogleCalendarApi,
   type GoogleBusyPeriod,
@@ -83,13 +84,6 @@ export type GoogleCalendarProviderResult = {
   status: "completed" | "failed" | "outcome_unknown";
 };
 
-const hostedVoiceAppointmentSchema = z.object({
-  appointmentRef: z.string().trim().min(1).max(200),
-  end: z.string().datetime({ offset: true }),
-  spoken: z.string().trim().min(1).max(240),
-  start: z.string().datetime({ offset: true }),
-});
-
 export function getGoogleCalendarHostedVoiceResult(
   value: Record<string, unknown>,
 ) {
@@ -117,17 +111,17 @@ export function getGoogleCalendarHostedVoiceResult(
     .safeParse(value.date);
   if (date.success) result.date = date.data;
 
-  const appointment = hostedVoiceAppointmentSchema.partial().safeParse(value);
+  const appointment = appointmentMatchSchema.partial().safeParse(value);
   if (appointment.success) Object.assign(result, appointment.data);
 
   const slots = z
-    .array(hostedVoiceAppointmentSchema.omit({ appointmentRef: true }))
+    .array(appointmentMatchSchema.omit({ appointmentRef: true }))
     .max(16)
     .safeParse(value.slots);
   if (slots.success) result.slots = slots.data;
 
   const appointments = z
-    .array(hostedVoiceAppointmentSchema)
+    .array(appointmentMatchSchema)
     .max(20)
     .safeParse(value.appointments);
   if (appointments.success) result.appointments = appointments.data;

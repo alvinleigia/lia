@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
+import {
+  type AppointmentMatch,
+  appointmentSlotOptions,
+  isAppointmentLookup,
+  upcomingAppointmentMatches,
+} from "@/lib/appointment-lookup";
 import type {
   ConversationalTaskSnapshotV1,
   ToolDefinitionV1,
@@ -11,7 +17,6 @@ import {
 import { buildCanonicalToolInput } from "@/lib/conversational-task-tool-runtime";
 import { db } from "@/lib/db-config";
 import { channelConversations, operationAttempts } from "@/lib/db-schema";
-import { getGoogleCalendarHostedVoiceResult } from "@/lib/google-calendar";
 import {
   getOperationAttemptToolResult,
   getProjectOperation,
@@ -51,8 +56,10 @@ export async function getTaskCalendarAvailability(
       Number(definition.execution.handler),
     );
     if (
-      row?.provider.providerType !== "google_calendar" ||
-      row.operation.operationType !== "google_calendar.availability"
+      !row ||
+      !["google_calendar.availability", "appointment.availability"].includes(
+        row.operation.operationType,
+      )
     )
       continue;
     const date = definition.inputSchema.fields.find(
@@ -67,15 +74,20 @@ export async function getTaskCalendarAvailability(
       );
       if (
         operation?.provider.id !== row.provider.id ||
-        !["google_calendar.book", "google_calendar.reschedule"].includes(
-          operation.operation.operationType,
-        )
+        ![
+          "google_calendar.book",
+          "google_calendar.reschedule",
+          "appointment.book",
+          "appointment.reschedule",
+        ].includes(operation.operation.operationType)
       )
         continue;
-      const startKey =
-        operation.operation.operationType === "google_calendar.reschedule"
-          ? "newStart"
-          : "start";
+      const startKey = [
+        "google_calendar.reschedule",
+        "appointment.reschedule",
+      ].includes(operation.operation.operationType)
+        ? "newStart"
+        : "start";
       const start = write.inputSchema.fields.find(
         ({ key }) => key === startKey,
       );
@@ -116,12 +128,8 @@ export function verifiedCalendarSlots(input: {
     payload?.date !== input.date
   )
     return [];
-  const result = getGoogleCalendarHostedVoiceResult(attempt.responsePayload);
-  if (result.date !== input.date || !Array.isArray(result.slots)) return [];
-  return result.slots.map((slot: { spoken: string; start: string }) => ({
-    label: slot.spoken,
-    value: slot.start,
-  }));
+  if (attempt.responsePayload.date !== input.date) return [];
+  return appointmentSlotOptions(attempt.responsePayload);
 }
 
 export async function readTaskCalendarAvailability(input: {
@@ -188,6 +196,7 @@ export async function executeTaskReadOperation(input: {
   definition: ToolDefinitionV1;
   projectId: number;
   requestId?: string;
+  selectedAppointment?: AppointmentMatch;
   snapshot: ConversationalTaskSnapshotV1;
   taskRunId: number;
 }) {
@@ -304,22 +313,47 @@ export async function executeTaskReadOperation(input: {
   if (!details) throw new Error("The lookup attempt was not found.");
   let status = getTaskOperationOutcome(details.attempt, details.operation);
   let reason = getTaskOperationReason(details.attempt);
+  let mappedDetails = details;
   if (
     status === "success" &&
-    details.operation.operationType === "google_calendar.lookup"
+    isAppointmentLookup(details.operation.operationType)
   ) {
-    const result = getGoogleCalendarHostedVoiceResult(
+    const appointments = upcomingAppointmentMatches(
       details.attempt.responsePayload,
     );
-    const appointments = Array.isArray(result.appointments)
-      ? result.appointments
-      : [];
-    // A scalar field mapping must never silently select the first of several matches.
-    if (appointments.length !== 1) {
+    const selected = input.selectedAppointment
+      ? appointments?.find(
+          (item) =>
+            item.appointmentRef === input.selectedAppointment?.appointmentRef &&
+            item.start === input.selectedAppointment.start &&
+            item.end === input.selectedAppointment.end,
+        )
+      : appointments?.length === 1
+        ? appointments[0]
+        : null;
+    if (!appointments) {
+      status = "provider_failure";
+      reason = "invalid_appointment_result";
+    } else if (!selected) {
       status = appointments.length ? "rejected" : "no_result";
-      reason = appointments.length
-        ? "multiple_appointments"
-        : "appointment_not_found";
+      reason = input.selectedAppointment
+        ? "appointment_selection_changed"
+        : appointments.length
+          ? "multiple_appointments"
+          : "appointment_not_found";
+    } else {
+      // Keep the complete provider response in the ledger. Only the verified choice
+      // is passed to scalar mappings (including existing published index-zero mappings).
+      mappedDetails = {
+        ...details,
+        attempt: {
+          ...details.attempt,
+          responsePayload: {
+            ...details.attempt.responsePayload,
+            appointments: [selected],
+          },
+        },
+      };
     }
   }
   if (
@@ -336,7 +370,9 @@ export async function executeTaskReadOperation(input: {
       status,
       errorCode: status === "success" ? null : (reason ?? status),
       result:
-        status === "success" ? getOperationAttemptToolResult(details) : null,
+        status === "success"
+          ? getOperationAttemptToolResult(mappedDetails)
+          : null,
       type: "tool.result",
     });
     if (
@@ -363,9 +399,12 @@ export async function assertTaskCalendarSlot(input: {
   );
   if (
     !operation ||
-    !["google_calendar.book", "google_calendar.reschedule"].includes(
-      operation.operation.operationType,
-    )
+    ![
+      "google_calendar.book",
+      "google_calendar.reschedule",
+      "appointment.book",
+      "appointment.reschedule",
+    ].includes(operation.operation.operationType)
   )
     return;
   const binding = await getTaskCalendarAvailability(input.snapshot);

@@ -16,7 +16,10 @@ import {
   readTaskCalendarAvailability,
   refreshExpiredTaskCalendarAvailability,
 } from "../../src/lib/conversational-task-calendar-availability";
-import { executeRequiredTaskFieldLookup } from "../../src/lib/conversational-task-field-lookups";
+import {
+  executeRequiredTaskFieldLookup,
+  readPendingTaskAppointmentChoice,
+} from "../../src/lib/conversational-task-field-lookups";
 import {
   confirmTaskOperation,
   executeConfirmedTaskOperation,
@@ -1841,7 +1844,7 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
             id: "10000000-0000-4000-8000-000000000098",
             key: "appointmentRef",
             label: "Appointment reference",
-            dependsOn: ["guestName", "guestEmail"],
+            dependsOn: [],
           },
           ...definition.fields.slice(base.fields.length),
         ],
@@ -1966,8 +1969,12 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
     });
     const multipleRun = await startReadyRun(rescheduleTask.task.id);
     expect(await findForRun(multipleRun.taskRunId)).toMatchObject({
-      status: "blocked",
-      reply: expect.stringContaining("More than one appointment"),
+      status: "choice",
+      inputRequest: {
+        fieldKey: "appointmentRef",
+        inputKind: "choice",
+        options: expect.any(Array),
+      },
     });
     for (const blockedRun of [missingRun, multipleRun]) {
       const blocked = await getConversationalTaskRuntime({
@@ -1984,6 +1991,367 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
         .where(eq(operationAttempts.taskRunId, blockedRun.taskRunId));
       expect(attempts.map(({ operationId }) => operationId)).toEqual([find.id]);
     }
+    const pendingChoice = await readPendingTaskAppointmentChoice({
+      projectId,
+      taskRunId: multipleRun.taskRunId,
+      snapshot: lookupSnapshot,
+    });
+    expect(pendingChoice?.appointments).toHaveLength(2);
+    const resumedChoices = await buildHybridChannelResumeReplies({
+      projectId,
+      channelType: "project_chat",
+      externalConversationId: multipleRun.externalConversationId,
+    });
+    expect(resumedChoices[0].payload).toMatchObject({
+      inputRequest: {
+        inputKind: "choice",
+        options: pendingChoice?.inputRequest.options,
+      },
+    });
+    const choose = (answer: string, requestId: string) =>
+      executeRequiredTaskFieldLookup({
+        projectId,
+        taskRunId: multipleRun.taskRunId,
+        snapshot: lookupSnapshot,
+        requestId,
+        selection: { fieldKey: "appointmentRef", answer },
+      });
+    expect(
+      await choose("apt_another_patient", "invalid-appointment-choice"),
+    ).toMatchObject({ status: "choice" });
+    // Even an expired offer must be rechecked, then the exact selected appointment maps.
+    await db
+      .update(operationAttempts)
+      .set({ finishedAt: new Date(Date.now() - 301_000) })
+      .where(eq(operationAttempts.taskRunId, multipleRun.taskRunId));
+    expect(
+      await choose("the second one", "verified-appointment-choice"),
+    ).toEqual({ status: "success" });
+    const selectedRuntime = await getConversationalTaskRuntime({
+      projectId,
+      taskRunId: multipleRun.taskRunId,
+    });
+    expect(selectedRuntime?.fields).toContainEqual(
+      expect.objectContaining({
+        fieldKey: "appointmentRef",
+        state: "valid",
+        canonicalValue: pendingChoice?.appointments[1].appointmentRef,
+      }),
+    );
+    expect(selectedRuntime?.tools).toHaveLength(2);
+    expect(selectedRuntime?.confirmations).toHaveLength(0);
+    expect(
+      (
+        await buildHybridChannelResumeReplies({
+          projectId,
+          channelType: "project_chat",
+          externalConversationId: multipleRun.externalConversationId,
+        })
+      )[0].payload,
+    ).toMatchObject({ inputRequest: { fieldKey: "preferredDate" } });
+
+    // A changed identity invalidates the resolved reference; arbitrary caller refs are ignored.
+    const changedAt = new Date().toISOString();
+    await applyConversationalTaskEvent({
+      authentication: null,
+      channelIdentity: {},
+      channelType: "project_chat",
+      conversationId: multipleRun.conversationId,
+      correction: true,
+      eventId: "change-appointment-identity",
+      expectedRevision: selectedRuntime?.execution?.revision ?? null,
+      occurredAt: changedAt,
+      receivedAt: changedAt,
+      projectId,
+      providerSequence: null,
+      schemaVersion: 1,
+      taskRunId: multipleRun.taskRunId,
+      type: "field.candidates",
+      candidates: [
+        {
+          canonicalValue: "Another Patient",
+          naturalValue: "Another Patient",
+          fieldKey: "guestName",
+          provenance: { source: "visitor", sourceReference: null },
+          state: "valid",
+          validation: { code: null, message: null, valid: true },
+        },
+        {
+          canonicalValue: "forged-reference",
+          naturalValue: "forged-reference",
+          fieldKey: "appointmentRef",
+          provenance: { source: "visitor", sourceReference: null },
+          state: "valid",
+          validation: { code: null, message: null, valid: true },
+        },
+      ],
+    });
+    const changedRuntime = await getConversationalTaskRuntime({
+      projectId,
+      taskRunId: multipleRun.taskRunId,
+    });
+    expect(
+      changedRuntime?.fields.find(
+        (field) => field.fieldKey === "appointmentRef",
+      )?.state,
+    ).not.toBe("valid");
+    expect(
+      await readPendingTaskAppointmentChoice({
+        projectId,
+        taskRunId: multipleRun.taskRunId,
+        snapshot: lookupSnapshot,
+      }),
+    ).toBeNull();
+    expect(
+      await readPendingTaskAppointmentChoice({
+        projectId: projectId + 999_999,
+        taskRunId: multipleRun.taskRunId,
+        snapshot: lookupSnapshot,
+      }),
+    ).toBeNull();
+
+    // The same contract works through a non-Google adapter and a voice session.
+    const genericProvider = await createIntegrationProvider({
+      config: { url: "https://appointments.example.test/lookup" },
+      name: "Appointment adapter fixture",
+      projectId,
+      providerType: "webhook",
+      status: "active",
+    });
+    const genericLookup = await createOperation({
+      projectId,
+      providerId: genericProvider.id,
+      name: "Universal appointment lookup",
+      operationType: "appointment.lookup",
+      inputMapping: {
+        patientName: "fields.guestName",
+        patientEmail: "fields.guestEmail",
+      },
+      outputMapping: {
+        "fields.appointmentRef":
+          "responsePayload.appointments.0.appointmentRef",
+      },
+      status: "active",
+    });
+    const genericAvailability = await createOperation({
+      projectId,
+      providerId: genericProvider.id,
+      name: "Universal availability",
+      operationType: "appointment.availability",
+      inputMapping: { date: "fields.preferredDate" },
+      outputMapping: {},
+      status: "active",
+    });
+    const genericReschedule = await createOperation({
+      projectId,
+      providerId: genericProvider.id,
+      name: "Universal reschedule",
+      operationType: "appointment.reschedule",
+      inputMapping: {
+        patientName: "fields.guestName",
+        patientEmail: "fields.guestEmail",
+        appointmentRef: "fields.appointmentRef",
+        newStart: "fields.appointmentStart",
+      },
+      outputMapping: {},
+      status: "active",
+    });
+    const genericTask = await createPublishedTask({
+      name: "Universal appointment selection",
+      projectId,
+      operationId: genericLookup.id,
+      definition: {
+        ...lookupSnapshot.task.definition,
+        tools: [
+          {
+            access: "read",
+            allowedStages: ["lookup"],
+            tool: { id: `operation:${genericAvailability.id}`, version: 1 },
+          },
+          {
+            access: "write",
+            allowedStages: ["operation"],
+            tool: { id: `operation:${genericReschedule.id}`, version: 1 },
+          },
+          {
+            access: "read",
+            allowedStages: ["lookup"],
+            tool: { id: `operation:${genericLookup.id}`, version: 1 },
+          },
+        ],
+      },
+    });
+    const genericSnapshot = conversationalTaskSnapshotV1Schema.parse(
+      genericTask.version.snapshot,
+    );
+    const genericRun = await startReadyRun(genericTask.task.id, "telnyx_voice");
+    const calendarFetch = globalThis.fetch;
+    let adapterAppointments = pendingChoice?.appointments ?? [];
+    const genericWrites: Record<string, unknown>[] = [];
+    const newSlot = {
+      start: new Date(Date.now() + 8 * 86_400_000).toISOString(),
+      end: new Date(Date.now() + 8 * 86_400_000 + 30 * 60_000).toISOString(),
+      spoken: "Fixture available appointment time",
+    };
+    globalThis.fetch = async (resource, init) => {
+      if (!String(resource).startsWith("https://appointments.example.test/"))
+        return calendarFetch(resource, init);
+      const request = JSON.parse(String(init?.body));
+      let response: Record<string, unknown> = {
+        status: "success",
+        appointments: adapterAppointments,
+      };
+      if (request.operationType === "appointment.availability")
+        response = {
+          status: "success",
+          date: request.payload.date,
+          slots: [newSlot],
+        };
+      if (request.operationType === "appointment.reschedule") {
+        genericWrites.push(request.payload);
+        response = {
+          status: "success",
+          appointmentRef: request.payload.appointmentRef,
+          ...newSlot,
+        };
+      }
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    const genericFind = (requestId: string, answer?: string) =>
+      executeRequiredTaskFieldLookup({
+        projectId,
+        taskRunId: genericRun.taskRunId,
+        snapshot: genericSnapshot,
+        requestId,
+        ...(answer
+          ? { selection: { fieldKey: "appointmentRef", answer } }
+          : {}),
+      });
+    expect(await genericFind("generic-offer")).toMatchObject({
+      status: "choice",
+    });
+    expect(
+      (
+        await buildHybridChannelResumeReplies({
+          projectId,
+          channelType: "telnyx_voice",
+          externalConversationId: genericRun.externalConversationId,
+        })
+      )[0].payload,
+    ).toMatchObject({ inputRequest: { inputKind: "choice" } });
+    // Simulate the first displayed appointment starting while the caller decides.
+    // Its position must not disappear from the cached numbered offer.
+    await db
+      .update(operationAttempts)
+      .set({
+        finishedAt: new Date(Date.now() - 120_000),
+        responsePayload: {
+          status: "success",
+          appointments: [
+            {
+              ...adapterAppointments[0],
+              start: new Date(Date.now() - 60_000).toISOString(),
+              end: new Date(Date.now() + 29 * 60_000).toISOString(),
+            },
+            adapterAppointments[1],
+          ],
+        },
+      })
+      .where(eq(operationAttempts.taskRunId, genericRun.taskRunId));
+    // The offered appointment disappeared: do not silently choose the remaining one.
+    adapterAppointments = adapterAppointments.slice(1);
+    expect(await genericFind("generic-changed", "first")).toMatchObject({
+      status: "choice",
+      reply: expect.stringContaining("appointments have changed"),
+    });
+    expect(await genericFind("generic-selected", "first")).toEqual({
+      status: "success",
+    });
+    expect(
+      (
+        await getConversationalTaskRuntime({
+          projectId,
+          taskRunId: genericRun.taskRunId,
+        })
+      )?.fields,
+    ).toContainEqual(
+      expect.objectContaining({
+        fieldKey: "appointmentRef",
+        state: "valid",
+        canonicalValue: adapterAppointments[0].appointmentRef,
+      }),
+    );
+    for (const [fieldKey, canonicalValue] of [
+      ["preferredDate", newSlot.start.slice(0, 10)],
+      ["appointmentStart", newSlot.start],
+    ]) {
+      await db
+        .update(conversationalTaskFieldValues)
+        .set({ canonicalValue, naturalValue: canonicalValue, state: "valid" })
+        .where(
+          and(
+            eq(conversationalTaskFieldValues.taskRunId, genericRun.taskRunId),
+            eq(conversationalTaskFieldValues.fieldKey, fieldKey),
+          ),
+        );
+    }
+    const genericBinding = await getTaskCalendarAvailability(genericSnapshot);
+    expect(genericBinding?.definition.id).toBe(
+      `operation:${genericAvailability.id}`,
+    );
+    if (!genericBinding)
+      throw new Error("Generic availability binding missing");
+    await executeTaskReadOperation({
+      projectId,
+      taskRunId: genericRun.taskRunId,
+      snapshot: genericSnapshot,
+      definition: genericBinding.definition,
+      requestId: "generic-availability",
+    });
+    const genericConfirmation = await prepareTaskOperationConfirmation({
+      projectId,
+      taskRunId: genericRun.taskRunId,
+      toolId: `operation:${genericReschedule.id}`,
+    });
+    expect(genericWrites).toHaveLength(0);
+    await expect(
+      executeConfirmedTaskOperation({
+        confirmationId: genericConfirmation.id,
+        principal,
+        projectId,
+        taskRunId: genericRun.taskRunId,
+      }),
+    ).rejects.toThrow();
+    expect(genericWrites).toHaveLength(0);
+    await confirmTaskOperation({
+      confirmationId: genericConfirmation.id,
+      principal,
+      projectId,
+      taskRunId: genericRun.taskRunId,
+    });
+    await executeConfirmedTaskOperation({
+      confirmationId: genericConfirmation.id,
+      principal,
+      projectId,
+      taskRunId: genericRun.taskRunId,
+    });
+    await processAndReconcileTaskOperation({
+      confirmationId: genericConfirmation.id,
+      principal,
+      projectId,
+      workerId: "generic-reschedule-fixture",
+    });
+    expect(genericWrites).toEqual([
+      {
+        patientName: "UAT Guest",
+        patientEmail: "uat.guest@example.com",
+        appointmentRef: adapterAppointments[0].appointmentRef,
+        newStart: newSlot.start,
+      },
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -1705,6 +1705,16 @@ Identity-first reschedule task lookup follow-up on 2026-09-12:
   regressions, TypeScript, focused lint, and the production build. Fresh
   staging automatic lookup, the reschedule write, and live voice UAT remain pending.
 
+### Shared appointment matching follow-up (2026-09-12)
+
+The earlier multiple-match limitation above is superseded by shared Lia selection logic. After configured name/contact collection, one upcoming match supplies the internal reference; several matches produce numbered choices in chat and voice. A selected appointment is re-fetched before its reference is mapped. Unknown references, changed appointment times, malformed results, and changed identity cannot silently select another appointment. Provider-specific and communication-channel-specific selection implementations are not required.
+
+Provider-neutral `appointment.lookup/availability/book/reschedule/cancel` operations can use the existing webhook/n8n adapter. See [the adapter contract](APPOINTMENT_ADAPTER_CONTRACT.md). Google Calendar retains its existing operation names and mappings. A live Calendly adapter remains future work, not a configured integration.
+
+Verification includes scoped durable-ledger tests for missing identity, a single match, no match, multiple matches, reload/resume choices, stale offers, changed identity, arbitrary references, cross-project reads, voice selection through a second provider, and confirmed generic rescheduling. Calendar HTTP and the generic provider are mocked; these checks do not replace live staging UAT.
+
+Next manual staging test: use a fresh Project Chat session with the action published and its reschedule step pinned to task version 2. Request rescheduling, enter Alex Test and the test contact number, and verify that the existing booking is found without asking for its reference. Select a new time, confirm, and verify the same calendar event moved with its reason retained. Then test two upcoming appointments, cancellation, and record turn/tool latency. Do not create another assistant for this test. This code change does not require republishing an unchanged task or action.
+
 Phase 18 remains **IN PROGRESS**. Booking success and unlisted-slot rejection
 have staging evidence above. Remaining checks include stale-slot rejection,
 no-result/failure handling, reschedule/cancel routing and writes, measured
