@@ -33,6 +33,14 @@ import {
 import { logChatRequest } from "../../src/lib/chat-logs";
 import { getOrCreateDefaultCompanyForUser } from "../../src/lib/companies";
 import { addContactTag, setContactAttribute } from "../../src/lib/contacts";
+import {
+  DEFAULT_CONVERSATION_PROJECT_POLICY,
+  DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
+} from "../../src/lib/conversation-contracts";
+import {
+  createProjectConversationalTask,
+  publishConversationalTask,
+} from "../../src/lib/conversational-tasks";
 import { db } from "../../src/lib/db-config";
 import { durableJobs } from "../../src/lib/db-schema";
 import { getProjectSourceDocuments } from "../../src/lib/documents";
@@ -50,6 +58,8 @@ import {
   listProjectCatalogProducts,
   listProjectCatalogs,
 } from "../../src/lib/product-catalogs";
+import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
+import { createProjectForUser } from "../../src/lib/projects";
 import { getUserByEmail } from "../../src/lib/users";
 import {
   createWhatsAppChannelAdapter,
@@ -3976,4 +3986,136 @@ test("widget action flow creates a submission", async ({ page }) => {
   await expect(page.getByText(fieldKey, { exact: true })).toBeVisible();
   await expect(page.getByText(answer, { exact: true })).toBeVisible();
   await expect(page.getByText("submission.submitted")).toBeVisible();
+});
+
+test("project chat semantic handoff preserves the original statement and suppresses premature confirmation", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-statement-handoff-${runId}@example.test`;
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: "Statement Handoff UAT",
+    password,
+  });
+  await signInWithEmail(page, email);
+  await expect(page).toHaveURL(/\/projects/);
+  const user = await getUserByEmail(email);
+  if (!user) throw new Error("Statement fixture user missing");
+  const project = await createProjectForUser(
+    user.id,
+    `Statement Handoff ${runId}`,
+  );
+  const projectId = project.id;
+  const task = await createProjectConversationalTask(projectId, {
+    name: "Statement Booking",
+    objective: "Collect the requested booking details.",
+    description: "Synthetic browser handoff regression.",
+  });
+  const taskVersion = await publishConversationalTask({
+    projectId,
+    taskId: task.id,
+    userId: user.id,
+    assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
+    projectPolicy: DEFAULT_CONVERSATION_PROJECT_POLICY,
+  });
+  if (!taskVersion) throw new Error("Statement task publication failed");
+  const action = await createChatbotAction({
+    projectId,
+    name: "Statement Booking Flow",
+    status: "active",
+    description: "Synthetic browser handoff regression.",
+    triggerPhrases: ["start statement fixture"],
+  });
+  await createActionFlowStep({
+    actionId: action.id,
+    projectId,
+    sortOrder: 1,
+    stepType: "conversational_task",
+    label: "Book",
+    isRequired: true,
+    settings: {
+      conversationalTask: {
+        schemaVersion: 1,
+        outcomeRoutes: { completed: "end", cancelled: "end" },
+        task: {
+          name: task.name,
+          outcomes: DEFAULT_CONVERSATIONAL_TASK_DEFINITION.outcomes,
+          schemaVersion: 1,
+          taskId: task.id,
+          taskVersionId: taskVersion.id,
+          versionNumber: 1,
+        },
+        transferContextKeys: [],
+        transferFieldKeys: [],
+      },
+    },
+  });
+  await createPublishedActionFlowVersion({
+    actionId: action.id,
+    projectId,
+    publishedByUserId: user.id,
+  });
+  const routed: Array<Record<string, unknown>> = [];
+  const premature =
+    "I can proceed to create this appointment. Shall I confirm and book it now?";
+  const reviewed =
+    "Server-verified review: 22 September 2026, 10:00 am Australia/Sydney; Alex Test; persistent knee pain.";
+  await page.route("**/api/conversation/turn", async (route) => {
+    await route.fulfill({
+      json: {
+        activeTask: null,
+        execution: {
+          proposal: {
+            reply: premature,
+            taskRecommendation: { taskId: task.id },
+          },
+        },
+      },
+    });
+  });
+  await page.route("**/api/actions/runtime", async (route) => {
+    const body = route.request().postDataJSON();
+    if (body.actionId) routed.push(body);
+    await route.fulfill({
+      json: {
+        action: null,
+        activeFlow: null,
+        handled: Boolean(body.actionId) || Boolean(body.resume),
+        replies: body.actionId
+          ? [
+              {
+                type: "text",
+                text: reviewed,
+                fallbackText: reviewed,
+                payload: {},
+              },
+            ]
+          : [],
+      },
+    });
+  });
+  await page.goto("/projects/chat");
+  await expect(
+    page.getByRole("button", { name: "Statement Booking Flow", exact: true }),
+  ).toBeEnabled();
+  for (const statement of [
+    "I want to book an appointment on 22 September 2026 at 10:00 am Australia/Sydney. My name is Alex Test, my contact number is +61491570006, and the reason is persistent knee pain.",
+    "I have noted your preferred appointment on 2026-09-22 at 10:00 am Australia/Sydney, patient name Alex Test, contact +61491570006, and reason persistent knee pain. How would you like to proceed with confirmation?",
+  ]) {
+    const before = routed.length;
+    await sendProjectChatMessage(page, statement);
+    await expect.poll(() => routed.length).toBe(before + 1);
+    expect(routed.at(-1)).toMatchObject({
+      actionId: action.id,
+      announceStart: false,
+      text: statement,
+    });
+    await expect(page.getByText(statement, { exact: true })).toHaveCount(1);
+    await expect(page.getByText(premature, { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText(reviewed, { exact: true }).last(),
+    ).toBeVisible();
+  }
 });

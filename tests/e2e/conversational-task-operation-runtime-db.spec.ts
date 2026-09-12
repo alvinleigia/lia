@@ -1836,13 +1836,16 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
     if (!action) throw new Error("Opening action missing");
     const originalExecute = StructuredTurnEngine.prototype.execute;
     try {
-      for (const [channelType, clock, fromPrompt] of [
+      for (const [channelType, clock, fromPrompt, pastedSummary] of [
         ["project_chat", "10:00 am", false],
         ["telnyx_voice", "10:00 am", false],
         ["project_chat", "8:00 pm", false],
         ["project_chat", "10:00 am", true],
+        ["project_chat", "10:00 am", true, true],
       ] as const) {
-        const text = `Book on ${date} at ${clock} UTC. My name is Alex Test, email alex@example.com, phone +61491570006, reason persistent knee pain.`;
+        const text = pastedSummary
+          ? `I have noted your preferred appointment on ${date} at ${clock} UTC, patient name Alex Test, email alex@example.com, contact +61491570006, and reason persistent knee pain. How would you like to proceed with confirmation?`
+          : `Book on ${date} at ${clock} UTC. My name is Alex Test, email alex@example.com, phone +61491570006, reason persistent knee pain.`;
         const stages: string[] = [];
         StructuredTurnEngine.prototype.execute = async (input) => {
           const starting =
@@ -1905,7 +1908,7 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
             },
           };
         };
-        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${suffix}`;
+        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${Boolean(pastedSummary)}-${suffix}`;
         const [conversation] = await db
           .insert(channelConversations)
           .values({ channelType, externalConversationId, projectId })

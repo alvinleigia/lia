@@ -1853,3 +1853,52 @@ available time and complete review, then confirm the synthetic booking. A second
 published bike-service task must be configured for deployed bike UAT; the local
 fixture does not create that task in project #94. Telnyx hosted AI changes remain
 outside this preflight.
+
+
+### Project Chat semantic handoff correction - 2026-09-13
+
+A subsequent deployed screenshot exposed a browser handoff omitted from the
+previous extraction preflight. The Project Chat client displayed the routing
+model's reply and called `startActionFlow(action, undefined, false)`. This
+replaced the visitor's full statement with the action's generic start phrase.
+The task therefore had no original details to extract and asked for the date
+again. The earlier passing extractor/database tests did not exercise this
+client branch; the input wording was not the cause of that loss.
+
+The client now forwards the exact original message to the canonical flow and
+lets that flow own the response. It does not duplicate the displayed user
+message or show a premature confirmation request from the routing model.
+
+Verification completed:
+
+- A Chromium regression in `auth-project.spec.ts` reproduced the original bug:
+  the captured runtime request contained `start statement fixture` instead of
+  the complete appointment request. After the fix, the same test passed for
+  both the normal booking request and the pasted assistant-style summary. It
+  checks request contents, one displayed user message, suppression of the
+  premature routing reply and display of the runtime response. Routing and
+  runtime HTTP responses are mocked; this is a real client-component test, not
+  a live calendar booking.
+- The exact pasted summary, including its trailing confirmation question,
+  passed two real-model extraction runs with all six fields retained, one
+  model call per run, and no write operation.
+- The persisted calendar-ledger regression now includes the pasted summary.
+  It passed with a complete review, confirmation recovery and exactly one
+  simulated booking write. Calendar HTTP and model proposals remain mocked in
+  that database test.
+- All 320 offline channel contract tests, focused Biome checks, TypeScript and
+  the production build passed.
+
+For future changes to conversation entry or statement extraction, run the
+browser semantic-handoff regression as well as the real-model extraction
+matrix and persisted runtime test. An extractor-only pass is not evidence that
+the browser preserved the message. Keep local engineering evidence separate
+from deployed UAT acceptance; deployed chat with a real calendar still requires
+its own result.
+
+```powershell
+npx playwright test auth-project --grep 'semantic handoff preserves' --workers=1
+npx playwright test --config=playwright.runtime.config.ts conversational-task-operation-runtime-db --grep 'Calendar slots use'
+$env:LIA_LIVE_STATEMENT_UAT = '1'
+npx playwright test --config=playwright.contract.config.ts statement-extraction --grep 'pasted booking summary' --repeat-each=2 --workers=1
+```

@@ -434,6 +434,23 @@ cases.push(
   },
 );
 
+cases.push({
+  name: "pasted booking summary ending in a confirmation question",
+  snapshot: appointment,
+  message:
+    "I have noted your preferred appointment on 2026-09-22 at 10:00 am Australia/Sydney, patient name Alex Test, contact +61491570006, and reason persistent knee pain. How would you like to proceed with confirmation?",
+  requested: null,
+  expected: {
+    patientName: "Alex Test",
+    contactNumber: "+61491570006",
+    preferredDate: "2026-09-22",
+    requestedTime: "10:00",
+    timezone: "Australia/Sydney",
+    reason: "persistent knee pain",
+  },
+  missing: null,
+});
+
 for (const scenario of cases) {
   test(`@live-openai statement UAT: ${scenario.name}`, async () => {
     const testInfo = test.info();

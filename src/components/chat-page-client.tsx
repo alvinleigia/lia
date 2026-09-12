@@ -361,20 +361,25 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
       }
 
       const proposal = payload.execution.proposal;
-      setFlowMessages((current) => [
-        ...current,
-        makeFlowMessage("assistant", proposal.reply),
-      ]);
-
       if (proposal.taskRecommendation) {
         const action = findActionForTaskRecommendation(
           actions,
           proposal.taskRecommendation.taskId,
         );
         if (action) {
-          await startActionFlow(action, undefined, false);
+          // The task owns the response after handoff. Preserve the visitor's
+          // statement for extraction; it is already displayed in the chat.
+          return await runCanonicalFlow({
+            actionId: action.id,
+            announceStart: false,
+            text,
+          });
         }
       }
+      setFlowMessages((current) => [
+        ...current,
+        makeFlowMessage("assistant", proposal.reply),
+      ]);
       return true;
     } catch {
       return false;
