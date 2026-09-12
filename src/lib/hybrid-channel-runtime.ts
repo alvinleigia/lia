@@ -45,6 +45,7 @@ import {
   CalendarSlotValidationError,
   executeTaskReadOperation,
   getTaskCalendarAvailability,
+  matchRequestedCalendarSlot,
   readTaskCalendarAvailability,
   refreshExpiredTaskCalendarAvailability,
 } from "@/lib/conversational-task-calendar-availability";
@@ -1263,6 +1264,12 @@ async function executeTaskBoundary(input: {
           text: input.runtimeInput.text,
         })
       : normalizedProposal;
+  const hasRequestedCalendarTime =
+    calendar &&
+    proposal.fieldCandidates.some(
+      ({ fieldKey, source }) =>
+        fieldKey === calendar.startFieldKey && source === "visitor",
+    );
   if (calendar && !calendarAnswer) {
     proposal.fieldCandidates = proposal.fieldCandidates.filter(
       ({ fieldKey }) => fieldKey !== calendar.startFieldKey,
@@ -1548,7 +1555,60 @@ async function executeTaskBoundary(input: {
         snapshot,
         taskRunId: runtime.run.id,
       });
-      const selected = canonicalSession.runtime.fields.find(
+      const suppliedSlot =
+        !calendarAnswer && hasRequestedCalendarTime
+          ? matchRequestedCalendarSlot({
+              text: input.runtimeInput.text,
+              date: String(date),
+              timezone:
+                calendar.timezone ?? input.project.companyTimeZone ?? "UTC",
+              options: availability.options,
+            })
+          : null;
+      if (suppliedSlot) {
+        const current = await getConversationTaskRuntimeSession(
+          input.runtimeInput,
+        );
+        const accepted = await applyConversationalTaskEvent({
+          authentication: null,
+          candidates: [
+            {
+              fieldKey: calendar.startFieldKey,
+              naturalValue: suppliedSlot.value,
+              provenance: {
+                source: "visitor",
+                sourceReference: `channel-message:${input.runtimeInput.inboundMessageId}`,
+              },
+              state: "candidate",
+              validation: { code: null, message: null, valid: false },
+            },
+          ],
+          channelIdentity: {
+            externalConversationId: input.runtimeInput.externalConversationId,
+          },
+          channelType: input.runtimeInput.channelType,
+          conversationId: runtime.run.conversationId,
+          correction: true,
+          eventId: `channel-message:${input.runtimeInput.inboundMessageId}:offered-time`,
+          expectedRevision: current.execution?.revision ?? null,
+          occurredAt: new Date().toISOString(),
+          receivedAt: new Date().toISOString(),
+          projectId: input.runtimeInput.projectId,
+          providerSequence: null,
+          schemaVersion: 1,
+          taskRunId: runtime.run.id,
+          type: "field.candidates",
+        });
+        if (
+          accepted.disposition !== "applied" &&
+          accepted.reason !== "duplicate_event"
+        )
+          throw new Error("The requested time could not be validated.");
+        canonicalSession = await getConversationTaskRuntimeSession(
+          input.runtimeInput,
+        );
+      }
+      const selected = canonicalSession.runtime?.fields.find(
         ({ fieldKey }) => fieldKey === calendar.startFieldKey,
       )?.canonicalValue;
       if (
@@ -1570,6 +1630,12 @@ async function executeTaskBoundary(input: {
       revision = canonicalSession.execution?.revision ?? revision;
     }
   }
+  if (canonicalSession.runtime && canonicalSession.snapshot)
+    reconciledProposal = reconcileTaskTurnWithRuntime({
+      fields: canonicalSession.runtime.fields,
+      proposal,
+      snapshot: canonicalSession.snapshot,
+    });
   const availabilityDefinition = canonicalSession.snapshot
     ? getBoundAvailabilityDefinition(canonicalSession.snapshot)
     : null;
@@ -1965,6 +2031,7 @@ async function runHybridChannelBoundaryInternal(
 
   let inputRequest = dispatch.execution?.inputRequest ?? null;
   let replyProposal = proposal;
+  let continuation = resolveHybridDeterministicContinuation(dispatch);
   if (
     sourceNode.kind === "knowledge" &&
     dispatch.targetNode?.kind === "conversational_task"
@@ -1988,29 +2055,24 @@ async function runHybridChannelBoundaryInternal(
       taskSession.runtime &&
       taskSession.snapshot
     ) {
-      replyProposal = reconcileTaskTurnWithRuntime({
-        fields: taskSession.runtime.fields,
-        proposal,
-        snapshot: taskSession.snapshot,
+      // The router selects a task; the task must still read this visitor message.
+      // This is fresh extraction under the pinned task, not unrestricted field transfer.
+      const entered = await executeTaskBoundary({
+        history,
+        node: dispatch.targetNode,
+        project,
+        runtimeInput: { ...input, consumeTriggerMessage: false },
       });
-      inputRequest = await hydrateProjectResourceInputRequest({
-        fields: taskSession.runtime.fields,
-        taskRunId: taskSession.runtime.run.id,
-        inputRequest: getTaskRuntimeInputRequest({
-          fields: taskSession.runtime.fields,
-          proposal: replyProposal,
-          snapshot: taskSession.snapshot,
+      replyProposal = entered.output;
+      inputRequest = entered.inputRequest ?? null;
+      continuation = resolveHybridDeterministicContinuation(
+        await dispatchHybridFlowBoundary({
+          execute: async () => entered,
+          graph,
+          responseOwner: dispatch.targetNode.responseOwner,
+          sourceNodeId: dispatch.targetNode.id,
         }),
-        projectId: input.projectId,
-        snapshot: taskSession.snapshot,
-      });
-      await recordTaskFieldRequest({
-        conversationId: taskSession.runtime.run.conversationId,
-        inputRequest,
-        revision: taskSession.execution.revision,
-        runtimeInput: input,
-        taskRunId: taskSession.runtime.run.id,
-      });
+      );
     }
   }
 
@@ -2021,7 +2083,6 @@ async function runHybridChannelBoundaryInternal(
       text: replyProposal.reply,
     }),
   ];
-  const continuation = resolveHybridDeterministicContinuation(dispatch);
   if (continuation?.kind === "cancel") {
     const cancelled = await cancelChannelFlowAfterHybridEnd({
       projectId: input.projectId,

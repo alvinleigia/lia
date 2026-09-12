@@ -1,6 +1,8 @@
 import { generateKeyPairSync } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { and, eq, inArray } from "drizzle-orm";
+import type { RuntimeActionStep } from "../../src/lib/action-runtime";
+import { startChannelFlow } from "../../src/lib/channel-flow-runtime";
 import type { ChannelType } from "../../src/lib/channels";
 import {
   REFERENCE_BOOKING_PROJECT_POLICY,
@@ -10,6 +12,7 @@ import {
   type ConversationalTaskDefinitionV1,
   conversationalTaskSnapshotV1Schema,
 } from "../../src/lib/conversation-contracts";
+import { StructuredTurnEngine } from "../../src/lib/conversation-turn-engine";
 import {
   executeTaskReadOperation,
   getTaskCalendarAvailability,
@@ -35,9 +38,13 @@ import {
   getConversationalTaskRuntime,
   startConversationalTaskRun,
 } from "../../src/lib/conversational-task-runtime";
+import { getConversationTaskRuntimeSession } from "../../src/lib/conversational-task-runtime-session";
 import { resolveProjectTaskToolDefinition } from "../../src/lib/conversational-task-tools";
 import { db } from "../../src/lib/db-config";
 import {
+  actionFlowVersions,
+  actionSubmissionEvents,
+  actionSubmissions,
   channelConversations,
   channelMessages,
   companies,
@@ -54,6 +61,7 @@ import {
   operationAttempts,
   operations,
   outboxMessages,
+  projectActions,
   projects,
   providerSecrets,
   users,
@@ -63,7 +71,11 @@ import {
   claimNextDurableJob,
   failDurableJob,
 } from "../../src/lib/durable-jobs";
-import { buildHybridChannelResumeReplies } from "../../src/lib/hybrid-channel-runtime";
+import {
+  buildHybridChannelResumeReplies,
+  runHybridChannelBoundary,
+} from "../../src/lib/hybrid-channel-runtime";
+import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
 import {
   createIntegrationProvider,
   createOperation,
@@ -77,6 +89,7 @@ import {
   processProjectOutboxQueue,
 } from "../../src/lib/outbox";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
+import { getRuntimeProjectAction } from "../../src/lib/runtime-actions";
 import { createTextReply } from "../../src/lib/runtime-replies";
 
 test.describe.configure({ mode: "serial" });
@@ -395,6 +408,18 @@ test.afterAll(async () => {
   await db
     .delete(channelConversations)
     .where(eq(channelConversations.projectId, fixture.projectId));
+  await db
+    .delete(actionSubmissionEvents)
+    .where(eq(actionSubmissionEvents.projectId, fixture.projectId));
+  await db
+    .delete(actionSubmissions)
+    .where(eq(actionSubmissions.projectId, fixture.projectId));
+  await db
+    .delete(actionFlowVersions)
+    .where(eq(actionFlowVersions.projectId, fixture.projectId));
+  await db
+    .delete(projectActions)
+    .where(eq(projectActions.projectId, fixture.projectId));
   await db
     .delete(conversationalTaskVersions)
     .where(eq(conversationalTaskVersions.projectId, fixture.projectId));
@@ -1687,6 +1712,264 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
     expect(first.attempt.traceId).toBeTruthy();
     const available = await readTaskCalendarAvailability(scope);
     expect(available.options.length).toBeGreaterThan(0);
+    // A router with no field-transfer whitelist must let the selected task
+    // extract the opening message, then bind only a provider-verified time.
+    const entryDefinition: ConversationalTaskDefinitionV1 = {
+      ...definition,
+      fields: [
+        ...definition.fields,
+        {
+          ...base.fields[0],
+          id: "10000000-0000-4000-8000-000000000098",
+          key: "reason",
+          label: "Reason",
+          type: "text",
+          dependsOn: [],
+        },
+        {
+          ...base.fields[0],
+          id: "10000000-0000-4000-8000-000000000097",
+          key: "contactNumber",
+          label: "Contact Number",
+          type: "phone",
+          dependsOn: [],
+        },
+      ],
+    };
+    const entryTask = await createPublishedTask({
+      definition: entryDefinition,
+      name: "Opening booking",
+      operationId: booking.id,
+      projectId,
+    });
+    const [entryAction] = await db
+      .insert(projectActions)
+      .values({
+        name: "Opening appointment",
+        projectId,
+        status: "active",
+        triggerPhrases: ["appointment"],
+      })
+      .returning();
+    const stepBase = {
+      fieldKey: null,
+      inputType: null,
+      isEnabled: true,
+      isRequired: true,
+      nextStepId: null,
+      operationId: null,
+      options: [],
+      prompt: null,
+    };
+    const steps: RuntimeActionStep[] = [
+      {
+        ...stepBase,
+        id: 1,
+        sortOrder: 1,
+        label: "Router",
+        stepType: "knowledge_conversation",
+        settings: {
+          knowledgeConversation: {
+            answeredRoute: "end",
+            handoffRoute: "end",
+            noAnswerRoute: "end",
+            recommendationTargetStepIds: [2],
+            remainActiveAfterAnswer: true,
+            schemaVersion: 1,
+            stageMode: "goal_driven",
+          },
+        },
+      },
+      {
+        ...stepBase,
+        id: 2,
+        sortOrder: 2,
+        label: "Booking",
+        stepType: "conversational_task",
+        settings: {
+          conversationalTask: {
+            schemaVersion: 1,
+            outcomeRoutes: { cancelled: "end", completed: "end" },
+            task: {
+              name: entryTask.task.name,
+              outcomes: entryDefinition.outcomes,
+              schemaVersion: 1,
+              taskId: entryTask.task.id,
+              taskVersionId: entryTask.version.id,
+              versionNumber: 1,
+            },
+            transferContextKeys: [],
+            transferFieldKeys: [],
+          },
+        },
+      },
+    ];
+    const [entryVersion] = await db
+      .insert(actionFlowVersions)
+      .values({
+        actionId: entryAction.id,
+        projectId,
+        status: "published",
+        versionNumber: 1,
+        snapshot: {
+          schemaVersion: 1,
+          action: entryAction,
+          branchRules: [],
+          steps,
+          hybridGraph: compileHybridFlowGraph({ branchRules: [], steps }).graph,
+        },
+      })
+      .returning();
+    await db
+      .update(projectActions)
+      .set({ publishedVersionId: entryVersion.id })
+      .where(eq(projectActions.id, entryAction.id));
+    const action = await getRuntimeProjectAction(projectId, entryAction.id);
+    if (!action) throw new Error("Opening action missing");
+    const originalExecute = StructuredTurnEngine.prototype.execute;
+    try {
+      for (const [channelType, clock] of [
+        ["project_chat", "10:00 am"],
+        ["telnyx_voice", "10:00 am"],
+        ["project_chat", "8:00 pm"],
+      ] as const) {
+        const text = `Book on ${date} at ${clock} UTC. My name is Alex Test, email alex@example.com, phone +61491570006, reason persistent knee pain.`;
+        const stages: string[] = [];
+        StructuredTurnEngine.prototype.execute = async (input) => {
+          expect(input.visitorMessage).toBe(text);
+          stages.push(input.stage);
+          const routing = input.stage === "knowledge";
+          if (!routing)
+            expect(input.activeTask?.task.id).toBe(entryTask.task.id);
+          return {
+            attempts: 1,
+            modelEscalationReason: null,
+            source: "model",
+            usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+            proposal: {
+              schemaVersion: 1,
+              turnKind: routing ? "task_recommendation" : "field_answer",
+              reply: "What date?",
+              grounding: { status: "not_needed", excerptIds: [] },
+              fieldCandidates: routing
+                ? []
+                : Object.entries({
+                    guestName: "Alex Test",
+                    guestEmail: "alex@example.com",
+                    contactNumber: "+61491570006",
+                    reason: "persistent knee pain",
+                    preferredDate: date,
+                    appointmentStart: clock,
+                  }).map(([fieldKey, naturalValue]) => ({
+                    fieldKey,
+                    naturalValue,
+                    confidence: 1,
+                    source: "visitor" as const,
+                  })),
+              taskRecommendation: routing
+                ? {
+                    taskId: entryTask.task.id,
+                    confidence: 1,
+                    reason: "Visitor requests booking",
+                  }
+                : null,
+              toolRequest: null,
+              routeRecommendation: null,
+              outcomeRecommendation: null,
+              nextAction: "ask",
+              ambiguity: { requiresClarification: false, question: null },
+              safety: { decision: "allow", reasonCode: null },
+              decisionSummary: "Visitor supplied booking details",
+              validation: {
+                accepted: true,
+                modelAttemptCount: 1,
+                providerModelId: "fixture",
+              },
+            },
+          };
+        };
+        const externalConversationId = `opening-${channelType}-${clock}-${suffix}`;
+        const [conversation] = await db
+          .insert(channelConversations)
+          .values({ channelType, externalConversationId, projectId })
+          .returning();
+        conversationIds.push(conversation.id);
+        const [message] = await db
+          .insert(channelMessages)
+          .values({
+            conversationId: conversation.id,
+            direction: "inbound",
+            messageType: "text",
+            projectId,
+            text,
+          })
+          .returning();
+        const started = await startChannelFlow({
+          action,
+          conversationId: externalConversationId,
+          projectId,
+          source: channelType,
+        });
+        const [submission] = await db
+          .select()
+          .from(actionSubmissions)
+          .where(
+            and(
+              eq(actionSubmissions.projectId, projectId),
+              eq(actionSubmissions.conversationId, externalConversationId),
+            ),
+          );
+        const result = await runHybridChannelBoundary({
+          action,
+          boundaryNodeId: started.boundaryNodeId ?? "missing",
+          channelConversationId: conversation.id,
+          channelType,
+          externalConversationId,
+          inboundMessageId: message.id,
+          projectId,
+          submission,
+          text,
+        });
+        expect(stages).toEqual(["knowledge", "extraction"]);
+        const session = await getConversationTaskRuntimeSession({
+          channelType,
+          externalConversationId,
+          projectId,
+        });
+        const fields = Object.fromEntries(
+          (session.runtime?.fields ?? []).map((field) => [
+            field.fieldKey,
+            field,
+          ]),
+        );
+        for (const [key, canonicalValue] of Object.entries({
+          guestName: "Alex Test",
+          guestEmail: "alex@example.com",
+          contactNumber: "+61491570006",
+          reason: "persistent knee pain",
+          preferredDate: date,
+        })) {
+          expect(fields[key]).toMatchObject({ canonicalValue, state: "valid" });
+        }
+        if (clock === "10:00 am") {
+          expect(fields.appointmentStart).toMatchObject({
+            canonicalValue: `${date}T10:00:00.000Z`,
+            state: "valid",
+          });
+          expect(result.replies.map((reply) => reply.text).join(" ")).toContain(
+            "Confirm",
+          );
+        } else {
+          expect(fields.appointmentStart.state).not.toBe("valid");
+          expect(result.replies[0].payload).toMatchObject({
+            inputRequest: { fieldKey: "appointmentStart", inputKind: "choice" },
+          });
+        }
+        expect(insertedEvent).toBeNull();
+      }
+    } finally {
+      StructuredTurnEngine.prototype.execute = originalExecute;
+    }
     const resumeInput = {
       channelType: "project_chat" as const,
       externalConversationId: run.externalConversationId,

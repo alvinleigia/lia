@@ -35,6 +35,7 @@ export type CalendarAvailabilityBinding = {
   definition: ToolDefinitionV1;
   dateFieldKey: string;
   startFieldKey: string;
+  timezone?: string;
 };
 
 export async function getTaskCalendarAvailability(
@@ -96,6 +97,10 @@ export async function getTaskCalendarAvailability(
           definition,
           dateFieldKey: date.source.key,
           startFieldKey: start.source.key,
+          timezone:
+            typeof row.provider.config.timezone === "string"
+              ? row.provider.config.timezone
+              : undefined,
         };
       }
     }
@@ -439,5 +444,72 @@ export async function assertTaskCalendarSlot(input: {
       throw new CalendarSlotValidationError(
         `The selected time is no longer available or could not be verified. Choose another time. Lia attempt #${availability.attempt?.id}.`,
       );
+  }
+}
+
+// A time stated in a multi-field message is a preference until a fresh provider
+// offer contains that exact local date/time. Never invent a slot from model output.
+export function matchRequestedCalendarSlot(input: {
+  text: string;
+  date: string;
+  timezone: string;
+  options: Array<{ label: string; value: string }>;
+}) {
+  const matches = [
+    ...input.text.matchAll(
+      /\b(\d{1,2})(?::([0-5]\d))?\s*(am|pm)\b|\b([01]\d|2[0-3]):([0-5]\d)\b/gi,
+    ),
+  ];
+  const minutes = new Set<number>();
+  for (const match of matches) {
+    if (match[3]) {
+      const hour = Number(match[1]);
+      if (hour < 1 || hour > 12) return null;
+      minutes.add(
+        ((hour % 12) + (match[3].toLowerCase() === "pm" ? 12 : 0)) * 60 +
+          Number(match[2] ?? 0),
+      );
+    } else minutes.add(Number(match[4]) * 60 + Number(match[5]));
+  }
+  if (minutes.size !== 1) return null;
+  const zones = [
+    ...new Set(
+      input.text.match(/\b[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?\b/g) ?? [],
+    ),
+  ];
+  // Explicit UTC/GMT must not silently use the provider's local timezone.
+  // Offsets and ambiguous abbreviations need a choice rather than a guessed zone.
+  if (
+    /\b(?:UTC|GMT)\s*[+-]|\b(?:IST|EST|EDT|CST|CDT|MST|MDT|PST|PDT|AEST|AEDT|BST|CET|CEST)\b/i.test(
+      input.text,
+    )
+  )
+    return null;
+  if (/\b(?:UTC|GMT)\b/i.test(input.text)) zones.push("UTC");
+  if (new Set(zones).size > 1) return null;
+  try {
+    const format = new Intl.DateTimeFormat("en-CA", {
+      timeZone: zones[0] ?? input.timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    const options = input.options.filter((option) => {
+      const parts = Object.fromEntries(
+        format
+          .formatToParts(new Date(option.value))
+          .map((part) => [part.type, part.value]),
+      );
+      return (
+        `${parts.year}-${parts.month}-${parts.day}` === input.date &&
+        minutes.has(Number(parts.hour) * 60 + Number(parts.minute))
+      );
+    });
+    return options.length === 1 ? options[0] : null;
+  } catch {
+    return null;
   }
 }
