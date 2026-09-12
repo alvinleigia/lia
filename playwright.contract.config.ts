@@ -15,6 +15,7 @@ export default defineConfig({
     "conversation-diagnostics.spec.ts",
     "conversation-turn-contracts.spec.ts",
     "conversation-turn-engine.spec.ts",
+    "statement-extraction.spec.ts",
     "conversational-task-runtime.spec.ts",
     "conversational-task-schema.spec.ts",
     "flow-content-components.spec.ts",

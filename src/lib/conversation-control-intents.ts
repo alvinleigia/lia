@@ -112,3 +112,17 @@ export function isExplicitHumanHandoffRequest(value: string) {
     pattern.test(normalized),
   );
 }
+
+// Only short value-like replies qualify for the free-text fast path. Sentences
+// and corrections need extraction even when every supplied entity is text.
+export function isSimpleTaskTextAnswer(value: string) {
+  const text = value.trim();
+  return (
+    Boolean(text) &&
+    text.split(/\s+/).length <= 8 &&
+    !/[,;:!?\n]|\.\s/.test(text) &&
+    !/\b(?:i|my|we|our|and|actually|instead|rather|change|correct|update)\b/i.test(
+      text,
+    )
+  );
+}

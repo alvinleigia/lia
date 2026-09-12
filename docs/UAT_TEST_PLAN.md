@@ -1780,3 +1780,76 @@ Result: [ ] Pass [x] Fail
 - Accepted limitations: See [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 - Phase 16 approver/date: `Single tester / release owner - 2026-08-16`
 - Phase 17 approver/date: `Single tester / release owner - 2026-08-20`
+
+
+## Cross-domain statement extraction preflight - 2026-09-13
+
+Status: engineering preflight passed; deployed Project Chat UAT is still pending.
+These checks do not constitute staging release sign-off. Browser automation
+could not initialize in this session, so no live project/task configuration was
+changed and no real calendar appointments were created.
+
+The shared extraction path now distinguishes short value-like text replies from
+sentences and corrections before taking the deterministic text shortcut. It
+preserves an extracted single text value when that value occurs in the visitor's
+sentence. Simple raw answers still override an invented model alternative.
+Task prompts, normalization rules and the currently requested field are now
+included in model context. Extraction instructions require all supplied task
+fields, no invented defaults, and no recommendation of the already active task.
+The behavior is driven by the published task fields, without bike-specific or
+medical-specific entity names in the extraction implementation.
+
+Reproduced before the fix:
+
+- A text-only bike statement at the name prompt was saved wholesale as the name
+  without reaching model extraction.
+- `My name is Alex Test.` replaced the extracted `Alex Test` with the entire
+  sentence during task reconciliation.
+- Live extraction sometimes re-recommended the active task, causing rejected
+  proposals and retries; some initial calls exhausted the 15-second deadline.
+
+Real-model matrix in `tests/e2e/statement-extraction.spec.ts`: eight synthetic
+English scenarios, each run twice, 16/16 passed after the fixes. The final run
+used one model call per scenario, with no repair attempts, and took 1.9-4.0
+seconds per extraction call. This is a small observed sample, not an end-to-end
+chat or voice latency guarantee. Missing reasons/subjects remained missing.
+
+| Scenario | Verified result |
+| --- | --- |
+| Exact 22 September 2026 appointment sentence at task entry | Name, phone, date, time, timezone and reason extracted; confirmation requested |
+| Same appointment sentence at the name prompt | All supplied fields retained; confirmation requested |
+| Full Yamaha MT-15 service sentence at the name prompt | Customer, phone, bike, service, date and time extracted |
+| Text-only bike sentence | Three text entities extracted; only missing phone requested next |
+| Appointment sentence without reason | Supplied details retained; reason requested |
+| Single name within a sentence | Only the name saved; next missing field requested |
+| Bike correction after details were collected | Only bike model changed; other details retained |
+| Bike booking without service subject | Other details retained; service subject requested |
+
+Additional verification:
+
+- 320 offline channel contract tests passed, including four new focused
+  regressions for text-only extraction, single-name extraction, correction and
+  preservation of the caller's exact simple reason.
+- The isolated database/browser-flow runtime test `Calendar slots use the task
+  ledger and block arbitrary, empty, failed and stale selections` passed. It
+  covers opening-message handoff, persisted fields, unavailable times, structured
+  confirmation recovery and exactly one confirmed booking operation. That test
+  mocks model proposals and Google Calendar HTTP; the separate matrix above
+  uses the actual LLM with no database or calendar writes.
+- TypeScript, focused Biome checks, diff whitespace checks and production build
+  passed.
+
+Reproduce real-model preflight in PowerShell (uses configured model credentials
+and synthetic data; opt-in prevents ordinary offline runs from making API calls):
+
+```powershell
+$env:LIA_LIVE_STATEMENT_UAT = '1'
+npx playwright test --config=playwright.contract.config.ts statement-extraction --grep @live-openai --workers=1 --repeat-each=2
+```
+
+Next deployed UAT: use a new Project Chat conversation and the published booking
+flow, submit the original all-details appointment sentence, verify the exact
+available time and complete review, then confirm the synthetic booking. A second
+published bike-service task must be configured for deployed bike UAT; the local
+fixture does not create that task in project #94. Telnyx hosted AI changes remain
+outside this preflight.

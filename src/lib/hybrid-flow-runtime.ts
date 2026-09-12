@@ -3,7 +3,10 @@ import type {
   TaskOutcomeV1,
   ToolDefinitionV1,
 } from "@/lib/conversation-contracts";
-import { isExplicitCancellationRequest } from "@/lib/conversation-control-intents";
+import {
+  isExplicitCancellationRequest,
+  isSimpleTaskTextAnswer,
+} from "@/lib/conversation-control-intents";
 import type { TurnResultV1 } from "@/lib/conversation-turn-contracts";
 import type { FieldCandidateV1 } from "@/lib/conversational-task-runtime-contracts";
 import type {
@@ -150,6 +153,22 @@ export function bindRequestedTaskTextAnswer(input: {
     input.proposal.fieldCandidates.some(
       ({ fieldKey }) => fieldKey !== input.requestedFieldKey,
     )
+  ) {
+    return input.proposal;
+  }
+
+  // Preserve an extracted value from a sentence only when it appears in the
+  // actual visitor text. Never replace a simple answer with an invented value.
+  const candidate = input.proposal.fieldCandidates.find(
+    ({ fieldKey }) => fieldKey === input.requestedFieldKey,
+  );
+  if (
+    !isSimpleTaskTextAnswer(value) &&
+    typeof candidate?.naturalValue === "string" &&
+    candidate.naturalValue.trim() &&
+    value
+      .toLocaleLowerCase()
+      .includes(candidate.naturalValue.trim().toLocaleLowerCase())
   ) {
     return input.proposal;
   }

@@ -7,6 +7,7 @@ import {
   isExplicitCancellationRequest,
   isExplicitHumanHandoffRequest,
   isPotentialKnowledgeSideQuestion,
+  isSimpleTaskTextAnswer,
 } from "@/lib/conversation-control-intents";
 import {
   compileStructuredTurn,
@@ -443,7 +444,8 @@ function directFieldProposal(
     requestedField.optionSource?.kind !== "project_resource" &&
     !(
       ["address", "text"].includes(requestedField.type) &&
-      (isPotentialKnowledgeSideQuestion(value) ||
+      (!isSimpleTaskTextAnswer(value) ||
+        isPotentialKnowledgeSideQuestion(value) ||
         hasDirectUnresolvedFieldEvidence(input))
     )
   ) {

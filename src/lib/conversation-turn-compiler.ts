@@ -35,6 +35,7 @@ type CompileTurnInput = {
   fieldState: TurnFieldStateV1[];
   history: TurnMessageV1[];
   openingTurn?: boolean;
+  requestedFieldKey?: string | null;
   projectPolicy: ConversationProjectPolicyV1;
   projectName: string;
   publishedTasks: PublishedTaskOption[];
@@ -90,6 +91,10 @@ Non-negotiable protocol:
 - Propose decisions only. Never claim to have changed a field, started or switched a task, called a tool, advanced a route, completed an outcome, or contacted a person.
 - Use only listed field keys, task IDs, tool IDs, stages, outcome keys, output ports, and excerpt IDs.
 - Values inferred from visitor wording are candidates with source "visitor"; they are never validated by you.
+- For an active task, extract every explicitly supplied field from the current visitor message using that task's labels, prompts, types, and normalization rules. One message can answer several fields, regardless of which field was asked. Return field_answer (or field_correction for changes) and the extracted candidates; do not put the entire sentence into one text field.
+- During extraction for the active task, keep taskRecommendation null unless the visitor explicitly requests a different listed task. Continuing the current task is not a task recommendation. Return extracted candidates with nextAction "ask" and null toolRequest, routeRecommendation, and outcomeRecommendation; the server decides when validation and confirmation are ready.
+- Missing required fields during extraction are not ambiguity: keep requiresClarification false and question null, preserve the candidates that are known, and let the server request the missing field. Use ambiguity only when the meaning of a supplied value or the visitor's intent is unclear.
+- Preserve supplied values and propose only explicit corrections to existing values. Never invent a missing required value or substitute a generic default. Ask only for missing or ambiguous details; the server validates candidates and prepares the final confirmation.
 - A task match is a recommendation. If more than one task or meaning remains plausible, ask exactly one focused clarification.
 - Missing details for a clear task match are not ambiguity. Recommend the task with requiresClarification false, question null, and nextAction "ask".
 - When recommending a task the visitor explicitly requested, do not ask whether they want to proceed. Answer any side question first, then state that you will continue with the requested task.
@@ -221,6 +226,8 @@ function taskContract(snapshot: ConversationalTaskSnapshotV1 | null) {
       key: field.key,
       label: field.label,
       type: field.type,
+      prompt: field.prompt,
+      normalization: field.normalization,
       required: field.required,
       confirmation: field.confirmation,
       dependsOn: field.dependsOn,
@@ -281,6 +288,7 @@ Project policy:
 ${renderJson(modelVisibleProjectPolicy(input.projectPolicy))}
 
 Current stage: ${input.stage}
+Requested field (other supplied fields are also allowed): ${input.requestedFieldKey ?? "none"}
 Opening turn: ${Boolean(input.openingTurn)}
 Assistant already introduced: ${input.assistantIntroduced}
 
