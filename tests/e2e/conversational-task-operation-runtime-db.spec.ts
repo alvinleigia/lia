@@ -2233,9 +2233,17 @@ async function verifyCalendarRuntime(
           )?.naturalValue,
         ).toBe("Is 3:30 pm available?");
         expect(freeBusyCalls).toBe(before);
-        StructuredTurnEngine.prototype.execute = async () => {
-          throw new Error("Clear follow-up must not call the model");
-        };
+        StructuredTurnEngine.prototype.execute = async (input) =>
+          originalExecute.call(
+            new StructuredTurnEngine({
+              provider: {
+                async generateTurn() {
+                  throw new Error("Clear follow-up must not call the model");
+                },
+              },
+            }),
+            input,
+          );
         const chosen = await runBrowserFlowText({
           ...browserInput,
           text: "the second one",

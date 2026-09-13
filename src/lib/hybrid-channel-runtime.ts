@@ -96,7 +96,6 @@ import {
   createMismatchedTaskSelectionProposal,
   createRequestedTaskSelectionProposal,
   dispatchHybridFlowBoundary,
-  extractLocalTaskFieldCandidates,
   getRequiredCompletionOperationDefinition,
   getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
@@ -1406,9 +1405,8 @@ async function executeTaskBoundary(input: {
       requestedAnswer.trim(),
     ) &&
     parseCalendarTimePreference(requestedAnswer, timezone);
-  const localCandidates = input.runtimeInput.selection
-    ? null
-    : earlyTimeQuestion && calendar
+  const localCandidates =
+    earlyTimeQuestion && calendar
       ? [
           {
             fieldKey: calendar.startFieldKey,
@@ -1417,11 +1415,7 @@ async function executeTaskBoundary(input: {
             source: "visitor" as const,
           },
         ]
-      : extractLocalTaskFieldCandidates({
-          snapshot,
-          text: requestedAnswer,
-          timezone,
-        });
+      : null;
   const localProposal = localCandidates?.length
     ? {
         ...operationTurn({

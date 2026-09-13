@@ -8,12 +8,14 @@ import {
   type ConversationalTaskSnapshotV1,
   conversationalTaskSnapshotV1Schema,
 } from "../../src/lib/conversation-contracts";
+import { extractLocalTaskFieldCandidates } from "../../src/lib/conversation-field-extraction";
+import { compileStructuredTurn } from "../../src/lib/conversation-turn-compiler";
 import type { TurnResultV1 } from "../../src/lib/conversation-turn-contracts";
 import { StructuredTurnEngine } from "../../src/lib/conversation-turn-engine";
+import { validateStructuredTurnProposal } from "../../src/lib/conversation-turn-validator";
 import { canonicalizeFieldCandidates } from "../../src/lib/conversational-task-field-validation";
 import {
   bindRequestedTaskTextAnswer,
-  extractLocalTaskFieldCandidates,
   normalizeActiveTaskQuestion,
   reconcileTaskTurnWithRuntime,
 } from "../../src/lib/hybrid-flow-runtime";
@@ -692,7 +694,7 @@ for (const [snapshot, phoneKey, dateKey, timeKey] of [
       ["3:30 pm", timeKey],
     ]) {
       const candidates = extractLocalTaskFieldCandidates({
-        snapshot,
+        fields: snapshot.task.definition.fields,
         text,
         timezone: "Australia/Sydney",
       });
@@ -717,7 +719,7 @@ test("explicit configured labels support multiple entities and preserve normal v
   const text =
     "Customer Name: Alex Test; Service Subject: oil change; Service Time: 15:30";
   const candidates = extractLocalTaskFieldCandidates({
-    snapshot: bike,
+    fields: bike.task.definition.fields,
     text,
     timezone: "UTC",
   });
@@ -754,12 +756,16 @@ test("local extraction defers ambiguous mappings and compound language to the mo
     [bike, "cancel"],
   ] as const) {
     expect(
-      extractLocalTaskFieldCandidates({ snapshot, text, timezone: "UTC" }),
+      extractLocalTaskFieldCandidates({
+        fields: snapshot.task.definition.fields,
+        text,
+        timezone: "UTC",
+      }),
     ).toBeNull();
   }
   expect(
     extractLocalTaskFieldCandidates({
-      snapshot: twoTimes,
+      fields: twoTimes.task.definition.fields,
       text: "Dropoff time: 15:30",
       timezone: "UTC",
     })?.[0].fieldKey,
@@ -781,4 +787,126 @@ test("a question containing mapped entities can continue collection without acce
       },
     }).turnKind,
   ).toBe("side_question");
+});
+
+for (const channel of [
+  "project_chat",
+  "widget",
+  "whatsapp",
+  "telnyx_voice",
+] as const) {
+  test(`${channel}: shared engine extracts labelled fields for tasks and ordinary flows without a model call`, async () => {
+    const engine = new StructuredTurnEngine({
+      provider: {
+        async generateTurn() {
+          throw new Error("No model call expected");
+        },
+      },
+    });
+    for (const collectionOnly of [false, true]) {
+      const result = await engine.execute({
+        ...input(
+          bike,
+          "Customer Name: Alex Test; Service Subject: oil change; Customer Phone: +61491570006",
+          "serviceDate",
+        ),
+        channel,
+        activeTask: collectionOnly ? null : bike,
+        collection: collectionOnly
+          ? { name: "Bike service", fields: bike.task.definition.fields }
+          : undefined,
+      });
+      expect(result.source).toBe("deterministic");
+      expect(result.attempts).toBe(0);
+      expect(
+        result.proposal.fieldCandidates.map(({ fieldKey }) => fieldKey),
+      ).toEqual(["customerName", "serviceSubject", "customerPhone"]);
+      expect(result.proposal.toolRequest).toBeNull();
+    }
+  });
+}
+
+test("ordinary flow interpretation uses the LLM for context and keeps uncertain mappings as clarification", async () => {
+  let calls = 0;
+  const engine = new StructuredTurnEngine({
+    provider: {
+      async generateTurn(i) {
+        calls++;
+        expect(i.system).toContain("Bike service");
+        return {
+          modelId: i.modelId,
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          output: {
+            ...proposal({}),
+            turnKind: "ordinary_question",
+            nextAction: "clarify",
+            ambiguity: {
+              requiresClarification: true,
+              question: "Do you mean the service subject or the bike model?",
+            },
+            reply: "Do you mean the service subject or the bike model?",
+          },
+        };
+      },
+    },
+  });
+  const result = await engine.execute({
+    ...input(bike, "Can you use the other one?", "customerName"),
+    activeTask: null,
+    collection: { name: "Bike service", fields: bike.task.definition.fields },
+  });
+  expect(calls).toBe(1);
+  expect(result.proposal.ambiguity.requiresClarification).toBe(true);
+  expect(result.proposal.fieldCandidates).toEqual([]);
+});
+
+test("field-only contracts cannot invent fields, execute tools, or accept uncertain mappings", () => {
+  const allowed = compileStructuredTurn({
+    ...input(bike, bikeMessage),
+    retrieval: [],
+    activeTask: null,
+    collection: { name: "Bike service", fields: bike.task.definition.fields },
+  }).validation;
+  expect(
+    validateStructuredTurnProposal(
+      proposal({ serviceSubject: "oil change" }),
+      allowed,
+    ).fieldCandidates,
+  ).toHaveLength(1);
+  expect(() =>
+    validateStructuredTurnProposal(
+      proposal({ unconfiguredField: "x" }),
+      allowed,
+    ),
+  ).toThrow();
+  expect(() =>
+    validateStructuredTurnProposal(
+      {
+        ...proposal({}),
+        toolRequest: {
+          toolId: "operation:999",
+          stage: "operation",
+          arguments: {},
+        },
+      },
+      allowed,
+    ),
+  ).toThrow();
+  const uncertain = proposal({ serviceSubject: "oil change" });
+  uncertain.fieldCandidates[0].confidence = 0.4;
+  expect(() => validateStructuredTurnProposal(uncertain, allowed)).toThrow();
+  expect(
+    validateStructuredTurnProposal(
+      {
+        ...uncertain,
+        fieldCandidates: [],
+        nextAction: "clarify",
+        ambiguity: {
+          requiresClarification: true,
+          question: "Did you mean an oil change?",
+        },
+      },
+      allowed,
+    ).ambiguity.requiresClarification,
+  ).toBe(true);
 });

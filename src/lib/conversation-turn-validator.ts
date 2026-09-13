@@ -60,13 +60,28 @@ export function validateStructuredTurnProposal(
   }
   for (const candidate of proposal.fieldCandidates) {
     const allowedFields =
-      allowed.activeTaskId === null && proposal.taskRecommendation
+      allowed.activeTaskId === null &&
+      !allowed.fieldCollectionOnly &&
+      proposal.taskRecommendation
         ? allowed.allowedTaskFieldKeys.get(proposal.taskRecommendation.taskId)
         : allowed.allowedFieldKeys;
     if (!allowedFields?.has(candidate.fieldKey)) {
       issues.push("unknown_field");
     }
   }
+  if (
+    proposal.fieldCandidates.some(
+      (candidate) =>
+        candidate.confidence < SEMANTIC_PROPOSAL_CONFIDENCE_MINIMUM,
+    ) &&
+    !proposal.ambiguity.requiresClarification
+  )
+    issues.push("ambiguous_field_requires_clarification");
+  if (
+    allowed.fieldCollectionOnly &&
+    proposal.fieldCandidates.some((candidate) => candidate.source !== "visitor")
+  )
+    issues.push("collection_requires_visitor_source");
   if (
     proposal.taskRecommendation &&
     !allowed.allowedTaskIds.has(proposal.taskRecommendation.taskId)
@@ -97,7 +112,8 @@ export function validateStructuredTurnProposal(
   if (
     allowed.activeTaskId === null &&
     ((proposal.fieldCandidates.length > 0 &&
-      proposal.taskRecommendation === null) ||
+      proposal.taskRecommendation === null &&
+      !allowed.fieldCollectionOnly) ||
       proposal.toolRequest ||
       proposal.routeRecommendation ||
       proposal.outcomeRecommendation)

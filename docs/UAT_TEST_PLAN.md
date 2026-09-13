@@ -2306,3 +2306,49 @@ checks an early time window refined to an exact time. Biome and the final
 production build passed. Standalone TypeScript checking reports only the two
 previously recorded nullable `session.runtime` assertions in the existing test
 fixture; no new diagnostics remain.
+
+
+## Global configured-field interpretation (2026-09-13)
+
+The shared StructuredTurnEngine now owns local field extraction for Business
+Tasks and supports a field-collection-only contract for ordinary Flow Builder
+input steps. Names, subjects, contact details, numeric values, dates, times and
+static choices come from the published schema; there are no patient-specific
+field names in this path. New flows using these existing field types require
+configuration and publication, not new extraction code.
+
+Explicit labels and clear current-field answers use the local path. Complex
+statements use the configured structured model. Unknown fields, non-visitor
+sources in collection-only turns, tools without an active task, and uncertain
+field mappings without clarification are rejected. Questions unrelated to a
+field still use the existing knowledge-answer path. This does not promise that
+arbitrary language is always unambiguous.
+
+Ordinary flows now consume supplied details in their opening message as well as
+later answers. Future-step values remain provisional in the submission metadata,
+pinned to the action version. Each value reaches canonical fields only when its
+step is reached and the existing step validator succeeds. Published branches,
+required fields, review, explicit confirmation, and operation execution remain
+owned by the deterministic runtime. Skipped-step values do not enter review.
+File uploads and product/resource selections retain their specialized handlers.
+
+Automated cases cover service collection outside scheduling across project chat,
+widget, WhatsApp and Lia voice runtime: multiple named fields, missing subject,
+invalid quantity, later field retention, opening-message extraction, model
+fallback, ambiguity without mutations, branch skips and version isolation.
+Model/provider responses are controlled fixtures; hosted Telnyx AI and a new
+calendar provider still require their own integration verification.
+
+For deployed UAT, publish a non-calendar flow with Customer Name, Customer Email,
+Quantity, Service Subject and Colour fields, then a confirmation step. Start with
+all details in one statement. Repeat while omitting Service Subject, supplying
+an invalid Quantity, and providing later fields before Customer Name. Lia must
+ask only for unresolved details and stop at review before saving the request.
+
+
+Verification: 338 offline contract tests and 14 persisted ordinary-flow tests
+passed. Three persisted calendar regressions also passed (stale selections,
+full-statement booking/confirmation recovery, and early reschedule preferences).
+Biome and the final production build passed. Standalone TypeScript checking still
+reports only the two pre-existing nullable `session.runtime` assertions recorded
+above; the new runtime and test code add no diagnostics.

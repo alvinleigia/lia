@@ -375,6 +375,7 @@ async function executeBrowserFlowText(
     : action
       ? await startChannelFlow({
           action,
+          openingMessage: text,
           announceStart: input.announceStart,
           contactId: inboundRecord.conversation.contactId,
           conversationId: input.conversationId,

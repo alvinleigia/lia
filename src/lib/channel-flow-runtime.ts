@@ -72,16 +72,24 @@ import {
   isExplicitCancellationRequest,
   isExplicitHumanHandoffRequest,
   isPotentialKnowledgeSideQuestion,
+  isSimpleTaskTextAnswer,
   shouldUseKnowledgeSideQuestion,
 } from "@/lib/conversation-control-intents";
+import { extractLocalTaskFieldCandidates } from "@/lib/conversation-field-extraction";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { executeConfiguredStructuredTurn } from "@/lib/conversation-turn-service";
+import { validateTaskFieldValue } from "@/lib/conversational-task-field-validation";
 import type { SelectActionSubmission } from "@/lib/db-schema";
 import {
   type FlowContentBlock,
   getFlowChoiceContentBlock,
   getFlowContentBlocks,
 } from "@/lib/flow-content-blocks";
+import {
+  FLOW_FIELD_CANDIDATES,
+  getFlowCollectionFields,
+  readFlowFieldCandidates,
+} from "@/lib/flow-field-collection";
 import {
   type FlowMediaUploadValue,
   formatFlowMediaUploadValue,
@@ -966,6 +974,7 @@ async function connectFlow(input: {
 }
 
 async function advanceFlowToNextStep(input: {
+  openingMessage?: string;
   action: RuntimeAction;
   contactId?: number | null;
   projectId: number;
@@ -1245,6 +1254,22 @@ async function advanceFlowToNextStep(input: {
         submission,
       });
       submission = updatedSubmission;
+      const retained = readFlowFieldCandidates(
+        submission.metadata,
+        input.action,
+      )[String(step.id)];
+      if (retained !== undefined || input.openingMessage) {
+        const continued = await continueChannelFlow({
+          action: input.action,
+          answer: retained ?? input.openingMessage ?? "",
+          contactId: input.contactId,
+          projectId: input.projectId,
+          source: submission.source,
+          submission,
+          skipEntityInterpretation: retained !== undefined,
+        });
+        return { ...continued, replies: [...replies, ...continued.replies] };
+      }
       replies.push(...buildRuntimeRepliesForStep(step, submission.fields));
       return { replies };
     }
@@ -1383,6 +1408,7 @@ function findStepIndexById(action: RuntimeAction, stepId: number | null) {
 }
 
 export async function startChannelFlow(input: {
+  openingMessage?: string;
   action: RuntimeAction;
   announceStart?: boolean;
   contactId?: number | null;
@@ -1446,6 +1472,11 @@ export async function startChannelFlow(input: {
     projectId: input.projectId,
     submission,
     stepIndex,
+    openingMessage:
+      input.openingMessage &&
+      !isExactActionTrigger(input.action, input.openingMessage)
+        ? input.openingMessage
+        : undefined,
   });
 
   return {
@@ -1628,7 +1659,139 @@ async function routeResponsePolicyOutput(input: {
   };
 }
 
+async function interpretFlowFieldAnswer(input: {
+  action: RuntimeAction;
+  step: RuntimeActionStep;
+  submission: SelectActionSubmission;
+  projectId: number;
+  source: string;
+  answer: string;
+  channelConversationId?: number | null;
+  inboundMessageId?: number | null;
+}): Promise<{ answers: Record<string, string> } | { reply: string } | null> {
+  const collection = getFlowCollectionFields(
+    input.action,
+    input.step,
+    input.submission.fields,
+    Boolean(getFlowEditState(input.action, input.submission)),
+  );
+  if (!collection.length) return null;
+  const fields = collection.map(({ field }) => field);
+  const local = extractLocalTaskFieldCandidates({
+    fields,
+    text: input.answer,
+    timezone: "UTC",
+  });
+  // Existing single-field answers and choice buttons keep their zero-model path.
+  if (
+    !local &&
+    isSimpleTaskTextAnswer(input.answer) &&
+    !isPotentialKnowledgeSideQuestion(input.answer) &&
+    validateStepAnswer(input.step, input.answer, input.submission.fields)
+      .isValid
+  )
+    return null;
+  const project = await getProjectTurnContext(input.projectId);
+  if (!project)
+    return { reply: formatStepPrompt(input.step, input.submission.fields) };
+  const timezone = project.companyTimeZone ?? "UTC";
+  let candidates = local;
+  if (!candidates) {
+    try {
+      const [projectPolicy, history] = await Promise.all([
+        getConversationProjectPolicy(input.projectId),
+        input.channelConversationId
+          ? listRecentChannelMessages({
+              beforeMessageId: input.inboundMessageId,
+              conversationId: input.channelConversationId,
+              projectId: input.projectId,
+            }).then(toTurnHistory)
+          : Promise.resolve([]),
+      ]);
+      const { proposal } = await executeConfiguredStructuredTurn({
+        activeTask: null,
+        collection: { name: input.action.name, fields },
+        assistantBehavior: normalizeProjectAiSettings(
+          project.projectAiSettings,
+        ),
+        assistantIntroduced: true,
+        channel: getChannelTypeForFlowSource(input.source),
+        companyName: project.companyName,
+        context: [
+          {
+            key: "lia_timezone",
+            value: timezone,
+            modelVisible: true,
+            sensitivity: "standard",
+          },
+        ],
+        fieldState: fields.map((field) => ({
+          fieldKey: field.key,
+          label: field.label,
+          required: field.required,
+          sensitivity: field.sensitivity,
+          state: Object.hasOwn(input.submission.fields, field.key)
+            ? "valid"
+            : "missing",
+          value:
+            input.submission.fields[field.key] == null
+              ? null
+              : String(input.submission.fields[field.key]),
+        })),
+        history,
+        projectId: input.projectId,
+        projectName: project.projectName,
+        projectPolicy,
+        publishedTasks: [],
+        requestedFieldKey:
+          collection.find(({ step }) => step.id === input.step.id)?.field.key ??
+          null,
+        stage: "extraction",
+        visitorMessage: input.answer,
+      });
+      if (
+        proposal.ambiguity.requiresClarification ||
+        proposal.safety.decision !== "allow" ||
+        ["fail", "handoff", "cancel"].includes(proposal.nextAction)
+      )
+        return { reply: proposal.ambiguity.question ?? proposal.reply };
+      if (!proposal.fieldCandidates.length)
+        return isPotentialKnowledgeSideQuestion(input.answer)
+          ? null
+          : { reply: formatStepPrompt(input.step, input.submission.fields) };
+      candidates = proposal.fieldCandidates;
+    } catch {
+      return {
+        reply: `I couldn't interpret those details reliably. ${formatStepPrompt(input.step, input.submission.fields)}`,
+      };
+    }
+  }
+  const answers: Record<string, string> = {};
+  for (const candidate of candidates) {
+    const target = collection.find(
+      ({ field }) => field.key === candidate.fieldKey,
+    );
+    if (!target || typeof candidate.naturalValue === "object") continue;
+    if (Object.hasOwn(answers, String(target.step.id)))
+      return { reply: `Which value did you mean for ${target.field.label}?` };
+    const normalized = validateTaskFieldValue({
+      field: target.field,
+      value: candidate.naturalValue,
+      contextValues: new Map([["lia_timezone", timezone]]),
+    });
+    const value = normalized.ok ? normalized.value : candidate.naturalValue;
+    answers[String(target.step.id)] =
+      typeof value === "object"
+        ? String(candidate.naturalValue)
+        : String(value);
+  }
+  return Object.keys(answers).length
+    ? { answers }
+    : { reply: formatStepPrompt(input.step, input.submission.fields) };
+}
+
 async function continueChannelFlow(input: {
+  skipEntityInterpretation?: boolean;
   action: RuntimeAction;
   answer: string;
   channelConversationId?: number | null;
@@ -1644,7 +1807,11 @@ async function continueChannelFlow(input: {
     (step) => step.id === input.submission.currentStepId,
   );
 
-  if (currentStep && isExplicitHumanHandoffRequest(input.answer)) {
+  if (
+    !input.skipEntityInterpretation &&
+    currentStep &&
+    isExplicitHumanHandoffRequest(input.answer)
+  ) {
     await requestHumanHandoff({
       action: input.action,
       projectId: input.projectId,
@@ -1749,7 +1916,10 @@ async function continueChannelFlow(input: {
   }
 
   const policy = getActionResponsePolicy(step.settings);
-  if (isExplicitCancellationRequest(input.answer)) {
+  if (
+    !input.skipEntityInterpretation &&
+    isExplicitCancellationRequest(input.answer)
+  ) {
     return routeResponsePolicyOutput({
       action: input.action,
       contactId: input.contactId,
@@ -1761,24 +1931,85 @@ async function continueChannelFlow(input: {
     });
   }
 
+  const interpretation = input.skipEntityInterpretation
+    ? null
+    : await interpretFlowFieldAnswer({ ...input, step });
+  if (interpretation && "reply" in interpretation)
+    return { replies: [createTextReply(interpretation.reply)] };
+  if (interpretation || input.skipEntityInterpretation) {
+    const pending = {
+      ...readFlowFieldCandidates(input.submission.metadata, input.action),
+      ...(interpretation && "answers" in interpretation
+        ? interpretation.answers
+        : {}),
+    };
+    const currentAnswer = pending[String(step.id)];
+    delete pending[String(step.id)];
+    const updated = await recordActionFlowProgress({
+      projectId: input.projectId,
+      submissionId: input.submission.id,
+      currentStepId: step.id,
+      fields: input.submission.fields,
+      expectedRevision: input.submission.revision,
+      metadata: {
+        ...input.submission.metadata,
+        [FLOW_FIELD_CANDIDATES]: {
+          actionId: input.action.id,
+          actionVersionId: input.action.versionId,
+          answers: pending,
+        },
+      },
+      event: {
+        eventType: "field.candidates",
+        message: "Mapped supplied values to published flow fields.",
+        payload: {
+          stepIds:
+            interpretation && "answers" in interpretation
+              ? Object.keys(interpretation.answers)
+              : [String(step.id)],
+        },
+      },
+    });
+    if (!updated)
+      return {
+        replies: [
+          createTextReply("I could not save those details. Please try again."),
+        ],
+      };
+    input = {
+      ...input,
+      submission: updated,
+      answer: currentAnswer ?? input.answer,
+    };
+    if (currentAnswer === undefined)
+      return {
+        replies: [
+          createTextReply("I noted those details."),
+          ...buildRuntimeRepliesForStep(step, updated.fields),
+        ],
+      };
+  }
   const parsedAnswer = validateStepAnswer(
     step,
     input.answer,
     input.submission.fields,
   );
 
-  const interruption = await tryAnswerDeterministicFlowQuestion({
-    answerIsValid: parsedAnswer.isValid,
-    action: input.action,
-    channelConversationId: input.channelConversationId,
-    inboundMessageId: input.inboundMessageId,
-    projectId: input.projectId,
-    resumePrompt: formatStepPrompt(step, input.submission.fields),
-    source: input.source,
-    stepId: step.id,
-    submissionId: input.submission.id,
-    text: input.answer,
-  });
+  const interruption =
+    interpretation || input.skipEntityInterpretation
+      ? null
+      : await tryAnswerDeterministicFlowQuestion({
+          answerIsValid: parsedAnswer.isValid,
+          action: input.action,
+          channelConversationId: input.channelConversationId,
+          inboundMessageId: input.inboundMessageId,
+          projectId: input.projectId,
+          resumePrompt: formatStepPrompt(step, input.submission.fields),
+          source: input.source,
+          stepId: step.id,
+          submissionId: input.submission.id,
+          text: input.answer,
+        });
   if (interruption) return interruption;
 
   if (!parsedAnswer.isValid) {
@@ -2218,6 +2449,7 @@ export async function processChannelFlowText(input: {
 
   const result = await startChannelFlow({
     action: triggeredAction,
+    openingMessage: input.text,
     contactId: input.contactId ?? null,
     conversationId: input.conversationId,
     projectId: input.projectId,

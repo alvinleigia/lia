@@ -9,8 +9,10 @@ import {
   isPotentialKnowledgeSideQuestion,
   isSimpleTaskTextAnswer,
 } from "@/lib/conversation-control-intents";
+import { extractLocalTaskFieldCandidates } from "@/lib/conversation-field-extraction";
 import {
   compileStructuredTurn,
+  type FieldCollectionContext,
   type PublishedTaskOption,
   planOpeningTurn,
 } from "@/lib/conversation-turn-compiler";
@@ -58,6 +60,7 @@ export interface TurnKnowledgeRetriever {
 }
 
 export type ExecuteStructuredTurnInput = {
+  collection?: FieldCollectionContext;
   activeTask: ConversationalTaskSnapshotV1 | null;
   assistantBehavior: ProjectAiSettings;
   assistantIntroduced: boolean;
@@ -429,18 +432,35 @@ function directFieldProposal(
   input: ExecuteStructuredTurnInput,
   reasonCode: "model_unavailable" | null,
 ): TurnResultV1 | null {
-  if (!input.activeTask) return null;
+  const collectionFields =
+    input.activeTask?.task.definition.fields ?? input.collection?.fields;
+  if (!collectionFields || input.stage !== "extraction") return null;
 
   const value = input.visitorMessage.trim();
+  const localCandidates = extractLocalTaskFieldCandidates({
+    fields: collectionFields,
+    text: value,
+    timezone: String(
+      input.context.find(({ key }) => key === "lia_timezone")?.value ?? "UTC",
+    ),
+  });
+  if (localCandidates?.length) {
+    const field = collectionFields.find(
+      ({ key }) => key === localCandidates[0].fieldKey,
+    );
+    if (field)
+      return {
+        ...buildDirectFieldProposal({ field, reasonCode, value }),
+        fieldCandidates: localCandidates,
+      };
+  }
   const fieldStates = new Map(
     input.fieldState.map((field) => [field.fieldKey, field.state]),
   );
-  const unresolvedFields = input.activeTask.task.definition.fields.filter(
-    (field) => {
-      const state = fieldStates.get(field.key) ?? "missing";
-      return ["cleared", "invalid", "missing"].includes(state);
-    },
-  );
+  const unresolvedFields = collectionFields.filter((field) => {
+    const state = fieldStates.get(field.key) ?? "missing";
+    return ["cleared", "invalid", "missing"].includes(state);
+  });
   const requestedField = input.requestedFieldKey
     ? unresolvedFields.find((field) => field.key === input.requestedFieldKey)
     : null;
@@ -515,7 +535,7 @@ function preserveAmbiguousDateWording(
   proposal: TurnResultV1,
 ): TurnResultV1 {
   const dateFields = new Map(
-    input.activeTask?.task.definition.fields
+    (input.activeTask?.task.definition.fields ?? input.collection?.fields ?? [])
       .filter((field) => field.type === "date")
       .map((field) => [field.key, field]),
   );
@@ -612,14 +632,19 @@ function buildDirectFieldProposal(input: {
 }
 
 function hasDirectUnresolvedFieldEvidence(input: ExecuteStructuredTurnInput) {
-  if (!input.activeTask || input.stage !== "extraction") return false;
+  if ((!input.activeTask && !input.collection) || input.stage !== "extraction")
+    return false;
 
   const fieldStates = new Map(
     input.fieldState.map((field) => [field.fieldKey, field.state]),
   );
   const value = input.visitorMessage.trim();
 
-  return input.activeTask.task.definition.fields.some((field) => {
+  return (
+    input.activeTask?.task.definition.fields ??
+    input.collection?.fields ??
+    []
+  ).some((field) => {
     const state = fieldStates.get(field.key) ?? "missing";
     if (!["cleared", "invalid", "missing"].includes(state)) return false;
 
