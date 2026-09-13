@@ -273,7 +273,11 @@ export function ActionFlowPreview({ action }: ActionFlowPreviewProps) {
       );
       setState({
         ...state,
-        answer: getActionStepInputType(currentStep) === "date" ? answer : "",
+        answer: ["date", "time"].includes(
+          getActionStepInputType(currentStep) ?? "",
+        )
+          ? answer
+          : "",
         diagnostics: [
           ...state.diagnostics,
           {

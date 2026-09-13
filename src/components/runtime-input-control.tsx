@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DateInputControl } from "@/components/date-input-control";
+import { DateTimeInputControl } from "@/components/date-time-input-control";
 import { Button } from "@/components/ui/button";
 import type { RuntimeInputRequest } from "@/lib/runtime-input-request";
 
@@ -18,18 +18,19 @@ export function RuntimeInputControl({
   onSubmit,
   request,
 }: RuntimeInputControlProps) {
-  const [date, setDate] = useState("");
+  const [value, setValue] = useState("");
 
-  if (request.inputKind === "date") {
+  if (request.inputKind === "date" || request.inputKind === "time") {
     return (
-      <DateInputControl
+      <DateTimeInputControl
         compact={compact}
-        description="You can also type a date or your full request below."
+        description={`You can also type a ${request.inputKind} or your full request below.`}
         disabled={disabled}
         label={request.label}
-        onChange={setDate}
+        onChange={setValue}
         onSubmit={onSubmit}
-        value={date}
+        type={request.inputKind}
+        value={value}
       />
     );
   }

@@ -5,30 +5,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type DateInputControlProps = {
+type DateTimeInputControlProps = {
   compact?: boolean;
   description?: string;
   disabled?: boolean;
   label: string;
+  type: "date" | "time";
   onChange: (value: string) => void;
   onSubmit: (value: string) => void | Promise<void>;
   value: string;
 };
 
-export function DateInputControl({
+export function DateTimeInputControl({
   compact = false,
   description,
   disabled = false,
   label,
   onChange,
   onSubmit,
+  type,
   value,
-}: DateInputControlProps) {
-  const dateId = useId();
+}: DateTimeInputControlProps) {
+  const inputId = useId();
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   // Server-rendered controls must wait for their change handler before accepting
-  // input, otherwise a date entered during hydration can be lost.
+  // input, otherwise a value entered during hydration can be lost.
   const isDisabled = disabled || !ready;
 
   return (
@@ -39,16 +41,16 @@ export function DateInputControl({
         if (value && !isDisabled) void onSubmit(value);
       }}
     >
-      <Label htmlFor={dateId}>{label}</Label>
+      <Label htmlFor={inputId}>{label}</Label>
       <div className="flex flex-wrap items-center gap-2">
         <Input
           className="w-auto max-w-full"
-          id={dateId}
-          type="date"
+          id={inputId}
+          type={type}
           required
           value={value}
           disabled={isDisabled}
-          aria-describedby={description ? `${dateId}-description` : undefined}
+          aria-describedby={description ? `${inputId}-description` : undefined}
           onChange={(event) => onChange(event.target.value)}
         />
         <Button
@@ -57,12 +59,12 @@ export function DateInputControl({
           variant="outline"
           disabled={isDisabled || !value}
         >
-          Use date
+          Use {type}
         </Button>
       </div>
       {description && (
         <p
-          id={`${dateId}-description`}
+          id={`${inputId}-description`}
           className="text-sm text-muted-foreground"
         >
           {description}

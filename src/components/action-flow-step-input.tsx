@@ -2,7 +2,7 @@
 
 import { Send } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
-import { DateInputControl } from "@/components/date-input-control";
+import { DateTimeInputControl } from "@/components/date-time-input-control";
 import {
   getActionOptionBehavior,
   getActionOptionHref,
@@ -271,14 +271,15 @@ export function ActionFlowStepInput({
     );
   };
 
-  if (inputConfig.type === "date") {
+  if (inputConfig.type === "date" || inputConfig.type === "time") {
     return (
-      <DateInputControl
+      <DateTimeInputControl
         compact={compact}
         disabled={disabled}
         label={step.label || placeholder}
         onChange={onChange}
         onSubmit={onSubmit}
+        type={inputConfig.type}
         value={value}
       />
     );

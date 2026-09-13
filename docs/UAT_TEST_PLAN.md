@@ -2178,3 +2178,43 @@ its TypeScript checks. The Flow Builder screenshot was visually inspected.
 The action detail page still logs an unrelated header hydration mismatch in local
 development; the date control now waits until interactive and the regression
 passes despite that page re-render. This change does not resolve the header issue.
+
+
+## Shared time input from configured field types (2026-09-13)
+
+- Extended the shared date control into `DateTimeInputControl`, using the existing
+  native date/time inputs and shadcn primitives. Flow Builder preview, Project Chat,
+  and the widget now consume the same control.
+- Business Task `time` fields automatically render the time control from their
+  runtime input request. Dedicated Flow Builder Date/Time steps and generic
+  Collect Input steps configured as date/time also render it in chat and widget.
+  No field-name, appointment, or provider-specific UI mapping is required.
+- The picker submits a local `HH:mm` value through the existing text command and
+  validation path. It does not invent a date, timezone, or verified appointment
+  slot. Typed answers and full statements remain available in the composer.
+- Configured choices and provider availability offers retain their choice controls.
+  Existing slot validation, confirmation refresh, and booking safeguards still apply.
+- Published definitions remain the runtime source; editing a draft does not update
+  a pinned published version or silently migrate an existing conversation.
+
+Verification: the parameterized browser regression covers date and time through
+both Business Task input requests and dedicated/generic legacy flow steps, in
+Project Chat and a mobile-sized widget, plus actual Flow Builder previews. It
+checks empty/loading controls, explicit submission, midnight, Enter submission,
+reset, optional-step Skip visibility, validation feedback, and full-statement
+submission. Browser runtime responses are mocked to isolate UI delivery; existing
+runtime/contract tests cover server validation and provider selection rules.
+
+Manual UAT: configure an arbitrary required time field (for example Service Time
+or Callback Time), publish the relevant task/flow version, and begin a new chat.
+The time control should appear without code changes. Submit 15:30, then repeat
+with a typed time or a full statement. For appointment slots, verify that available
+slot buttons remain in use instead of an unrestricted time picker.
+
+Verification results: both parameterized browser tests passed; both focused input
+contract tests passed; all 327 offline contract tests passed; Biome and the
+production build passed. Standalone TypeScript checking reports only the two
+previously recorded nullable `session.runtime` errors in
+`conversational-task-operation-runtime-db.spec.ts` (2309 and 2439). The existing
+unrelated Action Detail header hydration warning also remains; both control
+browser tests passed with their hydration readiness guard.

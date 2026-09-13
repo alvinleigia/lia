@@ -35,6 +35,7 @@ import {
   findActionForTaskRecommendation,
   getActionStartControlText,
   getActionStepChoiceDisplayMode,
+  getActionStepInputType,
   getActionStepOptions,
   getFlowEditSectionOptions,
   getRunnableActionSteps,
@@ -183,6 +184,7 @@ export function ChatPageClient({ actions, projectId }: ChatPageClientProps) {
     ? isActionInputStep(activeStep) &&
       shouldRenderActionStepInlineControl({
         hasOptions: activeStepHasOptions,
+        inputType: getActionStepInputType(activeStep),
         stepType: activeStep.stepType,
       })
     : false;

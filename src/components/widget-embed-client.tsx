@@ -17,6 +17,7 @@ import {
   type FlowEditSection,
   getActionStartControlText,
   getActionStepChoiceDisplayMode,
+  getActionStepInputType,
   getActionStepOptions,
   getFlowEditSectionOptions,
   getRunnableActionSteps,
@@ -117,6 +118,7 @@ export function WidgetEmbedClient({ actions, token }: WidgetEmbedClientProps) {
     ? isActionInputStep(activeStep) &&
       shouldRenderActionStepInlineControl({
         hasOptions: activeStepHasOptions,
+        inputType: getActionStepInputType(activeStep),
         stepType: activeStep.stepType,
       })
     : false;

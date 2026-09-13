@@ -127,6 +127,55 @@ test("project-resource fields request selectable channel choices", () => {
   });
 });
 
+test("configured date and time fields automatically request shared browser controls", () => {
+  for (const type of ["date", "time"] as const) {
+    for (const key of ["servicePreference", "callbackPreference"]) {
+      const request = createTaskRuntimeInputRequest({
+        ...REFERENCE_BOOKING_TASK_DEFINITION.fields[4],
+        key,
+        label: key,
+        type,
+        required: false,
+      });
+      expect(request).toMatchObject({
+        fieldKey: key,
+        inputKind: type,
+        label: key,
+        required: false,
+      });
+      expect(shouldRenderRuntimeInputControl(request)).toBe(true);
+      expect(
+        getBrowserComposerPlaceholder({ fallback: "Ask a question", request }),
+      ).toBe(`Type ${key} or your full request...`);
+      expect(
+        shouldRenderActionStepInlineControl({
+          hasOptions: false,
+          stepType: type,
+        }),
+      ).toBe(true);
+      expect(
+        shouldRenderActionStepInlineControl({
+          hasOptions: false,
+          stepType: "collect_input",
+          inputType: type,
+        }),
+      ).toBe(true);
+    }
+  }
+  const slot = createTaskRuntimeInputRequest({
+    ...REFERENCE_BOOKING_TASK_DEFINITION.fields[4],
+    key: "availableSlot",
+    label: "Available slot",
+    type: "time",
+    optionSource: {
+      kind: "static",
+      options: [{ label: "3:30 PM", value: "15:30" }],
+    },
+  });
+  expect(slot.inputKind).toBe("choice");
+  expect(slot.options).toEqual([{ label: "3:30 PM", value: "15:30" }]);
+});
+
 test("browser chat renders only dedicated runtime controls inline", () => {
   const request = {
     fieldKey: "guestEmail",

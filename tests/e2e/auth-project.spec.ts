@@ -17,6 +17,7 @@ import {
   updateActionFlowStep,
   validateActionFlowRoutes,
 } from "../../src/lib/action-flows";
+import type { RuntimeAction } from "../../src/lib/action-runtime";
 import { writeAuditLog } from "../../src/lib/audit";
 import { runBrowserFlowMediaCommand } from "../../src/lib/browser-flow-media-command";
 import { runBrowserFlowText } from "../../src/lib/browser-flow-runtime";
@@ -33,6 +34,7 @@ import {
 import { logChatRequest } from "../../src/lib/chat-logs";
 import { getOrCreateDefaultCompanyForUser } from "../../src/lib/companies";
 import { addContactTag, setContactAttribute } from "../../src/lib/contacts";
+import { REFERENCE_BOOKING_TASK_DEFINITION } from "../../src/lib/conversation-contract-fixtures";
 import {
   DEFAULT_CONVERSATION_PROJECT_POLICY,
   DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
@@ -60,6 +62,7 @@ import {
 } from "../../src/lib/product-catalogs";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 import { createProjectForUser } from "../../src/lib/projects";
+import { createTaskRuntimeInputRequest } from "../../src/lib/runtime-input-request";
 import { getUserByEmail } from "../../src/lib/users";
 import {
   createWhatsAppChannelAdapter,
@@ -4120,191 +4123,259 @@ test("project chat semantic handoff preserves the original statement and suppres
   }
 });
 
-test("shared date control supports Flow Builder, chat and widget", async ({
-  page,
-}) => {
-  test.setTimeout(180_000);
-  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const email = `e2e-date-picker-${runId}@example.test`;
-  await signUpOrUseExistingAccount(page, {
-    email,
-    name: "Date Picker UAT",
-    password,
-  });
-  await signInWithEmail(page, email);
-  await expect(page).toHaveURL(/\/projects/);
-  const user = await getUserByEmail(email);
-  if (!user) throw new Error("Date picker fixture user missing");
-  const project = await createProjectForUser(user.id, `Date Picker ${runId}`);
-  const projectId = project.id;
-  const token = await createOrRotateProjectWidgetToken(projectId);
+for (const inputKind of ["date", "time"] as const) {
+  test(`shared ${inputKind} control supports Flow Builder, chat and widget`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    const fieldLabel = inputKind === "date" ? "Service Date" : "Service Time";
+    const returnLabel = inputKind === "date" ? "Return Date" : "Return Time";
+    const selectedValue = inputKind === "date" ? "2026-09-24" : "15:30";
+    const inputRequest = createTaskRuntimeInputRequest({
+      ...REFERENCE_BOOKING_TASK_DEFINITION.fields[4],
+      key: inputKind === "date" ? "serviceDate" : "serviceTime",
+      label: fieldLabel,
+      type: inputKind,
+    });
+    const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const email = `e2e-${inputKind}-picker-${runId}@example.test`;
+    await signUpOrUseExistingAccount(page, {
+      email,
+      name: "Date Picker UAT",
+      password,
+    });
+    await signInWithEmail(page, email);
+    await expect(page).toHaveURL(/\/projects/);
+    const user = await getUserByEmail(email);
+    if (!user) throw new Error("Date picker fixture user missing");
+    const project = await createProjectForUser(user.id, `Date Picker ${runId}`);
+    const projectId = project.id;
+    const token = await createOrRotateProjectWidgetToken(projectId);
 
-  for (const channel of ["project_chat", "widget"] as const) {
-    const commands: Array<Record<string, unknown>> = [];
-    const url =
-      channel === "widget"
-        ? "**/api/widget/actions/runtime"
-        : "**/api/actions/runtime";
-    // Isolate UI delivery from providers; date validation is covered by runtime tests.
-    await page.route(url, async (route) => {
-      const body = route.request().postDataJSON();
-      if (!body.resume) commands.push(body);
-      const text =
-        body.text === "09/10/2026"
-          ? "That date could mean day/month or month/day. Please write the month name or use YYYY-MM-DD."
-          : "What is your preferred service date?";
-      await route.fulfill({
-        json: {
-          action: null,
-          activeFlow: {
-            actionId: 999,
-            actionName: "Service fixture",
-            stepIndex: 0,
-            fields: {},
-            mode: "collecting",
-            revision: commands.length,
-          },
-          handled: true,
-          replies: [
-            {
-              type: "text",
-              text,
-              fallbackText: text,
-              payload: {
-                inputRequest: {
-                  fieldKey: "serviceDate",
-                  label: "Service Date",
-                  inputKind: "date",
-                  options: [],
-                  required: true,
+    for (const channel of ["project_chat", "widget"] as const) {
+      const commands: Array<Record<string, unknown>> = [];
+      let legacyFlow = false;
+      let legacyCommands = 0;
+      const legacyAction: RuntimeAction = {
+        id: 999,
+        versionId: null,
+        versionNumber: null,
+        name: "Service fixture",
+        description: null,
+        triggerPhrases: [],
+        branchRules: [],
+        steps: [inputKind, "collect_input"].map((stepType, index) => ({
+          id: index + 1,
+          sortOrder: index + 1,
+          stepType,
+          inputType: inputKind,
+          fieldKey: index === 0 ? inputRequest.fieldKey : `return${inputKind}`,
+          label: index === 0 ? fieldLabel : returnLabel,
+          prompt: "Choose your preference.",
+          isRequired: true,
+          isEnabled: true,
+          operationId: null,
+          nextStepId: null,
+          options: [],
+          settings: {},
+        })),
+      };
+      const url =
+        channel === "widget"
+          ? "**/api/widget/actions/runtime"
+          : "**/api/actions/runtime";
+      // Isolate UI delivery from providers; field validation is covered by runtime tests.
+      await page.route(url, async (route) => {
+        const body = route.request().postDataJSON();
+        if (!body.resume) commands.push(body);
+        if (legacyFlow && !body.resume) legacyCommands += 1;
+        const text =
+          body.text === "09/10/2026" || body.text === "25:70"
+            ? inputKind === "date"
+              ? "That date could mean day/month or month/day. Please write the month name or use YYYY-MM-DD."
+              : "Enter a time such as 15:30 or 3:30 PM."
+            : `What is your preferred service ${inputKind}?`;
+        await route.fulfill({
+          json: {
+            action: legacyFlow ? legacyAction : null,
+            activeFlow: {
+              actionId: 999,
+              actionName: "Service fixture",
+              stepIndex: legacyFlow ? Math.min(legacyCommands - 1, 1) : 0,
+              fields: {},
+              mode: "collecting",
+              revision: commands.length,
+            },
+            handled: true,
+            replies: [
+              {
+                type: "text",
+                text,
+                fallbackText: text,
+                payload: {
+                  inputRequest: legacyFlow ? null : inputRequest,
                 },
               },
-            },
-          ],
-        },
+            ],
+          },
+        });
       });
-    });
-    await page.setViewportSize(
-      channel === "widget"
-        ? { width: 390, height: 740 }
-        : { width: 1280, height: 900 },
-    );
-    await page.goto(
-      channel === "widget"
-        ? `/widget/embed?token=${encodeURIComponent(token)}`
-        : "/projects/chat",
-    );
-    const date = page.getByLabel("Service Date", { exact: true });
-    const useDate = page.getByRole("button", { name: "Use date", exact: true });
-    await expect(date).toBeVisible();
-    await expect(useDate).toBeDisabled();
-    await date.fill("2026-09-24");
-    expect(commands).toHaveLength(0);
-    await expect(useDate).toBeEnabled();
-    await page.screenshot({
-      path: `test-results/date-picker-${channel}.png`,
-      fullPage: true,
-    });
-    await useDate.click();
-    await expect.poll(() => commands.length).toBe(1);
-    expect(commands[0]).toMatchObject({
-      text: "2026-09-24",
-      expectedRevision: 0,
-    });
-    expect(commands[0].selection).toBeUndefined();
-    await expect(date).toHaveValue("");
-    const send = async (target: Page, message: string) => {
-      if (channel === "project_chat") {
-        await sendProjectChatMessage(target, message);
-      } else {
-        await target
-          .getByPlaceholder("Type Service Date or your full request...")
-          .fill(message);
-        await target.getByRole("button", { name: "Send", exact: true }).click();
-      }
-    };
-    await send(page, "09/10/2026");
-    await expect(
-      page.getByText(/That date could mean day\/month/),
-    ).toBeVisible();
-    await expect(date).toBeVisible();
-    const statement =
-      "Book my bike service on 24 September 2026. My name is Alex Test and the reason is an oil change.";
-    await send(page, statement);
-    await expect.poll(() => commands.length).toBe(3);
-    expect(commands[2]).toMatchObject({ text: statement });
-    await expect(page.getByText(statement, { exact: true })).toBeVisible();
-    await page.unroute(url);
-  }
+      await page.setViewportSize(
+        channel === "widget"
+          ? { width: 390, height: 740 }
+          : { width: 1280, height: 900 },
+      );
+      await page.goto(
+        channel === "widget"
+          ? `/widget/embed?token=${encodeURIComponent(token)}`
+          : "/projects/chat",
+      );
+      const date = page.getByLabel(fieldLabel, { exact: true });
+      const useDate = page.getByRole("button", {
+        name: `Use ${inputKind}`,
+        exact: true,
+      });
+      await expect(date).toBeVisible();
+      await expect(useDate).toBeDisabled();
+      await date.fill(selectedValue);
+      expect(commands).toHaveLength(0);
+      await expect(useDate).toBeEnabled();
+      await page.screenshot({
+        path: `test-results/${inputKind}-picker-${channel}.png`,
+        fullPage: true,
+      });
+      await useDate.click();
+      await expect.poll(() => commands.length).toBe(1);
+      expect(commands[0]).toMatchObject({
+        text: selectedValue,
+        expectedRevision: 0,
+      });
+      expect(commands[0].selection).toBeUndefined();
+      await expect(date).toHaveValue("");
+      const send = async (target: Page, message: string) => {
+        if (channel === "project_chat") {
+          await sendProjectChatMessage(target, message);
+        } else {
+          await target
+            .getByPlaceholder(`Type ${fieldLabel} or your full request...`)
+            .fill(message);
+          await target
+            .getByRole("button", { name: "Send", exact: true })
+            .click();
+        }
+      };
+      await send(page, inputKind === "date" ? "09/10/2026" : "25:70");
+      await expect(
+        page.getByText(
+          inputKind === "date"
+            ? /That date could mean day\/month/
+            : /Enter a time such as/,
+        ),
+      ).toBeVisible();
+      await expect(date).toBeVisible();
+      const statement =
+        "Book my bike service on 24 September 2026 at 3:30 PM. My name is Alex Test and the reason is an oil change.";
+      await send(page, statement);
+      await expect.poll(() => commands.length).toBe(3);
+      expect(commands[2]).toMatchObject({ text: statement });
+      await expect(page.getByText(statement, { exact: true })).toBeVisible();
+      // Both a dedicated date/time step and a generic Collect Input step must
+      // render from their configured types in the actual chat surfaces.
+      legacyFlow = true;
+      await send(page, "Continue to return preference");
+      await expect(date).toBeVisible();
+      await date.fill(selectedValue);
+      await useDate.click();
+      const returnInput = page.getByLabel(returnLabel, { exact: true });
+      await expect(returnInput).toBeVisible();
+      await expect(returnInput).toHaveValue("");
+      await returnInput.fill(inputKind === "date" ? "2026-09-25" : "00:00");
+      await returnInput.press("Enter");
+      await expect.poll(() => commands.length).toBe(6);
+      expect(commands[4]).toMatchObject({ text: selectedValue });
+      expect(commands[5]).toMatchObject({
+        text: inputKind === "date" ? "2026-09-25" : "00:00",
+      });
+      expect(commands[5].selection).toBeUndefined();
+      await page.unroute(url);
+    }
 
-  const action = await createChatbotAction({
-    projectId,
-    name: "Reusable Date Input Preview",
-    status: "active",
-    description:
-      "Checks the same date control through the existing flow renderer.",
-    triggerPhrases: [],
-  });
-  for (const [index, stepType] of ["date", "collect_input"].entries()) {
+    const action = await createChatbotAction({
+      projectId,
+      name: `Reusable ${inputKind} Input Preview`,
+      status: "active",
+      description:
+        "Checks the same date/time control through the existing flow renderer.",
+      triggerPhrases: [],
+    });
+    for (const [index, stepType] of [inputKind, "collect_input"].entries()) {
+      await createActionFlowStep({
+        projectId,
+        actionId: action.id,
+        fieldKey: index === 0 ? inputRequest.fieldKey : `return${inputKind}`,
+        inputType: inputKind,
+        isRequired: index === 0,
+        label: index === 0 ? fieldLabel : returnLabel,
+        prompt: `Choose a ${inputKind}.`,
+        sortOrder: index + 1,
+        stepType,
+        settings:
+          inputKind === "date"
+            ? {
+                validationMinDate: "2026-09-24",
+                validationMaxDate: "2026-09-26",
+              }
+            : {},
+      });
+    }
     await createActionFlowStep({
       projectId,
       actionId: action.id,
-      fieldKey: index === 0 ? "serviceDate" : "returnDate",
-      inputType: "date",
-      isRequired: index === 0,
-      label: index === 0 ? "Service Date" : "Return Date",
-      prompt: "Choose a date.",
-      sortOrder: index + 1,
-      stepType,
-      settings: {
-        validationMinDate: "2026-09-24",
-        validationMaxDate: "2026-09-26",
-      },
+      stepType: "submit",
+      sortOrder: 3,
+      isRequired: false,
+      label: "Finish Preview",
     });
-  }
-  await createActionFlowStep({
-    projectId,
-    actionId: action.id,
-    stepType: "submit",
-    sortOrder: 3,
-    isRequired: false,
-    label: "Finish Preview",
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/projects/actions/${action.id}`);
+    const preview = page
+      .locator('[data-slot="card"]')
+      .filter({ hasText: "Preview And Test Mode" });
+    const date = preview.getByLabel(fieldLabel, { exact: true });
+    const useDate = preview.getByRole("button", {
+      name: `Use ${inputKind}`,
+      exact: true,
+    });
+    await expect(date).toBeVisible();
+    await expect(useDate).toBeDisabled();
+    if (inputKind === "date") {
+      await date.fill("2026-09-23");
+      await expect(useDate).toBeEnabled();
+      await useDate.click();
+      await expect(
+        preview
+          .getByText("Please enter a valid date.", { exact: true })
+          .first(),
+      ).toBeVisible();
+      await expect(date).toHaveValue("2026-09-23");
+    }
+    await date.fill(selectedValue);
+    await useDate.click();
+    const returnDate = preview.getByLabel(returnLabel, { exact: true });
+    await expect(returnDate).toHaveValue("");
+    await expect(
+      preview.getByRole("button", { name: "Skip", exact: true }),
+    ).toBeVisible();
+    await returnDate.fill(inputKind === "date" ? "2026-09-25" : "00:00");
+    await returnDate.press("Enter");
+    await expect(
+      preview.getByRole("button", { name: "Submit Preview", exact: true }),
+    ).toBeVisible();
+    await preview.getByRole("button", { name: "Reset", exact: true }).click();
+    await expect(date).toHaveValue("");
+    await date.fill(selectedValue);
+    await preview.screenshot({
+      path: `test-results/shared-${inputKind}-flow-preview.png`,
+    });
   });
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(`/projects/actions/${action.id}`);
-  const preview = page
-    .locator('[data-slot="card"]')
-    .filter({ hasText: "Preview And Test Mode" });
-  const date = preview.getByLabel("Service Date", { exact: true });
-  const useDate = preview.getByRole("button", {
-    name: "Use date",
-    exact: true,
-  });
-  await expect(date).toBeVisible();
-  await expect(useDate).toBeDisabled();
-  await date.fill("2026-09-23");
-  await expect(useDate).toBeEnabled();
-  await useDate.click();
-  await expect(
-    preview.getByText("Please enter a valid date.", { exact: true }).first(),
-  ).toBeVisible();
-  await expect(date).toHaveValue("2026-09-23");
-  await date.fill("2026-09-24");
-  await useDate.click();
-  const returnDate = preview.getByLabel("Return Date", { exact: true });
-  await expect(returnDate).toHaveValue("");
-  await expect(
-    preview.getByRole("button", { name: "Skip", exact: true }),
-  ).toBeVisible();
-  await returnDate.fill("2026-09-25");
-  await returnDate.press("Enter");
-  await expect(
-    preview.getByRole("button", { name: "Submit Preview", exact: true }),
-  ).toBeVisible();
-  await preview.getByRole("button", { name: "Reset", exact: true }).click();
-  await expect(date).toHaveValue("");
-  await date.fill("2026-09-24");
-  await preview.screenshot({
-    path: "test-results/shared-date-flow-preview.png",
-  });
-});
+}
