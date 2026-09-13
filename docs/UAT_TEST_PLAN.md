@@ -2218,3 +2218,38 @@ previously recorded nullable `session.runtime` errors in
 `conversational-task-operation-runtime-db.spec.ts` (2309 and 2439). The existing
 unrelated Action Detail header hydration warning also remains; both control
 browser tests passed with their hydration readiness guard.
+
+
+## Preferred appointment times and nearby alternatives (2026-09-13)
+
+1. Begin booking/rescheduling and choose a date with morning and afternoon slots.
+   Verify the short offer says that a different preferred time can be typed.
+2. Without selecting an offered morning button, send `Is 3:30 pm available?`.
+   If available, the same task should show its review (or ask for any remaining
+   required information). No identity/date/reason re-entry should be required.
+3. Mark 3:30 pm busy and repeat in a fresh test conversation. Verify that Lia says
+   the preferred time is unavailable and lists the nearest actual alternatives,
+   such as 3 pm and 4 pm when available. Select one, confirm, and verify the event.
+4. Send `Show me times after 2 pm` or `in the afternoon`. Verify matching choices
+   are offered instead of silently selecting a time from the window.
+5. Simulate a provider failure. Lia must say it could not verify availability,
+   preserve the collected details, and allow retry; it must not call the time busy.
+6. Select a later slot, let the availability result expire, then confirm. If the
+   same slot remains available, the existing confirmation should complete it.
+   If a manual blocking event was added meanwhile, no write should occur and the
+   alternative choices should be near the selected time.
+
+Automated coverage uses provider mocks and persisted task/conversation records:
+complete versus partial availability, full-day matching beyond the short offer,
+nearby and window choices, malformed/stale results, timezone ambiguity, retained
+fields, explicit confirmation, and a slot becoming busy before the write. Tests
+also exercise existing lookup/reschedule/cancel paths and offered-slot refresh.
+No real customer calendar events are created by these automated checks.
+
+Verification results: 37 focused calendar/provider tests, all 327 offline contract
+tests, all five new persisted preference scenarios, and eight selected persisted
+regressions passed (including alternative selection and provider retry). Biome and
+the production build passed. Standalone TypeScript checking still reports only the
+two previously recorded nullable `session.runtime` assertions in the existing
+operation-runtime test fixture; production compilation passed. These checks used
+mocked provider responses, not live Google Calendar customer events.

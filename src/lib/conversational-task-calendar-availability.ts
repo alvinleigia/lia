@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import {
   type AppointmentMatch,
   appointmentSlotOptions,
+  completeAppointmentSlotOptions,
   isAppointmentLookup,
   upcomingAppointmentMatches,
 } from "@/lib/appointment-lookup";
@@ -109,6 +110,7 @@ export async function getTaskCalendarAvailability(
 }
 
 export function verifiedCalendarSlots(input: {
+  includeAll?: boolean;
   attempt: {
     status: string;
     responsePayload: Record<string, unknown>;
@@ -134,7 +136,11 @@ export function verifiedCalendarSlots(input: {
   )
     return [];
   if (attempt.responsePayload.date !== input.date) return [];
-  return appointmentSlotOptions(attempt.responsePayload);
+  return (
+    (input.includeAll
+      ? completeAppointmentSlotOptions(attempt.responsePayload)
+      : null) ?? appointmentSlotOptions(attempt.responsePayload)
+  );
 }
 
 export async function readTaskCalendarAvailability(input: {
@@ -167,6 +173,12 @@ export async function readTaskCalendarAvailability(input: {
     attempt: attempt ?? null,
     date,
     options: verifiedCalendarSlots({ attempt: attempt ?? null, date }),
+    allOptions: verifiedCalendarSlots({
+      attempt: attempt ?? null,
+      date,
+      includeAll: true,
+    }),
+    complete: completeAppointmentSlotOptions(attempt?.responsePayload) !== null,
   };
 }
 
@@ -427,11 +439,12 @@ export async function assertTaskCalendarSlot(input: {
   // An expired offer can only proceed when a fresh lookup below verifies it again.
   const offeredOptions = input.refresh
     ? verifiedCalendarSlots({
+        includeAll: true,
         attempt: availability.attempt,
         date: availability.date,
         now: availability.attempt?.finishedAt ?? undefined,
       })
-    : availability.options;
+    : availability.allOptions;
   if (!offeredOptions.some(({ value }) => value === selected))
     throw new CalendarSlotValidationError(
       "Choose a provider-verified available appointment time before confirmation.",
@@ -442,28 +455,37 @@ export async function assertTaskCalendarSlot(input: {
       definition: binding.definition,
     });
     availability = await readTaskCalendarAvailability({ ...input, binding });
-    if (!availability.options.some(({ value }) => value === selected))
+    if (!availability.allOptions.some(({ value }) => value === selected))
       throw new CalendarSlotValidationError(
         `The selected time is no longer available or could not be verified. Choose another time. Lia attempt #${availability.attempt?.id}.`,
       );
   }
 }
 
-// A time stated in a multi-field message is a preference until a fresh provider
-// offer contains that exact local date/time. Never invent a slot from model output.
-export function findRequestedCalendarSlots(input: {
-  text: string;
-  date: string;
+export const CALENDAR_TIME_CHOICE_HINT =
+  'Choose a time above, or tell me another preferred time, such as "3:30 pm" or "after 2 pm".';
+
+type SlotOption = { label: string; value: string };
+type TimePreference = {
+  kind: "exact" | "window";
+  minute: number;
+  endMinute: number;
   timezone: string;
-  options: Array<{ label: string; value: string }>;
-}) {
-  const matches = [
-    ...input.text.matchAll(
+};
+
+function parseCalendarTimePreference(
+  text: string,
+  timezone: string,
+): TimePreference | null {
+  // Do not interpret a negated time, competing times, or an unclear timezone as a selection.
+  if (/\b(?:not|instead of|except|between)\b/i.test(text)) return null;
+  const clocks = [
+    ...text.matchAll(
       /\b(\d{1,2})(?::([0-5]\d))?\s*(am|pm)\b|\b([01]\d|2[0-3]):([0-5]\d)\b/gi,
     ),
   ];
   const minutes = new Set<number>();
-  for (const match of matches) {
+  for (const match of clocks) {
     if (match[3]) {
       const hour = Number(match[1]);
       if (hour < 1 || hour > 12) return null;
@@ -473,47 +495,112 @@ export function findRequestedCalendarSlots(input: {
       );
     } else minutes.add(Number(match[4]) * 60 + Number(match[5]));
   }
-  if (minutes.size !== 1) return null;
+  if (minutes.size > 1) return null;
   const zones = [
     ...new Set(
-      input.text.match(/\b[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?\b/g) ?? [],
+      text.match(/\b[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?\b/g) ?? [],
     ),
   ];
-  // Explicit UTC/GMT must not silently use the provider's local timezone.
-  // Offsets and ambiguous abbreviations need a choice rather than a guessed zone.
   if (
     /\b(?:UTC|GMT)\s*[+-]|\b(?:IST|EST|EDT|CST|CDT|MST|MDT|PST|PDT|AEST|AEDT|BST|CET|CEST)\b/i.test(
-      input.text,
+      text,
     )
   )
     return null;
-  if (/\b(?:UTC|GMT)\b/i.test(input.text)) zones.push("UTC");
+  if (/\b(?:UTC|GMT)\b/i.test(text)) zones.push("UTC");
   if (new Set(zones).size > 1) return null;
+  timezone = zones[0] ?? timezone;
   try {
-    const format = new Intl.DateTimeFormat("en-CA", {
-      timeZone: zones[0] ?? input.timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    });
-    const options = input.options.filter((option) => {
-      const parts = Object.fromEntries(
-        format
-          .formatToParts(new Date(option.value))
-          .map((part) => [part.type, part.value]),
-      );
-      return (
-        `${parts.year}-${parts.month}-${parts.day}` === input.date &&
-        minutes.has(Number(parts.hour) * 60 + Number(parts.minute))
-      );
-    });
-    return options;
+    new Intl.DateTimeFormat("en", { timeZone: timezone });
   } catch {
     return null;
   }
+  const minute = [...minutes][0];
+  if (minute !== undefined) {
+    const clock = clocks[0];
+    const beforeClock = text.slice(0, clock.index).trim();
+    const afterClock = text.slice((clock.index ?? 0) + clock[0].length).trim();
+    if (
+      /\b(?:after|from|later than)$/i.test(beforeClock) ||
+      /^(?:onwards|or later)\b/i.test(afterClock)
+    )
+      return { kind: "window", minute, endMinute: 1440, timezone };
+    if (/\b(?:before|earlier than)$/i.test(beforeClock))
+      return { kind: "window", minute: 0, endMinute: minute, timezone };
+    return { kind: "exact", minute, endMinute: minute, timezone };
+  }
+  const periods = [...text.matchAll(/\b(morning|afternoon|evening)\b/gi)];
+  if (periods.length !== 1) return null;
+  const period = periods[0][1].toLowerCase();
+  const [from, to] =
+    period === "morning"
+      ? [0, 720]
+      : period === "afternoon"
+        ? [720, 1020]
+        : [1020, 1440];
+  return { kind: "window", minute: from, endMinute: to, timezone };
+}
+
+// Match and rank only provider-returned slots. This helper never fabricates an
+// instant from a requested clock time; date and timezone remain explicit.
+export function suggestCalendarSlots(input: {
+  text: string;
+  date: string;
+  timezone: string;
+  options: SlotOption[];
+}) {
+  const preference = parseCalendarTimePreference(input.text, input.timezone);
+  if (!preference) return null;
+  const format = new Intl.DateTimeFormat("en-CA", {
+    timeZone: preference.timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const candidates = input.options.flatMap((option) => {
+    if (!Number.isFinite(Date.parse(option.value))) return [];
+    const parts = Object.fromEntries(
+      format
+        .formatToParts(new Date(option.value))
+        .map((part) => [part.type, part.value]),
+    );
+    if (`${parts.year}-${parts.month}-${parts.day}` !== input.date) return [];
+    return [{ option, minute: Number(parts.hour) * 60 + Number(parts.minute) }];
+  });
+  const matches = candidates.filter(({ minute }) =>
+    preference.kind === "exact"
+      ? minute === preference.minute
+      : minute >= preference.minute && minute < preference.endMinute,
+  );
+  const distance = (minute: number) =>
+    preference.kind === "exact"
+      ? Math.abs(minute - preference.minute)
+      : Math.max(preference.minute - minute, minute - preference.endMinute, 0);
+  const nearest = [...candidates].sort(
+    (a, b) => distance(a.minute) - distance(b.minute) || a.minute - b.minute,
+  );
+  return {
+    kind: preference.kind,
+    matches: matches.map(({ option }) => option),
+    options: (matches.length && preference.kind === "window"
+      ? matches
+      : nearest
+    )
+      .slice(0, 6)
+      .map(({ option }) => option),
+  };
+}
+
+// A time stated in a multi-field message is a preference until the provider
+// verifies that exact local date/time. A broad window always asks for a choice.
+export function findRequestedCalendarSlots(
+  input: Parameters<typeof suggestCalendarSlots>[0],
+) {
+  const suggestions = suggestCalendarSlots(input);
+  return suggestions?.kind === "exact" ? suggestions.matches : null;
 }
 
 // Preserve the single-slot selection contract; zero matches means not offered,

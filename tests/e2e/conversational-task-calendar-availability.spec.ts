@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   findRequestedCalendarSlots,
   matchRequestedCalendarSlot,
+  suggestCalendarSlots,
   verifiedCalendarSlots,
 } from "../../src/lib/conversational-task-calendar-availability";
 import { getTaskOperationOutcome } from "../../src/lib/task-operation-outcome";
@@ -206,4 +207,107 @@ test("distinguishes an unoffered requested time from missing or ambiguous input"
       ],
     }),
   ).toHaveLength(2);
+});
+
+const afternoonOptions = [
+  "09:00",
+  "14:00",
+  "15:00",
+  "15:30",
+  "16:00",
+  "16:30",
+].map((time) => ({ label: time, value: `2026-09-21T${time}:00Z` }));
+test("full-day verified results allow a requested time beyond the initial display list", () => {
+  const full = {
+    ...attempt,
+    responsePayload: {
+      ...attempt.responsePayload,
+      availabilityComplete: true,
+      allSlots: afternoonOptions.map((option) => ({
+        start: option.value,
+        end: new Date(Date.parse(option.value) + 1800000).toISOString(),
+        spoken: option.label,
+      })),
+    },
+  };
+  expect(verifiedCalendarSlots({ attempt: full, date, now })).toHaveLength(1);
+  expect(
+    verifiedCalendarSlots({ attempt: full, date, now, includeAll: true }),
+  ).toHaveLength(6);
+  expect(
+    verifiedCalendarSlots({
+      attempt: full,
+      date,
+      now: new Date(now.getTime() + 301000),
+      includeAll: true,
+    }),
+  ).toEqual([]);
+  expect(
+    verifiedCalendarSlots({
+      attempt: { ...full, status: "failed" },
+      date,
+      now,
+      includeAll: true,
+    }),
+  ).toEqual([]);
+  expect(
+    verifiedCalendarSlots({
+      attempt: {
+        ...full,
+        responsePayload: {
+          ...full.responsePayload,
+          allSlots: [{ start: "invented" }],
+        },
+      },
+      date,
+      now,
+      includeAll: true,
+    }),
+  ).toEqual(verifiedCalendarSlots({ attempt, date, now }));
+});
+test("exact afternoon requests use the verified slot and busy requests rank nearest alternatives", () => {
+  const input = {
+    text: "Is 3:30 pm available?",
+    date,
+    timezone: "UTC",
+    options: afternoonOptions,
+  };
+  expect(suggestCalendarSlots(input)?.matches).toEqual([afternoonOptions[3]]);
+  const busy = suggestCalendarSlots({
+    ...input,
+    options: afternoonOptions.filter(
+      (option) => option !== afternoonOptions[3],
+    ),
+  });
+  expect(busy?.matches).toEqual([]);
+  expect(busy?.options.slice(0, 2)).toEqual([
+    afternoonOptions[2],
+    afternoonOptions[4],
+  ]);
+  for (const text of ["after 2 pm", "in the afternoon", "before 4 pm"]) {
+    expect(suggestCalendarSlots({ ...input, text })?.kind).toBe("window");
+    expect(findRequestedCalendarSlots({ ...input, text })).toBeNull();
+  }
+  expect(
+    suggestCalendarSlots({ ...input, text: "after 2 pm" })?.matches,
+  ).not.toContainEqual(afternoonOptions[0]);
+  for (const text of [
+    "not 3:30 pm",
+    "3 pm or 4 pm",
+    "3:30 pm IST",
+    "3:30 pm Invalid/Zone",
+    "morning or afternoon",
+  ])
+    expect(suggestCalendarSlots({ ...input, text })).toBeNull();
+});
+
+test("words in an appointment reason do not turn an exact time into a window", () => {
+  expect(
+    suggestCalendarSlots({
+      text: "Book at 3:30 pm for pain after exercise",
+      date,
+      timezone: "UTC",
+      options: afternoonOptions,
+    })?.kind,
+  ).toBe("exact");
 });

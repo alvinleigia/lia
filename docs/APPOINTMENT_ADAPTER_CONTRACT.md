@@ -17,7 +17,7 @@ Google Calendar keeps its existing `google_calendar.*` operations. A webhook or 
 | Operation | Canonical input | Business response |
 | --- | --- | --- |
 | `appointment.lookup` | Configured identity fields | `status`, `appointments` |
-| `appointment.availability` | `date` (`YYYY-MM-DD`) | `status`, `date`, `slots` |
+| `appointment.availability` | `date` (`YYYY-MM-DD`) | `status`, `date`, `slots`; optional complete-day `allSlots`, `availabilityComplete` |
 | `appointment.book` | `start`, configured patient/contact/reason fields | Verified `status`, `appointmentRef`, `start`, `end`, `spoken` |
 | `appointment.reschedule` | `appointmentRef`, `newStart`, configured identity fields | Verified `status`, `appointmentRef`, `start`, `end`, `spoken` |
 | `appointment.cancel` | `appointmentRef`, configured identity fields | Verified `status`, `appointmentRef` |
@@ -31,3 +31,35 @@ Only lookup and availability are read-only. Book/reschedule/cancel remain confir
 ## Current coverage
 
 Google Calendar and a mocked webhook adapter exercise the same Lia matching and selection logic. The webhook regression also covers availability and confirmation before rescheduling. No live Calendly adapter or account has been configured. Calendly integration requires implementing and validating this contract against its API and the target account's identity/booking data; changing the communication channel does not supply that adapter.
+
+
+## Preferred times beyond the first offer
+
+`slots` remains the short display list (maximum 16). To support a complete search
+of the requested business day, an adapter may additionally return
+`availabilityComplete: true` and `allSlots`, containing every available start on
+that day, within the configured opening hours, duration, slot interval, and
+scheduling horizon. Each item has the same `{start, end, spoken}` shape as `slots`.
+The full set is bounded to 300 unique valid starts; do not mark a truncated result
+complete. Google Calendar now supplies this full set from the same daily free/busy
+read used to construct its short list, without an additional provider request.
+
+Lia owns exact-time matching, local-time window filtering, and nearest-slot ranking.
+A request such as "Is 3:30 pm available?" or "after 2 pm" triggers a fresh read in
+an active slot-selection conversation. Lia selects a single verified exact match,
+or offers up to six matching/nearby choices. It retains the task's date, identity,
+reason, and selected existing appointment. An ambiguous clock/timezone requires
+clarification. A provider failure is not reported as an unavailable time.
+
+The scoped ledger retains the complete result. Field validation, reviews, and
+confirmation-time revalidation use it, so a later selected slot is not rejected
+merely because it was outside the initial display list. Writes still require
+confirmation and the provider's final availability/idempotency checks.
+
+Older adapters returning only `slots` remain supported. Lia can verify slots they
+return, but cannot claim that an omitted time is unavailable or search beyond that
+partial set. Such adapters need to implement the complete-day response contract
+before offering full preferred-time search. This is an adapter capability, not a
+per-flow code change. The hosted Google Calendar tool result also exposes the
+bounded complete-day fields for voice consumers; no new Telnyx account or live
+Calendly integration is part of this change.

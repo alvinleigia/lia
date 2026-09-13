@@ -223,3 +223,29 @@ export function appointmentReviewLines(summary: unknown) {
         .map((item) => `- ${item.label}: ${item.value}`)
     : [];
 }
+
+// Optional provider-neutral full-day result. `slots` remains the bounded display
+// list for older consumers; absence of a complete result never proves a time busy.
+export function completeAppointmentSlotOptions(value: unknown) {
+  const parsed = z
+    .object({
+      availabilityComplete: z.literal(true),
+      allSlots: z
+        .array(appointmentMatchSchema.omit({ appointmentRef: true }))
+        .max(300),
+    })
+    .safeParse(value);
+  if (
+    !parsed.success ||
+    parsed.data.allSlots.some(
+      (slot) => Date.parse(slot.end) <= Date.parse(slot.start),
+    ) ||
+    new Set(parsed.data.allSlots.map((slot) => Date.parse(slot.start))).size !==
+      parsed.data.allSlots.length
+  )
+    return null;
+  return parsed.data.allSlots.map((slot) => ({
+    label: slot.spoken,
+    value: slot.start,
+  }));
+}

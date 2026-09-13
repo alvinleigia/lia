@@ -1546,6 +1546,7 @@ async function verifyCalendarRuntime(
   confirmationRefreshCase?: "available" | "busy" | "failed",
   selectionRefreshCase?: "available" | "busy" | "failed" | "fresh",
   resumeCase?: "available" | "busy" | "failed" | "reload" | "changed",
+  preferenceCase?: "available" | "busy" | "failed" | "window" | "conflict",
 ) {
   test.setTimeout(540_000);
   if (!fixture) throw new Error("The operation fixture is not ready.");
@@ -1692,11 +1693,23 @@ async function verifyCalendarRuntime(
           "fixture@example.test": {
             busy:
               mode === "busy"
-                ? resumeCase
-                  ? [{ start: `${date}T10:00:00Z`, end: `${date}T10:30:00Z` }]
-                  : selectionRefreshCase
-                    ? [{ start: `${date}T10:30:00Z`, end: `${date}T11:00:00Z` }]
-                    : [{ start: `${date}T00:00:00Z`, end: `${date}T23:59:59Z` }]
+                ? preferenceCase
+                  ? [{ start: `${date}T15:30:00Z`, end: `${date}T16:00:00Z` }]
+                  : resumeCase
+                    ? [{ start: `${date}T10:00:00Z`, end: `${date}T10:30:00Z` }]
+                    : selectionRefreshCase
+                      ? [
+                          {
+                            start: `${date}T10:30:00Z`,
+                            end: `${date}T11:00:00Z`,
+                          },
+                        ]
+                      : [
+                          {
+                            start: `${date}T00:00:00Z`,
+                            end: `${date}T23:59:59Z`,
+                          },
+                        ]
                 : [],
           },
         },
@@ -1924,12 +1937,22 @@ async function verifyCalendarRuntime(
       ] of statementsOnly
         ? ([
             ["project_chat", "10:00 am", false],
+            ["project_chat", "3:30 pm", false],
             ["telnyx_voice", "10:00 am", false],
-            ["project_chat", "8:00 pm", false],
+            [
+              "project_chat",
+              selectionRefreshCase ? "10:45 am" : "8:00 pm",
+              false,
+            ],
             ["project_chat", "10:00 am", true],
             ["project_chat", "10:00 am", true, true],
           ] as const)
         : []) {
+        if (
+          preferenceCase &&
+          (channelType !== "project_chat" || clock !== "8:00 pm")
+        )
+          continue;
         if (
           resumeCase &&
           (channelType !== "project_chat" || clock !== "10:00 am" || fromPrompt)
@@ -1937,7 +1960,7 @@ async function verifyCalendarRuntime(
           continue;
         if (
           selectionRefreshCase &&
-          (channelType !== "project_chat" || clock !== "8:00 pm")
+          (channelType !== "project_chat" || clock !== "10:45 am")
         )
           continue;
         const text = pastedSummary
@@ -2016,7 +2039,7 @@ async function verifyCalendarRuntime(
             },
           };
         };
-        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${Boolean(pastedSummary)}-${resumeCase ?? selectionRefreshCase ?? "default"}-${suffix}`;
+        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${Boolean(pastedSummary)}-${preferenceCase ?? resumeCase ?? selectionRefreshCase ?? "default"}-${suffix}`;
         const [conversation] = await db
           .insert(channelConversations)
           .values({ channelType, externalConversationId, projectId })
@@ -2102,9 +2125,147 @@ async function verifyCalendarRuntime(
         })) {
           expect(fields[key]).toMatchObject({ canonicalValue, state: "valid" });
         }
-        if (clock === "10:00 am") {
+        if (preferenceCase) {
+          if (!session.runtime) throw new Error("Missing preference runtime");
+          const preferenceScope = {
+            binding,
+            projectId,
+            taskRunId: session.runtime.run.id,
+          };
+          const before = await readTaskCalendarAvailability(preferenceScope);
+          expect(
+            before.options.some(
+              ({ value }) => value === `${date}T15:30:00.000Z`,
+            ),
+          ).toBe(false);
+          expect(
+            before.allOptions.some(
+              ({ value }) => value === `${date}T15:30:00.000Z`,
+            ),
+          ).toBe(true);
+          mode =
+            preferenceCase === "busy" || preferenceCase === "failed"
+              ? preferenceCase
+              : "available";
+          StructuredTurnEngine.prototype.execute = async () => {
+            throw new Error("Time preference queries must not call the model");
+          };
+          const callsBefore = freeBusyCalls;
+          const reply = await runBrowserFlowText({
+            ...browserInput,
+            text:
+              preferenceCase === "window"
+                ? "Show me times after 2 pm"
+                : "Is 3:30 pm available?",
+          });
+          expect(freeBusyCalls).toBeGreaterThan(callsBefore);
+          const after = await getConversationalTaskRuntime(preferenceScope);
+          for (const key of [
+            "guestName",
+            "guestEmail",
+            "contactNumber",
+            "reason",
+            "preferredDate",
+          ])
+            expect(
+              after?.fields.find((field) => field.fieldKey === key)
+                ?.canonicalValue,
+            ).toEqual(fields[key].canonicalValue);
+          expect(insertedEvent).toBeNull();
+          const responseText = reply.replies.map((item) => item.text).join(" ");
+          if (preferenceCase === "available" || preferenceCase === "conflict") {
+            expect(after?.fields).toContainEqual(
+              expect.objectContaining({
+                fieldKey: "appointmentStart",
+                state: "valid",
+                canonicalValue: `${date}T15:30:00.000Z`,
+              }),
+            );
+            expect(responseText).toContain("Please review");
+            // Expiration must not reset a later slot to the initial morning offer.
+            const fresh = await readTaskCalendarAvailability(preferenceScope);
+            if (!fresh.attempt) throw new Error("Missing preference attempt");
+            await db
+              .update(operationAttempts)
+              .set({ finishedAt: new Date(Date.now() - 301000) })
+              .where(eq(operationAttempts.id, fresh.attempt.id));
+            if (preferenceCase === "conflict") mode = "busy";
+            const confirmed = await runBrowserFlowText({
+              ...browserInput,
+              text: "Confirm",
+            });
+            if (preferenceCase === "available") {
+              expect(insertedEvent).toMatchObject({
+                start: { dateTime: `${date}T15:30:00.000Z` },
+              });
+              expect(
+                confirmed.replies.map((item) => item.text).join(" "),
+              ).toContain("completed");
+            } else {
+              expect(insertedEvent).toBeNull();
+              expect(
+                confirmed.replies.map((item) => item.text).join(" "),
+              ).toContain("couldn't confirm availability");
+              expect(confirmed.replies.at(-1)?.payload).toMatchObject({
+                inputRequest: {
+                  options: expect.arrayContaining([
+                    expect.objectContaining({ value: `${date}T15:00:00.000Z` }),
+                  ]),
+                },
+              });
+            }
+          } else if (preferenceCase === "failed") {
+            expect(responseText).toContain("couldn't verify availability");
+            expect(responseText).not.toContain("isn't available");
+            mode = "available";
+            const retry = await runBrowserFlowText({
+              ...browserInput,
+              text: "Is 3:30 pm available?",
+            });
+            expect(retry.replies.map((item) => item.text).join(" ")).toContain(
+              "Please review",
+            );
+          } else {
+            expect(reply.replies.at(-1)?.payload).toMatchObject({
+              inputRequest: {
+                fieldKey: "appointmentStart",
+                options: expect.arrayContaining([
+                  expect.objectContaining({ value: `${date}T15:00:00.000Z` }),
+                ]),
+              },
+            });
+            expect(responseText).toContain(
+              preferenceCase === "busy"
+                ? "nearest available alternatives"
+                : "matching your preference",
+            );
+            expect(
+              after?.fields.find(
+                (field) => field.fieldKey === "appointmentStart",
+              )?.state,
+            ).not.toBe("valid");
+            const selected = await runBrowserFlowText({
+              ...browserInput,
+              text: `${date}T15:00:00.000Z`,
+              selection: {
+                id: "afternoon-slot",
+                label: "3 pm",
+                value: `${date}T15:00:00.000Z`,
+              },
+            });
+            expect(
+              selected.replies.map((item) => item.text).join(" "),
+            ).toContain("Please review");
+            await runBrowserFlowText({ ...browserInput, text: "Confirm" });
+            expect(insertedEvent).toMatchObject({
+              start: { dateTime: `${date}T15:00:00.000Z` },
+            });
+          }
+          continue;
+        }
+        if (clock === "10:00 am" || clock === "3:30 pm") {
           expect(fields.appointmentStart).toMatchObject({
-            canonicalValue: `${date}T10:00:00.000Z`,
+            canonicalValue: `${date}T${clock === "3:30 pm" ? "15:30" : "10:00"}:00.000Z`,
             state: "valid",
           });
           expect(result.replies.map((reply) => reply.text).join(" ")).toContain(
@@ -3298,5 +3459,23 @@ for (const outcome of [
 ] as const) {
   test(`Expired confirmation resumes with retained details: ${outcome}`, async () => {
     await verifyCalendarRuntime(true, undefined, undefined, outcome);
+  });
+}
+
+for (const preferenceCase of [
+  "available",
+  "busy",
+  "failed",
+  "window",
+  "conflict",
+] as const) {
+  test(`Preferred appointment time beyond initial choices: ${preferenceCase}`, async () => {
+    await verifyCalendarRuntime(
+      true,
+      undefined,
+      undefined,
+      undefined,
+      preferenceCase,
+    );
   });
 }

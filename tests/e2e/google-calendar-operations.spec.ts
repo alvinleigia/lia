@@ -246,6 +246,15 @@ test("availability uses freebusy and excludes past, closed, and overlapping slot
     },
     status: "completed",
   });
+  const full = available.responsePayload.allSlots as Array<{ start: string }>;
+  expect(available.responsePayload.availabilityComplete).toBe(true);
+  expect(full.length).toBeGreaterThan(4);
+  expect(full).toContainEqual(
+    expect.objectContaining({ start: "2026-08-24T05:30:00.000Z" }),
+  );
+  expect(full).not.toContainEqual(
+    expect.objectContaining({ start: MONDAY_NINE_THIRTY }),
+  );
   expect(api.freeBusyCalls).toBe(1);
 
   const weekend = await execute(context, "google_calendar.availability", {

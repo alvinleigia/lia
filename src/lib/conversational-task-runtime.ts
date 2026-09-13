@@ -1812,7 +1812,7 @@ export async function applyConversationalTaskEvent(
               starts.every(
                 (candidate) =>
                   candidate.provenance.source === "visitor" &&
-                  availability.options.some(
+                  availability.allOptions.some(
                     ({ value }) => value === candidate.naturalValue,
                   ),
               )

@@ -122,6 +122,14 @@ export function getGoogleCalendarHostedVoiceResult(
     .max(16)
     .safeParse(value.slots);
   if (slots.success) result.slots = slots.data;
+  const allSlots = z
+    .array(appointmentMatchSchema.omit({ appointmentRef: true }))
+    .max(300)
+    .safeParse(value.allSlots);
+  if (value.availabilityComplete === true && allSlots.success) {
+    result.allSlots = allSlots.data;
+    result.availabilityComplete = true;
+  }
 
   const appointments = z
     .array(appointmentMatchSchema)
@@ -203,7 +211,13 @@ async function checkAvailability(
     context.now,
   );
   if (!window.ok)
-    return completed("no_result", { reason: window.reason, slots: [] });
+    return completed("no_result", {
+      date: parsed.data.date,
+      reason: window.reason,
+      slots: [],
+      allSlots: [],
+      availabilityComplete: true,
+    });
 
   const busy = await context.api.freeBusy({
     end: window.end,
@@ -212,13 +226,15 @@ async function checkAvailability(
   const slots = buildAvailableSlots({
     busy,
     config: context.config,
-    limit: parsed.data.limit,
+    limit: 300,
     now: context.now,
     window,
   });
   return completed(slots.length ? "success" : "no_result", {
     date: parsed.data.date,
-    slots,
+    slots: slots.slice(0, parsed.data.limit),
+    allSlots: slots,
+    availabilityComplete: true,
   });
 }
 

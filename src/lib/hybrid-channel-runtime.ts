@@ -42,12 +42,14 @@ import {
   readCanonicalAvailability,
 } from "@/lib/conversational-task-availability";
 import {
+  CALENDAR_TIME_CHOICE_HINT,
   CalendarSlotValidationError,
   executeTaskReadOperation,
   findRequestedCalendarSlots,
   getTaskCalendarAvailability,
   readTaskCalendarAvailability,
   refreshExpiredTaskCalendarAvailability,
+  suggestCalendarSlots,
   verifiedCalendarSlots,
 } from "@/lib/conversational-task-calendar-availability";
 import {
@@ -254,7 +256,7 @@ async function buildTaskConfirmationText(input: {
           projectId: input.projectId,
           taskRunId: input.runtime.run.id,
         })
-      ).options
+      ).allOptions
     : [];
   const lines: string[] = [];
   for (const definition of input.snapshot.task.definition.fields) {
@@ -912,7 +914,21 @@ async function recoverCalendarSlot(input: {
     snapshot,
     taskRunId: runtime.run.id,
   });
-  const fieldKey = availability.options.length
+  const selected = runtime.fields.find(
+    ({ fieldKey }) => fieldKey === binding.startFieldKey,
+  )?.canonicalValue;
+  const selectedInstant =
+    typeof selected === "string" ? Date.parse(selected) : NaN;
+  const options = Number.isFinite(selectedInstant)
+    ? [...availability.allOptions]
+        .sort(
+          (a, b) =>
+            Math.abs(Date.parse(a.value) - selectedInstant) -
+            Math.abs(Date.parse(b.value) - selectedInstant),
+        )
+        .slice(0, 6)
+    : availability.options;
+  const fieldKey = options.length
     ? binding.startFieldKey
     : binding.dateFieldKey;
   const field = snapshot.task.definition.fields.find(
@@ -948,15 +964,15 @@ async function recoverCalendarSlot(input: {
   });
   const inputRequest: RuntimeInputRequest = {
     fieldKey,
-    inputKind: availability.options.length ? "choice" : "date",
+    inputKind: options.length ? "choice" : "date",
     label: field.label,
     required: field.required,
-    options: availability.options.length ? availability.options : [],
+    options: options.length ? options : [],
   };
   const outcome = availability.attempt
     ? getTaskOperationOutcome(availability.attempt)
     : null;
-  const message = !availability.options.length
+  const message = !options.length
     ? outcome === "no_result"
       ? `There are no available appointment times for that date. Please choose another date. Lia attempt #${availability.attempt?.id}.`
       : `I could not verify available appointment times. Please try another date or ask the team for help.${availability.attempt ? ` Lia attempt #${availability.attempt.id}.` : ""}`
@@ -968,6 +984,7 @@ async function recoverCalendarSlot(input: {
       reply: [
         message,
         ...inputRequest.options.map(({ label }) => `- ${label}`),
+        CALENDAR_TIME_CHOICE_HINT,
       ].join("\n"),
     }),
     signals: [],
@@ -1202,38 +1219,55 @@ async function executeTaskBoundary(input: {
     signals: [],
   });
   const calendar = await getTaskCalendarAvailability(snapshot);
+  const savedAvailability = calendar
+    ? await readTaskCalendarAvailability({
+        binding: calendar,
+        projectId: input.runtimeInput.projectId,
+        taskRunId: runtime.run.id,
+      })
+    : null;
+  const savedOptions = savedAvailability
+    ? verifiedCalendarSlots({
+        attempt: savedAvailability.attempt,
+        date: savedAvailability.date,
+        now: savedAvailability.attempt?.finishedAt ?? undefined,
+        includeAll: true,
+      })
+    : [];
+  const savedMatches = savedOptions.filter(
+    ({ value, label }) =>
+      value === requestedAnswer ||
+      label.toLowerCase() === requestedAnswer.trim().toLowerCase(),
+  );
+  const savedOption = savedMatches.length === 1 ? savedMatches[0] : null;
+  // A date correction belongs to normal field extraction, not to the previous day.
+  const dateCorrection =
+    !savedOption &&
+    /\b(?:today|tomorrow|next|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d|\b\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b|\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}\/\d{1,2}\b/i.test(
+      requestedAnswer,
+    );
+  const preference =
+    savedAvailability && !dateCorrection
+      ? suggestCalendarSlots({
+          text: requestedAnswer,
+          date: String(savedAvailability.date),
+          timezone:
+            calendar?.timezone ?? input.project.companyTimeZone ?? "UTC",
+          options: [],
+        })
+      : null;
   const calendarAnswer =
     calendar &&
     requestedField?.key === calendar.startFieldKey &&
+    !dateCorrection &&
     !isExplicitCancellationRequest(requestedAnswer) &&
     !isExplicitHumanHandoffRequest(requestedAnswer) &&
-    !isPotentialKnowledgeSideQuestion(requestedAnswer);
+    (!isPotentialKnowledgeSideQuestion(requestedAnswer) || Boolean(preference));
   let selectionValue: string | null = null;
-  if (calendarAnswer && !appointmentSelected) {
-    const availability = await readTaskCalendarAvailability({
-      binding: calendar,
-      projectId: input.runtimeInput.projectId,
-      taskRunId: runtime.run.id,
-    });
-    // Resolve the click against the saved offer even after its freshness window.
-    // Refresh before field validation, which accepts only a currently verified slot.
-    const offeredOptions = verifiedCalendarSlots({
-      attempt: availability.attempt,
-      date: availability.date,
-      now: availability.attempt?.finishedAt ?? undefined,
-    });
-    const option = offeredOptions.find(
-      ({ value, label }) =>
-        value === requestedAnswer ||
-        label.toLowerCase() === requestedAnswer.trim().toLowerCase(),
-    );
-    if (!option) {
-      if (!offeredOptions.length)
-        throw new CalendarSlotValidationError(
-          "Available times could not be verified. Please choose another date.",
-        );
-      return rejectMismatchedSelection();
-    }
+  if (calendarAnswer && !appointmentSelected && requestedField) {
+    if (!savedOption && !preference) return rejectMismatchedSelection();
+    // Every requested preference gets a fresh provider check, even when the first
+    // short offer was recent. A truncated offer cannot rule out a later time.
     await executeTaskReadOperation({
       definition: calendar.definition,
       projectId: input.runtimeInput.projectId,
@@ -1246,14 +1280,65 @@ async function executeTaskBoundary(input: {
       projectId: input.runtimeInput.projectId,
       taskRunId: runtime.run.id,
     });
-    if (!refreshed.options.some(({ value }) => value === option.value))
-      throw new CalendarSlotValidationError(
-        "The selected time is no longer available or could not be verified.",
-      );
+    if (savedOption) {
+      if (
+        !refreshed.allOptions.some(({ value }) => value === savedOption.value)
+      )
+        throw new CalendarSlotValidationError(
+          "The selected time is no longer available or could not be verified.",
+        );
+      selectionValue = savedOption.value;
+    } else {
+      const suggestions = suggestCalendarSlots({
+        text: requestedAnswer,
+        date: String(refreshed.date),
+        timezone: calendar.timezone ?? input.project.companyTimeZone ?? "UTC",
+        options: refreshed.allOptions,
+      });
+      if (!suggestions) return rejectMismatchedSelection();
+      const outcome = refreshed.attempt
+        ? getTaskOperationOutcome(refreshed.attempt)
+        : null;
+      if (suggestions.kind === "exact" && suggestions.matches.length === 1) {
+        selectionValue = suggestions.matches[0].value;
+      } else {
+        const options =
+          suggestions.kind === "exact" && suggestions.matches.length > 1
+            ? suggestions.matches
+            : suggestions.options;
+        const verified =
+          refreshed.complete &&
+          ["success", "no_result"].includes(outcome ?? "");
+        const message = suggestions.matches.length
+          ? "Here are available times matching your preference."
+          : verified
+            ? options.length
+              ? "Your preferred time isn't available. Here are the nearest available alternatives."
+              : "There are no available times matching your preference on this date. You can request another date."
+            : "I couldn't verify availability for your preferred time. You can try again or ask the team for help.";
+        return {
+          inputRequest: {
+            fieldKey: calendar.startFieldKey,
+            inputKind: "choice",
+            label: requestedField.label,
+            required: requestedField.required,
+            options,
+          },
+          output: operationTurn({
+            nextAction: "ask",
+            reply: [
+              message,
+              ...options.map(({ label }) => `- ${label}`),
+              CALENDAR_TIME_CHOICE_HINT,
+            ].join("\n"),
+          }),
+          signals: [],
+        };
+      }
+    }
     session = await getConversationTaskRuntimeSession(input.runtimeInput);
     if (!session.runtime || !session.snapshot || !session.execution)
       throw new Error("The appointment task is unavailable.");
-    selectionValue = option.value;
   }
   if (
     !appointmentSelected &&
@@ -1605,6 +1690,7 @@ async function executeTaskBoundary(input: {
         })
       : proposal;
   let requestedTimeNotOffered = false;
+  let preferredOptions: Array<{ label: string; value: string }> | null = null;
   if (
     calendar &&
     canonicalSession.runtime &&
@@ -1649,10 +1735,33 @@ async function executeTaskBoundary(input: {
               date: String(date),
               timezone:
                 calendar.timezone ?? input.project.companyTimeZone ?? "UTC",
-              options: availability.options,
+              options: availability.allOptions,
             })
           : null;
-      requestedTimeNotOffered = suppliedMatches?.length === 0;
+      const suppliedWindow =
+        !calendarAnswer && hasRequestedCalendarTime
+          ? suggestCalendarSlots({
+              text: input.runtimeInput.text,
+              date: String(date),
+              timezone:
+                calendar.timezone ?? input.project.companyTimeZone ?? "UTC",
+              options: availability.allOptions,
+            })
+          : null;
+      if (suppliedWindow?.kind === "window")
+        preferredOptions = suppliedWindow.options;
+      requestedTimeNotOffered =
+        suppliedMatches?.length === 0 ||
+        (suppliedWindow?.kind === "window" && !suppliedWindow.matches.length);
+      if (requestedTimeNotOffered)
+        preferredOptions =
+          suggestCalendarSlots({
+            text: input.runtimeInput.text,
+            date: String(date),
+            timezone:
+              calendar.timezone ?? input.project.companyTimeZone ?? "UTC",
+            options: availability.allOptions,
+          })?.options ?? null;
       const suppliedSlot =
         suppliedMatches?.length === 1 ? suppliedMatches[0] : null;
       if (suppliedSlot) {
@@ -1704,7 +1813,7 @@ async function executeTaskBoundary(input: {
       if (
         !availability.options.length ||
         (selected &&
-          !availability.options.some(({ value }) => value === selected))
+          !availability.allOptions.some(({ value }) => value === selected))
       ) {
         throw new CalendarSlotValidationError(
           availability.options.length
@@ -1820,6 +1929,8 @@ async function executeTaskBoundary(input: {
             snapshot: canonicalSession.snapshot,
           })
         : null;
+    if (inputRequest && preferredOptions?.length)
+      inputRequest.options = preferredOptions;
     if (
       canonicalSession.execution &&
       canonicalSession.runtime &&
@@ -1841,7 +1952,7 @@ async function executeTaskBoundary(input: {
         inputRequest.fieldKey === calendar.startFieldKey
           ? {
               ...reconciledProposal,
-              reply: `${requestedTimeNotOffered ? "I couldn't find availability for your requested time. Please choose one of these alternative appointment times." : reconciledProposal.reply}\n${inputRequest.options.map(({ label }) => `- ${label}`).join("\n")}`,
+              reply: `${requestedTimeNotOffered ? "I couldn't find availability for your requested time. Please choose one of these alternative appointment times." : reconciledProposal.reply}\n${inputRequest.options.map(({ label }) => `- ${label}`).join("\n")}\n${CALENDAR_TIME_CHOICE_HINT}`,
             }
           : reconciledProposal,
       signals: [],
