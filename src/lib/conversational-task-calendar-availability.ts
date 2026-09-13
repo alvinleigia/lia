@@ -421,7 +421,9 @@ export async function assertTaskCalendarSlot(input: {
   const selected = runtime?.fields.find(
     ({ fieldKey }) => fieldKey === binding.startFieldKey,
   )?.canonicalValue;
-  let availability = await readTaskCalendarAvailability({ ...input, binding });
+  let availability = input.refresh
+    ? await readTaskCalendarAvailability({ ...input, binding })
+    : await refreshExpiredTaskCalendarAvailability({ ...input, binding });
   // An expired offer can only proceed when a fresh lookup below verifies it again.
   const offeredOptions = input.refresh
     ? verifiedCalendarSlots({

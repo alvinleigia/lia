@@ -1541,7 +1541,10 @@ test("operation sandbox resolves prefixed and bare field mappings without losing
   });
 });
 
-async function verifyCalendarRuntime(statementsOnly: boolean) {
+async function verifyCalendarRuntime(
+  statementsOnly: boolean,
+  confirmationRefreshCase?: "available" | "busy" | "failed",
+) {
   test.setTimeout(540_000);
   if (!fixture) throw new Error("The operation fixture is not ready.");
   const projectId = fixture.projectId;
@@ -1720,6 +1723,70 @@ async function verifyCalendarRuntime(statementsOnly: boolean) {
     expect(first.attempt.traceId).toBeTruthy();
     const available = await readTaskCalendarAvailability(scope);
     expect(available.options.length).toBeGreaterThan(0);
+    if (confirmationRefreshCase) {
+      const selected = available.options[0].value;
+      await setField("appointmentStart", selected);
+      const review = await prepare();
+      const offered = await readTaskCalendarAvailability(scope);
+      if (!offered.attempt) throw new Error("Confirmation offer missing");
+      await db
+        .update(operationAttempts)
+        .set({ finishedAt: new Date(Date.now() - 301_000) })
+        .where(eq(operationAttempts.id, offered.attempt.id));
+      mode = confirmationRefreshCase;
+      const callsBefore = freeBusyCalls;
+      const confirm = () =>
+        confirmTaskOperation({
+          confirmationId: review.id,
+          principal,
+          projectId,
+          taskRunId: run.taskRunId,
+        });
+      if (confirmationRefreshCase === "available") {
+        expect((await confirm()).status).toBe("confirmed");
+        expect(
+          (await getConversationalTaskRuntime(scope))?.fields,
+        ).toContainEqual(
+          expect.objectContaining({
+            fieldKey: "appointmentStart",
+            canonicalValue: selected,
+            state: "confirmed",
+          }),
+        );
+        await executeConfirmedTaskOperation({
+          confirmationId: review.id,
+          principal,
+          projectId,
+          taskRunId: run.taskRunId,
+        });
+        const result = await processAndReconcileTaskOperation({
+          confirmationId: review.id,
+          principal,
+          projectId,
+          workerId: "expired-offer-confirmation",
+        });
+        expect(result.businessOutcome).toBe("success");
+        const writes = await db
+          .select()
+          .from(operationAttempts)
+          .where(
+            and(
+              eq(operationAttempts.projectId, projectId),
+              eq(operationAttempts.taskRunId, run.taskRunId),
+              eq(operationAttempts.operationId, booking.id),
+            ),
+          );
+        expect(writes).toHaveLength(1);
+      } else {
+        await expect(confirm()).rejects.toThrow("provider-verified");
+        expect(insertedEvent).toBeNull();
+        expect(
+          (await getConversationalTaskRuntime(scope))?.confirmations[0]?.status,
+        ).toBe("pending");
+      }
+      expect(freeBusyCalls).toBeGreaterThan(callsBefore);
+      return;
+    }
     // A router with no field-transfer whitelist must let the selected task
     // extract the opening message, then bind only a provider-verified time.
     const entryDefinition: ConversationalTaskDefinitionV1 = {
@@ -2858,3 +2925,9 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
 test("Detailed appointment statements route into verified slots and recover confirmation", async () => {
   await verifyCalendarRuntime(true);
 });
+
+for (const outcome of ["available", "busy", "failed"] as const) {
+  test(`Expired availability at confirmation: ${outcome}`, async () => {
+    await verifyCalendarRuntime(false, outcome);
+  });
+}

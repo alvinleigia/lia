@@ -563,7 +563,7 @@ export async function confirmTaskOperation(input: {
       .where(eq(conversationalTaskConfirmations.id, confirmation.id));
     throw new Error("The confirmation expired. Prepare it again.");
   }
-  const context = await loadTaskOperationContext({
+  let context = await loadTaskOperationContext({
     projectId: input.projectId,
     taskRunId: input.taskRunId,
     toolId: confirmation.toolId,
@@ -574,6 +574,12 @@ export async function confirmTaskOperation(input: {
     snapshot: context.snapshot,
     taskRunId: input.taskRunId,
     refresh: false,
+  });
+  // An expired availability offer may have refreshed mapped task fields.
+  context = await loadTaskOperationContext({
+    projectId: input.projectId,
+    taskRunId: input.taskRunId,
+    toolId: confirmation.toolId,
   });
   const state = await buildConfirmationState(context);
   if (state.canonicalHash !== confirmation.canonicalHash) {

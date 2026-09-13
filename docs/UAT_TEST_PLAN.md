@@ -1957,3 +1957,36 @@ Deployment acceptance still requires a fresh Project Chat session: send the
 original complete booking request; Lia should select the booking task, check
 availability, and show a verified review or available alternatives without
 asking the user to choose booking/cancellation/rescheduling again.
+
+
+### Availability expiry during confirmation - 2026-09-13
+
+Deployed UAT returned to slot selection after Confirm, with the originally
+selected 10:00 slot still listed. The visitor could not recall the delay before
+confirming, so expiry is a reproduced cause, not a verified live timestamp.
+
+Availability offers last five minutes, while confirmation reviews last fifteen.
+Previously, confirmation checked only the unexpired offer. On expiry it rejected
+the selection; recovery refreshed availability and cleared that same selection,
+even if the refreshed provider result still contained it.
+
+Confirmation now uses the existing expired-offer refresh helper before deciding
+whether the selected slot is invalid. A freshly verified identical slot can
+proceed with the existing confirmation. A busy slot or failed lookup still blocks
+the write. Confirmation reloads mapped task state before comparing its canonical
+hash, so changed details cannot silently reuse the prior review.
+
+The isolated expired-offer regression failed before the fix at
+`assertTaskCalendarSlot`. After the fix, all three provider outcomes passed:
+available (same selected start retained and exactly one booking attempt), busy
+(no write), and failed lookup (no write). Provider HTTP is mocked and tests use
+scoped synthetic task runs. All 321 offline contract tests, focused Biome checks,
+and the production build including TypeScript passed. No model call is added.
+
+```powershell
+npx playwright test --config=playwright.runtime.config.ts conversational-task-operation-runtime-db --grep 'Expired availability at confirmation|requires explicit confirmation and invalidates'
+```
+
+Deployed acceptance: a review with a still-valid confirmation should survive an
+availability-cache expiry when its selected slot remains free. If the provider
+reports the slot unavailable, offer alternatives without claiming a booking.
