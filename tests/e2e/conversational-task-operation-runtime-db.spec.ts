@@ -1545,6 +1545,7 @@ async function verifyCalendarRuntime(
   statementsOnly: boolean,
   confirmationRefreshCase?: "available" | "busy" | "failed",
   selectionRefreshCase?: "available" | "busy" | "failed" | "fresh",
+  resumeCase?: "available" | "busy" | "failed" | "reload",
 ) {
   test.setTimeout(540_000);
   if (!fixture) throw new Error("The operation fixture is not ready.");
@@ -1685,9 +1686,11 @@ async function verifyCalendarRuntime(
           "fixture@example.test": {
             busy:
               mode === "busy"
-                ? selectionRefreshCase
-                  ? [{ start: `${date}T10:30:00Z`, end: `${date}T11:00:00Z` }]
-                  : [{ start: `${date}T00:00:00Z`, end: `${date}T23:59:59Z` }]
+                ? resumeCase
+                  ? [{ start: `${date}T10:00:00Z`, end: `${date}T10:30:00Z` }]
+                  : selectionRefreshCase
+                    ? [{ start: `${date}T10:30:00Z`, end: `${date}T11:00:00Z` }]
+                    : [{ start: `${date}T00:00:00Z`, end: `${date}T23:59:59Z` }]
                 : [],
           },
         },
@@ -1922,6 +1925,11 @@ async function verifyCalendarRuntime(
           ] as const)
         : []) {
         if (
+          resumeCase &&
+          (channelType !== "project_chat" || clock !== "10:00 am" || fromPrompt)
+        )
+          continue;
+        if (
           selectionRefreshCase &&
           (channelType !== "project_chat" || clock !== "8:00 pm")
         )
@@ -2002,7 +2010,7 @@ async function verifyCalendarRuntime(
             },
           };
         };
-        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${Boolean(pastedSummary)}-${selectionRefreshCase ?? "default"}-${suffix}`;
+        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${Boolean(pastedSummary)}-${resumeCase ?? selectionRefreshCase ?? "default"}-${suffix}`;
         const [conversation] = await db
           .insert(channelConversations)
           .values({ channelType, externalConversationId, projectId })
@@ -2103,6 +2111,122 @@ async function verifyCalendarRuntime(
           });
         }
         expect(insertedEvent).toBeNull();
+        if (resumeCase) {
+          if (!session.runtime) throw new Error("Resume task missing");
+          const resumeScope = { projectId, taskRunId: session.runtime.run.id };
+          const oldReview = session.runtime.confirmations.find(
+            ({ status }) => status === "pending",
+          );
+          if (!oldReview) throw new Error("Resume review missing");
+          await db
+            .update(conversationalTaskConfirmations)
+            .set({ expiresAt: new Date(Date.now() - 1_000) })
+            .where(eq(conversationalTaskConfirmations.id, oldReview.id));
+          const offer = await readTaskCalendarAvailability({
+            ...resumeScope,
+            binding,
+          });
+          if (!offer.attempt) throw new Error("Resume offer missing");
+          await db
+            .update(operationAttempts)
+            .set({ finishedAt: new Date(Date.now() - 16 * 60_000) })
+            .where(eq(operationAttempts.id, offer.attempt.id));
+          mode = resumeCase === "reload" ? "available" : resumeCase;
+          const callsBefore = freeBusyCalls;
+          StructuredTurnEngine.prototype.execute = async () => {
+            throw new Error("Resuming confirmation must not require a model");
+          };
+          const replies =
+            resumeCase === "reload"
+              ? await buildHybridChannelResumeReplies({
+                  channelType,
+                  externalConversationId,
+                  projectId,
+                })
+              : (await runBrowserFlowText({ ...browserInput, text: "Confirm" }))
+                  .replies;
+          expect(freeBusyCalls).toBeGreaterThan(callsBefore);
+          expect(insertedEvent).toBeNull();
+          const resumed = await getConversationalTaskRuntime(resumeScope);
+          for (const fieldKey of [
+            "guestName",
+            "guestEmail",
+            "contactNumber",
+            "reason",
+            "preferredDate",
+          ]) {
+            expect(
+              resumed?.fields.find((field) => field.fieldKey === fieldKey)
+                ?.canonicalValue,
+            ).toEqual(fields[fieldKey].canonicalValue);
+          }
+          if (resumeCase === "available" || resumeCase === "reload") {
+            expect(replies.at(-1)?.payload).toMatchObject({
+              inputRequest: { fieldKey: "lia_confirmation" },
+            });
+            expect(replies.map(({ text }) => text).join(" ")).toContain(
+              "persistent knee pain",
+            );
+            const fresh = resumed?.confirmations.find(
+              ({ status }) => status === "pending",
+            );
+            expect(fresh?.id).not.toBe(oldReview.id);
+            expect(fresh?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+            expect(resumed?.fields).toContainEqual(
+              expect.objectContaining({
+                fieldKey: "appointmentStart",
+                canonicalValue: `${date}T10:00:00.000Z`,
+                state: "valid",
+              }),
+            );
+            const completed = await runBrowserFlowText({
+              ...browserInput,
+              text: "Confirm",
+            });
+            expect(
+              completed.replies.map(({ text }) => text).join(" "),
+            ).toContain("submitted successfully");
+            expect(insertedEvent).toMatchObject({
+              start: { dateTime: `${date}T10:00:00.000Z` },
+            });
+            const writes = await db
+              .select()
+              .from(operationAttempts)
+              .where(
+                and(
+                  eq(operationAttempts.projectId, projectId),
+                  eq(operationAttempts.taskRunId, session.runtime.run.id),
+                  eq(operationAttempts.operationId, booking.id),
+                ),
+              );
+            expect(writes).toHaveLength(1);
+          } else {
+            expect(replies.at(-1)?.payload).toMatchObject({
+              inputRequest: {
+                fieldKey:
+                  resumeCase === "busy" ? "appointmentStart" : "preferredDate",
+              },
+            });
+            expect(
+              resumed?.fields.find(
+                ({ fieldKey }) => fieldKey === "appointmentStart",
+              )?.state,
+            ).not.toBe("valid");
+            if (resumeCase === "busy") {
+              const alternatives = await readTaskCalendarAvailability({
+                ...resumeScope,
+                binding,
+              });
+              expect(alternatives.options.length).toBeGreaterThan(0);
+              expect(
+                alternatives.options.some(
+                  ({ value }) => value === `${date}T10:00:00.000Z`,
+                ),
+              ).toBe(false);
+            }
+          }
+          continue;
+        }
         if (selectionRefreshCase) {
           const selectionScope = {
             binding,
@@ -3087,5 +3211,11 @@ for (const outcome of ["available", "busy", "failed"] as const) {
 for (const outcome of ["available", "busy", "failed", "fresh"] as const) {
   test(`Offered time selection revalidates and retains context: ${outcome}`, async () => {
     await verifyCalendarRuntime(true, undefined, outcome);
+  });
+}
+
+for (const outcome of ["available", "busy", "failed", "reload"] as const) {
+  test(`Expired confirmation resumes with retained details: ${outcome}`, async () => {
+    await verifyCalendarRuntime(true, undefined, undefined, outcome);
   });
 }

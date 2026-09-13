@@ -60,6 +60,7 @@ import {
   listTaskOperationConfirmations,
   prepareTaskOperationConfirmation,
   processAndReconcileTaskOperation,
+  TaskConfirmationExpiredError,
   type TaskOperationPrincipal,
 } from "@/lib/conversational-task-operations";
 import {
@@ -783,12 +784,27 @@ async function executeTaskConfirmation(input: {
 
   const principal = channelTaskPrincipal(input.runtimeInput);
   if (active.status === "pending") {
-    await confirmTaskOperation({
-      confirmationId: active.id,
-      principal,
-      projectId: input.runtimeInput.projectId,
-      taskRunId: input.session.runtime.run.id,
-    });
+    try {
+      await confirmTaskOperation({
+        confirmationId: active.id,
+        principal,
+        projectId: input.runtimeInput.projectId,
+        taskRunId: input.session.runtime.run.id,
+      });
+    } catch (error) {
+      if (!(error instanceof TaskConfirmationExpiredError)) throw error;
+      const prepared = await prepareRequiredTaskConfirmation({
+        projectId: input.runtimeInput.projectId,
+        runtime: input.session.runtime,
+        snapshot: input.session.snapshot,
+      });
+      if (!prepared) throw error;
+      // A delayed confirmation refreshes the review, never authorizes the new one.
+      return {
+        output: operationTurn({ nextAction: "confirm", reply: prepared.text }),
+        signals: [],
+      };
+    }
   }
   await executeConfirmedTaskOperation({
     confirmationId: active.id,

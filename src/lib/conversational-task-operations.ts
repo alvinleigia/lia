@@ -41,6 +41,8 @@ import {
   getTaskOperationReason,
 } from "@/lib/task-operation-outcome";
 
+export class TaskConfirmationExpiredError extends Error {}
+
 const CONFIRMATION_TTL_MINUTES = 15;
 const ACTIVE_CONFIRMATION_STATUSES = [
   "pending",
@@ -561,7 +563,9 @@ export async function confirmTaskOperation(input: {
       .update(conversationalTaskConfirmations)
       .set({ invalidatedAt: now, status: "expired", updatedAt: now })
       .where(eq(conversationalTaskConfirmations.id, confirmation.id));
-    throw new Error("The confirmation expired. Prepare it again.");
+    throw new TaskConfirmationExpiredError(
+      "The confirmation expired. Prepare it again.",
+    );
   }
   let context = await loadTaskOperationContext({
     projectId: input.projectId,

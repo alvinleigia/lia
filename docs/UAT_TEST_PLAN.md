@@ -2028,3 +2028,42 @@ reason, and present the review. Confirm once and verify the calendar event.
 Existing UAT bookings must be considered when choosing the requested date/time.
 This uses shared task/calendar bindings rather than patient-specific extraction;
 other providers and flow configurations still require their own acceptance checks.
+
+
+### Resuming after confirmation expiry - 2026-09-13
+
+The next pause/resume regression starts from a complete booking statement and
+ages its saved availability result by sixteen minutes while expiring the pending
+confirmation. Before the fix, sending Confirm raised "The confirmation expired.
+Prepare it again." instead of returning a fresh review. Collected fields were
+still stored; the missing behavior was recovery of the expired confirmation.
+
+The operation layer now reports that condition with a specific error type. The
+shared channel runtime handles it by using the existing confirmation preparation
+path, which refreshes volatile facts and validates the selected slot. The delayed
+Confirm does not authorize the replacement review. The visitor must confirm the
+new review before a write occurs. Other errors retain their existing handling.
+The five-minute availability and fifteen-minute confirmation limits are unchanged.
+
+Regression scenarios cover an unchanged available slot, a newly occupied slot
+with alternatives remaining, a failed availability lookup, and the server resume
+reply path used on reopening the conversation. Each checks retained name, email,
+phone, reason, and preferred date, a new availability request, and no immediate
+booking. Available/reopen cases then confirm the new review and assert exactly
+one booking at the retained time. Extraction and calendar HTTP are mocked; the
+resume-reply test does not drive an actual browser reload or external calendar.
+
+```powershell
+npx playwright test --config=playwright.runtime.config.ts conversational-task-operation-runtime-db --grep 'Expired confirmation resumes with retained details|requires explicit confirmation and invalidates'
+```
+
+Deployed UAT: start a fresh chat with a complete booking statement for a free
+slot. Leave the review open for over fifteen minutes, then Confirm. Lia should
+show a fresh review with the same details and no booking yet. Confirm that review
+and verify one event. Separately repeat after reopening the same conversation;
+a new conversation is not a resume of the old task.
+
+Verification: all four resume scenarios passed (2.9 minutes), as did the existing
+explicit-confirmation/correction regression. All 321 offline contracts, focused
+Biome checks, and the production build including TypeScript passed. No live
+calendar appointment or external model call was made by these tests.
