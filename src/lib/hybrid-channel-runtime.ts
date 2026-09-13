@@ -289,7 +289,17 @@ async function buildTaskConfirmationText(input: {
     lines.push(`- ${definition.label}: ${displayValue}`);
   }
 
+  const availableSlot = calendarOptions.find(
+    (option) => option.value === fieldValues.get(calendar?.startFieldKey ?? ""),
+  );
+  const timezone = calendar?.timezone;
   return [
+    ...(availableSlot
+      ? [
+          `Yes, ${availableSlot.label}${timezone && !availableSlot.label.includes(timezone) ? ` (${timezone})` : ""} is currently available.`,
+          "",
+        ]
+      : []),
     "Please review these details:",
     ...lines,
     ...appointmentReviewLines(input.confirmationSummary),

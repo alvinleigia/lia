@@ -2225,8 +2225,10 @@ browser tests passed with their hydration readiness guard.
 1. Begin booking/rescheduling and choose a date with morning and afternoon slots.
    Verify the short offer says that a different preferred time can be typed.
 2. Without selecting an offered morning button, send `Is 3:30 pm available?`.
-   If available, the same task should show its review (or ask for any remaining
+   If available, the same task should acknowledge the verified date, time, and
+   timezone before showing its review and confirmation (or ask for any remaining
    required information). No identity/date/reason re-entry should be required.
+   Busy or failed checks must not produce a positive availability acknowledgement.
 3. Mark 3:30 pm busy and repeat in a fresh test conversation. Verify that Lia says
    the preferred time is unavailable and lists the nearest actual alternatives,
    such as 3 pm and 4 pm when available. Select one, confirm, and verify the event.
@@ -2253,3 +2255,8 @@ the production build passed. Standalone TypeScript checking still reports only t
 two previously recorded nullable `session.runtime` assertions in the existing
 operation-runtime test fixture; production compilation passed. These checks used
 mocked provider responses, not live Google Calendar customer events.
+
+Availability acknowledgement follow-up: the three persisted preferred-time tests
+(available, busy, failed) passed, including acknowledgement-before-review ordering
+and no positive claim for unavailable/unverified results. Biome and the production
+build passed. Provider responses were mocked.

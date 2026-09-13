@@ -2181,7 +2181,15 @@ async function verifyCalendarRuntime(
                 canonicalValue: `${date}T15:30:00.000Z`,
               }),
             );
-            expect(responseText).toContain("Please review");
+            expect(responseText).toMatch(
+              /^Yes, .*3:30 pm \(UTC\) is currently available\./,
+            );
+            expect(
+              responseText.indexOf("is currently available."),
+            ).toBeLessThan(responseText.indexOf("Please review"));
+            expect(responseText.indexOf("Please review")).toBeLessThan(
+              responseText.indexOf("Confirm to submit"),
+            );
             // Expiration must not reset a later slot to the initial morning offer.
             const fresh = await readTaskCalendarAvailability(preferenceScope);
             if (!fresh.attempt) throw new Error("Missing preference attempt");
@@ -2217,6 +2225,7 @@ async function verifyCalendarRuntime(
           } else if (preferenceCase === "failed") {
             expect(responseText).toContain("couldn't verify availability");
             expect(responseText).not.toContain("isn't available");
+            expect(responseText).not.toContain("is currently available.");
             mode = "available";
             const retry = await runBrowserFlowText({
               ...browserInput,
@@ -2226,6 +2235,7 @@ async function verifyCalendarRuntime(
               "Please review",
             );
           } else {
+            expect(responseText).not.toContain("is currently available.");
             expect(reply.replies.at(-1)?.payload).toMatchObject({
               inputRequest: {
                 fieldKey: "appointmentStart",
