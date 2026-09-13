@@ -1541,8 +1541,8 @@ test("operation sandbox resolves prefixed and bare field mappings without losing
   });
 });
 
-test("Calendar slots use the task ledger and block arbitrary, empty, failed and stale selections", async () => {
-  test.setTimeout(360_000);
+async function verifyCalendarRuntime(statementsOnly: boolean) {
+  test.setTimeout(540_000);
   if (!fixture) throw new Error("The operation fixture is not ready.");
   const projectId = fixture.projectId;
   const privateKey = generateKeyPairSync("rsa", { modulusLength: 2048 })
@@ -1792,9 +1792,10 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
         ...stepBase,
         id: 2,
         sortOrder: 2,
-        label: "Booking",
+        label: "Check Availability and Book",
         stepType: "conversational_task",
         settings: {
+          nodeLabel: "Check Availability and Book",
           conversationalTask: {
             schemaVersion: 1,
             outcomeRoutes: { cancelled: "end", completed: "end" },
@@ -1836,16 +1837,23 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
     if (!action) throw new Error("Opening action missing");
     const originalExecute = StructuredTurnEngine.prototype.execute;
     try {
-      for (const [channelType, clock, fromPrompt, pastedSummary] of [
-        ["project_chat", "10:00 am", false],
-        ["telnyx_voice", "10:00 am", false],
-        ["project_chat", "8:00 pm", false],
-        ["project_chat", "10:00 am", true],
-        ["project_chat", "10:00 am", true, true],
-      ] as const) {
+      for (const [
+        channelType,
+        clock,
+        fromPrompt,
+        pastedSummary,
+      ] of statementsOnly
+        ? ([
+            ["project_chat", "10:00 am", false],
+            ["telnyx_voice", "10:00 am", false],
+            ["project_chat", "8:00 pm", false],
+            ["project_chat", "10:00 am", true],
+            ["project_chat", "10:00 am", true, true],
+          ] as const)
+        : []) {
         const text = pastedSummary
           ? `I have noted your preferred appointment on ${date} at ${clock} UTC, patient name Alex Test, email alex@example.com, contact +61491570006, and reason persistent knee pain. How would you like to proceed with confirmation?`
-          : `Book on ${date} at ${clock} UTC. My name is Alex Test, email alex@example.com, phone +61491570006, reason persistent knee pain.`;
+          : `I want to book an appointment on ${date} at ${clock} UTC. My name is Alex Test, email alex@example.com, phone +61491570006, reason persistent knee pain.`;
         const stages: string[] = [];
         StructuredTurnEngine.prototype.execute = async (input) => {
           const starting =
@@ -1853,8 +1861,27 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
           if (!starting) expect(input.visitorMessage).toBe(text);
           stages.push(input.stage);
           const routing = input.stage === "knowledge";
-          if (!routing)
-            expect(input.activeTask?.task.id).toBe(entryTask.task.id);
+          if (routing) {
+            const routed = await originalExecute.call(
+              new StructuredTurnEngine({
+                provider: {
+                  async generateTurn() {
+                    throw new Error(
+                      "Clear booking intent must not call the routing model",
+                    );
+                  },
+                },
+              }),
+              input,
+            );
+            expect(routed.source).toBe("deterministic");
+            expect(routed.attempts).toBe(0);
+            expect(routed.proposal.taskRecommendation?.taskId).toBe(
+              entryTask.task.id,
+            );
+            return routed;
+          }
+          expect(input.activeTask?.task.id).toBe(entryTask.task.id);
           return {
             attempts: 1,
             modelEscalationReason: null,
@@ -1862,37 +1889,27 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
             usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
             proposal: {
               schemaVersion: 1,
-              turnKind: routing
-                ? "task_recommendation"
-                : fromPrompt && !starting
-                  ? "ordinary_question"
-                  : "field_answer",
+              turnKind:
+                fromPrompt && !starting ? "ordinary_question" : "field_answer",
               reply:
                 "I have noted your details. How would you like to proceed with confirmation?",
               grounding: { status: "not_needed", excerptIds: [] },
-              fieldCandidates:
-                routing || starting
-                  ? []
-                  : Object.entries({
-                      guestName: "Alex Test",
-                      guestEmail: "alex@example.com",
-                      contactNumber: "+61491570006",
-                      reason: "persistent knee pain",
-                      preferredDate: date,
-                      appointmentStart: clock,
-                    }).map(([fieldKey, naturalValue]) => ({
-                      fieldKey,
-                      naturalValue,
-                      confidence: 1,
-                      source: "visitor" as const,
-                    })),
-              taskRecommendation: routing
-                ? {
-                    taskId: entryTask.task.id,
+              fieldCandidates: starting
+                ? []
+                : Object.entries({
+                    guestName: "Alex Test",
+                    guestEmail: "alex@example.com",
+                    contactNumber: "+61491570006",
+                    reason: "persistent knee pain",
+                    preferredDate: date,
+                    appointmentStart: clock,
+                  }).map(([fieldKey, naturalValue]) => ({
+                    fieldKey,
+                    naturalValue,
                     confidence: 1,
-                    reason: "Visitor requests booking",
-                  }
-                : null,
+                    source: "visitor" as const,
+                  })),
+              taskRecommendation: null,
               toolRequest: null,
               routeRecommendation: null,
               outcomeRecommendation: null,
@@ -2063,6 +2080,7 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
     } finally {
       StructuredTurnEngine.prototype.execute = originalExecute;
     }
+    if (statementsOnly) return;
     const resumeInput = {
       channelType: "project_chat" as const,
       externalConversationId: run.externalConversationId,
@@ -2831,4 +2849,12 @@ test("Calendar slots use the task ledger and block arbitrary, empty, failed and 
   } finally {
     globalThis.fetch = originalFetch;
   }
+}
+
+test("Calendar slots use the task ledger and block arbitrary, empty, failed and stale selections", async () => {
+  await verifyCalendarRuntime(false);
+});
+
+test("Detailed appointment statements route into verified slots and recover confirmation", async () => {
+  await verifyCalendarRuntime(true);
 });

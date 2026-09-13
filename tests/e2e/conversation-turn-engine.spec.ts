@@ -1239,6 +1239,13 @@ test("appointment requests route through graph aliases without a model", async (
   ];
   for (const [visitorMessage, taskId] of [
     ["I want to book an appointment.", 1],
+    ["Can you book an appointment?", 1],
+    [
+      "I want to book an appointment on 22 September 2026 at 10:00 am Australia/Sydney. My name is Alex Test, my contact number is +61491570006, and the reason is persistent knee pain.",
+      1,
+    ],
+    ["Please cancel my appointment on 22 September 2026 at 10 am.", 2],
+    ["I want to reschedule my appointment. My name is Example Visitor.", 3],
     ["I want to cancel my appointment.", 2],
     ["I need to reschedule my appointment.", 3],
     ["I want to reschedule my appointment.", 3],
@@ -1262,6 +1269,34 @@ test("appointment requests route through graph aliases without a model", async (
     expect(provider.calls).toHaveLength(0);
   }
 });
+test("detailed requests do not choose between multiple matching booking tasks", async () => {
+  const result = await new StructuredTurnEngine({
+    provider: new QueueProvider([]),
+  }).execute({
+    ...engineInput(),
+    activeTask: null,
+    stage: "knowledge",
+    visitorMessage:
+      "I want to book an appointment on 22 September 2026 at 10 am.",
+    publishedTasks: [
+      {
+        id: 1,
+        name: "Service A",
+        aliases: ["Check Availability and Book"],
+        objective: "Book service A",
+      },
+      {
+        id: 2,
+        name: "Service B",
+        aliases: ["Check Availability and Book"],
+        objective: "Book service B",
+      },
+    ],
+  });
+  expect(result.proposal.taskRecommendation).toBeNull();
+  expect(result.proposal.nextAction).toBe("clarify");
+});
+
 test("routing failures offer deterministic task clarification", async () => {
   const result = await new StructuredTurnEngine({
     provider: new QueueProvider([]),
@@ -1307,6 +1342,10 @@ test("model retries share one total deadline", async () => {
 test("informational appointment questions and negations never route deterministically", async () => {
   for (const visitorMessage of [
     "How do I book an appointment?",
+    "I want to book an appointment if it is free.",
+    "I want to book an appointment, or reschedule my existing one.",
+    "I want to book an appointment. Actually, cancel my appointment instead.",
+    "I want to book an appointment on Tuesday, but not yet.",
     "Can I cancel my appointment?",
     "I do not want to book an appointment.",
     "What happens if I reschedule my appointment?",

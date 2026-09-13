@@ -194,11 +194,20 @@ function findExplicitTaskIntent(input: ExecuteStructuredTurnInput) {
 
   const message = input.visitorMessage.trim();
   // Semantic aliases apply only to explicit action requests, never informational questions.
-  const action = message
-    .match(
-      /^(?:(?:i|we)\s+(?:want|need|would like)\s+to\s+|please\s+|(?:can|could|would)\s+you\s+)?(book|cancel|reschedule)\s+(?:(?:a|an|the|my|our)\s+)?appointment[.!?]?$/i,
-    )?.[1]
-    ?.toLowerCase();
+  const request = message.match(
+    /^(?:(?:i|we)\s+(?:want|need|would like)\s+to\s+|please\s+|(?:can|could|would)\s+you\s+)?(book|cancel|reschedule)\s+(?:(?:a|an|the|my|our)\s+)?appointment(?=$|[.!?]|\s+(?:on|at|for|with)\b)/i,
+  );
+  const details = request ? message.slice(request[0].length) : "";
+  // Extra field values do not make a clear request ambiguous. Leave conditional,
+  // conflicting, or informational continuations to semantic routing.
+  const action =
+    request &&
+    !/\b(?:book|cancel|reschedule|if|unless|but|or|not|never|instead|actually)\b|\b(?:don['\u2019]t|do not)\b/i.test(
+      details,
+    ) &&
+    !isPotentialKnowledgeSideQuestion(details.replace(/^[.!?]\s*/, ""))
+      ? request[1].toLowerCase()
+      : null;
   if (!action && isPotentialKnowledgeSideQuestion(message)) return null;
   const visitorIntent = normalizeTaskIntent(message);
   const matches = input.publishedTasks.filter((task) =>

@@ -533,3 +533,74 @@ for (const scenario of cases) {
     expect(resolved.next.toolRequest).toBeNull();
   });
 }
+
+test("@live-openai routing UAT: detailed service request among lifecycle tasks", async () => {
+  test.skip(
+    process.env.LIA_LIVE_STATEMENT_UAT !== "1",
+    "Opt-in live model test",
+  );
+  test.setTimeout(45_000);
+  const provider = new AiSdkStructuredTurnProvider();
+  const calls: unknown[] = [];
+  const result = await new StructuredTurnEngine({
+    provider: {
+      async generateTurn(request) {
+        const started = Date.now();
+        try {
+          const generated = await provider.generateTurn(request);
+          calls.push({
+            model: request.modelId,
+            elapsedMs: Date.now() - started,
+            output: generated.output,
+          });
+          return generated;
+        } catch (error) {
+          calls.push({
+            model: request.modelId,
+            elapsedMs: Date.now() - started,
+            error: error instanceof Error ? error.name : "unknown",
+          });
+          throw error;
+        }
+      },
+    },
+  }).execute({
+    ...input(
+      bike,
+      "Please arrange a bicycle tune-up for 22 September 2026 at 10:00 am Australia/Sydney.",
+    ),
+    activeTask: null,
+    fieldState: [],
+    stage: "knowledge",
+    publishedTasks: [
+      {
+        id: 95,
+        name: "Service Booking",
+        aliases: ["Check Availability and Book"],
+        candidateFieldKeys: [],
+        objective:
+          "Book a service appointment in an available slot with a required subject.",
+      },
+      {
+        id: 96,
+        name: "Service Cancellation",
+        aliases: ["Find and Cancel Appointment"],
+        candidateFieldKeys: [],
+        objective: "Find and cancel an existing service appointment.",
+      },
+      {
+        id: 97,
+        name: "Service Rescheduling",
+        aliases: ["Find and Reschedule Appointment"],
+        candidateFieldKeys: [],
+        objective:
+          "Find and move an existing service appointment to a newly confirmed available slot.",
+      },
+    ],
+  });
+  console.log(JSON.stringify({ calls, result }));
+  expect(result.source).toBe("model");
+  expect(result.proposal.taskRecommendation?.taskId).toBe(95);
+  expect(result.proposal.ambiguity.requiresClarification).toBe(false);
+  expect(result.proposal.fieldCandidates).toEqual([]);
+});

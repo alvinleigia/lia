@@ -1902,3 +1902,58 @@ npx playwright test --config=playwright.runtime.config.ts conversational-task-op
 $env:LIA_LIVE_STATEMENT_UAT = '1'
 npx playwright test --config=playwright.contract.config.ts statement-extraction --grep 'pasted booking summary' --repeat-each=2 --workers=1
 ```
+
+
+### Detailed appointment intent routing - 2026-09-13
+
+Deployed UAT then displayed "Which task would you like help with" for the full
+booking statement. This is the engine's model-failure fallback. The explicit
+appointment shortcut only accepted a request ending immediately after
+"appointment", so adding date/time/contact/reason details unnecessarily required
+a routing model call. The screenshot does not establish whether that live model
+call failed due to timeout, provider error, or rejected output.
+
+The shortcut now accepts a clear appointment request followed by details and
+selects only a uniquely matching published graph alias. Conditional, conflicting,
+informational, and multiple-match requests remain on semantic routing. Field
+extraction and calendar validation still run in the selected task; recognizing
+an intent does not authorize a booking write.
+
+Verification for this change:
+
+- The exact reported message failed the local routing regression before the
+  fix and passes after it, with zero routing-model calls. Booking, cancellation,
+  rescheduling, conditional wording, negation, questions, and duplicate matching
+  tasks are covered with mocked providers.
+- The persisted statement-handoff test now uses the real routing engine with
+  an unavailable routing model, instead of mocking the task recommendation. Its
+  fixture supplies the actual saved `settings.nodeLabel` so the compiler exposes
+  the same alias as the deployed flow. Entity extraction and calendar APIs remain
+  mocked; this is not deployed calendar UAT.
+- The Chromium semantic-handoff regression passed for both original statement
+  formats. Its backend responses are mocked.
+- A non-sensitive bicycle tune-up paraphrase selected the booking task among
+  booking/cancellation/rescheduling options in two actual model runs. This checks
+  semantic routing outside the deterministic appointment shortcut. It does not
+  certify every possible wording. Automatic approval review prevented sending
+  the screenshot's phone/medical payload to the external model in this run;
+  the exact message was checked locally instead.
+
+Focused Biome checks, the production build (including TypeScript), and all 321
+offline contract tests passed.
+
+The statement scenarios now run separately from the calendar-cache scenarios,
+using shared setup and preserving the assertions. Running them in one long test
+could let an earlier offer expire and refresh before the later test aged the
+original attempt. The database test time allowance is nine minutes per scenario
+group; application timeouts are unchanged. Both isolated groups passed (3.8
+minutes each), including the complete statement handoff and confirmation checks.
+
+```powershell
+npx playwright test --config=playwright.runtime.config.ts conversational-task-operation-runtime-db --grep 'Calendar slots use|Detailed appointment statements'
+```
+
+Deployment acceptance still requires a fresh Project Chat session: send the
+original complete booking request; Lia should select the booking task, check
+availability, and show a verified review or available alternatives without
+asking the user to choose booking/cancellation/rescheduling again.
