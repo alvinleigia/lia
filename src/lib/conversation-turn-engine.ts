@@ -469,7 +469,13 @@ function directFieldProposal(
       field: requestedField,
       value,
     });
-    if (validation.ok) {
+    if (
+      validation.ok ||
+      (!validation.ok &&
+        ["ambiguous_numeric_date", "ambiguous_relative_date"].includes(
+          validation.code,
+        ))
+    ) {
       return buildDirectFieldProposal({
         field: requestedField,
         reasonCode,
@@ -500,6 +506,68 @@ function directFieldProposal(
     reasonCode,
     value,
   });
+}
+
+// Keep ambiguous dates from the current message visible to deterministic
+// validation even when a model has guessed one of their ISO interpretations.
+function preserveAmbiguousDateWording(
+  input: ExecuteStructuredTurnInput,
+  proposal: TurnResultV1,
+): TurnResultV1 {
+  const dateFields = new Map(
+    input.activeTask?.task.definition.fields
+      .filter((field) => field.type === "date")
+      .map((field) => [field.key, field]),
+  );
+  const ambiguousDates = [
+    ...input.visitorMessage.matchAll(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/g),
+  ].filter((match) => {
+    const first = Number(match[1]);
+    const second = Number(match[2]);
+    return (
+      first >= 1 &&
+      first <= 12 &&
+      second >= 1 &&
+      second <= 12 &&
+      first !== second
+    );
+  });
+  if (!ambiguousDates.length || !dateFields.size) return proposal;
+  const contextValues = new Map(
+    input.context.map(({ key, value }) => [key, value]),
+  );
+
+  return {
+    ...proposal,
+    fieldCandidates: proposal.fieldCandidates.map((candidate) => {
+      const field = dateFields.get(candidate.fieldKey);
+      if (!field || typeof candidate.naturalValue !== "string")
+        return candidate;
+      // An explicit month name or ISO date in the message may itself clarify
+      // earlier numeric wording (for example "09/10/2026, I mean 9 October").
+      if (
+        input.visitorMessage
+          .toLowerCase()
+          .includes(candidate.naturalValue.toLowerCase())
+      )
+        return candidate;
+      const normalized = validateTaskFieldValue({
+        contextValues,
+        field,
+        value: candidate.naturalValue,
+      });
+      if (!normalized.ok) return candidate;
+      const match = ambiguousDates.find((date) => {
+        const first = date[1].padStart(2, "0");
+        const second = date[2].padStart(2, "0");
+        return (
+          normalized.value === `${date[3]}-${first}-${second}` ||
+          normalized.value === `${date[3]}-${second}-${first}`
+        );
+      });
+      return match ? { ...candidate, naturalValue: match[0] } : candidate;
+    }),
+  };
 }
 
 function buildDirectFieldProposal(input: {
@@ -868,12 +936,15 @@ export class StructuredTurnEngine {
             }),
           ]).finally(() => clearTimeout(deadlineTimer));
           lastUsage = generated.usage;
-          const proposal = applyIntentRoutingPolicy(
-            validateStructuredTurnProposal(
-              generated.output,
+          const proposal = preserveAmbiguousDateWording(
+            input,
+            applyIntentRoutingPolicy(
+              validateStructuredTurnProposal(
+                generated.output,
+                compiled.validation,
+              ),
               compiled.validation,
             ),
-            compiled.validation,
           );
           if (hasUnsafeTurnOutput(proposal.reply)) {
             throw new TurnProposalValidationError(["unsafe_output"]);

@@ -2098,3 +2098,52 @@ with mocked extraction and calendar HTTP; deployed wording still needs UAT.
 Verification passed: 22 calendar contract tests, all three persisted runtime
 scenarios with the final wording (5.4 minutes), focused Biome checks, and the
 production build including TypeScript. No live booking was created by these tests.
+
+
+### Date picker and unambiguous date collection - 2026-09-13
+
+Project Chat and the embedded widget render the shared date control whenever a
+published task requests a field of type `date`. The browser's native date picker
+uses the existing Input, Label, and Button primitives. Selecting a date does not
+submit it; Use date sends YYYY-MM-DD through the existing runtime text command.
+The normal composer remains available for typed dates and complete statements.
+The control uses task field metadata, with no appointment-specific field keys.
+
+Shared validation accepts ISO/year-first dates, unambiguous day/month or
+month/day dates, English month names, and the existing supported relative dates.
+Ambiguous numeric dates such as 09/10/2026 require a month name or ISO date,
+regardless of locale. Invalid calendar days are rejected instead of rolling into
+the next month. Named calendar dates retain their date across timezones; explicit
+timestamp inputs retain timezone conversion. Unsupported wording asks for a
+clearer date rather than using JavaScript's permissive string-date guessing.
+
+The extraction protocol preserves date wording. A server guard also restores
+ambiguous numeric wording when a model guesses one of its possible dates, while
+retaining the other extracted fields. A standalone ambiguous date answer uses
+local validation without a model call. Contract tests exercise this through chat,
+widget, and Lia's voice channel interface with a mocked model; this does not
+constitute a live Telnyx hosted-AI acceptance test.
+
+UAT: resume the rescheduling task after selecting the existing appointment. Use
+the Preferred Date picker to choose 24 September 2026 and press Use date. Lia
+should continue to available times without asking for the date again. Separately,
+enter 09/10/2026 and expect clarification; then enter 9 October 2026. Also start a
+fresh chat with a complete booking statement and confirm it still skips questions
+for details already supplied. Availability and final confirmation guards remain
+owned by the existing task runtime.
+
+
+Verification: all 327 offline contract tests, the focused browser input-control
+contract, the desktop/mobile browser regression, focused Biome checks, and the
+production build passed. Browser tests use mocked runtime responses to verify
+ISO submission, contextual date controls, clarification display, and full-message
+entry; field validation and extraction are covered by separate runtime contracts.
+Screenshots were visually inspected. No live appointments were created.
+
+Two existing verification limitations were also observed outside the changed
+behavior: the full channel-runtime-v1 spec assumes every voice inbound kind is
+supported, contrary to the voice adapter's explicit media/location/product limits;
+standalone tsc reports nullable session.runtime accesses at lines 2309 and 2439 of
+conversational-task-operation-runtime-db.spec.ts. These unrelated assertions and nullability sites remain unchanged. The new date-control assertion and production build
+both pass. An initial browser run hit a database connection timeout; the final
+browser run completed successfully in 48.2 seconds.

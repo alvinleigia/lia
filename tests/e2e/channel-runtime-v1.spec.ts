@@ -144,7 +144,13 @@ test("browser chat renders only dedicated runtime controls inline", () => {
       inputKind: "date",
       label: "Preferred Date",
     }),
-  ).toBe(false);
+  ).toBe(true);
+  expect(
+    getBrowserComposerPlaceholder({
+      fallback: "Ask a question",
+      request: { ...request, inputKind: "date", label: "Service Date" },
+    }),
+  ).toBe("Type Service Date or your full request...");
   expect(
     shouldRenderRuntimeInputControl({
       ...request,

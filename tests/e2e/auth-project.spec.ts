@@ -4119,3 +4119,121 @@ test("project chat semantic handoff preserves the original statement and suppres
     ).toBeVisible();
   }
 });
+
+test("date picker and typed statements share the runtime command in chat and widget", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `e2e-date-picker-${runId}@example.test`;
+  await signUpOrUseExistingAccount(page, {
+    email,
+    name: "Date Picker UAT",
+    password,
+  });
+  await signInWithEmail(page, email);
+  await expect(page).toHaveURL(/\/projects/);
+  const user = await getUserByEmail(email);
+  if (!user) throw new Error("Date picker fixture user missing");
+  const project = await createProjectForUser(user.id, `Date Picker ${runId}`);
+  const projectId = project.id;
+  const token = await createOrRotateProjectWidgetToken(projectId);
+
+  for (const channel of ["project_chat", "widget"] as const) {
+    const commands: Array<Record<string, unknown>> = [];
+    const url =
+      channel === "widget"
+        ? "**/api/widget/actions/runtime"
+        : "**/api/actions/runtime";
+    // Isolate UI delivery from providers; date validation is covered by runtime tests.
+    await page.route(url, async (route) => {
+      const body = route.request().postDataJSON();
+      if (!body.resume) commands.push(body);
+      const text =
+        body.text === "09/10/2026"
+          ? "That date could mean day/month or month/day. Please write the month name or use YYYY-MM-DD."
+          : "What is your preferred service date?";
+      await route.fulfill({
+        json: {
+          action: null,
+          activeFlow: {
+            actionId: 999,
+            actionName: "Service fixture",
+            stepIndex: 0,
+            fields: {},
+            mode: "collecting",
+            revision: commands.length,
+          },
+          handled: true,
+          replies: [
+            {
+              type: "text",
+              text,
+              fallbackText: text,
+              payload: {
+                inputRequest: {
+                  fieldKey: "serviceDate",
+                  label: "Service Date",
+                  inputKind: "date",
+                  options: [],
+                  required: true,
+                },
+              },
+            },
+          ],
+        },
+      });
+    });
+    await page.setViewportSize(
+      channel === "widget"
+        ? { width: 390, height: 740 }
+        : { width: 1280, height: 900 },
+    );
+    await page.goto(
+      channel === "widget"
+        ? `/widget/embed?token=${encodeURIComponent(token)}`
+        : "/projects/chat",
+    );
+    const date = page.getByLabel("Service Date", { exact: true });
+    const useDate = page.getByRole("button", { name: "Use date", exact: true });
+    await expect(date).toBeVisible();
+    await expect(useDate).toBeDisabled();
+    await date.fill("2026-09-24");
+    expect(commands).toHaveLength(0);
+    await expect(useDate).toBeEnabled();
+    await page.screenshot({
+      path: `test-results/date-picker-${channel}.png`,
+      fullPage: true,
+    });
+    await useDate.click();
+    await expect.poll(() => commands.length).toBe(1);
+    expect(commands[0]).toMatchObject({
+      text: "2026-09-24",
+      expectedRevision: 0,
+    });
+    expect(commands[0].selection).toBeUndefined();
+    await expect(date).toHaveValue("");
+    const send = async (target: Page, message: string) => {
+      if (channel === "project_chat") {
+        await sendProjectChatMessage(target, message);
+      } else {
+        await target
+          .getByPlaceholder("Type Service Date or your full request...")
+          .fill(message);
+        await target.getByRole("button", { name: "Send", exact: true }).click();
+      }
+    };
+    await send(page, "09/10/2026");
+    await expect(
+      page.getByText(/That date could mean day\/month/),
+    ).toBeVisible();
+    await expect(date).toBeVisible();
+    const statement =
+      "Book my bike service on 24 September 2026. My name is Alex Test and the reason is an oil change.";
+    await send(page, statement);
+    await expect.poll(() => commands.length).toBe(3);
+    expect(commands[2]).toMatchObject({ text: statement });
+    await expect(page.getByText(statement, { exact: true })).toBeVisible();
+    await page.unroute(url);
+  }
+});

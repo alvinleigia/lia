@@ -620,3 +620,75 @@ test("verified and authenticated starts require explicit identity references", (
     }).success,
   ).toBe(true);
 });
+
+test("calendar dates stay exact across locales and reject ambiguous or invalid dates", () => {
+  for (const locale of ["en-US", "en-AU", "en-IN"]) {
+    for (const timezone of [
+      "Australia/Sydney",
+      "America/Los_Angeles",
+      "Asia/Kolkata",
+    ]) {
+      const contextValues = new Map([
+        ["lia_locale", locale],
+        ["lia_timezone", timezone],
+      ]);
+      for (const value of [
+        "2026-09-24",
+        "24 September 2026",
+        "September 24, 2026",
+        "24th Sep 2026",
+        "24 Sept 2026",
+        "2026/09/24",
+        "24/09/2026",
+        "09/24/2026",
+      ]) {
+        expect(
+          validateTaskFieldValue({
+            contextValues,
+            field: fieldFor("date"),
+            value,
+          }),
+        ).toEqual({ ok: true, value: "2026-09-24" });
+      }
+      for (const value of ["09/10/2026", "10-09-2026"]) {
+        expect(
+          validateTaskFieldValue({
+            contextValues,
+            field: fieldFor("date"),
+            value,
+          }),
+        ).toMatchObject({ ok: false, code: "ambiguous_numeric_date" });
+      }
+      for (const value of [
+        "31/09/2026",
+        "31 September 2026",
+        "2026-02-29",
+        "2026-02-30T10:00:00Z",
+        "February 30, 2026",
+        "09/10/26",
+      ]) {
+        expect(
+          validateTaskFieldValue({
+            contextValues,
+            field: fieldFor("date"),
+            value,
+          }).ok,
+        ).toBe(false);
+      }
+      expect(
+        validateTaskFieldValue({
+          contextValues,
+          field: fieldFor("date"),
+          value: "09/09/2026",
+        }),
+      ).toEqual({ ok: true, value: "2026-09-09" });
+      expect(
+        validateTaskFieldValue({
+          contextValues,
+          field: fieldFor("date"),
+          value: "29 February 2028",
+        }),
+      ).toEqual({ ok: true, value: "2028-02-29" });
+    }
+  }
+});

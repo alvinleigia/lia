@@ -200,7 +200,7 @@ function validateDate(
   const relative = resolveRelativeDate(normalized, context);
   if (relative) return relative;
 
-  const isoMatch = normalized.match(ISO_DATE_PATTERN);
+  const isoMatch = normalized.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
   if (isoMatch) {
     const year = Number(isoMatch[1]);
     const month = Number(isoMatch[2]);
@@ -215,11 +215,19 @@ function validateDate(
     const first = Number(localized[1]);
     const second = Number(localized[2]);
     const year = Number(localized[3]);
-    const monthFirst =
-      second > 12 ||
-      (first <= 12 &&
-        second <= 12 &&
-        context.locale.toLowerCase().startsWith("en-us"));
+    if (
+      first >= 1 &&
+      first <= 12 &&
+      second >= 1 &&
+      second <= 12 &&
+      first !== second
+    ) {
+      return invalid(
+        "ambiguous_numeric_date",
+        "That date could mean day/month or month/day. Please write the month name or use YYYY-MM-DD.",
+      );
+    }
+    const monthFirst = second > 12;
     const month = monthFirst ? first : second;
     const day = monthFirst ? second : first;
     return validCalendarDate(year, month, day)
@@ -227,7 +235,53 @@ function validateDate(
       : invalid("invalid_date", "Enter a valid calendar date.");
   }
 
-  const instant = new Date(normalized);
+  const named = normalized.match(
+    /^(?:(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]+)|([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?),?\s+(\d{4})$/i,
+  );
+  if (named) {
+    const months = [
+      "january",
+      "february",
+      "march",
+      "april",
+      "may",
+      "june",
+      "july",
+      "august",
+      "september",
+      "october",
+      "november",
+      "december",
+    ];
+    const monthName = (named[2] || named[3])
+      .toLowerCase()
+      .replace(/^sept$/, "sep");
+    const month =
+      months.findIndex(
+        (name) => monthName === name || monthName === name.slice(0, 3),
+      ) + 1;
+    const day = Number(named[1] || named[4]);
+    const year = Number(named[5]);
+    return month && validCalendarDate(year, month, day)
+      ? { ok: true, value: isoDate(year, month, day) }
+      : invalid("invalid_date", "Enter a valid calendar date.");
+  }
+
+  // Only explicit timestamp strings represent instants. Calendar dates above
+  // retain their date regardless of the browser/server timezone.
+  const timestamp = normalized.match(
+    /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/i,
+  );
+  const instant = new Date(
+    timestamp &&
+      validCalendarDate(
+        Number(timestamp[1]),
+        Number(timestamp[2]),
+        Number(timestamp[3]),
+      )
+      ? normalized
+      : NaN,
+  );
   if (!Number.isNaN(instant.getTime())) {
     const zoned = dateInTimezone(instant, context);
     if (zoned) return { ok: true, value: zoned };

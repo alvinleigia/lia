@@ -604,3 +604,78 @@ test("@live-openai routing UAT: detailed service request among lifecycle tasks",
   expect(result.proposal.ambiguity.requiresClarification).toBe(false);
   expect(result.proposal.fieldCandidates).toEqual([]);
 });
+
+test("ambiguous date answers reach validation without spending a model call", async () => {
+  let calls = 0;
+  const provider: StructuredTurnProvider = {
+    async generateTurn() {
+      calls += 1;
+      throw new Error("Must not guess a date");
+    },
+  };
+  const result = await new StructuredTurnEngine({ provider }).execute(
+    input(appointment, "09/10/2026", "preferredDate"),
+  );
+  expect(calls).toBe(0);
+  const resolved = await reconcile(
+    appointment,
+    result.proposal,
+    "09/10/2026",
+    "preferredDate",
+  );
+  expect(resolved.values.preferredDate).toBeUndefined();
+  expect(resolved.next.reply).toContain("month name");
+});
+
+for (const channel of ["project_chat", "widget", "telnyx_voice"] as const) {
+  test(`${channel} preserves ambiguous dates from statements even when the model guesses ISO`, async () => {
+    const message =
+      "Book on 09/10/2026. My name is Alex Test and the reason is an oil change.";
+    const provider: StructuredTurnProvider = {
+      async generateTurn(i) {
+        return {
+          modelId: i.modelId,
+          output: proposal({
+            serviceDate: channel === "widget" ? "9 October 2026" : "2026-10-09",
+            customerName: "Alex Test",
+            serviceSubject: "oil change",
+          }),
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        };
+      },
+    };
+    const result = await new StructuredTurnEngine({ provider }).execute({
+      ...input(bike, message),
+      channel,
+    });
+    expect(
+      result.proposal.fieldCandidates.find((c) => c.fieldKey === "serviceDate")
+        ?.naturalValue,
+    ).toBe("09/10/2026");
+    const resolved = await reconcile(bike, result.proposal, message, null);
+    expect(resolved.values.serviceDate).toBeUndefined();
+    expect(resolved.values.customerName).toBe("Alex Test");
+    expect(resolved.values.serviceSubject).toBe("oil change");
+    expect(resolved.next.reply).toContain("month name");
+  });
+}
+
+test("an explicit ISO clarification in the same statement is retained", async () => {
+  const provider: StructuredTurnProvider = {
+    async generateTurn(i) {
+      return {
+        modelId: i.modelId,
+        output: proposal({ preferredDate: "2026-10-09" }),
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      };
+    },
+  };
+  const result = await new StructuredTurnEngine({ provider }).execute(
+    input(
+      appointment,
+      "Book on 09/10/2026, I mean 2026-10-09.",
+      "preferredDate",
+    ),
+  );
+  expect(result.proposal.fieldCandidates[0].naturalValue).toBe("2026-10-09");
+});
