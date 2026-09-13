@@ -2147,3 +2147,34 @@ standalone tsc reports nullable session.runtime accesses at lines 2309 and 2439 
 conversational-task-operation-runtime-db.spec.ts. These unrelated assertions and nullability sites remain unchanged. The new date-control assertion and production build
 both pass. An initial browser run hit a database connection timeout; the final
 browser run completed successfully in 48.2 seconds.
+
+
+### Reuse the Flow Builder date input - 2026-09-13
+
+The native date input is now a single controlled DateInputControl component.
+ActionFlowStepInput uses it for the existing Date block and collect-input steps
+with date answer format; RuntimeInputControl uses it for Business Task date
+questions in Project Chat and the widget. Both supply their own current value,
+change callback, and existing submit callback. The task renderer's duplicate
+form markup has been removed. No new field type, parsing system, provider,
+dependency, or booking path was added in this consolidation.
+
+The shared control waits for hydration before accepting input, preventing an
+entry into server-rendered HTML from being lost when the client takes over.
+The existing Flow Builder preview retains rejected date values for correction;
+its date bounds and required/optional rules remain in its existing validator.
+The task validator and date ambiguity protections are unchanged.
+
+The browser regression now covers the existing Flow Builder preview as well as
+chat and widget. Preview checks exercise date and collect-input/date blocks,
+rejection of a date outside configured bounds, retention of the rejected value,
+advancing to the next date field, optional-field controls, keyboard submission,
+and Reset. Chat/widget checks retain ISO submission and full-message entry.
+
+
+Verification passed: the combined browser regression (chat, mobile widget, and
+Flow Builder preview), focused Biome checks, and the production build including
+its TypeScript checks. The Flow Builder screenshot was visually inspected.
+The action detail page still logs an unrelated header hydration mismatch in local
+development; the date control now waits until interactive and the regression
+passes despite that page re-render. This change does not resolve the header issue.

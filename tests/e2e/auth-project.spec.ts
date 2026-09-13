@@ -4120,7 +4120,7 @@ test("project chat semantic handoff preserves the original statement and suppres
   }
 });
 
-test("date picker and typed statements share the runtime command in chat and widget", async ({
+test("shared date control supports Flow Builder, chat and widget", async ({
   page,
 }) => {
   test.setTimeout(180_000);
@@ -4236,4 +4236,75 @@ test("date picker and typed statements share the runtime command in chat and wid
     await expect(page.getByText(statement, { exact: true })).toBeVisible();
     await page.unroute(url);
   }
+
+  const action = await createChatbotAction({
+    projectId,
+    name: "Reusable Date Input Preview",
+    status: "active",
+    description:
+      "Checks the same date control through the existing flow renderer.",
+    triggerPhrases: [],
+  });
+  for (const [index, stepType] of ["date", "collect_input"].entries()) {
+    await createActionFlowStep({
+      projectId,
+      actionId: action.id,
+      fieldKey: index === 0 ? "serviceDate" : "returnDate",
+      inputType: "date",
+      isRequired: index === 0,
+      label: index === 0 ? "Service Date" : "Return Date",
+      prompt: "Choose a date.",
+      sortOrder: index + 1,
+      stepType,
+      settings: {
+        validationMinDate: "2026-09-24",
+        validationMaxDate: "2026-09-26",
+      },
+    });
+  }
+  await createActionFlowStep({
+    projectId,
+    actionId: action.id,
+    stepType: "submit",
+    sortOrder: 3,
+    isRequired: false,
+    label: "Finish Preview",
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/projects/actions/${action.id}`);
+  const preview = page
+    .locator('[data-slot="card"]')
+    .filter({ hasText: "Preview And Test Mode" });
+  const date = preview.getByLabel("Service Date", { exact: true });
+  const useDate = preview.getByRole("button", {
+    name: "Use date",
+    exact: true,
+  });
+  await expect(date).toBeVisible();
+  await expect(useDate).toBeDisabled();
+  await date.fill("2026-09-23");
+  await expect(useDate).toBeEnabled();
+  await useDate.click();
+  await expect(
+    preview.getByText("Please enter a valid date.", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(date).toHaveValue("2026-09-23");
+  await date.fill("2026-09-24");
+  await useDate.click();
+  const returnDate = preview.getByLabel("Return Date", { exact: true });
+  await expect(returnDate).toHaveValue("");
+  await expect(
+    preview.getByRole("button", { name: "Skip", exact: true }),
+  ).toBeVisible();
+  await returnDate.fill("2026-09-25");
+  await returnDate.press("Enter");
+  await expect(
+    preview.getByRole("button", { name: "Submit Preview", exact: true }),
+  ).toBeVisible();
+  await preview.getByRole("button", { name: "Reset", exact: true }).click();
+  await expect(date).toHaveValue("");
+  await date.fill("2026-09-24");
+  await preview.screenshot({
+    path: "test-results/shared-date-flow-preview.png",
+  });
 });

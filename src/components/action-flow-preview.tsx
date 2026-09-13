@@ -12,6 +12,7 @@ import {
   buildActionStepTextFallbackMessage,
   buildInvalidStepAnswerMessage,
   buildStepAnswerResult,
+  getActionStepInputType,
   getActionStepPrompt,
   getNextActionStepDecision,
   getRunnableActionSteps,
@@ -272,7 +273,7 @@ export function ActionFlowPreview({ action }: ActionFlowPreviewProps) {
       );
       setState({
         ...state,
-        answer: "",
+        answer: getActionStepInputType(currentStep) === "date" ? answer : "",
         diagnostics: [
           ...state.diagnostics,
           {
