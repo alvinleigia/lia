@@ -70,6 +70,7 @@ import {
 import {
   applyConversationalTaskEvent,
   ConversationalTaskRuntimeConflictError,
+  getConversationalTaskRuntime,
   startConversationalTaskRun,
 } from "@/lib/conversational-task-runtime";
 import { getConversationTaskRuntimeSession } from "@/lib/conversational-task-runtime-session";
@@ -310,12 +311,19 @@ async function prepareRequiredTaskConfirmation(input: {
     taskRunId: input.runtime.run.id,
     toolId: definition.id,
   });
+  // Preparation can refresh mapped fields; render the review from that state.
+  const refreshedRuntime = await getConversationalTaskRuntime({
+    projectId: input.projectId,
+    taskRunId: input.runtime.run.id,
+  });
+  if (!refreshedRuntime) throw new Error("The task is unavailable.");
   return {
+    confirmation,
     text: await buildTaskConfirmationText({
       confirmationSummary: confirmation.summary,
       operationName: definition.name,
       projectId: input.projectId,
-      runtime: input.runtime,
+      runtime: refreshedRuntime,
       snapshot: input.snapshot,
     }),
   };
@@ -736,7 +744,7 @@ async function executeTaskConfirmation(input: {
     projectId: input.runtimeInput.projectId,
     taskRunId: input.session.runtime.run.id,
   });
-  const active = confirmations.find((confirmation) =>
+  let active = confirmations.find((confirmation) =>
     ["pending", "confirmed", "executing", "outcome_unknown"].includes(
       confirmation.status,
     ),
@@ -799,11 +807,23 @@ async function executeTaskConfirmation(input: {
         snapshot: input.session.snapshot,
       });
       if (!prepared) throw error;
-      // A delayed confirmation refreshes the review, never authorizes the new one.
-      return {
-        output: operationTurn({ nextAction: "confirm", reply: prepared.text }),
-        signals: [],
-      };
+      if (prepared.confirmation.canonicalHash !== active.canonicalHash) {
+        return {
+          output: operationTurn({
+            nextAction: "confirm",
+            reply: `The details have changed since your earlier review.\n\n${prepared.text}`,
+          }),
+          signals: [],
+        };
+      }
+      // This click confirms the unchanged reviewed details after a fresh check.
+      active = prepared.confirmation;
+      await confirmTaskOperation({
+        confirmationId: active.id,
+        principal,
+        projectId: input.runtimeInput.projectId,
+        taskRunId: input.session.runtime.run.id,
+      });
     }
   }
   await executeConfirmedTaskOperation({

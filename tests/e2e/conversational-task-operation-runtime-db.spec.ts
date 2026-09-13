@@ -1545,7 +1545,7 @@ async function verifyCalendarRuntime(
   statementsOnly: boolean,
   confirmationRefreshCase?: "available" | "busy" | "failed",
   selectionRefreshCase?: "available" | "busy" | "failed" | "fresh",
-  resumeCase?: "available" | "busy" | "failed" | "reload",
+  resumeCase?: "available" | "busy" | "failed" | "reload" | "changed",
 ) {
   test.setTimeout(540_000);
   if (!fixture) throw new Error("The operation fixture is not ready.");
@@ -1628,7 +1628,7 @@ async function verifyCalendarRuntime(
   const run = await startReadyRun(published.task.id);
   const scope = { binding, projectId, taskRunId: run.taskRunId };
   const date = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
-  const setField = async (fieldKey: string, value: string) => {
+  const setField = async (fieldKey: string, value: string, target = run) => {
     const now = new Date().toISOString();
     const result = await applyConversationalTaskEvent({
       authentication: null,
@@ -1643,7 +1643,7 @@ async function verifyCalendarRuntime(
       ],
       channelIdentity: {},
       channelType: "project_chat",
-      conversationId: run.conversationId,
+      conversationId: target.conversationId,
       correction: true,
       eventId: `calendar-field-${Date.now()}-${fieldKey}`,
       expectedRevision: null,
@@ -1652,7 +1652,7 @@ async function verifyCalendarRuntime(
       projectId,
       providerSequence: null,
       schemaVersion: 1,
-      taskRunId: run.taskRunId,
+      taskRunId: target.taskRunId,
       type: "field.candidates",
     });
     expect(result.disposition).toBe("applied");
@@ -1672,6 +1672,7 @@ async function verifyCalendarRuntime(
     });
   let mode: "available" | "busy" | "failed" = "available";
   let freeBusyCalls = 0;
+  let changeDuringRefresh: typeof run | null = null;
   const originalFetch = globalThis.fetch;
   let insertedEvent: Record<string, unknown> | null = null;
   globalThis.fetch = async (url, init) => {
@@ -1679,6 +1680,11 @@ async function verifyCalendarRuntime(
       return Response.json({ access_token: "fixture-token", expires_in: 3600 });
     if (String(url).endsWith("/freeBusy")) {
       freeBusyCalls += 1;
+      if (changeDuringRefresh) {
+        const target = changeDuringRefresh;
+        changeDuringRefresh = null;
+        await setField("reason", "Updated service reason", target);
+      }
       if (mode === "failed")
         return new Response("unavailable", { status: 503 });
       return Response.json({
@@ -2131,7 +2137,16 @@ async function verifyCalendarRuntime(
             .update(operationAttempts)
             .set({ finishedAt: new Date(Date.now() - 16 * 60_000) })
             .where(eq(operationAttempts.id, offer.attempt.id));
-          mode = resumeCase === "reload" ? "available" : resumeCase;
+          mode =
+            resumeCase === "reload" || resumeCase === "changed"
+              ? "available"
+              : resumeCase;
+          if (resumeCase === "changed")
+            changeDuringRefresh = {
+              externalConversationId,
+              conversationId: session.runtime.run.conversationId,
+              taskRunId: session.runtime.run.id,
+            };
           const callsBefore = freeBusyCalls;
           StructuredTurnEngine.prototype.execute = async () => {
             throw new Error("Resuming confirmation must not require a model");
@@ -2146,7 +2161,7 @@ async function verifyCalendarRuntime(
               : (await runBrowserFlowText({ ...browserInput, text: "Confirm" }))
                   .replies;
           expect(freeBusyCalls).toBeGreaterThan(callsBefore);
-          expect(insertedEvent).toBeNull();
+          if (resumeCase !== "available") expect(insertedEvent).toBeNull();
           if (resumeCase === "failed") {
             expect(replies.at(-1)?.text).toContain(
               "I could not verify available appointment times",
@@ -2166,33 +2181,69 @@ async function verifyCalendarRuntime(
             expect(
               resumed?.fields.find((field) => field.fieldKey === fieldKey)
                 ?.canonicalValue,
-            ).toEqual(fields[fieldKey].canonicalValue);
+            ).toEqual(
+              resumeCase === "changed" && fieldKey === "reason"
+                ? "Updated service reason"
+                : fields[fieldKey].canonicalValue,
+            );
           }
-          if (resumeCase === "available" || resumeCase === "reload") {
-            expect(replies.at(-1)?.payload).toMatchObject({
-              inputRequest: { fieldKey: "lia_confirmation" },
-            });
-            expect(replies.map(({ text }) => text).join(" ")).toContain(
-              "persistent knee pain",
-            );
-            const fresh = resumed?.confirmations.find(
-              ({ status }) => status === "pending",
-            );
-            expect(fresh?.id).not.toBe(oldReview.id);
-            expect(fresh?.expiresAt.getTime()).toBeGreaterThan(Date.now());
-            expect(resumed?.fields).toContainEqual(
-              expect.objectContaining({
-                fieldKey: "appointmentStart",
-                canonicalValue: `${date}T10:00:00.000Z`,
-                state: "valid",
-              }),
-            );
-            const completed = await runBrowserFlowText({
-              ...browserInput,
-              text: "Confirm",
-            });
+          if (
+            resumeCase === "available" ||
+            resumeCase === "reload" ||
+            resumeCase === "changed"
+          ) {
+            let completionReplies = replies;
+            if (resumeCase === "available") {
+              expect(replies.map(({ text }) => text).join(" ")).not.toContain(
+                "Please review these details",
+              );
+              expect(
+                replies.some(({ intent }) => intent === "confirmation"),
+              ).toBe(false);
+              const confirmed = resumed?.confirmations.find(
+                ({ status }) => status === "consumed",
+              );
+              expect(confirmed?.id).not.toBe(oldReview.id);
+              expect(confirmed?.canonicalHash).toBe(oldReview.canonicalHash);
+              expect(confirmed?.expiresAt.getTime()).toBeGreaterThan(
+                Date.now(),
+              );
+            } else {
+              expect(replies.at(-1)?.payload).toMatchObject({
+                inputRequest: { fieldKey: "lia_confirmation" },
+              });
+              expect(replies.map(({ text }) => text).join(" ")).toContain(
+                resumeCase === "changed"
+                  ? "Updated service reason"
+                  : "persistent knee pain",
+              );
+              if (resumeCase === "changed") {
+                expect(replies.map(({ text }) => text).join(" ")).toContain(
+                  "details have changed",
+                );
+              }
+              const fresh = resumed?.confirmations.find(
+                ({ status }) => status === "pending",
+              );
+              expect(fresh?.id).not.toBe(oldReview.id);
+              expect(fresh?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+              if (resumeCase === "changed")
+                expect(fresh?.canonicalHash).not.toBe(oldReview.canonicalHash);
+              expect(resumed?.fields).toContainEqual(
+                expect.objectContaining({
+                  fieldKey: "appointmentStart",
+                  canonicalValue: `${date}T10:00:00.000Z`,
+                  state: "valid",
+                }),
+              );
+              const completed = await runBrowserFlowText({
+                ...browserInput,
+                text: "Confirm",
+              });
+              completionReplies = completed.replies;
+            }
             expect(
-              completed.replies.map(({ text }) => text).join(" "),
+              completionReplies.map(({ text }) => text).join(" "),
             ).toContain("submitted successfully");
             expect(insertedEvent).toMatchObject({
               start: { dateTime: `${date}T10:00:00.000Z` },
@@ -2208,6 +2259,16 @@ async function verifyCalendarRuntime(
                 ),
               );
             expect(writes).toHaveLength(1);
+            const confirmationId = writes[0].taskConfirmationId;
+            if (!confirmationId)
+              throw new Error("Booking confirmation missing");
+            const replay = await executeConfirmedTaskOperation({
+              ...resumeScope,
+              confirmationId,
+              principal,
+            });
+            expect(replay.created).toBe(false);
+            expect(replay.attempt.id).toBe(writes[0].id);
           } else {
             expect(replies.at(-1)?.payload).toMatchObject({
               inputRequest: {
@@ -3228,7 +3289,13 @@ for (const outcome of ["available", "busy", "failed", "fresh"] as const) {
   });
 }
 
-for (const outcome of ["available", "busy", "failed", "reload"] as const) {
+for (const outcome of [
+  "available",
+  "busy",
+  "failed",
+  "reload",
+  "changed",
+] as const) {
   test(`Expired confirmation resumes with retained details: ${outcome}`, async () => {
     await verifyCalendarRuntime(true, undefined, undefined, outcome);
   });

@@ -2032,41 +2032,48 @@ other providers and flow configurations still require their own acceptance check
 
 ### Resuming after confirmation expiry - 2026-09-13
 
-The next pause/resume regression starts from a complete booking statement and
-ages its saved availability result by sixteen minutes while expiring the pending
-confirmation. Before the fix, sending Confirm raised "The confirmation expired.
-Prepare it again." instead of returning a fresh review. Collected fields were
-still stored; the missing behavior was recovery of the expired confirmation.
+The accepted UAT behavior is background revalidation when a visitor presses
+Confirm after the fifteen-minute review window. Repeating an identical review
+is unnecessary. The regression reproduced the old extra-review response before
+this policy change.
 
-The operation layer now reports that condition with a specific error type. The
-shared channel runtime handles it by using the existing confirmation preparation
-path, which refreshes volatile facts and validates the selected slot. The delayed
-Confirm does not authorize the replacement review. The visitor must confirm the
-new review before a write occurs. Other errors retain their existing handling.
-The five-minute availability and fifteen-minute confirmation limits are unchanged.
+The shared channel runtime uses the existing preparation path to refresh volatile
+facts, then compares the new confirmation's canonical hash with the review the
+visitor confirmed. That hash covers the operation input, reviewed field/tool
+facts, and pinned task/tool versions. If identical, the current click confirms
+the refreshed record and proceeds through the usual write-time checks and durable
+operation ledger. If different, Lia explains that details changed and presents
+the updated review for a separate confirmation. Review rendering reloads the
+runtime after preparation so a corrected field is actually shown; the concurrent
+correction regression exposed stale display values before this reload was added.
+Busy or unverifiable slots still block booking. The expiry durations and underlying operation guards are unchanged.
 
-Regression scenarios cover an unchanged available slot, a newly occupied slot
-with alternatives remaining, a failed availability lookup, and the server resume
-reply path used on reopening the conversation. Each checks retained name, email,
-phone, reason, and preferred date, a new availability request, and no immediate
-booking. Available/reopen cases then confirm the new review and assert exactly
-one booking at the retained time. Extraction and calendar HTTP are mocked; the
-resume-reply test does not drive an actual browser reload or external calendar.
+The test begins with a complete booking statement, expires the pending review,
+and ages its availability result by sixteen minutes. Scenarios cover unchanged
+availability, a newly busy slot, provider failure, reopening the conversation
+without pressing Confirm, and a detail correction during the background lookup.
+They check retained fields, no extra review for unchanged details, explicit review
+for changes, and no booking from simply reopening the conversation. Successful
+cases assert one booking attempt and replay the confirmed operation to verify it
+returns the same attempt rather than creating another. Extraction and calendar
+HTTP are mocked; timestamp aging replaces a real sixteen-minute wait.
 
 ```powershell
 npx playwright test --config=playwright.runtime.config.ts conversational-task-operation-runtime-db --grep 'Expired confirmation resumes with retained details|requires explicit confirmation and invalidates'
 ```
 
-Deployed UAT: start a fresh chat with a complete booking statement for a free
-slot. Leave the review open for over fifteen minutes, then Confirm. Lia should
-show a fresh review with the same details and no booking yet. Confirm that review
-and verify one event. Separately repeat after reopening the same conversation;
-a new conversation is not a resume of the old task.
+Verification passed: all five resume scenarios plus the explicit-confirmation
+and correction safeguard (six tests, 2.8 minutes), all 321 offline contract tests,
+focused Biome checks, and the production build including TypeScript. The tests
+made no external model calls and created no live calendar appointments.
 
-Verification: all four resume scenarios passed (2.9 minutes), as did the existing
-explicit-confirmation/correction regression. All 321 offline contracts, focused
-Biome checks, and the production build including TypeScript passed. No live
-calendar appointment or external model call was made by these tests.
+Deployed UAT: start a fresh chat with a complete booking statement for a free
+slot. Leave the review open for over fifteen minutes, then Confirm once. If all
+reviewed details remain unchanged and the slot remains available, Lia should
+report completion without repeating the review. Verify one calendar event. A
+changed slot must instead be explained with alternatives; changed reviewed
+information must require confirmation. Reopening the same conversation alone
+must never create a booking.
 
 
 ### Explain alternatives after a requested time cannot be matched - 2026-09-13
