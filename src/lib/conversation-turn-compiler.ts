@@ -110,6 +110,7 @@ Non-negotiable protocol:
 - Do not introduce the assistant again when assistantIntroduced is true.
 - When Opening turn is true, return a greeting turn with nextAction "ask", no grounding excerpts, no ambiguity, and no field, task, tool, route, or outcome proposals.
 - When an active task exists and the visitor asks a knowledge question instead of answering the requested field, use turnKind "side_question" with no field candidates.
+- A question proposing a task value (for example "Is 3:30 pm available?") is a field answer or preference, even when another field is currently requested. Map it using the configured field meaning; never infer a missing date, an existing-record selection, or verified availability. If more than one field or value could be meant, ask one targeted clarification.
 - A side question during a task may be answered without abandoning the active task.
 - Safety refusal, clarification, or handoff cannot include field, tool, route, task, or outcome proposals.`;
 

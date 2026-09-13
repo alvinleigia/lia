@@ -13,6 +13,7 @@ import { StructuredTurnEngine } from "../../src/lib/conversation-turn-engine";
 import { canonicalizeFieldCandidates } from "../../src/lib/conversational-task-field-validation";
 import {
   bindRequestedTaskTextAnswer,
+  extractLocalTaskFieldCandidates,
   normalizeActiveTaskQuestion,
   reconcileTaskTurnWithRuntime,
 } from "../../src/lib/hybrid-flow-runtime";
@@ -678,4 +679,106 @@ test("an explicit ISO clarification in the same statement is retained", async ()
     ),
   );
   expect(result.proposal.fieldCandidates[0].naturalValue).toBe("2026-10-09");
+});
+
+for (const [snapshot, phoneKey, dateKey, timeKey] of [
+  [appointment, "contactNumber", "preferredDate", "requestedTime"],
+  [bike, "customerPhone", "serviceDate", "serviceTime"],
+] as const) {
+  test(`${snapshot.task.name}: local entities map independently of the pending field`, async () => {
+    for (const [text, key] of [
+      ["+61491570006", phoneKey],
+      ["2026-09-22", dateKey],
+      ["3:30 pm", timeKey],
+    ]) {
+      const candidates = extractLocalTaskFieldCandidates({
+        snapshot,
+        text,
+        timezone: "Australia/Sydney",
+      });
+      expect(candidates).toEqual([
+        { fieldKey: key, naturalValue: text, source: "visitor", confidence: 1 },
+      ]);
+      const resolved = await reconcile(
+        snapshot,
+        { ...proposal({}), fieldCandidates: candidates ?? [] },
+        text,
+        snapshot.task.definition.fields[0].key,
+      );
+      expect(resolved.values[key]).toBeDefined();
+      expect(
+        resolved.values[snapshot.task.definition.fields[0].key],
+      ).toBeUndefined();
+    }
+  });
+}
+
+test("explicit configured labels support multiple entities and preserve normal validation", async () => {
+  const text =
+    "Customer Name: Alex Test; Service Subject: oil change; Service Time: 15:30";
+  const candidates = extractLocalTaskFieldCandidates({
+    snapshot: bike,
+    text,
+    timezone: "UTC",
+  });
+  expect(candidates?.map(({ fieldKey }) => fieldKey)).toEqual([
+    "customerName",
+    "serviceSubject",
+    "serviceTime",
+  ]);
+  const resolved = await reconcile(
+    bike,
+    { ...proposal({}), fieldCandidates: candidates ?? [] },
+    text,
+    "customerPhone",
+  );
+  expect(resolved.values).toMatchObject({
+    customerName: "Alex Test",
+    serviceSubject: "oil change",
+    serviceTime: "15:30",
+  });
+  expect(resolved.next.nextAction).toBe("ask");
+});
+
+test("local extraction defers ambiguous mappings and compound language to the model", () => {
+  const twoTimes = task("Delivery", [
+    ["pickup", "Pickup time", "time"],
+    ["dropoff", "Dropoff time", "time"],
+  ]);
+  for (const [snapshot, text] of [
+    [twoTimes, "15:30"],
+    [bike, "09/10/2026"],
+    [bike, bikeMessage],
+    [bike, "3 pm or 4 pm"],
+    [bike, "Service Time: 15:30; Service Time: 16:00"],
+    [bike, "cancel"],
+  ] as const) {
+    expect(
+      extractLocalTaskFieldCandidates({ snapshot, text, timezone: "UTC" }),
+    ).toBeNull();
+  }
+  expect(
+    extractLocalTaskFieldCandidates({
+      snapshot: twoTimes,
+      text: "Dropoff time: 15:30",
+      timezone: "UTC",
+    })?.[0].fieldKey,
+  ).toBe("dropoff");
+});
+
+test("a question containing mapped entities can continue collection without accepting ambiguity", () => {
+  const clear = {
+    ...proposal({ serviceTime: "15:30" }),
+    turnKind: "side_question" as const,
+  };
+  expect(normalizeActiveTaskQuestion(clear).turnKind).toBe("field_answer");
+  expect(
+    normalizeActiveTaskQuestion({
+      ...clear,
+      ambiguity: {
+        requiresClarification: true,
+        question: "Pickup or dropoff?",
+      },
+    }).turnKind,
+  ).toBe("side_question");
 });

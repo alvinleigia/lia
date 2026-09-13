@@ -2260,3 +2260,49 @@ Availability acknowledgement follow-up: the three persisted preferred-time tests
 (available, busy, failed) passed, including acknowledgement-before-review ordering
 and no positive claim for unavailable/unverified results. Biome and the production
 build passed. Provider responses were mocked.
+
+
+## Context-aware entity collection (2026-09-13)
+
+Shared Business Task execution now tries explicit configured labels and
+unambiguous scalar phone, email, ISO date, and time answers locally, independently
+of the currently requested field. Complex wording and ambiguous mappings still
+use the existing structured LLM extractor and field validators. Multiple fields
+of the same type require a label or interpretation; the local path does not guess.
+Model-declared ambiguity prompts for clarification before applying its candidates.
+
+Calendar clock and time-window preferences supplied early remain unverified
+visitor candidates in the existing field ledger. They do not supply an appointment
+reference, infer a new date, or authorize a write. Once the existing appointment
+and new date are resolved, Lia matches the retained preference against provider
+availability and prepares a review only when all required fields are ready.
+A side question restores pending appointment choices rather than a raw reference
+prompt. The same published field definitions and provider bindings are reused.
+
+Manual UAT:
+1. Start rescheduling with a name/phone that matches multiple upcoming appointments.
+2. Before selecting one, send `Is 3:30 pm available?`. Expect acknowledgement of the
+   preference and the existing appointment choices, without claiming availability.
+3. Ask a side question. Its answer should be followed by those appointment choices.
+4. Select the appointment, then provide the new date. If 3:30 pm is available,
+   expect its availability acknowledgement and review without re-entering the time.
+5. Repeat with an unavailable time and check nearby alternatives. Repeat with
+   `3:30 pm or 4 pm`; clarification must not silently overwrite the saved preference.
+6. In a different task (such as bike servicing), supply a phone/date/time before
+   the requested name, or use configured labels such as `Service Time: 15:30`.
+   Verify the value maps to the correct field and remaining required fields are asked.
+
+Automated coverage includes both appointment and bike-service schemas, typed and
+labelled values, ambiguous mappings, LLM fallback, early exact/window preferences,
+side-question recovery, conversation resume, appointment identity retention,
+provider verification, and explicit confirmation. Provider and model responses
+are mocked; these checks do not certify a live Telnyx AI or Calendly integration.
+
+Verification: all 332 offline contract tests passed, including 14 statement
+extraction tests. Five persisted scenarios passed: preferred time available,
+busy, provider failure, full-statement booking/confirmation recovery, and early
+rescheduling preferences with side questions and ambiguity. The latter also
+checks an early time window refined to an exact time. Biome and the final
+production build passed. Standalone TypeScript checking reports only the two
+previously recorded nullable `session.runtime` assertions in the existing test
+fixture; no new diagnostics remain.

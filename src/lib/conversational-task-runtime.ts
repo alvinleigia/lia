@@ -1842,6 +1842,45 @@ export async function applyConversationalTaskEvent(
           referenceDate: occurredAt,
           resolveProjectResource: resolveProjectTaskResource,
         });
+        // A visitor's clock preference is useful before its date or resource is
+        // resolved, but it is never a provider-verified start. Keep the original
+        // value in the existing field ledger without making it tool-ready.
+        if (
+          event.candidates.some(
+            ({ naturalValue }) =>
+              typeof naturalValue === "string" &&
+              /\d{1,2}:\d{2}|\d{1,2}\s*(?:am|pm)\b|\b(?:morning|afternoon|evening)\b/i.test(
+                naturalValue,
+              ),
+          )
+        ) {
+          const { getTaskCalendarAvailability, parseCalendarTimePreference } =
+            await import("@/lib/conversational-task-calendar-availability");
+          const binding = await getTaskCalendarAvailability(snapshot);
+          if (binding) {
+            for (const candidate of canonicalCandidates) {
+              if (
+                candidate.fieldKey !== binding.startFieldKey ||
+                candidate.provenance.source !== "visitor" ||
+                candidate.validation.code === "source_not_allowed" ||
+                typeof candidate.naturalValue !== "string" ||
+                /^\d{4}-\d{2}-\d{2}T/.test(candidate.naturalValue) ||
+                !parseCalendarTimePreference(
+                  candidate.naturalValue,
+                  binding.timezone ?? "UTC",
+                )
+              )
+                continue;
+              candidate.canonicalValue = null;
+              candidate.state = "candidate";
+              candidate.validation = {
+                valid: false,
+                code: "calendar_availability_required",
+                message: "The preferred time needs an availability check.",
+              };
+            }
+          }
+        }
         const result = applyFieldCandidates({
           candidates: canonicalCandidates,
           definition: appointmentIdentityDefinition(snapshot),

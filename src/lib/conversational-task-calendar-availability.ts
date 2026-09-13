@@ -473,7 +473,7 @@ type TimePreference = {
   timezone: string;
 };
 
-function parseCalendarTimePreference(
+export function parseCalendarTimePreference(
   text: string,
   timezone: string,
 ): TimePreference | null {

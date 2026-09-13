@@ -47,6 +47,7 @@ import {
   executeTaskReadOperation,
   findRequestedCalendarSlots,
   getTaskCalendarAvailability,
+  parseCalendarTimePreference,
   readTaskCalendarAvailability,
   refreshExpiredTaskCalendarAvailability,
   suggestCalendarSlots,
@@ -95,6 +96,7 @@ import {
   createMismatchedTaskSelectionProposal,
   createRequestedTaskSelectionProposal,
   dispatchHybridFlowBoundary,
+  extractLocalTaskFieldCandidates,
   getRequiredCompletionOperationDefinition,
   getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
@@ -1394,6 +1396,42 @@ async function executeTaskBoundary(input: {
     requestedFieldKey: selectionValue ? (requestedField?.key ?? null) : null,
     selectionValue,
   });
+  const timezone = calendar?.timezone ?? input.project.companyTimeZone ?? "UTC";
+  // A narrowly recognized time question can arrive before the appointment/date
+  // is resolved. Retain it as a preference; never infer the appointment to change.
+  const earlyTimeQuestion =
+    calendar &&
+    !input.runtimeInput.selection &&
+    /^(?:(?:(?:is|after|before|from|show me times after|show me times before)\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{2}:\d{2})(?:\s+(?:available|free))?|(?:in the\s+)?(?:morning|afternoon|evening))\s*\??$/i.test(
+      requestedAnswer.trim(),
+    ) &&
+    parseCalendarTimePreference(requestedAnswer, timezone);
+  const localCandidates = input.runtimeInput.selection
+    ? null
+    : earlyTimeQuestion && calendar
+      ? [
+          {
+            fieldKey: calendar.startFieldKey,
+            naturalValue: requestedAnswer,
+            confidence: 1,
+            source: "visitor" as const,
+          },
+        ]
+      : extractLocalTaskFieldCandidates({
+          snapshot,
+          text: requestedAnswer,
+          timezone,
+        });
+  const localProposal = localCandidates?.length
+    ? {
+        ...operationTurn({
+          nextAction: "ask",
+          reply: "I noted those details.",
+        }),
+        turnKind: "field_answer" as const,
+        fieldCandidates: localCandidates,
+      }
+    : null;
   const extractedProposal = appointmentSelected
     ? operationTurn({
         nextAction: "ask",
@@ -1401,7 +1439,8 @@ async function executeTaskBoundary(input: {
       })
     : selectionProposal
       ? selectionProposal
-      : bindRequestedTaskSelection({
+      : (localProposal ??
+        bindRequestedTaskSelection({
           proposal: (
             await executeConfiguredStructuredTurn({
               activeTask: session.snapshot,
@@ -1432,7 +1471,7 @@ async function executeTaskBoundary(input: {
             ? (requestedField?.key ?? null)
             : null,
           selectionValue,
-        });
+        }));
   const normalizedProposal = normalizeActiveTaskQuestion(extractedProposal);
   const proposal =
     !appointmentSelected &&
@@ -1451,10 +1490,29 @@ async function executeTaskBoundary(input: {
       ({ fieldKey, source }) =>
         fieldKey === calendar.startFieldKey && source === "visitor",
     );
-  if (calendar && !calendarAnswer) {
-    proposal.fieldCandidates = proposal.fieldCandidates.filter(
-      ({ fieldKey }) => fieldKey !== calendar.startFieldKey,
+  if (calendar && !calendarAnswer && hasRequestedCalendarTime) {
+    proposal.fieldCandidates = proposal.fieldCandidates.map((candidate) =>
+      candidate.fieldKey === calendar.startFieldKey
+        ? { ...candidate, naturalValue: requestedAnswer }
+        : candidate,
     );
+  }
+  // Uncertain model mappings are questions, not accepted values or tool calls.
+  if (
+    proposal.ambiguity.requiresClarification &&
+    !["cancel", "handoff", "fail"].includes(proposal.nextAction)
+  ) {
+    return {
+      inputRequest: null,
+      output: {
+        ...proposal,
+        fieldCandidates: [],
+        toolRequest: null,
+        nextAction: "clarify",
+        reply: proposal.ambiguity.question ?? proposal.reply,
+      },
+      signals: [],
+    };
   }
   let revision = session.execution.revision;
 
@@ -1548,6 +1606,22 @@ async function executeTaskBoundary(input: {
       !resumedSession.snapshot
     ) {
       return { output: knowledgeProposal, signals: [] };
+    }
+    const resumedAppointment = await readPendingTaskAppointmentChoice({
+      runtime: resumedSession.runtime,
+      projectId: input.runtimeInput.projectId,
+      taskRunId: resumedSession.runtime.run.id,
+      snapshot: resumedSession.snapshot,
+    });
+    if (resumedAppointment) {
+      return {
+        inputRequest: resumedAppointment.inputRequest,
+        output: operationTurn({
+          nextAction: "ask",
+          reply: `${knowledgeProposal.reply}\n\n${resumedAppointment.reply}`,
+        }),
+        signals: [],
+      };
     }
     const resumedProposal = reconcileTaskSideQuestionWithRuntime({
       fields: resumedSession.runtime.fields,
@@ -1649,7 +1723,12 @@ async function executeTaskBoundary(input: {
       });
     return {
       inputRequest,
-      output: operationTurn({ nextAction: "ask", reply: fieldLookup.reply }),
+      output: operationTurn({
+        nextAction: "ask",
+        reply: hasRequestedCalendarTime
+          ? `I noted your preferred time. First, let's identify the appointment to change.\n\n${fieldLookup.reply}`
+          : fieldLookup.reply,
+      }),
       signals: [],
     };
   }
@@ -1738,26 +1817,35 @@ async function executeTaskBoundary(input: {
         snapshot,
         taskRunId: runtime.run.id,
       });
-      const suppliedMatches =
+      const retainedTime = canonicalSession.runtime.fields.find(
+        ({ fieldKey }) => fieldKey === calendar.startFieldKey,
+      );
+      const preferenceText =
         !calendarAnswer && hasRequestedCalendarTime
-          ? findRequestedCalendarSlots({
-              text: input.runtimeInput.text,
-              date: String(date),
-              timezone:
-                calendar.timezone ?? input.project.companyTimeZone ?? "UTC",
-              options: availability.allOptions,
-            })
-          : null;
-      const suppliedWindow =
-        !calendarAnswer && hasRequestedCalendarTime
-          ? suggestCalendarSlots({
-              text: input.runtimeInput.text,
-              date: String(date),
-              timezone:
-                calendar.timezone ?? input.project.companyTimeZone ?? "UTC",
-              options: availability.allOptions,
-            })
-          : null;
+          ? requestedAnswer
+          : retainedTime?.state === "candidate" &&
+              retainedTime.provenance.source === "visitor" &&
+              typeof retainedTime.naturalValue === "string"
+            ? retainedTime.naturalValue
+            : null;
+      const suppliedMatches = preferenceText
+        ? findRequestedCalendarSlots({
+            text: preferenceText,
+            date: String(date),
+            timezone:
+              calendar.timezone ?? input.project.companyTimeZone ?? "UTC",
+            options: availability.allOptions,
+          })
+        : null;
+      const suppliedWindow = preferenceText
+        ? suggestCalendarSlots({
+            text: preferenceText,
+            date: String(date),
+            timezone:
+              calendar.timezone ?? input.project.companyTimeZone ?? "UTC",
+            options: availability.allOptions,
+          })
+        : null;
       if (suppliedWindow?.kind === "window")
         preferredOptions = suppliedWindow.options;
       requestedTimeNotOffered =
@@ -1766,7 +1854,7 @@ async function executeTaskBoundary(input: {
       if (requestedTimeNotOffered)
         preferredOptions =
           suggestCalendarSlots({
-            text: input.runtimeInput.text,
+            text: preferenceText ?? requestedAnswer,
             date: String(date),
             timezone:
               calendar.timezone ?? input.project.companyTimeZone ?? "UTC",

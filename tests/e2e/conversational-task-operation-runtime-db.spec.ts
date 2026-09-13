@@ -1547,6 +1547,7 @@ async function verifyCalendarRuntime(
   selectionRefreshCase?: "available" | "busy" | "failed" | "fresh",
   resumeCase?: "available" | "busy" | "failed" | "reload" | "changed",
   preferenceCase?: "available" | "busy" | "failed" | "window" | "conflict",
+  contextCase = false,
 ) {
   test.setTimeout(540_000);
   if (!fixture) throw new Error("The operation fixture is not ready.");
@@ -1836,10 +1837,87 @@ async function verifyCalendarRuntime(
         },
       ],
     };
+    let entryOperationId = booking.id;
+    if (contextCase) {
+      // Seed only the isolated provider mock, then reuse the real lookup adapter.
+      const seed = await runOperationPreview({
+        projectId,
+        operationId: booking.id,
+        fields: {
+          guestName: "Alex Test",
+          appointmentStart: `${date}T09:30:00.000Z`,
+        },
+      });
+      expect(seed?.attempt.responsePayload.status).toBe("success");
+      const [stored] = await db
+        .select()
+        .from(googleCalendarAppointments)
+        .where(
+          and(
+            eq(googleCalendarAppointments.projectId, projectId),
+            eq(googleCalendarAppointments.providerId, provider.id),
+          ),
+        );
+      await db.insert(googleCalendarAppointments).values({
+        ...stored,
+        id: undefined,
+        reference: `apt_context_${suffix}`,
+        remoteEventId: "context-second",
+        operationKeyHash: `context-second-${suffix}`,
+      });
+      const find = await createOperation({
+        name: "Context lookup",
+        projectId,
+        providerId: provider.id,
+        operationType: "google_calendar.lookup",
+        inputMapping: { patientName: "fields.guestName" },
+        outputMapping: {
+          "fields.appointmentRef":
+            "responsePayload.appointments.0.appointmentRef",
+        },
+      });
+      const reschedule = await createOperation({
+        name: "Context reschedule",
+        projectId,
+        providerId: provider.id,
+        operationType: "google_calendar.reschedule",
+        inputMapping: {
+          patientName: "fields.guestName",
+          appointmentRef: "fields.appointmentRef",
+          newStart: "fields.appointmentStart",
+        },
+        outputMapping: {},
+      });
+      entryOperationId = reschedule.id;
+      entryDefinition.fields.splice(base.fields.length, 0, {
+        ...base.fields[0],
+        id: "10000000-0000-4000-8000-000000000096",
+        key: "appointmentRef",
+        label: "Appointment Reference",
+        dependsOn: [],
+      });
+      entryDefinition.tools = [
+        {
+          access: "read",
+          allowedStages: ["lookup"],
+          tool: { id: `operation:${find.id}`, version: 1 },
+        },
+        {
+          access: "read",
+          allowedStages: ["lookup"],
+          tool: { id: `operation:${availabilityOperation.id}`, version: 1 },
+        },
+        {
+          access: "write",
+          allowedStages: ["operation"],
+          tool: { id: `operation:${reschedule.id}`, version: 1 },
+        },
+      ];
+    }
     const entryTask = await createPublishedTask({
       definition: entryDefinition,
       name: "Opening booking",
-      operationId: booking.id,
+      operationId: entryOperationId,
       projectId,
     });
     const [entryAction] = await db
@@ -1929,6 +2007,278 @@ async function verifyCalendarRuntime(
     if (!action) throw new Error("Opening action missing");
     const originalExecute = StructuredTurnEngine.prototype.execute;
     try {
+      if (contextCase) {
+        const externalConversationId = `context-${suffix}`;
+        const browserInput = {
+          actionId: entryAction.id,
+          channelType: "project_chat" as const,
+          conversationId: externalConversationId,
+          projectId,
+          source: "project_chat" as const,
+        };
+        let calls = 0;
+        StructuredTurnEngine.prototype.execute = async (input) => {
+          calls++;
+          const knowledge = input.stage === "knowledge";
+          return {
+            attempts: 1,
+            source: "model",
+            usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+            modelEscalationReason: null,
+            proposal: {
+              schemaVersion: 1,
+              turnKind: knowledge ? "task_recommendation" : "field_answer",
+              reply: "Let's reschedule.",
+              grounding: { status: "not_needed", excerptIds: [] },
+              fieldCandidates: knowledge
+                ? []
+                : Object.entries({
+                    guestName: "Alex Test",
+                    guestEmail: "alex@example.com",
+                    contactNumber: "+61491570006",
+                    reason: "routine follow-up",
+                  }).map(([fieldKey, naturalValue]) => ({
+                    fieldKey,
+                    naturalValue,
+                    confidence: 1,
+                    source: "visitor",
+                  })),
+              taskRecommendation: knowledge
+                ? {
+                    taskId: entryTask.task.id,
+                    confidence: 1,
+                    reason: "Reschedule request",
+                  }
+                : null,
+              toolRequest: null,
+              routeRecommendation: null,
+              outcomeRecommendation: null,
+              nextAction: "ask",
+              ambiguity: { requiresClarification: false, question: null },
+              safety: { decision: "allow", reasonCode: null },
+              decisionSummary: "Context fixture",
+              validation: {
+                accepted: true,
+                modelAttemptCount: 1,
+                providerModelId: "fixture",
+              },
+            },
+          };
+        };
+        const opening = await runBrowserFlowText({
+          ...browserInput,
+          text: "I want to reschedule. My name is Alex Test, email alex@example.com, phone +61491570006, reason routine follow-up.",
+        });
+        const session = await getConversationTaskRuntimeSession({
+          channelType: "project_chat",
+          externalConversationId,
+          projectId,
+        });
+        if (!session.runtime) throw new Error("Context run missing");
+        conversationIds.push(session.runtime.run.conversationId);
+        const taskRunId = session.runtime.run.id;
+        const initial = opening.replies.at(-1)?.payload as {
+          inputRequest?: { options: Array<{ value: string }> };
+        };
+        expect(initial.inputRequest?.options).toHaveLength(2);
+        StructuredTurnEngine.prototype.execute = async () => {
+          throw new Error("Clear context answers must not call the model");
+        };
+        const before = freeBusyCalls;
+        const windowPreference = await runBrowserFlowText({
+          ...browserInput,
+          text: "after 2 pm",
+        });
+        expect(windowPreference.replies.at(-1)?.payload).toMatchObject({
+          inputRequest: {
+            inputKind: "choice",
+            options: initial.inputRequest?.options,
+          },
+        });
+        const windowRuntime = await getConversationalTaskRuntime({
+          projectId,
+          taskRunId,
+        });
+        expect(windowRuntime?.fields).toContainEqual(
+          expect.objectContaining({
+            fieldKey: "appointmentStart",
+            state: "candidate",
+            canonicalValue: null,
+            naturalValue: "after 2 pm",
+          }),
+        );
+        const early = await runBrowserFlowText({
+          ...browserInput,
+          text: "Is 3:30 pm available?",
+        });
+        expect(early.replies.at(-1)?.text).toContain(
+          "noted your preferred time",
+        );
+        expect(early.replies.at(-1)?.text).not.toContain(
+          "Please provide Appointment Reference",
+        );
+        expect(early.replies.at(-1)?.payload).toMatchObject({
+          inputRequest: {
+            inputKind: "choice",
+            options: initial.inputRequest?.options,
+          },
+        });
+        expect(freeBusyCalls).toBe(before);
+        let retained = await getConversationalTaskRuntime({
+          projectId,
+          taskRunId,
+        });
+        expect(retained?.fields).toContainEqual(
+          expect.objectContaining({
+            fieldKey: "appointmentStart",
+            state: "candidate",
+            canonicalValue: null,
+            naturalValue: "Is 3:30 pm available?",
+          }),
+        );
+        expect(
+          retained?.fields.find(({ fieldKey }) => fieldKey === "appointmentRef")
+            ?.canonicalValue,
+        ).toBeNull();
+        const resumed = await buildHybridChannelResumeReplies({
+          projectId,
+          channelType: "project_chat",
+          externalConversationId,
+        });
+        expect(resumed[0].payload).toMatchObject({
+          inputRequest: {
+            inputKind: "choice",
+            options: initial.inputRequest?.options,
+          },
+        });
+        const localCalls = calls;
+        const fallbackResult: Awaited<
+          ReturnType<StructuredTurnEngine["execute"]>
+        > = {
+          attempts: 1,
+          source: "model" as const,
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          modelEscalationReason: null,
+          proposal: {
+            schemaVersion: 1 as const,
+            turnKind: "side_question" as const,
+            reply: "The team can help with parking.",
+            grounding: { status: "not_needed" as const, excerptIds: [] },
+            fieldCandidates: [],
+            taskRecommendation: null,
+            toolRequest: null,
+            routeRecommendation: null,
+            outcomeRecommendation: null,
+            nextAction: "ask" as const,
+            ambiguity: { requiresClarification: false, question: null },
+            safety: { decision: "allow" as const, reasonCode: null },
+            decisionSummary: "Side question fixture",
+            validation: {
+              accepted: true,
+              modelAttemptCount: 1,
+              providerModelId: "fixture",
+            },
+          },
+        };
+        StructuredTurnEngine.prototype.execute = async () => {
+          calls++;
+          return fallbackResult;
+        };
+        const side = await runBrowserFlowText({
+          ...browserInput,
+          text: "Where can I park?",
+        });
+        expect(side.replies.at(-1)?.text).toContain("parking");
+        expect(side.replies.at(-1)?.text).not.toContain(
+          "Please provide Appointment Reference",
+        );
+        expect(side.replies.at(-1)?.payload).toMatchObject({
+          inputRequest: {
+            inputKind: "choice",
+            options: initial.inputRequest?.options,
+          },
+        });
+        expect(calls).toBe(localCalls + 2);
+        StructuredTurnEngine.prototype.execute = async () => {
+          calls++;
+          return {
+            ...fallbackResult,
+            proposal: {
+              ...fallbackResult.proposal,
+              nextAction: "clarify",
+              fieldCandidates: [
+                {
+                  fieldKey: "appointmentStart",
+                  naturalValue: "4 pm",
+                  confidence: 0.5,
+                  source: "visitor",
+                },
+              ],
+              ambiguity: {
+                requiresClarification: true,
+                question: "Do you prefer 3:30 pm or 4 pm?",
+              },
+            },
+          };
+        };
+        const unclear = await runBrowserFlowText({
+          ...browserInput,
+          text: "Is 3:30 pm or 4 pm available?",
+        });
+        expect(unclear.replies.at(-1)?.text).toContain("Do you prefer");
+        retained = await getConversationalTaskRuntime({ projectId, taskRunId });
+        expect(
+          retained?.fields.find(
+            ({ fieldKey }) => fieldKey === "appointmentStart",
+          )?.naturalValue,
+        ).toBe("Is 3:30 pm available?");
+        expect(freeBusyCalls).toBe(before);
+        StructuredTurnEngine.prototype.execute = async () => {
+          throw new Error("Clear follow-up must not call the model");
+        };
+        const chosen = await runBrowserFlowText({
+          ...browserInput,
+          text: "the second one",
+        });
+        expect(chosen.replies.at(-1)?.payload).toMatchObject({
+          inputRequest: { fieldKey: "preferredDate" },
+        });
+        const review = await runBrowserFlowText({
+          ...browserInput,
+          text: date,
+        });
+        expect(review.replies.at(-1)?.text).toMatch(
+          /^Yes, .*3:30 pm.*currently available/,
+        );
+        expect(review.replies.at(-1)?.payload).toMatchObject({
+          inputRequest: { fieldKey: "lia_confirmation" },
+        });
+        retained = await getConversationalTaskRuntime({ projectId, taskRunId });
+        expect(retained?.fields).toContainEqual(
+          expect.objectContaining({
+            fieldKey: "appointmentStart",
+            state: "valid",
+            canonicalValue: `${date}T15:30:00.000Z`,
+          }),
+        );
+        expect(retained?.fields).toContainEqual(
+          expect.objectContaining({
+            fieldKey: "appointmentRef",
+            canonicalValue: initial.inputRequest?.options[1].value,
+          }),
+        );
+        expect(retained?.fields).toContainEqual(
+          expect.objectContaining({
+            fieldKey: "reason",
+            canonicalValue: "routine follow-up",
+          }),
+        );
+        expect(
+          retained?.confirmations.filter(({ status }) => status === "consumed"),
+        ).toHaveLength(0);
+        expect(calls).toBe(5);
+        return;
+      }
       for (const [
         channelType,
         clock,
@@ -3489,3 +3839,14 @@ for (const preferenceCase of [
     );
   });
 }
+
+test("Early time preference survives appointment selection and date collection", async () => {
+  await verifyCalendarRuntime(
+    true,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    true,
+  );
+});

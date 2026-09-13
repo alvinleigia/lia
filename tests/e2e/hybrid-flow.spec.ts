@@ -1412,16 +1412,13 @@ test("candidate-bearing task answers do not remain ordinary conversation", () =>
   for (const turnKind of [
     "ordinary_question",
     "task_recommendation",
+    "side_question",
   ] as const) {
     expect(
       normalizeActiveTaskQuestion({ ...proposal, turnKind }).turnKind,
     ).toBe("field_answer");
   }
-  for (const turnKind of [
-    "side_question",
-    "task_switch",
-    "cancellation",
-  ] as const) {
+  for (const turnKind of ["task_switch", "cancellation"] as const) {
     expect(
       normalizeActiveTaskQuestion({ ...proposal, turnKind }).turnKind,
     ).toBe(turnKind);

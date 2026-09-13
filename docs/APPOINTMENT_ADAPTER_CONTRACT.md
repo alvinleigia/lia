@@ -63,3 +63,11 @@ before offering full preferred-time search. This is an adapter capability, not a
 per-flow code change. The hosted Google Calendar tool result also exposes the
 bounded complete-day fields for voice consumers; no new Telnyx account or live
 Calendly integration is part of this change.
+
+
+A preferred clock time may be collected before the appointment to change or its
+new date. Lia retains it as an unverified visitor candidate and resolves it against
+this availability contract after the prerequisites are collected. It is not a
+booking-ready timestamp until a provider-returned slot matches. Side questions
+retain pending appointment choices, and ambiguous values require clarification.
+This behavior reuses the existing field ledger and adapter bindings.
