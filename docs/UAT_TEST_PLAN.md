@@ -2067,3 +2067,27 @@ Verification: all four resume scenarios passed (2.9 minutes), as did the existin
 explicit-confirmation/correction regression. All 321 offline contracts, focused
 Biome checks, and the production build including TypeScript passed. No live
 calendar appointment or external model call was made by these tests.
+
+
+### Explain alternatives after a requested time cannot be matched - 2026-09-13
+
+Live UAT supplied a previously booked 10:00 time. The reply excluded that time
+but presented a generic choice prompt without explaining why. The shared runtime
+now introduces alternatives with "I couldn't find availability for your requested
+time." Recovery after a selected slot cannot be verified likewise explains the
+problem before listing alternatives. Failed lookup wording remains distinct.
+
+The existing time matcher now exposes its match set internally so the caller can
+distinguish no offered match from ambiguous/missing time or timezone input. Its
+single-slot API preserves its prior behavior. Multiple matches, including repeated
+daylight-saving hours, do not trigger the no-match explanation. The wording does
+not assert that another person booked a time: provider results can be a limited
+list of offers rather than an exhaustive availability report.
+
+Focused coverage checks time-match classification and the opening-request,
+resumed-busy-slot, and failed-lookup replies. Runtime tests use synthetic task runs
+with mocked extraction and calendar HTTP; deployed wording still needs UAT.
+
+Verification passed: 22 calendar contract tests, all three persisted runtime
+scenarios with the final wording (5.4 minutes), focused Biome checks, and the
+production build including TypeScript. No live booking was created by these tests.

@@ -44,8 +44,8 @@ import {
 import {
   CalendarSlotValidationError,
   executeTaskReadOperation,
+  findRequestedCalendarSlots,
   getTaskCalendarAvailability,
-  matchRequestedCalendarSlot,
   readTaskCalendarAvailability,
   refreshExpiredTaskCalendarAvailability,
   verifiedCalendarSlots,
@@ -940,7 +940,7 @@ async function recoverCalendarSlot(input: {
     ? outcome === "no_result"
       ? `There are no available appointment times for that date. Please choose another date. Lia attempt #${availability.attempt?.id}.`
       : `I could not verify available appointment times. Please try another date or ask the team for help.${availability.attempt ? ` Lia attempt #${availability.attempt.id}.` : ""}`
-    : "Please choose one of these currently available appointment times.";
+    : "I couldn't confirm availability for your selected time. Please choose one of these alternative appointment times.";
   return {
     inputRequest,
     output: operationTurn({
@@ -1584,6 +1584,7 @@ async function executeTaskBoundary(input: {
           snapshot: canonicalSession.snapshot,
         })
       : proposal;
+  let requestedTimeNotOffered = false;
   if (
     calendar &&
     canonicalSession.runtime &&
@@ -1621,9 +1622,9 @@ async function executeTaskBoundary(input: {
         snapshot,
         taskRunId: runtime.run.id,
       });
-      const suppliedSlot =
+      const suppliedMatches =
         !calendarAnswer && hasRequestedCalendarTime
-          ? matchRequestedCalendarSlot({
+          ? findRequestedCalendarSlots({
               text: input.runtimeInput.text,
               date: String(date),
               timezone:
@@ -1631,6 +1632,9 @@ async function executeTaskBoundary(input: {
               options: availability.options,
             })
           : null;
+      requestedTimeNotOffered = suppliedMatches?.length === 0;
+      const suppliedSlot =
+        suppliedMatches?.length === 1 ? suppliedMatches[0] : null;
       if (suppliedSlot) {
         const current = await getConversationTaskRuntimeSession(
           input.runtimeInput,
@@ -1817,7 +1821,7 @@ async function executeTaskBoundary(input: {
         inputRequest.fieldKey === calendar.startFieldKey
           ? {
               ...reconciledProposal,
-              reply: `${reconciledProposal.reply}\n${inputRequest.options.map(({ label }) => `- ${label}`).join("\n")}`,
+              reply: `${requestedTimeNotOffered ? "I couldn't find availability for your requested time. Please choose one of these alternative appointment times." : reconciledProposal.reply}\n${inputRequest.options.map(({ label }) => `- ${label}`).join("\n")}`,
             }
           : reconciledProposal,
       signals: [],

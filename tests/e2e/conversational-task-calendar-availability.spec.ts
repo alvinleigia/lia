@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  findRequestedCalendarSlots,
   matchRequestedCalendarSlot,
   verifiedCalendarSlots,
 } from "../../src/lib/conversational-task-calendar-availability";
@@ -171,4 +172,38 @@ test("explicit UTC overrides local provider time; unsupported zone shorthand ask
   for (const text of ["Book at 10 am UTC+10", "Book at 10 am IST"]) {
     expect(matchRequestedCalendarSlot({ ...input, text })).toBeNull();
   }
+});
+
+test("distinguishes an unoffered requested time from missing or ambiguous input", () => {
+  const input = {
+    date: "2026-09-22",
+    timezone: "Australia/Sydney",
+    options: [requestedSlot],
+  };
+  expect(
+    findRequestedCalendarSlots({ ...input, text: "Book at 11 am" }),
+  ).toEqual([]);
+  expect(
+    findRequestedCalendarSlots({ ...input, text: "Book at 10 am" }),
+  ).toEqual([requestedSlot]);
+  for (const text of [
+    "Book tomorrow",
+    "Book at 10 am or 11 am",
+    "Book at 13 am",
+    "Book at 10 am IST",
+    "Book at 10 am Invalid/Zone",
+  ]) {
+    expect(findRequestedCalendarSlots({ ...input, text })).toBeNull();
+  }
+  expect(
+    findRequestedCalendarSlots({
+      text: "Book at 1:30 am",
+      date: "2026-11-01",
+      timezone: "America/New_York",
+      options: [
+        { label: "First 1:30", value: "2026-11-01T05:30:00Z" },
+        { label: "Second 1:30", value: "2026-11-01T06:30:00Z" },
+      ],
+    }),
+  ).toHaveLength(2);
 });

@@ -2147,6 +2147,14 @@ async function verifyCalendarRuntime(
                   .replies;
           expect(freeBusyCalls).toBeGreaterThan(callsBefore);
           expect(insertedEvent).toBeNull();
+          if (resumeCase === "failed") {
+            expect(replies.at(-1)?.text).toContain(
+              "I could not verify available appointment times",
+            );
+            expect(replies.at(-1)?.text).not.toContain(
+              "I couldn't confirm availability for your selected time",
+            );
+          }
           const resumed = await getConversationalTaskRuntime(resumeScope);
           for (const fieldKey of [
             "guestName",
@@ -2213,6 +2221,9 @@ async function verifyCalendarRuntime(
               )?.state,
             ).not.toBe("valid");
             if (resumeCase === "busy") {
+              expect(replies.at(-1)?.text.split("\n")[0]).toBe(
+                "I couldn't confirm availability for your selected time. Please choose one of these alternative appointment times.",
+              );
               const alternatives = await readTaskCalendarAvailability({
                 ...resumeScope,
                 binding,
@@ -2228,6 +2239,9 @@ async function verifyCalendarRuntime(
           continue;
         }
         if (selectionRefreshCase) {
+          expect(result.replies[0].text.split("\n")[0]).toBe(
+            "I couldn't find availability for your requested time. Please choose one of these alternative appointment times.",
+          );
           const selectionScope = {
             binding,
             projectId,

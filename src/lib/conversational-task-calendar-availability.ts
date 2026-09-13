@@ -451,7 +451,7 @@ export async function assertTaskCalendarSlot(input: {
 
 // A time stated in a multi-field message is a preference until a fresh provider
 // offer contains that exact local date/time. Never invent a slot from model output.
-export function matchRequestedCalendarSlot(input: {
+export function findRequestedCalendarSlots(input: {
   text: string;
   date: string;
   timezone: string;
@@ -510,8 +510,17 @@ export function matchRequestedCalendarSlot(input: {
         minutes.has(Number(parts.hour) * 60 + Number(parts.minute))
       );
     });
-    return options.length === 1 ? options[0] : null;
+    return options;
   } catch {
     return null;
   }
+}
+
+// Preserve the single-slot selection contract; zero matches means not offered,
+// while null or multiple matches need clarification rather than an availability claim.
+export function matchRequestedCalendarSlot(
+  input: Parameters<typeof findRequestedCalendarSlots>[0],
+) {
+  const options = findRequestedCalendarSlots(input);
+  return options?.length === 1 ? options[0] : null;
 }
