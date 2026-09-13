@@ -1544,6 +1544,7 @@ test("operation sandbox resolves prefixed and bare field mappings without losing
 async function verifyCalendarRuntime(
   statementsOnly: boolean,
   confirmationRefreshCase?: "available" | "busy" | "failed",
+  selectionRefreshCase?: "available" | "busy" | "failed" | "fresh",
 ) {
   test.setTimeout(540_000);
   if (!fixture) throw new Error("The operation fixture is not ready.");
@@ -1684,7 +1685,9 @@ async function verifyCalendarRuntime(
           "fixture@example.test": {
             busy:
               mode === "busy"
-                ? [{ start: `${date}T00:00:00Z`, end: `${date}T23:59:59Z` }]
+                ? selectionRefreshCase
+                  ? [{ start: `${date}T10:30:00Z`, end: `${date}T11:00:00Z` }]
+                  : [{ start: `${date}T00:00:00Z`, end: `${date}T23:59:59Z` }]
                 : [],
           },
         },
@@ -1918,9 +1921,14 @@ async function verifyCalendarRuntime(
             ["project_chat", "10:00 am", true, true],
           ] as const)
         : []) {
+        if (
+          selectionRefreshCase &&
+          (channelType !== "project_chat" || clock !== "8:00 pm")
+        )
+          continue;
         const text = pastedSummary
           ? `I have noted your preferred appointment on ${date} at ${clock} UTC, patient name Alex Test, email alex@example.com, contact +61491570006, and reason persistent knee pain. How would you like to proceed with confirmation?`
-          : `I want to book an appointment on ${date} at ${clock} UTC. My name is Alex Test, email alex@example.com, phone +61491570006, reason persistent knee pain.`;
+          : `I want to book an appointment on ${date} at ${clock} UTC. My name is Alex Test, email alex@example.com, phone +61491570006${selectionRefreshCase ? "." : ", reason persistent knee pain."}`;
         const stages: string[] = [];
         StructuredTurnEngine.prototype.execute = async (input) => {
           const starting =
@@ -1967,7 +1975,9 @@ async function verifyCalendarRuntime(
                     guestName: "Alex Test",
                     guestEmail: "alex@example.com",
                     contactNumber: "+61491570006",
-                    reason: "persistent knee pain",
+                    ...(selectionRefreshCase
+                      ? {}
+                      : { reason: "persistent knee pain" }),
                     preferredDate: date,
                     appointmentStart: clock,
                   }).map(([fieldKey, naturalValue]) => ({
@@ -1992,7 +2002,7 @@ async function verifyCalendarRuntime(
             },
           };
         };
-        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${Boolean(pastedSummary)}-${suffix}`;
+        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${Boolean(pastedSummary)}-${selectionRefreshCase ?? "default"}-${suffix}`;
         const [conversation] = await db
           .insert(channelConversations)
           .values({ channelType, externalConversationId, projectId })
@@ -2073,7 +2083,7 @@ async function verifyCalendarRuntime(
           guestName: "Alex Test",
           guestEmail: "alex@example.com",
           contactNumber: "+61491570006",
-          reason: "persistent knee pain",
+          ...(selectionRefreshCase ? {} : { reason: "persistent knee pain" }),
           preferredDate: date,
         })) {
           expect(fields[key]).toMatchObject({ canonicalValue, state: "valid" });
@@ -2093,6 +2103,148 @@ async function verifyCalendarRuntime(
           });
         }
         expect(insertedEvent).toBeNull();
+        if (selectionRefreshCase) {
+          const selectionScope = {
+            binding,
+            projectId,
+            taskRunId: session.runtime.run.id,
+          };
+          const offer = await readTaskCalendarAvailability(selectionScope);
+          const slot = offer.options.find(
+            ({ value }) => value === `${date}T10:30:00.000Z`,
+          );
+          if (!slot || !offer.attempt)
+            throw new Error("The offered 10:30 slot is missing");
+          expect(result.replies[0].payload).toMatchObject({
+            inputRequest: { options: expect.arrayContaining([slot]) },
+          });
+          if (selectionRefreshCase !== "fresh")
+            await db
+              .update(operationAttempts)
+              .set({ finishedAt: new Date(Date.now() - 301_000) })
+              .where(eq(operationAttempts.id, offer.attempt.id));
+          mode =
+            selectionRefreshCase === "fresh"
+              ? "available"
+              : selectionRefreshCase;
+          const callsBefore = freeBusyCalls;
+          StructuredTurnEngine.prototype.execute = async () => {
+            throw new Error(
+              "An offered slot selection must not require a model",
+            );
+          };
+          const selection = await runBrowserFlowText({
+            ...browserInput,
+            text: slot.label,
+            ...(selectionRefreshCase === "fresh"
+              ? {
+                  selection: {
+                    id: `task-field:appointmentStart:${slot.value}`,
+                    label: slot.label,
+                    value: slot.value,
+                  },
+                }
+              : {}),
+          });
+          expect(freeBusyCalls).toBeGreaterThan(callsBefore);
+          const afterSelection =
+            await getConversationalTaskRuntime(selectionScope);
+          for (const fieldKey of [
+            "guestName",
+            "guestEmail",
+            "contactNumber",
+            "preferredDate",
+          ]) {
+            expect(
+              afterSelection?.fields.find(
+                (field) => field.fieldKey === fieldKey,
+              )?.canonicalValue,
+            ).toEqual(fields[fieldKey].canonicalValue);
+          }
+          expect(insertedEvent).toBeNull();
+          if (
+            selectionRefreshCase === "available" ||
+            selectionRefreshCase === "fresh"
+          ) {
+            expect(selection.replies.at(-1)?.payload).toMatchObject({
+              inputRequest: { fieldKey: "reason" },
+            });
+            expect(afterSelection?.fields).toContainEqual(
+              expect.objectContaining({
+                fieldKey: "appointmentStart",
+                state: "valid",
+                canonicalValue: slot.value,
+              }),
+            );
+          } else {
+            expect(selection.replies.at(-1)?.payload).toMatchObject({
+              inputRequest: {
+                fieldKey:
+                  selectionRefreshCase === "busy"
+                    ? "appointmentStart"
+                    : "preferredDate",
+              },
+            });
+            if (selectionRefreshCase === "busy") {
+              const currentOffer =
+                await readTaskCalendarAvailability(selectionScope);
+              expect(currentOffer.options.length).toBeGreaterThan(0);
+              expect(
+                currentOffer.options.some(({ value }) => value === slot.value),
+              ).toBe(false);
+            }
+            expect(
+              afterSelection?.fields.find(
+                (field) => field.fieldKey === "appointmentStart",
+              )?.state,
+            ).not.toBe("valid");
+          }
+          if (selectionRefreshCase === "available") {
+            StructuredTurnEngine.prototype.execute = async (turn) =>
+              originalExecute.call(
+                new StructuredTurnEngine({
+                  provider: {
+                    async generateTurn() {
+                      throw new Error(
+                        "A simple missing reason must not require the model",
+                      );
+                    },
+                  },
+                }),
+                turn,
+              );
+            const review = await runBrowserFlowText({
+              ...browserInput,
+              text: "Routine follow-up",
+            });
+            expect(review.replies.at(-1)?.payload).toMatchObject({
+              inputRequest: { fieldKey: "lia_confirmation" },
+            });
+            expect(insertedEvent).toBeNull();
+            const confirmed = await runBrowserFlowText({
+              ...browserInput,
+              text: "Confirm",
+            });
+            expect(
+              confirmed.replies.map(({ text }) => text).join(" "),
+            ).toContain("submitted successfully");
+            expect(insertedEvent).toMatchObject({
+              start: { dateTime: slot.value },
+            });
+            const writes = await db
+              .select()
+              .from(operationAttempts)
+              .where(
+                and(
+                  eq(operationAttempts.projectId, projectId),
+                  eq(operationAttempts.taskRunId, session.runtime.run.id),
+                  eq(operationAttempts.operationId, booking.id),
+                ),
+              );
+            expect(writes).toHaveLength(1);
+          }
+          continue;
+        }
         if (fromPrompt) {
           expect(result.replies.at(-1)?.payload).toMatchObject({
             inputRequest: { fieldKey: "lia_confirmation" },
@@ -2929,5 +3081,11 @@ test("Detailed appointment statements route into verified slots and recover conf
 for (const outcome of ["available", "busy", "failed"] as const) {
   test(`Expired availability at confirmation: ${outcome}`, async () => {
     await verifyCalendarRuntime(false, outcome);
+  });
+}
+
+for (const outcome of ["available", "busy", "failed", "fresh"] as const) {
+  test(`Offered time selection revalidates and retains context: ${outcome}`, async () => {
+    await verifyCalendarRuntime(true, undefined, outcome);
   });
 }

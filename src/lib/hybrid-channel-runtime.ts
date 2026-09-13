@@ -48,6 +48,7 @@ import {
   matchRequestedCalendarSlot,
   readTaskCalendarAvailability,
   refreshExpiredTaskCalendarAvailability,
+  verifiedCalendarSlots,
 } from "@/lib/conversational-task-calendar-availability";
 import {
   executeRequiredTaskFieldLookup,
@@ -1178,18 +1179,44 @@ async function executeTaskBoundary(input: {
       projectId: input.runtimeInput.projectId,
       taskRunId: runtime.run.id,
     });
-    const option = availability.options.find(
+    // Resolve the click against the saved offer even after its freshness window.
+    // Refresh before field validation, which accepts only a currently verified slot.
+    const offeredOptions = verifiedCalendarSlots({
+      attempt: availability.attempt,
+      date: availability.date,
+      now: availability.attempt?.finishedAt ?? undefined,
+    });
+    const option = offeredOptions.find(
       ({ value, label }) =>
         value === requestedAnswer ||
         label.toLowerCase() === requestedAnswer.trim().toLowerCase(),
     );
     if (!option) {
-      if (!availability.options.length)
+      if (!offeredOptions.length)
         throw new CalendarSlotValidationError(
           "Available times could not be verified. Please choose another date.",
         );
       return rejectMismatchedSelection();
     }
+    await executeTaskReadOperation({
+      definition: calendar.definition,
+      projectId: input.runtimeInput.projectId,
+      requestId: `calendar-selection:${input.runtimeInput.inboundMessageId}:${runtime.run.id}`,
+      snapshot,
+      taskRunId: runtime.run.id,
+    });
+    const refreshed = await readTaskCalendarAvailability({
+      binding: calendar,
+      projectId: input.runtimeInput.projectId,
+      taskRunId: runtime.run.id,
+    });
+    if (!refreshed.options.some(({ value }) => value === option.value))
+      throw new CalendarSlotValidationError(
+        "The selected time is no longer available or could not be verified.",
+      );
+    session = await getConversationTaskRuntimeSession(input.runtimeInput);
+    if (!session.runtime || !session.snapshot || !session.execution)
+      throw new Error("The appointment task is unavailable.");
     selectionValue = option.value;
   }
   if (

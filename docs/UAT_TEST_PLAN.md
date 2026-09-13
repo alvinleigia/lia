@@ -1990,3 +1990,41 @@ npx playwright test --config=playwright.runtime.config.ts conversational-task-op
 Deployed acceptance: a review with a still-valid confirmation should survive an
 availability-cache expiry when its selected slot remains free. If the provider
 reports the slot unavailable, offer alternatives without claiming a booking.
+
+
+### Availability revalidation when selecting an offered time - 2026-09-13
+
+UAT showed the visitor selecting 10:30 and receiving the same slot list again.
+An expired offer reproduced this locally: selection validation discarded the
+choice before refreshing availability. The screenshot does not establish the
+actual delay in the deployed session.
+
+The shared channel runtime now resolves an exact label or stored value against
+the saved offer, checks current provider availability, and then validates the
+selected field against that fresh result. Expiry alone no longer loses the
+choice. A still-available slot advances to the next missing required field while
+preserving collected details. A busy slot or failed lookup blocks progress to
+booking. Confirmation and write-time checks remain in place. Selection adds no
+model call; it performs a provider read even when the saved offer is fresh.
+
+Four persisted runtime regressions passed (3.8 minutes): expired but available,
+newly busy with other slots remaining, failed availability lookup, and a fresh
+structured button selection. They start from an opening statement without a
+reason, verify preservation of name/contact/date, and check that no booking has
+occurred at selection. The available case continues through collecting the
+reason, review, and explicit confirmation, asserting exactly one booking attempt
+at the selected instant. Calendar HTTP and extraction are mocked; these results
+do not replace deployed UAT. All 321 offline contract tests and the production
+build including TypeScript passed.
+
+```powershell
+npx playwright test --config=playwright.runtime.config.ts conversational-task-operation-runtime-db --grep 'Offered time selection'
+```
+
+Deployment acceptance starts in a fresh Project Chat session with the initial
+booking statement. If its requested time is occupied, select one alternative.
+Lia should retain an alternative that remains available, request the missing
+reason, and present the review. Confirm once and verify the calendar event.
+Existing UAT bookings must be considered when choosing the requested date/time.
+This uses shared task/calendar bindings rather than patient-specific extraction;
+other providers and flow configurations still require their own acceptance checks.
