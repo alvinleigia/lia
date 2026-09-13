@@ -2021,6 +2021,22 @@ async function executeTaskBoundary(input: {
             snapshot: canonicalSession.snapshot,
           })
         : null;
+    if (
+      calendar &&
+      hasRequestedCalendarTime &&
+      inputRequest?.fieldKey === calendar.dateFieldKey
+    ) {
+      const preference = parseCalendarTimePreference(requestedAnswer, timezone);
+      const hour = preference ? Math.floor(preference.minute / 60) : 0;
+      const acknowledgement =
+        preference?.kind === "exact"
+          ? `I have ${hour % 12 || 12}:${String(preference.minute % 60).padStart(2, "0")} ${hour >= 12 ? "pm" : "am"} noted as your preferred time.`
+          : "I noted your preferred time.";
+      reconciledProposal = {
+        ...reconciledProposal,
+        reply: `${acknowledgement}\n\n${reconciledProposal.reply}`,
+      };
+    }
     if (inputRequest && preferredOptions?.length)
       inputRequest.options = preferredOptions;
     if (

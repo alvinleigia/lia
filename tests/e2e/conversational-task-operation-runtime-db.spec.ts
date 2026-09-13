@@ -2251,6 +2251,20 @@ async function verifyCalendarRuntime(
         expect(chosen.replies.at(-1)?.payload).toMatchObject({
           inputRequest: { fieldKey: "preferredDate" },
         });
+        const repeated = await runBrowserFlowText({
+          ...browserInput,
+          text: "Is 3:30 pm available?",
+        });
+        expect(repeated.replies.at(-1)?.text).toContain(
+          "I have 3:30 pm noted as your preferred time.",
+        );
+        expect(repeated.replies.at(-1)?.payload).toMatchObject({
+          inputRequest: { fieldKey: "preferredDate" },
+        });
+        expect(repeated.replies.at(-1)?.text).not.toContain(
+          "currently available",
+        );
+        expect(freeBusyCalls).toBe(before);
         const review = await runBrowserFlowText({
           ...browserInput,
           text: date,
