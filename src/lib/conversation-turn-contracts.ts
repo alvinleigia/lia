@@ -74,7 +74,7 @@ export const turnToolRequestProposalV1Schema = z
   })
   .strict();
 
-export const turnResultV1ProviderSchema = z
+const turnResultV1BaseSchema = z
   .object({
     schemaVersion: z.literal(STRUCTURED_TURN_SCHEMA_VERSION),
     turnKind: z.enum(TURN_KINDS),
@@ -107,6 +107,7 @@ export const turnResultV1ProviderSchema = z
       .object({
         requiresClarification: z.boolean(),
         question: z.string().trim().min(1).max(500).nullable(),
+        fieldKeys: z.array(stableKey).max(50).nullable().optional(),
       })
       .strict(),
     safety: z
@@ -119,8 +120,25 @@ export const turnResultV1ProviderSchema = z
   })
   .strict();
 
-export const turnResultV1Schema = turnResultV1ProviderSchema.superRefine(
+// Providers require every property; older deterministic proposals remain valid.
+export const turnResultV1ProviderSchema = turnResultV1BaseSchema.extend({
+  ambiguity: turnResultV1BaseSchema.shape.ambiguity.extend({
+    fieldKeys: z.array(stableKey).max(50).nullable(),
+  }),
+});
+
+export const turnResultV1Schema = turnResultV1BaseSchema.superRefine(
   (result, context) => {
+    if (
+      !result.ambiguity.requiresClarification &&
+      result.ambiguity.fieldKeys?.length
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Uncertain fields require ambiguity.",
+        path: ["ambiguity", "fieldKeys"],
+      });
+    }
     if (
       result.ambiguity.requiresClarification &&
       (!result.ambiguity.question || result.nextAction !== "clarify")

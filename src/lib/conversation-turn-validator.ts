@@ -69,6 +69,15 @@ export function validateStructuredTurnProposal(
       issues.push("unknown_field");
     }
   }
+  for (const fieldKey of proposal.ambiguity.fieldKeys ?? []) {
+    const allowedFields =
+      allowed.activeTaskId === null &&
+      !allowed.fieldCollectionOnly &&
+      proposal.taskRecommendation
+        ? allowed.allowedTaskFieldKeys.get(proposal.taskRecommendation.taskId)
+        : allowed.allowedFieldKeys;
+    if (!allowedFields?.has(fieldKey)) issues.push("unknown_ambiguity_field");
+  }
   if (
     proposal.fieldCandidates.some(
       (candidate) =>

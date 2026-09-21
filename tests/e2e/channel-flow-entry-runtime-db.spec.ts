@@ -509,14 +509,14 @@ test("ordinary flow model interpretation clarifies ambiguity without losing cont
                 grounding: { status: "not_needed", excerptIds: [] },
                 fieldCandidates: Object.entries(
                   ambiguous
-                    ? {}
-                    : {
+                    ? {
+                        colour: ["blue", "red"],
                         customerName: "Alex Test",
                         customerEmail: "alex@example.com",
                         quantity: "2",
                         serviceSubject: "oil change",
-                        colour: "blue",
-                      },
+                      }
+                    : { colour: "blue" },
                 ).map(([fieldKey, naturalValue]) => ({
                   fieldKey,
                   naturalValue,
@@ -530,6 +530,7 @@ test("ordinary flow model interpretation clarifies ambiguity without losing cont
                 nextAction: ambiguous ? "clarify" : "ask",
                 ambiguity: {
                   requiresClarification: ambiguous,
+                  fieldKeys: ambiguous ? ["colour"] : null,
                   question: ambiguous ? "Which colour did you mean?" : null,
                 },
                 safety: { decision: "allow", reasonCode: null },
@@ -548,24 +549,38 @@ test("ordinary flow model interpretation clarifies ambiguity without losing cont
       conversationId,
       projectId: fixture.projectId,
       source: "project_chat",
-      text: "Can you use the other colour?",
+      text: "My name is Alex Test, my email is alex@example.com. I need two oil changes, but I am unsure whether to choose blue or red.",
     });
     expect(unclear.replies[0].text).toContain("Which colour");
     expect((await read()).fields).toEqual(before.fields);
+    expect((await read()).currentStepId).toBe(1);
+    expect(
+      readFlowFieldCandidates((await read()).metadata, action),
+    ).toMatchObject({
+      "1": "Alex Test",
+      "2": "alex@example.com",
+    });
+    await processChannelFlowText({
+      activeSubmission: await read(),
+      conversationId,
+      projectId: fixture.projectId,
+      source: "project_chat",
+      text: "Quantity: 3",
+    });
     expect((await read()).currentStepId).toBe(1);
     await processChannelFlowText({
       activeSubmission: await read(),
       conversationId,
       projectId: fixture.projectId,
       source: "project_chat",
-      text: "My name is Alex Test, my email is alex@example.com. I need two oil changes and choose blue.",
+      text: "blue",
     });
     const saved = await read();
-    expect(calls).toBe(2);
+    expect(calls).toBe(1);
     expect(saved.fields).toMatchObject({
       customerName: "Alex Test",
       customerEmail: "alex@example.com",
-      quantity: "2",
+      quantity: "3",
       serviceSubject: "oil change",
       colour: "blue",
     });

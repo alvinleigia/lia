@@ -11,6 +11,24 @@ import type { TaskFieldDefinition } from "@/lib/conversational-task-field-valida
 
 export const FLOW_FIELD_CANDIDATES = "flowFieldCandidates";
 
+export function readFlowClarificationField(
+  metadata: Record<string, unknown>,
+  action: RuntimeAction,
+): string | null {
+  const saved = metadata[FLOW_FIELD_CANDIDATES] as
+    | {
+        actionId?: unknown;
+        actionVersionId?: unknown;
+        clarificationFieldKey?: unknown;
+      }
+    | undefined;
+  return saved?.actionId === action.id &&
+    saved.actionVersionId === action.versionId &&
+    typeof saved.clarificationFieldKey === "string"
+    ? saved.clarificationFieldKey
+    : null;
+}
+
 // Use the published step definitions. Values for future steps stay provisional
 // until that step is reached and its own validator/branch rules run.
 export function getFlowCollectionFields(

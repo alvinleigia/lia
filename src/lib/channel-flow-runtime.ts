@@ -75,7 +75,10 @@ import {
   isSimpleTaskTextAnswer,
   shouldUseKnowledgeSideQuestion,
 } from "@/lib/conversation-control-intents";
-import { extractLocalTaskFieldCandidates } from "@/lib/conversation-field-extraction";
+import {
+  extractLocalTaskFieldCandidates,
+  getClearCandidatesDuringClarification,
+} from "@/lib/conversation-field-extraction";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { executeConfiguredStructuredTurn } from "@/lib/conversation-turn-service";
 import { validateTaskFieldValue } from "@/lib/conversational-task-field-validation";
@@ -88,6 +91,7 @@ import {
 import {
   FLOW_FIELD_CANDIDATES,
   getFlowCollectionFields,
+  readFlowClarificationField,
   readFlowFieldCandidates,
 } from "@/lib/flow-field-collection";
 import {
@@ -1668,7 +1672,11 @@ async function interpretFlowFieldAnswer(input: {
   answer: string;
   channelConversationId?: number | null;
   inboundMessageId?: number | null;
-}): Promise<{ answers: Record<string, string> } | { reply: string } | null> {
+}): Promise<{
+  answers?: Record<string, string>;
+  reply?: string;
+  clarificationFieldKey?: string | null;
+} | null> {
   const collection = getFlowCollectionFields(
     input.action,
     input.step,
@@ -1676,8 +1684,18 @@ async function interpretFlowFieldAnswer(input: {
     Boolean(getFlowEditState(input.action, input.submission)),
   );
   if (!collection.length) return null;
+  const clarificationField = collection.find(
+    ({ field }) =>
+      field.key ===
+      readFlowClarificationField(input.submission.metadata, input.action),
+  );
+  const requestedStep = clarificationField?.step ?? input.step;
   const fields = collection.map(({ field }) => field);
-  const local = extractLocalTaskFieldCandidates({
+  const retained = readFlowFieldCandidates(
+    input.submission.metadata,
+    input.action,
+  );
+  let local = extractLocalTaskFieldCandidates({
     fields,
     text: input.answer,
     timezone: "UTC",
@@ -1687,15 +1705,27 @@ async function interpretFlowFieldAnswer(input: {
     !local &&
     isSimpleTaskTextAnswer(input.answer) &&
     !isPotentialKnowledgeSideQuestion(input.answer) &&
-    validateStepAnswer(input.step, input.answer, input.submission.fields)
+    validateStepAnswer(requestedStep, input.answer, input.submission.fields)
       .isValid
-  )
-    return null;
+  ) {
+    if (!clarificationField) return null;
+    local = [
+      {
+        fieldKey: clarificationField.field.key,
+        naturalValue: input.answer,
+        confidence: 1,
+        source: "visitor",
+      },
+    ];
+  }
   const project = await getProjectTurnContext(input.projectId);
   if (!project)
     return { reply: formatStepPrompt(input.step, input.submission.fields) };
   const timezone = project.companyTimeZone ?? "UTC";
   let candidates = local;
+  let clarification:
+    | { reply: string; clarificationFieldKey: string | null }
+    | undefined;
   if (!candidates) {
     try {
       const [projectPolicy, history] = await Promise.all([
@@ -1725,17 +1755,19 @@ async function interpretFlowFieldAnswer(input: {
             sensitivity: "standard",
           },
         ],
-        fieldState: fields.map((field) => ({
+        fieldState: collection.map(({ field, step }) => ({
           fieldKey: field.key,
           label: field.label,
           required: field.required,
           sensitivity: field.sensitivity,
           state: Object.hasOwn(input.submission.fields, field.key)
             ? "valid"
-            : "missing",
+            : retained[String(step.id)] !== undefined
+              ? "candidate"
+              : "missing",
           value:
             input.submission.fields[field.key] == null
-              ? null
+              ? (retained[String(step.id)] ?? null)
               : String(input.submission.fields[field.key]),
         })),
         history,
@@ -1744,22 +1776,28 @@ async function interpretFlowFieldAnswer(input: {
         projectPolicy,
         publishedTasks: [],
         requestedFieldKey:
-          collection.find(({ step }) => step.id === input.step.id)?.field.key ??
-          null,
+          collection.find(({ step }) => step.id === requestedStep.id)?.field
+            .key ?? null,
         stage: "extraction",
         visitorMessage: input.answer,
       });
       if (
-        proposal.ambiguity.requiresClarification ||
         proposal.safety.decision !== "allow" ||
         ["fail", "handoff", "cancel"].includes(proposal.nextAction)
       )
         return { reply: proposal.ambiguity.question ?? proposal.reply };
-      if (!proposal.fieldCandidates.length)
+      if (proposal.ambiguity.requiresClarification) {
+        const keys = proposal.ambiguity.fieldKeys ?? [];
+        clarification = {
+          reply: proposal.ambiguity.question ?? proposal.reply,
+          clarificationFieldKey: keys.length === 1 ? keys[0] : null,
+        };
+        candidates = getClearCandidatesDuringClarification(proposal, fields);
+      } else if (!proposal.fieldCandidates.length)
         return isPotentialKnowledgeSideQuestion(input.answer)
           ? null
           : { reply: formatStepPrompt(input.step, input.submission.fields) };
-      candidates = proposal.fieldCandidates;
+      else candidates = proposal.fieldCandidates;
     } catch {
       return {
         reply: `I couldn't interpret those details reliably. ${formatStepPrompt(input.step, input.submission.fields)}`,
@@ -1779,11 +1817,23 @@ async function interpretFlowFieldAnswer(input: {
       value: candidate.naturalValue,
       contextValues: new Map([["lia_timezone", timezone]]),
     });
+    if (clarification && !normalized.ok) continue;
     const value = normalized.ok ? normalized.value : candidate.naturalValue;
     answers[String(target.step.id)] =
       typeof value === "object"
         ? String(candidate.naturalValue)
         : String(value);
+  }
+  if (clarification) return { answers, ...clarification };
+  if (
+    clarificationField &&
+    !Object.hasOwn(answers, String(clarificationField.step.id))
+  ) {
+    return {
+      answers,
+      clarificationFieldKey: clarificationField.field.key,
+      reply: `I noted those details. ${formatStepPrompt(clarificationField.step, input.submission.fields)}`,
+    };
   }
   return Object.keys(answers).length
     ? { answers }
@@ -1934,17 +1984,15 @@ async function continueChannelFlow(input: {
   const interpretation = input.skipEntityInterpretation
     ? null
     : await interpretFlowFieldAnswer({ ...input, step });
-  if (interpretation && "reply" in interpretation)
+  if (interpretation?.reply && !interpretation.answers)
     return { replies: [createTextReply(interpretation.reply)] };
   if (interpretation || input.skipEntityInterpretation) {
     const pending = {
       ...readFlowFieldCandidates(input.submission.metadata, input.action),
-      ...(interpretation && "answers" in interpretation
-        ? interpretation.answers
-        : {}),
+      ...interpretation?.answers,
     };
     const currentAnswer = pending[String(step.id)];
-    delete pending[String(step.id)];
+    if (!interpretation?.reply) delete pending[String(step.id)];
     const updated = await recordActionFlowProgress({
       projectId: input.projectId,
       submissionId: input.submission.id,
@@ -1957,16 +2005,16 @@ async function continueChannelFlow(input: {
           actionId: input.action.id,
           actionVersionId: input.action.versionId,
           answers: pending,
+          clarificationFieldKey: interpretation?.clarificationFieldKey ?? null,
         },
       },
       event: {
         eventType: "field.candidates",
         message: "Mapped supplied values to published flow fields.",
         payload: {
-          stepIds:
-            interpretation && "answers" in interpretation
-              ? Object.keys(interpretation.answers)
-              : [String(step.id)],
+          stepIds: interpretation?.answers
+            ? Object.keys(interpretation.answers)
+            : [String(step.id)],
         },
       },
     });
@@ -1976,6 +2024,8 @@ async function continueChannelFlow(input: {
           createTextReply("I could not save those details. Please try again."),
         ],
       };
+    if (interpretation?.reply)
+      return { replies: [createTextReply(interpretation.reply)] };
     input = {
       ...input,
       submission: updated,

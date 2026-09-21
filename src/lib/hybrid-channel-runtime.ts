@@ -29,6 +29,7 @@ import {
   isExplicitHumanHandoffRequest,
   isPotentialKnowledgeSideQuestion,
 } from "@/lib/conversation-control-intents";
+import { getClearCandidatesDuringClarification } from "@/lib/conversation-field-extraction";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import type {
   TurnContextValueV1,
@@ -112,7 +113,10 @@ import {
 import { startHybridTaskEntry } from "@/lib/hybrid-task-entry";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 import { getRuntimeProjectActionForSubmission } from "@/lib/runtime-actions";
-import type { RuntimeInputRequest } from "@/lib/runtime-input-request";
+import {
+  createTaskRuntimeInputRequest,
+  type RuntimeInputRequest,
+} from "@/lib/runtime-input-request";
 import {
   createTaskRuntimeReply,
   type RuntimeReply,
@@ -1491,26 +1495,18 @@ async function executeTaskBoundary(input: {
         : candidate,
     );
   }
-  // Uncertain model mappings are questions, not accepted values or tool calls.
-  if (
+  const clarifying =
     proposal.ambiguity.requiresClarification &&
-    !["cancel", "handoff", "fail"].includes(proposal.nextAction)
-  ) {
-    return {
-      inputRequest: null,
-      output: {
-        ...proposal,
-        fieldCandidates: [],
-        toolRequest: null,
-        nextAction: "clarify",
-        reply: proposal.ambiguity.question ?? proposal.reply,
-      },
-      signals: [],
-    };
+    !["cancel", "handoff", "fail"].includes(proposal.nextAction);
+  if (clarifying) {
+    proposal.fieldCandidates = getClearCandidatesDuringClarification(
+      proposal,
+      snapshot.task.definition.fields,
+    );
   }
   let revision = session.execution.revision;
 
-  if (proposal.turnKind === "side_question") {
+  if (!clarifying && proposal.turnKind === "side_question") {
     const now = new Date().toISOString();
     const suspended = await applyConversationalTaskEvent({
       authentication: null,
@@ -1690,6 +1686,34 @@ async function executeTaskBoundary(input: {
       return { output: proposal, signals: [] };
     }
     revision = fieldResult.revision;
+  }
+
+  if (clarifying) {
+    const keys = proposal.ambiguity.fieldKeys ?? [];
+    const field =
+      keys.length === 1
+        ? snapshot.task.definition.fields.find(({ key }) => key === keys[0])
+        : null;
+    const inputRequest = field ? createTaskRuntimeInputRequest(field) : null;
+    await recordTaskFieldRequest({
+      conversationId: session.runtime.run.conversationId,
+      inputRequest,
+      revision,
+      runtimeInput: input.runtimeInput,
+      taskRunId: session.runtime.run.id,
+    });
+    return {
+      inputRequest,
+      output: {
+        ...proposal,
+        toolRequest: null,
+        routeRecommendation: null,
+        outcomeRecommendation: null,
+        nextAction: "clarify",
+        reply: proposal.ambiguity.question ?? proposal.reply,
+      },
+      signals: [],
+    };
   }
 
   const fieldLookup = ["cancel", "handoff", "fail"].includes(

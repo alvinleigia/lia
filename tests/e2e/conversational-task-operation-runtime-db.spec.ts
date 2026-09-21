@@ -2018,6 +2018,21 @@ async function verifyCalendarRuntime(
         };
         let calls = 0;
         StructuredTurnEngine.prototype.execute = async (input) => {
+          if (input.visitorMessage === "routine follow-up") {
+            expect(input.requestedFieldKey).toBe("reason");
+            return originalExecute.call(
+              new StructuredTurnEngine({
+                provider: {
+                  async generateTurn() {
+                    throw new Error(
+                      "A short clarification must not call the model",
+                    );
+                  },
+                },
+              }),
+              input,
+            );
+          }
           calls++;
           const knowledge = input.stage === "knowledge";
           return {
@@ -2053,8 +2068,14 @@ async function verifyCalendarRuntime(
               toolRequest: null,
               routeRecommendation: null,
               outcomeRecommendation: null,
-              nextAction: "ask",
-              ambiguity: { requiresClarification: false, question: null },
+              nextAction: knowledge ? "ask" : "clarify",
+              ambiguity: {
+                requiresClarification: !knowledge,
+                question: knowledge
+                  ? null
+                  : "Is the reason a routine follow-up or knee pain?",
+                fieldKeys: knowledge ? null : ["reason"],
+              },
               safety: { decision: "allow", reasonCode: null },
               decisionSummary: "Context fixture",
               validation: {
@@ -2065,9 +2086,10 @@ async function verifyCalendarRuntime(
             },
           };
         };
+        const callsBeforeClarification = freeBusyCalls;
         const opening = await runBrowserFlowText({
           ...browserInput,
-          text: "I want to reschedule. My name is Alex Test, email alex@example.com, phone +61491570006, reason routine follow-up.",
+          text: "I want to reschedule. My name is Alex Test, email alex@example.com, phone +61491570006, reason routine follow-up or knee pain; I am not sure which.",
         });
         const session = await getConversationTaskRuntimeSession({
           channelType: "project_chat",
@@ -2077,7 +2099,38 @@ async function verifyCalendarRuntime(
         if (!session.runtime) throw new Error("Context run missing");
         conversationIds.push(session.runtime.run.conversationId);
         const taskRunId = session.runtime.run.id;
-        const initial = opening.replies.at(-1)?.payload as {
+        expect(opening.replies.at(-1)?.payload).toMatchObject({
+          inputRequest: { fieldKey: "reason" },
+        });
+        expect(session.runtime.fields).toContainEqual(
+          expect.objectContaining({
+            fieldKey: "guestName",
+            canonicalValue: "Alex Test",
+            state: "valid",
+          }),
+        );
+        expect(
+          session.runtime.fields.find(({ fieldKey }) => fieldKey === "reason")
+            ?.state,
+        ).toBe("missing");
+        expect(session.runtime.confirmations).toHaveLength(0);
+        expect(freeBusyCalls).toBe(callsBeforeClarification);
+        const clarified = await runBrowserFlowText({
+          ...browserInput,
+          text: "routine follow-up",
+        });
+        const afterClarification = await getConversationalTaskRuntime({
+          projectId,
+          taskRunId,
+        });
+        expect(afterClarification?.fields).toContainEqual(
+          expect.objectContaining({
+            fieldKey: "reason",
+            canonicalValue: "routine follow-up",
+            state: "valid",
+          }),
+        );
+        const initial = clarified.replies.at(-1)?.payload as {
           inputRequest?: { options: Array<{ value: string }> };
         };
         expect(initial.inputRequest?.options).toHaveLength(2);
@@ -2843,6 +2896,7 @@ async function verifyCalendarRuntime(
           continue;
         }
         if (selectionRefreshCase) {
+          if (!session.runtime) throw new Error("Missing selection runtime");
           expect(result.replies[0].text.split("\n")[0]).toBe(
             "I couldn't find availability for your requested time. Please choose one of these alternative appointment times.",
           );

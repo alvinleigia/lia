@@ -5,6 +5,35 @@ import {
   validateTaskFieldValue,
 } from "@/lib/conversational-task-field-validation";
 
+// Unscoped ambiguity is deliberately conservative. A model's confidence cannot
+// override an explicitly uncertain field or choose between duplicate candidates.
+export function getClearCandidatesDuringClarification(
+  proposal: TurnResultV1,
+  fields: TaskFieldDefinition[],
+): TurnResultV1["fieldCandidates"] {
+  const uncertain = proposal.ambiguity.fieldKeys;
+  if (
+    !proposal.ambiguity.requiresClarification ||
+    !uncertain?.length ||
+    proposal.safety.decision !== "allow"
+  )
+    return [];
+  if (uncertain.some((key) => !fields.some((field) => field.key === key)))
+    return [];
+  return proposal.fieldCandidates.filter((candidate, _, candidates) => {
+    const field = fields.find(({ key }) => key === candidate.fieldKey);
+    return (
+      field?.sourcePriority.includes("visitor") &&
+      candidate.source === "visitor" &&
+      candidate.confidence >= 0.7 &&
+      !uncertain.includes(candidate.fieldKey) &&
+      candidates.filter(({ fieldKey }) => fieldKey === candidate.fieldKey)
+        .length === 1 &&
+      (field.cardinality !== "single" || !Array.isArray(candidate.naturalValue))
+    );
+  });
+}
+
 // Only bypass model interpretation when the whole answer has an unambiguous
 // mapping to configured fields. Labels disambiguate multiple fields of one type.
 export function extractLocalTaskFieldCandidates(input: {

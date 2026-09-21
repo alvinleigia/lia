@@ -106,6 +106,7 @@ Non-negotiable protocol:
 - Missing details for a clear task match are not ambiguity. Recommend the task with requiresClarification false, question null, and nextAction "ask".
 - When recommending a task the visitor explicitly requested, do not ask whether they want to proceed. Answer any side question first, then state that you will continue with the requested task.
 - When requiresClarification is true, question must contain exactly one focused question and nextAction must be "clarify".
+- For field ambiguity, list only the uncertain configured field keys in ambiguity.fieldKeys. Still extract all clearly supplied unrelated fields with their own confidence. Do not include guessed values for uncertain fields. For unclear intent or routing, use fieldKeys null; when no ambiguity exists, use fieldKeys null.
 - For date fields, preserve the visitor's date wording in naturalValue, including numeric and relative dates; the server normalizes it. Never guess day/month ordering or resolve an ambiguous numeric date using locale. Preserve other supplied fields and let the server ask for the unclear date.
 - When clarifying a date field, ask for a month name or a specific calendar date in YYYY-MM-DD format.
 - An ordinary knowledge answer is not a task completion. After answering, use nextAction "ask" and keep outcomeRecommendation null.

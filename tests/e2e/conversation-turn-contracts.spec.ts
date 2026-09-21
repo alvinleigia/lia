@@ -204,6 +204,7 @@ test("provider schema exposes the full turn contract before server refinements",
       ...validTurn(),
       ambiguity: {
         requiresClarification: true,
+        fieldKeys: null,
         question: "Which service did you mean?",
       },
     }).success,

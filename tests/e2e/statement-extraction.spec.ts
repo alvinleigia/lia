@@ -8,7 +8,10 @@ import {
   type ConversationalTaskSnapshotV1,
   conversationalTaskSnapshotV1Schema,
 } from "../../src/lib/conversation-contracts";
-import { extractLocalTaskFieldCandidates } from "../../src/lib/conversation-field-extraction";
+import {
+  extractLocalTaskFieldCandidates,
+  getClearCandidatesDuringClarification,
+} from "../../src/lib/conversation-field-extraction";
 import { compileStructuredTurn } from "../../src/lib/conversation-turn-compiler";
 import type { TurnResultV1 } from "../../src/lib/conversation-turn-contracts";
 import { StructuredTurnEngine } from "../../src/lib/conversation-turn-engine";
@@ -452,6 +455,141 @@ cases.push({
     reason: "persistent knee pain",
   },
   missing: null,
+});
+
+// Entirely synthetic UAT identity; 202-555-0123 is in the fictional-use range.
+const bikeEnquiry = task("Bike Service Enquiry", [
+  ["customerName", "Customer Name", "text"],
+  ["customerPhone", "Contact Number", "phone"],
+  ["bikeModel", "Bike Model", "text"],
+  ["serviceSubject", "Service Reason", "text"],
+]);
+
+test("field-scoped clarification retains only clear unrelated candidates", () => {
+  const turn = proposal({
+    customerName: "UAT Rider",
+    customerPhone: "+12025550123",
+    bikeModel: "Yamaha MT-15",
+    serviceSubject: "oil change",
+  });
+  turn.nextAction = "clarify";
+  turn.ambiguity = {
+    requiresClarification: true,
+    question: "Oil change or brake inspection?",
+    fieldKeys: ["serviceSubject"],
+  };
+  const fields = bikeEnquiry.task.definition.fields;
+  expect(
+    getClearCandidatesDuringClarification(turn, fields).map(
+      ({ fieldKey }) => fieldKey,
+    ),
+  ).toEqual(["customerName", "customerPhone", "bikeModel"]);
+  turn.fieldCandidates[1].confidence = 0.5;
+  turn.fieldCandidates.push({
+    ...turn.fieldCandidates[2],
+    naturalValue: "Another bike",
+  });
+  expect(
+    getClearCandidatesDuringClarification(turn, fields).map(
+      ({ fieldKey }) => fieldKey,
+    ),
+  ).toEqual(["customerName"]);
+  expect(
+    getClearCandidatesDuringClarification(
+      { ...turn, ambiguity: { ...turn.ambiguity, fieldKeys: null } },
+      fields,
+    ),
+  ).toEqual([]);
+  expect(
+    getClearCandidatesDuringClarification(
+      { ...turn, safety: { decision: "refuse", reasonCode: "fixture" } },
+      fields,
+    ),
+  ).toEqual([]);
+  const allowed = compileStructuredTurn({
+    ...input(bikeEnquiry, "unclear reason"),
+    retrieval: [],
+  }).validation;
+  expect(() =>
+    validateStructuredTurnProposal(
+      {
+        ...turn,
+        ambiguity: { ...turn.ambiguity, fieldKeys: ["unknownField"] },
+      },
+      allowed,
+    ),
+  ).toThrow();
+});
+cases.push(
+  {
+    name: "bike enquiry all details in one message",
+    snapshot: bikeEnquiry,
+    message:
+      "I'm UAT Rider, phone +12025550123. My Yamaha MT-15 needs an oil change.",
+    requested: null,
+    expected: {
+      customerName: "UAT Rider",
+      customerPhone: "+12025550123",
+      bikeModel: "Yamaha MT-15",
+      serviceSubject: "oil change",
+    },
+    missing: null,
+  },
+  {
+    name: "bike enquiry missing reason",
+    snapshot: bikeEnquiry,
+    message: "I'm UAT Rider, phone +12025550123. My bike is a Yamaha MT-15.",
+    requested: null,
+    expected: {
+      customerName: "UAT Rider",
+      customerPhone: "+12025550123",
+      bikeModel: "Yamaha MT-15",
+    },
+    missing: "Service Reason",
+  },
+  {
+    name: "bike enquiry out-of-order model while name is pending",
+    snapshot: bikeEnquiry,
+    message: "My bike is a Yamaha MT-15.",
+    requested: "customerName",
+    expected: { bikeModel: "Yamaha MT-15" },
+    missing: "Customer Name",
+  },
+);
+
+test("@live-openai bike enquiry clarifies competing service reasons", async () => {
+  test.skip(
+    process.env.LIA_LIVE_STATEMENT_UAT !== "1",
+    "Opt-in synthetic live-model UAT.",
+  );
+  test.setTimeout(45_000);
+  expect(Boolean(process.env.OPENAI_API_KEY)).toBe(true);
+  const result = await new StructuredTurnEngine({
+    provider: new AiSdkStructuredTurnProvider(),
+  }).execute(
+    input(
+      bikeEnquiry,
+      "I need an oil change or a tyre replacement; I'm not sure which service to choose.",
+      "serviceSubject",
+      {
+        customerName: "UAT Rider",
+        customerPhone: "+12025550123",
+        bikeModel: "Yamaha MT-15",
+      },
+    ),
+  );
+  await test.info().attach("extraction-result", {
+    body: JSON.stringify(result, null, 2),
+    contentType: "application/json",
+  });
+  expect(result.source).toBe("model");
+  expect(result.proposal.nextAction).toBe("clarify");
+  expect(result.proposal.ambiguity.requiresClarification).toBe(true);
+  expect(result.proposal.ambiguity.question).toBeTruthy();
+  // Model candidates remain proposals. The persisted-flow regression verifies
+  // that clarification blocks even competing candidates from mutating fields.
+  expect(result.proposal.toolRequest).toBeNull();
+  expect(result.proposal.outcomeRecommendation).toBeNull();
 });
 
 for (const scenario of cases) {
