@@ -8,6 +8,7 @@ export default defineConfig({
     "ordinary-collection.spec.ts",
     "widget-collection.spec.ts",
     "observability.spec.ts",
+    "calendar-recovery.spec.ts",
   ],
   outputDir: "test-results/staging-bike-uat",
   fullyParallel: false,
