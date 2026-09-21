@@ -3,7 +3,11 @@ import { defineConfig, devices } from "@playwright/test";
 // Explicit opt-in: this suite uses only the isolated staging UAT project.
 export default defineConfig({
   testDir: "./tests/staging",
-  testMatch: ["bike-enquiry.spec.ts", "ordinary-collection.spec.ts"],
+  testMatch: [
+    "bike-enquiry.spec.ts",
+    "ordinary-collection.spec.ts",
+    "widget-collection.spec.ts",
+  ],
   outputDir: "test-results/staging-bike-uat",
   fullyParallel: false,
   workers: 1,

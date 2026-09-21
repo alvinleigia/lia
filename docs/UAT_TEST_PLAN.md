@@ -23,20 +23,23 @@ below must be reconciled with evidence rather than assumed to remain defects.
 
 Complete the following non-voice acceptance work before moving to live Telnyx:
 
-Implementation has started: eight isolated ordinary-form live cases passed,
-including branching, validation, reload, corrections and publication boundaries.
-One malformed-contact extraction case failed and has a candidate fix awaiting
-deployed retest. Review labels and a Radix lazy-child compatibility issue were
-also fixed. Evidence and the remaining boundaries are recorded in
+Candidate `00991b0` is deployed. Seventeen Project Chat cases and two embedded
+widget desktop/mobile cases passed on staging. The malformed-contact defect is
+fixed and verified: email and phone corrections retain other supplied fields.
+Configured review labels and Radix lazy-child compatibility are also fixed.
+The synthetic live calendar lifecycle passed and its appointment was cancelled.
+Evidence and remaining boundaries are recorded in
 [`UAT_ORDINARY_COLLECTION_2026-09-22.md`](UAT_ORDINARY_COLLECTION_2026-09-22.md).
+Calendar evidence is in
+[`UAT_CALENDAR_2026-09-22.md`](UAT_CALENDAR_2026-09-22.md).
 
 | Area | Remaining acceptance work | Current evidence boundary |
 | --- | --- | --- |
-| Ordinary Flow Builder inputs | Live configured-step flow with text, email/phone, quantity, date/time and choices; invalid input, ambiguous values, corrections, conditional branches and publication/version behavior. | Shared contract and database tests passed; seven recent live cases used a Business Task, not ordinary input steps. |
-| Appointment lifecycle | Consolidate the user's successful booking, reschedule, cancellation, delayed-confirmation and occupied-slot evidence; rerun the affected paths on the final build, including zero/one/multiple matches, timezone display and required reason. | Earlier manual evidence and automated calendar regressions exist; there is no consolidated current-build live sign-off. |
-| Session and failure recovery | Reload/resume, duplicate Confirm/retry, provider timeout or unavailable response, ambiguous corrections, side questions and handoff; verify no lost details, duplicate write or false completion. | Some automated and historical manual coverage exists; latest bike UI suite does not cover these cases. |
-| Existing channels and UI | Regression of the changed collection behavior in embedded widget/mobile, plus configured live WhatsApp before certifying that channel. | Recent live checks cover Project Chat only; adapter/database coverage is not live channel certification. |
-| Final release regression | Complete the relevant release checks on one candidate: full runtime/E2E suite, tenant isolation, publication boundaries, diagnostics and cost/latency evidence. | 339 contract tests, focused database checks, build and type-check passed. The latest broad operation run was stopped after 17 passes and replaced with a focused case; it was not a full-suite pass. |
+| Ordinary Flow Builder inputs | Passed for the configured field set; retain repeatable staging tests. | Ten live ordinary-input cases cover text, email/phone, quantity, date/time, choices, invalid input, ambiguity, corrections, branches and publication/version pinning. Seven Business Task cases also passed on this candidate. |
+| Appointment lifecycle | Current-build live booking, reschedule, occupied-slot alternatives, cancellation and zero/one-match lookup passed. Fresh live multiple-match and delayed/race checks remain distinct from automated and historical evidence. | Attempts 163, 170, 175 and 176; exact old/new times, timezone, reference and retained reason verified; synthetic appointment cleaned up. |
+| Session and failure recovery | Automated regression passed across the full run and focused fixes/reruns; retain the distinct live-channel gates. | Live reload/resume, ambiguity, corrections and fresh requests after cancel/completion passed. Automated expiry/revalidation, provider failures, duplicate messages, concurrent turns and tenant isolation passed. |
+| Existing channels and UI | Embedded widget desktop/mobile passed. Configured live WhatsApp remains required before certifying that channel. | Widget validation, branch, retained fields, reload and confirmation passed. Adapter/database coverage is not live channel certification. |
+| Final release regression | All 591 selected cases accounted for across the full run and focused reruns; retain diagnostics and cost/latency boundaries below. | Full run: 572 passed, 5 failed, 14 skipped after a serial failure. Three UI harness cases and a voice-capability assertion passed after correction. All 17 shared task-runtime cases passed after fixing calendar detection's nonnumeric operation-ID query, including the 14 skipped cases. Build, type-check and lint pass (three existing lint warnings). |
 | Deferred operations | Verify automatic durable-worker scheduling and perform the backup restore drill in a disposable environment. | `P15-UAT-01` and `P14-UAT-13` remain Open in the deferred register; do not mark closed without operational evidence. |
 
 These rows describe outstanding verification, not six newly discovered product
@@ -45,6 +48,34 @@ or blocked with its scope; fix reproduced defects and rerun affected regressions
 Infrastructure-dependent work must retain its explicit blocker or accepted
 limitation. Telnyx hosted-AI live UAT remains a separate later gate. A future
 calendar provider such as Calendly requires its own adapter verification.
+
+Live Execution Health on project 94 during this audit showed **72 queued,
+0 processing, 2 failed and 115 completed** jobs/messages. Recent queued items
+were Post Conversation jobs at attempt 0 of 3. Evidence:
+`tmp/staging-operation-health.txt` and `tmp/staging-operation-health.png`.
+This is an open operational finding; appointment success does not close it.
+Do not blindly replay the backlog or mark the scheduler gate passed.
+
+Conversation Diagnostics successfully displayed the lifecycle transcript,
+linked flows and operation evidence for conversation 1169. Its 24-hour request,
+latency and token cards showed zero despite those runtime turns. The cards read
+`chat_request_logs`, while `/api/actions/runtime` does not write those logs.
+Therefore these cards do not certify action-runtime cost or latency. Keep that
+instrumentation gap open; do not interpret zero as zero cost or instantaneous
+responses. Evidence: `tmp/staging-calendar-diagnostics.txt`.
+
+Lint gate cleanup corrected import order in the task outcomes page and formatting
+in test fixtures; no behavior changed. Scratch browser drivers were moved to the
+ignored test-results directory. Repository lint passes with three existing
+warnings. Full-run evidence: `tmp/nonvoice-full-regression-fixed.log`; resolved
+failures: `tmp/nonvoice-admin-catalog-retest.log`,
+`tmp/nonvoice-admin-support-retest.log`,
+`tmp/nonvoice-channel-contract-retest-2.log`, and
+`tmp/nonvoice-task-runtime-fixed.log`. This is a completed full run plus focused
+reruns, not a claim that the initial 591-case invocation was entirely green.
+After the calendar guard fix, the detailed appointment regression also passed
+(`tmp/nonvoice-calendar-guard-regression.log`), and the final production build
+passed (`tmp/nonvoice-final-build.log`).
 
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.

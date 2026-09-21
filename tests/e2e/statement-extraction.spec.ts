@@ -581,12 +581,10 @@ test("@live-openai collection retains explicit candidates with invalid contact f
       fields: snapshot.task.definition.fields,
     },
   });
-  await test
-    .info()
-    .attach("extraction-result", {
-      body: JSON.stringify(result, null, 2),
-      contentType: "application/json",
-    });
+  await test.info().attach("extraction-result", {
+    body: JSON.stringify(result, null, 2),
+    contentType: "application/json",
+  });
   expect(
     Object.fromEntries(
       result.proposal.fieldCandidates.map((c) => [c.fieldKey, c.naturalValue]),

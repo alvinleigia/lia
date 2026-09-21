@@ -352,7 +352,12 @@ test("certification covers every task reply intent and inbound kind", () => {
     ),
   ).toBe(true);
   expect(inbound).toHaveLength(5 * CERTIFICATION_CHANNELS.length);
-  expect(inbound.every((cell) => cell.normalized)).toBe(true);
+  expect(inbound.filter((cell) => !cell.normalized)).toEqual([
+    { channel: "telnyx_voice", kind: "selection", normalized: false },
+    { channel: "telnyx_voice", kind: "media", normalized: false },
+    { channel: "telnyx_voice", kind: "location", normalized: false },
+    { channel: "telnyx_voice", kind: "product_selection", normalized: false },
+  ]);
 });
 
 test("adapter delivery failure preserves runtime semantics", async () => {

@@ -14,6 +14,12 @@ gate.
 
 ## Review Point
 
+2026-09-22 audit: project 94's live Execution Health showed 72 queued,
+0 processing, 2 failed and 115 completed. Recent queued Post Conversation jobs
+had not been attempted. `P15-UAT-01` remains open; no automatic scheduler or
+third disposable restore target has been verified. See `UAT_TEST_PLAN.md` for
+the evidence and outstanding infrastructure details.
+
 Review every open row after all phases in `docs/UAT_TEST_PLAN.md` are complete.
 Close an item only after recording its result here and linking the validating
 commit, test run, or UAT evidence.

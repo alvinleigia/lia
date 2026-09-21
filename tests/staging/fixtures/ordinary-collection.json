@@ -3,10 +3,7 @@
   "action": {
     "name": "Ordinary Collection UAT 2026-09-22",
     "description": "Isolated configured input-step UAT. Enquiries only; no booking or external operation.",
-    "triggerPhrases": [
-      "ordinary collection uat",
-      "ordinary form enquiry"
-    ],
+    "triggerPhrases": ["ordinary collection uat", "ordinary form enquiry"],
     "settings": {}
   },
   "steps": [

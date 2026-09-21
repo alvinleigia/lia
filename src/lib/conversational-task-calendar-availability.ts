@@ -53,10 +53,9 @@ export async function getTaskCalendarAvailability(
       !binding?.allowedStages.includes("lookup")
     )
       continue;
-    const row = await getProjectOperation(
-      definition.projectId,
-      Number(definition.execution.handler),
-    );
+    const operationId = Number(definition.execution.handler);
+    if (!Number.isSafeInteger(operationId) || operationId <= 0) continue;
+    const row = await getProjectOperation(definition.projectId, operationId);
     if (
       !row ||
       !["google_calendar.availability", "appointment.availability"].includes(
@@ -70,9 +69,12 @@ export async function getTaskCalendarAvailability(
     for (const write of snapshot.toolDefinitions) {
       if (write.access !== "write" || write.execution.adapter !== "operation")
         continue;
+      const writeOperationId = Number(write.execution.handler);
+      if (!Number.isSafeInteger(writeOperationId) || writeOperationId <= 0)
+        continue;
       const operation = await getProjectOperation(
         write.projectId,
-        Number(write.execution.handler),
+        writeOperationId,
       );
       if (
         operation?.provider.id !== row.provider.id ||

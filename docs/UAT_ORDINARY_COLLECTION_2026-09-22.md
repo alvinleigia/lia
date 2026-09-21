@@ -5,7 +5,29 @@ Scope: live Project Chat on `https://lia-staging.leigia.com`, isolated project
 Task. Synthetic enquiries only; no calendar operation or external notification.
 The reusable import is `tests/staging/fixtures/ordinary-collection.json`.
 
-## Live results before the fixes
+## Deployed retest
+
+Candidate `00991b0` deployed successfully to staging and production. On staging,
+all ten ordinary-form Project Chat scenarios passed, including malformed contact
+correction, mobile time entry, and draft/publication/version pinning. The seven
+Bike Service Business Task scenarios also passed again. Evidence:
+`test-results/staging-nonvoice-candidate-report.json` (17 Project Chat passes;
+its two widget failures were test synchronization issues, retested below).
+
+The embedded widget passed on desktop and mobile: a complete natural-language
+request retains valid fields while rejecting quantity 99, accepts quantity 2,
+skips Colour on the inspection branch, resumes review after iframe reload, and
+saves after confirmation. Evidence:
+`test-results/staging-widget-candidate-report-3.json` (2 passes).
+The browser harness now waits for the actual iframe navigation before typing
+after reload; previously it typed into the document being replaced.
+
+The publication check restored the original prompt and published it again;
+action 62 is now version 5. These cases verify reusable configured fields in
+ordinary flows and Business Tasks, not arbitrary unsupported field types or
+unconfigured external providers.
+
+## Initial live results before the fixes
 
 On deployed commit `7b5e37d`, eight scenarios passed:
 
@@ -22,14 +44,14 @@ On deployed commit `7b5e37d`, eight scenarios passed:
 Evidence: `test-results/staging-ordinary-report-2.json`,
 `test-results/staging-ordinary-recovery-report.json`, and
 `test-results/staging-ordinary-version-report.json`. The version test restores
-the original prompt and publishes it again. Action 62 is now version 3.
+the original prompt and publishes it again (version 3 at that point).
 
 One scenario failed: a message containing an invalid email and short phone
 number caused Lia to ask for the already supplied name. A direct model
 reproduction also treated malformed email as semantic ambiguity. The extraction
 instruction now preserves explicit malformed values as candidates for server
-validation. The focused live-model regression passes; deployed UI retest remains
-required before closing this defect.
+validation. Both the focused live-model regression and deployed UI retest now
+pass, including correcting email and phone without recollecting other details.
 
 ## Changes and automated verification
 
@@ -46,7 +68,10 @@ required before closing this defect.
 - Migration journal (47 files), tenant-isolation database checks and cron-config
   checks passed. Cron-config success does not certify durable-worker scheduling.
 
-The initial full offline run was stopped after finding failures; it is not a
-full-suite pass. Current-build appointment lifecycle, widget/mobile, configured
-live WhatsApp, operational scheduler and disposable backup-restore checks remain
-separate gates in `UAT_TEST_PLAN.md`.
+The fresh full offline run completed: 572 passed, five failed, and 14 were
+skipped after a serial failure. All five failures were resolved and the skipped
+tests passed on focused reruns. One runtime fix prevents calendar detection from
+querying the database with a nonnumeric generic tool handler. This preserves
+ordinary task collection; valid calendar IDs still use the existing provider
+checks. See `UAT_TEST_PLAN.md` for the complete evidence and the separate live
+WhatsApp, metrics, operational scheduler and disposable backup-restore gates.

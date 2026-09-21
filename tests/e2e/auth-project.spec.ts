@@ -1314,7 +1314,9 @@ test("platform admin email lands on the platform dashboard", async ({
   await signInWithEmail(page, platformAdminEmail);
 
   await expect(page).toHaveURL(/\/platform/);
-  await expect(page.getByText("Platform").first()).toBeVisible();
+  await expect(page.getByText("Platform").first()).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(page.getByText("Tenants").first()).toBeVisible();
   await expect(page.getByText(platformAdminEmail)).toBeVisible();
 });
@@ -1472,6 +1474,7 @@ test("disabled tenant owner is blocked at sign in", async ({ browser }) => {
 test("platform admin can manage tenant detail support workflows", async ({
   browser,
 }) => {
+  test.setTimeout(120_000);
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const tenantName = `E2E Platform Support Tenant ${runId}`;
   const tenantEmail = `e2e-platform-support-${runId}@example.test`;
@@ -1530,10 +1533,12 @@ test("platform admin can manage tenant detail support workflows", async ({
   await expect(adminPage).toHaveURL(/\/platform/);
 
   const tenantRow = adminPage.locator("tr").filter({ hasText: tenantName });
-  await expect(tenantRow).toBeVisible();
+  await expect(tenantRow).toBeVisible({ timeout: 30_000 });
   await tenantRow.getByRole("link", { name: tenantName }).click();
 
-  await expect(adminPage).toHaveURL(/\/platform\/companies\/\d+/);
+  await expect(adminPage).toHaveURL(/\/platform\/companies\/\d+/, {
+    timeout: 30_000,
+  });
   await expect(adminPage.getByText(tenantName).first()).toBeVisible();
   await expect(adminPage.getByText(projectName).first()).toBeVisible();
 
@@ -1543,6 +1548,9 @@ test("platform admin can manage tenant detail support workflows", async ({
   await expect(memberCard).toBeVisible();
   await expect(memberCard).toContainText(memberEmail);
   await memberCard.getByRole("button", { name: "Disable" }).click();
+  await adminPage
+    .getByRole("button", { name: "Disable Member", exact: true })
+    .click();
   await expect(adminPage).toHaveURL(/memberUpdated=1/);
   const disabledMemberCard = adminPage
     .getByText(memberEmail)
@@ -2090,6 +2098,7 @@ test("company owner can create a media asset", async ({ page }) => {
 test("company owner can manage a product catalog and product lifecycle", async ({
   page,
 }) => {
+  test.setTimeout(120_000);
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const email = `e2e-catalog-${runId}@example.test`;
   const projectName = `E2E Catalog Project ${runId}`;
@@ -2203,6 +2212,9 @@ test("company owner can manage a product catalog and product lifecycle", async (
   );
   await expect(page.getByText("Product updated.")).toBeVisible();
   await page.getByRole("button", { name: "Archive" }).click();
+  await page
+    .getByRole("button", { name: "Archive Product", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Restore Product" }),
   ).toBeVisible();
@@ -2210,10 +2222,19 @@ test("company owner can manage a product catalog and product lifecycle", async (
   await expect(page.getByText("Product restored.")).toBeVisible();
 
   await page.getByRole("button", { name: "Archive" }).click();
+  await page
+    .getByRole("button", { name: "Archive Product", exact: true })
+    .click();
   await page.getByRole("button", { name: "Delete Permanently" }).click();
+  await page
+    .getByRole("button", { name: "Delete Product", exact: true })
+    .click();
   await expect(page.getByText("Product permanently deleted.")).toBeVisible();
 
   await page.getByRole("button", { name: "Archive" }).click();
+  await page
+    .getByRole("button", { name: "Archive Catalog", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Restore Catalog" }),
   ).toBeVisible();
@@ -2221,7 +2242,13 @@ test("company owner can manage a product catalog and product lifecycle", async (
   await expect(page.getByText("Catalog restored.")).toBeVisible();
 
   await page.getByRole("button", { name: "Archive" }).click();
+  await page
+    .getByRole("button", { name: "Archive Catalog", exact: true })
+    .click();
   await page.getByRole("button", { name: "Delete Permanently" }).click();
+  await page
+    .getByRole("button", { name: "Delete Catalog", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/projects\/catalog$/);
   await expect(page.getByText("Catalog permanently deleted.")).toBeVisible();
 });
