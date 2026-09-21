@@ -50,6 +50,7 @@ import {
   type ProjectAiSettings,
   resolveApprovedKnowledgeAnswer,
 } from "@/lib/project-ai-settings";
+import { measureRuntimeModelCall } from "@/lib/runtime-request-metrics";
 
 export interface TurnKnowledgeRetriever {
   retrieve(input: {
@@ -945,14 +946,16 @@ export class StructuredTurnEngine {
         try {
           let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
           const generated = await Promise.race([
-            this.provider.generateTurn({
-              maxOutputTokens: modelPolicy.maxOutputTokens,
-              maxRetries: modelPolicy.maxRetries,
-              messages: compiled.messages,
-              modelId,
-              system: compiled.system + repair,
-              timeoutMs: remainingMs,
-            }),
+            measureRuntimeModelCall(input.projectId, () =>
+              this.provider.generateTurn({
+                maxOutputTokens: modelPolicy.maxOutputTokens,
+                maxRetries: modelPolicy.maxRetries,
+                messages: compiled.messages,
+                modelId,
+                system: compiled.system + repair,
+                timeoutMs: remainingMs,
+              }),
+            ),
             new Promise<never>((_, reject) => {
               deadlineTimer = setTimeout(
                 () => reject(new Error("Turn deadline exceeded.")),

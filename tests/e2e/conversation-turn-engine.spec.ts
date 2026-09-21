@@ -21,6 +21,10 @@ import {
   postConversationJobPayloadSchema,
 } from "../../src/lib/post-conversation-jobs";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
+import {
+  measureRuntimeRequest,
+  type RuntimeRequestLog,
+} from "../../src/lib/runtime-request-metrics";
 
 const snapshot = conversationalTaskSnapshotV1Schema.parse({
   schemaVersion: 1,
@@ -140,7 +144,21 @@ test("invalid model identifiers are repaired before a proposal is accepted", asy
   ]);
   const engine = new StructuredTurnEngine({ provider });
 
-  const result = await engine.execute(engineInput());
+  const logs: RuntimeRequestLog[] = [];
+  const response = await measureRuntimeRequest(
+    "project_runtime",
+    async (metrics) => {
+      metrics.projectId = engineInput().projectId;
+      return Response.json(await engine.execute(engineInput()));
+    },
+    (log) => logs.push(log),
+  );
+  const result = await response.json();
+  expect(logs[0]).toMatchObject({
+    promptTokens: 240,
+    completionTokens: 160,
+    totalTokens: 400,
+  });
 
   expect(result.source).toBe("model");
   expect(result.attempts).toBe(2);

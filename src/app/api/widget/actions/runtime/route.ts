@@ -1,11 +1,13 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   BrowserFlowCommandError,
   runBrowserFlowText,
 } from "@/lib/browser-flow-runtime";
 import { channelInboundSelectionInputV1Schema } from "@/lib/channel-inbound-contract";
+import { logChatRequest } from "@/lib/chat-logs";
 import { resolveTraceId } from "@/lib/execution-trace";
+import { measureRuntimeRequest } from "@/lib/runtime-request-metrics";
 import {
   formatRuntimeServerTiming,
   measureRuntimeStage,
@@ -37,7 +39,7 @@ async function readJsonBody(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+async function handlePost(req: Request, metrics: { projectId: number | null }) {
   const requestStartedAt = performance.now();
   const timings: RuntimeStageTiming[] = [];
   const traceId = resolveTraceId(req.headers.get("x-lia-trace-id"));
@@ -84,6 +86,7 @@ export async function POST(req: Request) {
       );
     }
 
+    metrics.projectId = accessResult.widgetAccess.projectId;
     const result = await runBrowserFlowText({
       actionId: parsed.data.actionId,
       channelType: "widget",
@@ -152,4 +155,12 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+}
+
+export async function POST(req: Request) {
+  return measureRuntimeRequest(
+    "widget_runtime",
+    (metrics) => handlePost(req, metrics),
+    (log) => after(() => logChatRequest(log)),
+  );
 }

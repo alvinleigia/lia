@@ -64,6 +64,18 @@ Therefore these cards do not certify action-runtime cost or latency. Keep that
 instrumentation gap open; do not interpret zero as zero cost or instantaneous
 responses. Evidence: `tmp/staging-calendar-diagnostics.txt`.
 
+Follow-up implementation: Project Chat and widget runtime endpoints now write
+request/status/latency metrics through the existing log store after responding.
+A request-scoped collector adds reported model tokens across repair attempts;
+missing/failed usage is shown as unavailable. Values and prompts are not stored
+in these metric rows. Old failed jobs/outbox items now appear ahead of recent
+activity in Execution Health so their failure reasons remain inspectable.
+Verification: 346 contract tests, two scoped database tests, type-check,
+production build and tenant-scope checks passed. Live metrics verification uses
+`tests/staging/observability.spec.ts`. Scheduling activation still requires the
+hosting decision; this change does not claim to drain the queue or close
+`P15-UAT-01`.
+
 Lint gate cleanup corrected import order in the task outcomes page and formatting
 in test fixtures; no behavior changed. Scratch browser drivers were moved to the
 ignored test-results directory. Repository lint passes with three existing

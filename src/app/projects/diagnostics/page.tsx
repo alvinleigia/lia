@@ -146,6 +146,12 @@ export default async function DiagnosticsPage({
                   Model tokens
                 </p>
                 <p className="text-xl font-semibold">{health.totalTokens}</p>
+                {health.unmeteredRequests > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Token usage unavailable for {health.unmeteredRequests}{" "}
+                    requests.
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>

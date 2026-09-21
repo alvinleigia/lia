@@ -10,6 +10,7 @@ type WindowSummary = {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  unmeteredRequests: number;
 };
 
 type RouteSummary = {
@@ -43,6 +44,7 @@ async function getWindowSummary(
       promptTokens: sql<number>`coalesce(sum(${chatRequestLogs.promptTokens}), 0)`,
       completionTokens: sql<number>`coalesce(sum(${chatRequestLogs.completionTokens}), 0)`,
       totalTokens: sql<number>`coalesce(sum(${chatRequestLogs.totalTokens}), 0)`,
+      unmeteredRequests: sql<number>`count(*) filter (where ${chatRequestLogs.totalTokens} is null)`,
     })
     .from(chatRequestLogs)
     .where(
@@ -66,6 +68,7 @@ async function getWindowSummary(
     promptTokens: Number(row?.promptTokens ?? 0),
     completionTokens: Number(row?.completionTokens ?? 0),
     totalTokens: Number(row?.totalTokens ?? 0),
+    unmeteredRequests: Number(row?.unmeteredRequests ?? 0),
   };
 }
 

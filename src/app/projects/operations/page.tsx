@@ -375,6 +375,9 @@ export default async function OperationsPage({
               </p>
             ) : (
               <div className="divide-y rounded-md border bg-white">
+                <p className="px-4 py-3 text-sm text-muted-foreground">
+                  Failed items appear first, followed by recent activity.
+                </p>
                 {executionDiagnostics.items.map((item) => (
                   <div
                     key={`${item.kind}:${item.id}`}

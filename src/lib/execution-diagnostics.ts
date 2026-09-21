@@ -1,4 +1,4 @@
-import { count, desc, eq } from "drizzle-orm";
+import { count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import { durableJobs, outboxMessages } from "@/lib/db-schema";
 
@@ -55,7 +55,11 @@ export async function getProjectExecutionDiagnostics(
         })
         .from(durableJobs)
         .where(eq(durableJobs.projectId, projectId))
-        .orderBy(desc(durableJobs.createdAt), desc(durableJobs.id))
+        .orderBy(
+          sql`case when ${durableJobs.status} = 'failed' then 0 else 1 end`,
+          desc(durableJobs.createdAt),
+          desc(durableJobs.id),
+        )
         .limit(boundedLimit),
       db
         .select({
@@ -72,7 +76,11 @@ export async function getProjectExecutionDiagnostics(
         })
         .from(outboxMessages)
         .where(eq(outboxMessages.projectId, projectId))
-        .orderBy(desc(outboxMessages.createdAt), desc(outboxMessages.id))
+        .orderBy(
+          sql`case when ${outboxMessages.status} = 'failed' then 0 else 1 end`,
+          desc(outboxMessages.createdAt),
+          desc(outboxMessages.id),
+        )
         .limit(boundedLimit),
     ],
   );
@@ -84,7 +92,11 @@ export async function getProjectExecutionDiagnostics(
     ...recentJobs.map((item) => ({ ...item, kind: "job" as const })),
     ...recentOutbox.map((item) => ({ ...item, kind: "outbox" as const })),
   ]
-    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+    .sort(
+      (left, right) =>
+        Number(right.status === "failed") - Number(left.status === "failed") ||
+        right.createdAt.getTime() - left.createdAt.getTime(),
+    )
     .slice(0, boundedLimit);
 
   return {

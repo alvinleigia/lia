@@ -7,6 +7,7 @@ export default defineConfig({
     "bike-enquiry.spec.ts",
     "ordinary-collection.spec.ts",
     "widget-collection.spec.ts",
+    "observability.spec.ts",
   ],
   outputDir: "test-results/staging-bike-uat",
   fullyParallel: false,

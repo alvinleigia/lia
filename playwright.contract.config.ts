@@ -34,6 +34,7 @@ export default defineConfig({
     "phase17-analytics.spec.ts",
     "runtime-action-experiments.spec.ts",
     "runtime-stage-timing.spec.ts",
+    "runtime-request-metrics.spec.ts",
     "telnyx-voice.spec.ts",
     "whatsapp-template-contracts.spec.ts",
   ],

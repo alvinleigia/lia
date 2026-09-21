@@ -3,7 +3,12 @@ import { db } from "@/lib/db-config";
 import { chatRequestLogs } from "@/lib/db-schema";
 
 type ChatLogInput = {
-  route: "chat" | "structured_turn" | "widget";
+  route:
+    | "chat"
+    | "structured_turn"
+    | "widget"
+    | "project_runtime"
+    | "widget_runtime";
   projectId?: number | null;
   statusCode: number;
   latencyMs: number;
