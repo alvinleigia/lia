@@ -30,7 +30,7 @@ import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 config({ path: ".env.local", quiet: true });
 
-type FieldSpec = [string, string, "text" | "phone" | "date" | "time"];
+type FieldSpec = [string, string, "text" | "email" | "phone" | "date" | "time"];
 function task(name: string, specs: FieldSpec[]) {
   return conversationalTaskSnapshotV1Schema.parse({
     schemaVersion: 1,
@@ -556,6 +556,48 @@ cases.push(
     missing: "Customer Name",
   },
 );
+
+test("@live-openai collection retains explicit candidates with invalid contact formats", async () => {
+  test.skip(
+    process.env.LIA_LIVE_STATEMENT_UAT !== "1",
+    "Opt-in synthetic live-model UAT.",
+  );
+  test.setTimeout(60_000);
+  const snapshot = task("Ordinary form enquiry", [
+    ["customerName", "Customer Name", "text"],
+    ["customerEmail", "Customer Email", "email"],
+    ["contactNumber", "Contact Number", "phone"],
+    ["serviceSubject", "Service Subject", "text"],
+  ]);
+  const result = await new StructuredTurnEngine().execute({
+    ...input(
+      snapshot,
+      "I want an ordinary form enquiry. My name is UAT Form Rider, my email is not-an-email, my contact number is 123, and the service subject is oil change.",
+      "customerName",
+    ),
+    activeTask: null,
+    collection: {
+      name: snapshot.task.name,
+      fields: snapshot.task.definition.fields,
+    },
+  });
+  await test
+    .info()
+    .attach("extraction-result", {
+      body: JSON.stringify(result, null, 2),
+      contentType: "application/json",
+    });
+  expect(
+    Object.fromEntries(
+      result.proposal.fieldCandidates.map((c) => [c.fieldKey, c.naturalValue]),
+    ),
+  ).toMatchObject({
+    customerName: "UAT Form Rider",
+    customerEmail: "not-an-email",
+    contactNumber: "123",
+    serviceSubject: "oil change",
+  });
+});
 
 test("@live-openai bike enquiry clarifies competing service reasons", async () => {
   test.skip(

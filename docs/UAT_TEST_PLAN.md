@@ -9,6 +9,43 @@ This is the only active UAT document. Run the official checks at:
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
 
+## Current Non-Voice UAT Audit — 2026-09-22
+
+Do not treat the seven passing bike-enquiry cases as full release sign-off.
+On deployed commit `7b5e37d`, live staging Project Chat verified complete details,
+missing reason, out-of-order answers, ambiguity followed by a short clarification,
+review corrections, cancellation followed by a fresh request, and completion
+followed by a fresh request. See
+[`UAT_BIKE_ENQUIRY_2026-09-21.md`](UAT_BIKE_ENQUIRY_2026-09-21.md)
+for test evidence. TypeScript and production build passed; the two previously
+reported nullable test-fixture accesses are fixed. Historical pending entries
+below must be reconciled with evidence rather than assumed to remain defects.
+
+Complete the following non-voice acceptance work before moving to live Telnyx:
+
+Implementation has started: eight isolated ordinary-form live cases passed,
+including branching, validation, reload, corrections and publication boundaries.
+One malformed-contact extraction case failed and has a candidate fix awaiting
+deployed retest. Review labels and a Radix lazy-child compatibility issue were
+also fixed. Evidence and the remaining boundaries are recorded in
+[`UAT_ORDINARY_COLLECTION_2026-09-22.md`](UAT_ORDINARY_COLLECTION_2026-09-22.md).
+
+| Area | Remaining acceptance work | Current evidence boundary |
+| --- | --- | --- |
+| Ordinary Flow Builder inputs | Live configured-step flow with text, email/phone, quantity, date/time and choices; invalid input, ambiguous values, corrections, conditional branches and publication/version behavior. | Shared contract and database tests passed; seven recent live cases used a Business Task, not ordinary input steps. |
+| Appointment lifecycle | Consolidate the user's successful booking, reschedule, cancellation, delayed-confirmation and occupied-slot evidence; rerun the affected paths on the final build, including zero/one/multiple matches, timezone display and required reason. | Earlier manual evidence and automated calendar regressions exist; there is no consolidated current-build live sign-off. |
+| Session and failure recovery | Reload/resume, duplicate Confirm/retry, provider timeout or unavailable response, ambiguous corrections, side questions and handoff; verify no lost details, duplicate write or false completion. | Some automated and historical manual coverage exists; latest bike UI suite does not cover these cases. |
+| Existing channels and UI | Regression of the changed collection behavior in embedded widget/mobile, plus configured live WhatsApp before certifying that channel. | Recent live checks cover Project Chat only; adapter/database coverage is not live channel certification. |
+| Final release regression | Complete the relevant release checks on one candidate: full runtime/E2E suite, tenant isolation, publication boundaries, diagnostics and cost/latency evidence. | 339 contract tests, focused database checks, build and type-check passed. The latest broad operation run was stopped after 17 passes and replaced with a focused case; it was not a full-suite pass. |
+| Deferred operations | Verify automatic durable-worker scheduling and perform the backup restore drill in a disposable environment. | `P15-UAT-01` and `P14-UAT-13` remain Open in the deferred register; do not mark closed without operational evidence. |
+
+These rows describe outstanding verification, not six newly discovered product
+defects. Preserve completed phase evidence. Record each result as passed, failed,
+or blocked with its scope; fix reproduced defects and rerun affected regressions.
+Infrastructure-dependent work must retain its explicit blocker or accepted
+limitation. Telnyx hosted-AI live UAT remains a separate later gate. A future
+calendar provider such as Calendly requires its own adapter verification.
+
 Do not use localhost results for release sign-off. Phases 1-13 are complete;
 their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 

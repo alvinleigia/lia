@@ -1345,6 +1345,7 @@ test("non platform admin cannot open platform admin routes", async ({
 });
 
 test("disabled tenant owner is blocked at sign in", async ({ browser }) => {
+  test.setTimeout(120_000);
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const tenantName = `E2E Disabled Tenant ${runId}`;
   const tenantEmail = `e2e-disabled-${runId}@example.test`;
@@ -1392,13 +1393,17 @@ test("disabled tenant owner is blocked at sign in", async ({ browser }) => {
   await expect(adminPage).toHaveURL(/\/platform/);
 
   const tenantRow = adminPage.locator("tr").filter({ hasText: tenantName });
-  await expect(tenantRow).toBeVisible();
+  // The streamed platform dashboard may still be loading after auth redirects.
+  await expect(tenantRow).toBeVisible({ timeout: 30_000 });
   const tenantStatusResponse = adminPage.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
       new URL(response.url()).pathname === "/platform",
   );
   await tenantRow.getByRole("button", { name: "Disable" }).click();
+  await adminPage
+    .getByRole("button", { name: "Disable Company", exact: true })
+    .click();
   await tenantStatusResponse;
   await adminPage.goto("/platform");
   await expect(adminPage).toHaveURL(/\/platform$/);

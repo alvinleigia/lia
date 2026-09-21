@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "action": {
+    "name": "Ordinary Collection UAT 2026-09-22",
+    "description": "Isolated configured input-step UAT. Enquiries only; no booking or external operation.",
+    "triggerPhrases": [
+      "ordinary collection uat",
+      "ordinary form enquiry"
+    ],
+    "settings": {}
+  },
+  "steps": [
+    {
+      "id": 1,
+      "sortOrder": 1,
+      "stepType": "collect_input",
+      "fieldKey": "customerName",
+      "label": "Customer Name",
+      "prompt": "Please provide Customer Name.",
+      "inputType": "text",
+      "isRequired": true,
+      "isEnabled": true,
+      "options": [],
+      "settings": {},
+      "nextStepId": 2
+    },
+    {
+      "id": 2,
+      "sortOrder": 2,
+      "stepType": "email",
+      "fieldKey": "customerEmail",
+      "label": "Customer Email",
+      "prompt": "Please provide Customer Email.",
+      "inputType": "email",
+      "isRequired": true,
+      "isEnabled": true,
+      "options": [],
+      "settings": {},
+      "nextStepId": 3
+    },
+    {
+      "id": 3,
+      "sortOrder": 3,
+      "stepType": "phone",
+      "fieldKey": "contactNumber",
+      "label": "Contact Number",
+      "prompt": "Please provide Contact Number.",
+      "inputType": "phone",
+      "isRequired": true,
+      "isEnabled": true,
+      "options": [],
+      "settings": {},
+      "nextStepId": 4
+    },
+    {
+      "id": 4,
+      "sortOrder": 4,
+      "stepType": "number",
+      "fieldKey": "quantity",
+      "label": "Quantity",
+      "prompt": "Please provide Quantity.",
+      "inputType": "int",
+      "isRequired": true,
+      "isEnabled": true,
+      "options": [],
+      "settings": {
+        "validationMinNumber": 1,
+        "validationMaxNumber": 10
+      },
+      "nextStepId": 5
+    },
+    {
+      "id": 5,
+      "sortOrder": 5,
+      "stepType": "collect_input",
+      "fieldKey": "serviceSubject",
+      "label": "Service Subject",
+      "prompt": "Please provide Service Subject.",
+      "inputType": "text",
+      "isRequired": true,
+      "isEnabled": true,
+      "options": [],
+      "settings": {},
+      "nextStepId": 6
+    },
+    {
+      "id": 6,
+      "sortOrder": 6,
+      "stepType": "choice",
+      "fieldKey": "colour",
+      "label": "Colour",
+      "prompt": "Please provide Colour.",
+      "inputType": "text",
+      "isRequired": true,
+      "isEnabled": true,
+      "options": [
+        {
+          "label": "Blue",
+          "value": "blue"
+        },
+        {
+          "label": "Red",
+          "value": "red"
+        }
+      ],
+      "settings": {},
+      "nextStepId": 7
+    },
+    {
+      "id": 7,
+      "sortOrder": 7,
+      "stepType": "date",
+      "fieldKey": "preferredDate",
+      "label": "Preferred Date",
+      "prompt": "Please provide Preferred Date.",
+      "inputType": "date",
+      "isRequired": true,
+      "isEnabled": true,
+      "options": [],
+      "settings": {},
+      "nextStepId": 8
+    },
+    {
+      "id": 8,
+      "sortOrder": 8,
+      "stepType": "time",
+      "fieldKey": "preferredTime",
+      "label": "Preferred Time",
+      "prompt": "Please provide Preferred Time.",
+      "inputType": "time",
+      "isRequired": true,
+      "isEnabled": true,
+      "options": [],
+      "settings": {},
+      "nextStepId": 9
+    },
+    {
+      "id": 9,
+      "sortOrder": 9,
+      "stepType": "confirmation",
+      "fieldKey": null,
+      "label": "Review",
+      "prompt": "Please review your enquiry.",
+      "inputType": null,
+      "isRequired": false,
+      "isEnabled": true,
+      "options": [],
+      "settings": {},
+      "nextStepId": null
+    }
+  ],
+  "branchRules": [
+    {
+      "sourceStepId": 5,
+      "sourceFieldKey": "serviceSubject",
+      "operator": "equals",
+      "comparisonValue": "inspection",
+      "targetStepId": 7,
+      "sortOrder": 1,
+      "isEnabled": true,
+      "settings": {}
+    }
+  ]
+}

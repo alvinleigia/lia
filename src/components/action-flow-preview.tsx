@@ -68,9 +68,13 @@ function formatStepName(step: RuntimeActionStep | null | undefined) {
   }`;
 }
 
-function buildPrompt(step: RuntimeActionStep, fields: Record<string, unknown>) {
+function buildPrompt(
+  step: RuntimeActionStep,
+  fields: Record<string, unknown>,
+  action: RuntimeAction,
+) {
   if (isActionConfirmationStep(step)) {
-    return `${getActionStepPrompt(step)}\n\n${buildActionReviewSummary(fields)}`;
+    return `${getActionStepPrompt(step)}\n\n${buildActionReviewSummary(fields, action.steps)}`;
   }
 
   return buildActionStepTextFallbackMessage(step, fields);
@@ -123,7 +127,7 @@ function getInitialState(action: RuntimeAction): PreviewState {
           {
             id: "assistant-start",
             role: "assistant" as const,
-            text: buildPrompt(firstStep, {}),
+            text: buildPrompt(firstStep, {}, action),
           },
         ]
       : [
@@ -252,7 +256,7 @@ export function ActionFlowPreview({ action }: ActionFlowPreviewProps) {
         {
           id: getMessageId("assistant-step"),
           role: "assistant",
-          text: buildPrompt(nextStep, fields),
+          text: buildPrompt(nextStep, fields, action),
         },
       ],
       stepIndex: decision.stepIndex,

@@ -12,6 +12,25 @@ import {
 import { buildRuntimeRepliesForStep } from "@/lib/channel-flow-runtime";
 import { buildFlowContentDocument } from "@/lib/flow-content-blocks";
 
+test("review uses configured field labels without exposing companion keys", () => {
+  expect(
+    buildActionReviewSummary(
+      {
+        customerName: "UAT Rider",
+        preferredTime: "15:30",
+        colour: "blue",
+        colourName: "Blue",
+      },
+      [
+        { fieldKey: "customerName", label: "Customer Name", isEnabled: true },
+        { fieldKey: "preferredTime", label: "Preferred Time", isEnabled: true },
+        { fieldKey: "colour", label: "Colour", isEnabled: true },
+        { fieldKey: "customerName", label: "Disabled label", isEnabled: false },
+      ],
+    ),
+  ).toBe("- Preferred Time: 15:30\n- Customer Name: UAT Rider\n- Colour: Blue");
+});
+
 test("emits composed content in stored array order", () => {
   const step: RuntimeActionStep = {
     fieldKey: "selection",

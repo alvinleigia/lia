@@ -279,7 +279,7 @@ const scopedReadRequirements = new Map([
   ["durableJobs", ["durableJobs.projectId"]],
   ["outboxMessages", ["outboxMessages.projectId"]],
   ["chatRequestLogs", ["chatRequestLogs.projectId"]],
-  ["auditLogs", ["auditLogs.companyId"]],
+  ["auditLogs", ["auditLogs.companyId", "auditLogs.projectId"]],
   ["companyInvitations", ["companyInvitations.companyId"]],
   ["sourceDocuments", ["sourceDocuments.projectId"]],
   ["uploadJobs", ["uploadJobs.projectId"]],

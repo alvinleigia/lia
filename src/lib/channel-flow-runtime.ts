@@ -528,7 +528,7 @@ export function buildChannelFlowResumeReplies(input: {
         [
           formatStepPrompt(currentStep, input.submission.fields),
           "",
-          buildActionReviewSummary(input.submission.fields),
+          buildActionReviewSummary(input.submission.fields, input.action.steps),
           "",
           "Reply Confirm to save, or Cancel to stop.",
         ].join("\n"),
@@ -545,7 +545,7 @@ export function buildChannelFlowResumeReplies(input: {
       [
         "Please review your request before I save it.",
         "",
-        buildActionReviewSummary(input.submission.fields),
+        buildActionReviewSummary(input.submission.fields, input.action.steps),
         "",
         "Reply Confirm to save, or Cancel to stop.",
       ].join("\n"),
@@ -554,6 +554,7 @@ export function buildChannelFlowResumeReplies(input: {
 }
 
 async function submitFlow(input: {
+  action?: RuntimeAction;
   contactId?: number | null;
   includeCompletionReply?: boolean;
   projectId: number;
@@ -594,7 +595,7 @@ async function submitFlow(input: {
         [
           "Thanks. I saved this request.",
           "",
-          buildActionReviewSummary(submission.fields),
+          buildActionReviewSummary(submission.fields, input.action?.steps),
         ].join("\n"),
       ),
     ],
@@ -1220,6 +1221,7 @@ async function advanceFlowToNextStep(input: {
     if (isActionSubmitStep(step)) {
       replies.push(...buildRuntimeRepliesForStep(step, submission.fields));
       const result = await submitFlow({
+        action: input.action,
         contactId: input.contactId ?? getSubmissionContactId(submission),
         projectId: input.projectId,
         submission,
@@ -1241,7 +1243,7 @@ async function advanceFlowToNextStep(input: {
           [
             formatStepPrompt(step, submission.fields),
             "",
-            buildActionReviewSummary(submission.fields),
+            buildActionReviewSummary(submission.fields, input.action.steps),
             "",
             "Reply Confirm to save, or Cancel to stop.",
           ].join("\n"),
@@ -1297,7 +1299,7 @@ async function advanceFlowToNextStep(input: {
         [
           "Please review your request before I save it.",
           "",
-          buildActionReviewSummary(submission.fields),
+          buildActionReviewSummary(submission.fields, input.action.steps),
           "",
           "Reply Confirm to save, or Cancel to stop.",
         ].join("\n"),
@@ -1899,6 +1901,7 @@ async function continueChannelFlow(input: {
   ) {
     if (CONFIRM_WORDS.has(normalizedAnswer)) {
       return submitFlow({
+        action: input.action,
         contactId: input.contactId ?? getSubmissionContactId(input.submission),
         projectId: input.projectId,
         submission: input.submission,
@@ -1949,6 +1952,7 @@ async function continueChannelFlow(input: {
 
   if (!step) {
     return submitFlow({
+      action: input.action,
       contactId: input.contactId ?? getSubmissionContactId(input.submission),
       projectId: input.projectId,
       submission: input.submission,
@@ -2233,6 +2237,7 @@ async function continueChannelFlowMedia(input: {
 
   if (!step) {
     return submitFlow({
+      action: input.action,
       contactId: input.contactId ?? getSubmissionContactId(input.submission),
       projectId: input.projectId,
       submission: input.submission,

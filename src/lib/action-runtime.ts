@@ -2042,13 +2042,18 @@ function formatReviewValue(key: string, value: unknown) {
   return String(value);
 }
 
-export function buildActionReviewSummary(fields: Record<string, unknown>) {
+export function buildActionReviewSummary(
+  fields: Record<string, unknown>,
+  steps: Pick<RuntimeActionStep, "fieldKey" | "label" | "isEnabled">[] = [],
+) {
+  const labels = { ...REVIEW_FIELD_LABELS };
+  for (const step of steps) {
+    if (step.isEnabled && step.fieldKey && step.label?.trim()) {
+      labels[step.fieldKey] = step.label.trim();
+    }
+  }
   const knownLines = REVIEW_FIELD_ORDER.filter((key) => key in fields).map(
-    (key) =>
-      `- ${REVIEW_FIELD_LABELS[key] ?? key}: ${formatReviewValue(
-        key,
-        fields[key],
-      )}`,
+    (key) => `- ${labels[key] ?? key}: ${formatReviewValue(key, fields[key])}`,
   );
   const knownKeys = new Set([
     ...REVIEW_FIELD_ORDER,
@@ -2071,7 +2076,7 @@ export function buildActionReviewSummary(fields: Record<string, unknown>) {
       const prefix = key.endsWith("Id") ? key.slice(0, -2) : key;
       const companionName = fields[`${prefix}Name`];
 
-      return `- ${REVIEW_FIELD_LABELS[key] ?? key}: ${formatReviewValue(
+      return `- ${labels[key] ?? key}: ${formatReviewValue(
         key,
         companionName ?? value,
       )}`;

@@ -40,15 +40,24 @@ async function send(page: Page, message: string) {
   return result;
 }
 
-async function review(page: Page, result: RuntimeResult) {
+async function review(
+  page: Page,
+  result: RuntimeResult,
+  expected = {
+    name: "UAT Rider",
+    phone: "+12025550123",
+    bike: "Yamaha MT-15",
+    reason: /Service Reason: (?:an? )?oil change/i,
+  },
+) {
   const confirmation = result.replies.find(
     (reply) => reply.intent === "confirmation",
   );
   expect(confirmation).toBeDefined();
-  expect(confirmation?.text).toContain("Customer Name: UAT Rider");
-  expect(confirmation?.text).toContain("Contact Number: +12025550123");
-  expect(confirmation?.text).toContain("Bike Model: Yamaha MT-15");
-  expect(confirmation?.text).toMatch(/Service Reason: (?:an? )?oil change/i);
+  expect(confirmation?.text).toContain(`Customer Name: ${expected.name}`);
+  expect(confirmation?.text).toContain(`Contact Number: ${expected.phone}`);
+  expect(confirmation?.text).toContain(`Bike Model: ${expected.bike}`);
+  expect(confirmation?.text).toMatch(expected.reason);
   await expect(
     page.getByRole("button", { name: "Confirm", exact: true }),
   ).toBeVisible();
@@ -153,3 +162,76 @@ test("uncertain service reason is clarified before confirmation", async ({
   });
   await review(page, await send(page, "Oil change"));
 });
+
+test("review correction updates only supplied fields and requires fresh confirmation", async ({
+  page,
+}) => {
+  await review(
+    page,
+    await send(
+      page,
+      "I want to enquire about bike service. My name is UAT Rider, my contact number is +12025550123, my bike is a Yamaha MT-15, and the service reason is an oil change.",
+    ),
+  );
+  const corrected = await send(
+    page,
+    "Please change my contact number to +12025550124 and the service reason to a brake inspection. Keep my name and bike model the same.",
+  );
+  await review(page, corrected, {
+    name: "UAT Rider",
+    phone: "+12025550124",
+    bike: "Yamaha MT-15",
+    reason: /Service Reason: (?:an? )?brake inspection/i,
+  });
+  const text = corrected.replies.map(({ text }) => text).join("\n");
+  expect(text).not.toMatch(/submitted successfully|completed/i);
+  expect(text).not.toContain("+12025550123");
+  expect(text).not.toMatch(/Service Reason: (?:an? )?oil change/i);
+  const completed = await send(page, "Confirm");
+  expect(completed.replies.map(({ text }) => text).join("\n")).toMatch(
+    /completed|successfully/i,
+  );
+});
+
+for (const end of ["Cancel", "Confirm"] as const) {
+  test(`fresh request after ${end} does not inherit the previous reason or identity`, async ({
+    page,
+  }) => {
+    await review(
+      page,
+      await send(
+        page,
+        "I want to enquire about bike service. My name is UAT Rider, my contact number is +12025550123, my bike is a Yamaha MT-15, and the service reason is an oil change.",
+      ),
+    );
+    const ended = await send(page, end);
+    expect(ended.replies.map(({ text }) => text).join("\n")).toMatch(
+      end === "Cancel" ? /cancelled|canceled/i : /completed|successfully/i,
+    );
+    expect(ended.replies.some(({ intent }) => intent === "confirmation")).toBe(
+      false,
+    );
+    const restarted = await send(
+      page,
+      "I want to enquire about bike service. My name is UAT Second Rider, my contact number is +12025550124, and my bike is a Honda CB350.",
+    );
+    expect(restarted.replies.at(-1)?.payload?.inputRequest?.fieldKey).toBe(
+      "serviceReason",
+    );
+    expect(
+      restarted.replies.some(({ intent }) => intent === "confirmation"),
+    ).toBe(false);
+    const clarified = await send(page, "Brake inspection");
+    await review(page, clarified, {
+      name: "UAT Second Rider",
+      phone: "+12025550124",
+      bike: "Honda CB350",
+      reason: /Service Reason: (?:an? )?brake inspection/i,
+    });
+    const text = clarified.replies.map(({ text }) => text).join("\n");
+    expect(text).not.toContain("+12025550123");
+    expect(text).not.toContain("Yamaha MT-15");
+    expect(text).not.toMatch(/oil change/i);
+    await send(page, "Cancel");
+  });
+}
