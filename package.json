@@ -17,6 +17,8 @@
     "check:local-env": "node scripts/check-local-env.mjs",
     "check:migration-journal": "node scripts/check-migration-journal.mjs",
     "check:ops-health": "node scripts/check-ops-health.mjs",
+    "worker:durable": "node scripts/run-durable-worker.mjs",
+    "test:durable-worker-runner": "node --test scripts/run-durable-worker.test.mjs",
     "check:tenant-scope": "node scripts/check-tenant-scope.mjs",
     "certify:release": "node scripts/certify-release.mjs --full",
     "certify:release:fast": "node scripts/certify-release.mjs",

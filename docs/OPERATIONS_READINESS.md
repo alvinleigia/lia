@@ -221,6 +221,11 @@ POST /api/durable/process-next
 Authorization: Bearer <DURABLE_QUEUE_SECRET>
 ```
 
+The prepared runner defaults to local validation only: `npm run worker:durable`.
+See [Durable worker setup](DURABLE_WORKER_SETUP.md) for secret-store variables,
+future one-shot execution, batch limits and outcome checks. As requested on
+2026-09-22, Hobby remains in use and no durable scheduler has been activated.
+
 Before beta:
 
 - Confirm `UPLOAD_QUEUE_SECRET` is set outside the repo.

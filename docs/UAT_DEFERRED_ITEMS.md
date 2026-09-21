@@ -14,6 +14,19 @@ gate.
 
 ## Review Point
 
+2026-09-22 follow-up: the owner chose to retain Hobby and prepare worker setup
+without activating a scheduler. `scripts/run-durable-worker.mjs` and
+[`DURABLE_WORKER_SETUP.md`](DURABLE_WORKER_SETUP.md) are ready; the command defaults
+to validation without a request. Six mocked runner tests passed. No live worker
+execution or backlog replay was performed. `P15-UAT-01` remains open, with
+activation intentionally deferred.
+
+After deployment `9169c05`, live project 94 showed 76 queued, 0 processing,
+2 failed and 117 completed. Both failures are Hosted Voice Tool jobs from
+2026-09-07 at attempt 1 of 5, marked `provider_rejected`. The UI now exposes
+them before recent items. This identifies their recorded error, not its provider
+root cause. Evidence: `test-results/staging-failed-job-details.txt`.
+
 2026-09-22 audit: project 94's live Execution Health showed 72 queued,
 0 processing, 2 failed and 115 completed. Recent queued Post Conversation jobs
 had not been attempted. `P15-UAT-01` remains open; no automatic scheduler or

@@ -54,19 +54,17 @@ test("runtime turns populate Diagnostics request, latency and token metrics", as
     .toBeGreaterThanOrEqual(before.requests + 2);
   expect(await metric("Average latency")).toBeGreaterThan(0);
   expect(await metric("Model tokens")).toBeGreaterThan(before.tokens);
-  await test
-    .info()
-    .attach("metrics", {
-      body: JSON.stringify({
-        before,
-        after: {
-          requests: await metric("Requests - 24h"),
-          tokens: await metric("Model tokens"),
-          latencyMs: await metric("Average latency"),
-        },
-      }),
-      contentType: "application/json",
-    });
+  await test.info().attach("metrics", {
+    body: JSON.stringify({
+      before,
+      after: {
+        requests: await metric("Requests - 24h"),
+        tokens: await metric("Model tokens"),
+        latencyMs: await metric("Average latency"),
+      },
+    }),
+    contentType: "application/json",
+  });
   await page.screenshot({
     path: test.info().outputPath("runtime-metrics.png"),
     fullPage: true,

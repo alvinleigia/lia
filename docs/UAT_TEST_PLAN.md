@@ -60,9 +60,9 @@ Conversation Diagnostics successfully displayed the lifecycle transcript,
 linked flows and operation evidence for conversation 1169. Its 24-hour request,
 latency and token cards showed zero despite those runtime turns. The cards read
 `chat_request_logs`, while `/api/actions/runtime` does not write those logs.
-Therefore these cards do not certify action-runtime cost or latency. Keep that
-instrumentation gap open; do not interpret zero as zero cost or instantaneous
-responses. Evidence: `tmp/staging-calendar-diagnostics.txt`.
+This was an instrumentation gap, not evidence of zero cost or instantaneous
+responses. Evidence: `tmp/staging-calendar-diagnostics.txt`. The follow-up below
+closes the gap for new requests; historical requests are not backfilled.
 
 Follow-up implementation: Project Chat and widget runtime endpoints now write
 request/status/latency metrics through the existing log store after responding.
@@ -71,10 +71,20 @@ missing/failed usage is shown as unavailable. Values and prompts are not stored
 in these metric rows. Old failed jobs/outbox items now appear ahead of recent
 activity in Execution Health so their failure reasons remain inspectable.
 Verification: 346 contract tests, two scoped database tests, type-check,
-production build and tenant-scope checks passed. Live metrics verification uses
-`tests/staging/observability.spec.ts`. Scheduling activation still requires the
-hosting decision; this change does not claim to drain the queue or close
-`P15-UAT-01`.
+production build and tenant-scope checks passed. On deployed commit `9169c05`,
+the live metrics test and both widget desktop/mobile regressions passed (3/3).
+The metrics test verifies increased request/token totals and nonzero latency
+after a configured collection turn and cancellation. Evidence:
+`test-results/staging-observability-report.json` and
+`test-results/staging-observability/`. Provider-reported token totals do not
+represent billed cost or recover unreported usage.
+
+The owner chose to keep Hobby and prepare the worker without activating a
+scheduler. The runner's default performs local validation only; six mocked tests
+cover its execution boundary. See `DURABLE_WORKER_SETUP.md`. No live queue was
+processed. Project 94 now shows 76 queued, 0 processing, 2 failed and 117 completed;
+the two visible historical failures are Hosted Voice Tool `provider_rejected`
+jobs. Scheduler gate `P15-UAT-01` remains open and intentionally inactive.
 
 Lint gate cleanup corrected import order in the task outcomes page and formatting
 in test fixtures; no behavior changed. Scratch browser drivers were moved to the
