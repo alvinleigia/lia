@@ -113,8 +113,9 @@ with the command above. TypeScript and focused Biome checks passed.
 
 No application-code fix was needed: this verifies the existing expiry/recovery
 behavior on the deployed build. Both synthetic appointments were removed. The
-fresh delayed-confirmation gate is now passed; simultaneous provider writes and
-live WhatsApp/Telnyx remain separate checks. Worker scheduling remains inactive.
+fresh delayed-confirmation gate is now passed. The later simultaneous-confirmation
+results are recorded below. Live WhatsApp/Telnyx remain deferred and worker
+scheduling remains inactive.
 
 ## Simultaneous confirmation follow-up
 
@@ -126,8 +127,8 @@ found exactly one appointment. It was cancelled in attempt 244, and final lookup
 245 found no match.
 
 The live check exposed a recovery defect: the rejected caller received a generic
-team-review outcome instead of available alternatives. Evidence:
-`test-results/staging-calendar-race-report.json`. The isolated database test
+team-review outcome instead of available alternatives. Failure log:
+`tmp/staging-calendar-race.log`. The isolated database test
 reproduced the same failure (`tmp/calendar-write-race-repro.log`).
 
 The fix retains the task only for calendar booking/rescheduling operations that
@@ -158,4 +159,26 @@ and successful cleanup. The test stops on failure. Browser release timing does
 not establish exact provider arrival ordering; this is a live concurrency sample,
 not a guarantee against every possible external calendar writer or load level.
 
-Deployed retest: pending the recovery fix deployment.
+### Deployed race retest
+
+Fix `7465b76` deployed successfully to staging and production. All three live
+staging rounds passed in 2.9 minutes:
+
+| Slot (9 October 2026, Australia/Sydney) | Request release difference | Booking attempt | Cancellation | Final empty lookup |
+| --- | --- | --- | --- | --- |
+| 3:00 pm | 3.19 ms | 254 | 263 | 264 |
+| 3:30 pm | 3.32 ms | 273 | 282 | 283 |
+| 4:00 pm | 1.69 ms | 291 | 299 | 300 |
+
+Every round produced one successful booking and an availability-recovery reply
+for the other caller. The rejected caller selected an alternative and reached a
+new review with the same name, phone and reason; that alternative request was
+cancelled without another booking. Lookup across the two identities found exactly
+one actual appointment per round. All three bookings were cancelled and the final
+lookups returned no match. Evidence:
+`test-results/staging-calendar-race-fixed-report.json`,
+`test-results/staging-calendar-race-fixed/` screenshots and
+`tmp/staging-calendar-race-fixed.log`.
+
+The live simultaneous-booking UAT gate is passed for these tested Lia sessions.
+WhatsApp and Telnyx were not exercised and remain deferred by the owner.
