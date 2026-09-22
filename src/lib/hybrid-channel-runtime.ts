@@ -860,6 +860,22 @@ async function executeTaskConfirmation(input: {
   );
   const operationName = definition?.name ?? "The operation";
 
+  if ("recoverableCalendarSlot" in result && result.recoverableCalendarSlot) {
+    const binding = await getTaskCalendarAvailability(input.session.snapshot);
+    if (binding) {
+      // The rejected write is newer than the cached offer, regardless of its age.
+      await executeTaskReadOperation({
+        definition: binding.definition,
+        projectId: input.runtimeInput.projectId,
+        snapshot: input.session.snapshot,
+        taskRunId: input.session.runtime.run.id,
+      });
+      throw new CalendarSlotValidationError(
+        "The selected slot was taken during booking. Choose another available time.",
+      );
+    }
+  }
+
   const businessOutcome = result.businessOutcome;
   if (businessOutcome === "success") {
     const outcome = input.session.snapshot.task.definition.outcomes.find(

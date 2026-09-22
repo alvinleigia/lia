@@ -1073,12 +1073,24 @@ async function applyOperationResult(input: {
     };
   }
 
-  const terminalOutcome =
-    eventStatus === "success"
+  // A calendar write can lose the slot after its preflight check. Keep the
+  // task active so the caller can choose another time with a fresh confirmation.
+  const recoverableCalendarSlot =
+    eventStatus === "rejected" &&
+    reason === "slot_taken" &&
+    [
+      "google_calendar.book",
+      "google_calendar.reschedule",
+      "appointment.book",
+      "appointment.reschedule",
+    ].includes(operation.operationType);
+  const terminalOutcome = recoverableCalendarSlot
+    ? null
+    : eventStatus === "success"
       ? matchingOutcome(context.snapshot, "completed")
       : matchingOutcome(context.snapshot, "failed");
   const handoffOutcome =
-    eventStatus !== "success"
+    eventStatus !== "success" && !recoverableCalendarSlot
       ? matchingOutcome(context.snapshot, "handoff")
       : null;
   let outcomeKey: string | null = terminalOutcome?.key ?? null;
@@ -1191,6 +1203,7 @@ async function applyOperationResult(input: {
   return {
     attempt: attemptContext,
     businessOutcome: eventStatus,
+    recoverableCalendarSlot,
     reconciled: true,
   };
 }

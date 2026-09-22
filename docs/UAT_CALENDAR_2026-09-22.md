@@ -115,3 +115,47 @@ No application-code fix was needed: this verifies the existing expiry/recovery
 behavior on the deployed build. Both synthetic appointments were removed. The
 fresh delayed-confirmation gate is now passed; simultaneous provider writes and
 live WhatsApp/Telnyx remain separate checks. Worker scheduling remains inactive.
+
+## Simultaneous confirmation follow-up
+
+Initial deployed candidate `898fd99`: two isolated callers reviewed 9 October
+2026 at 3:00 pm Australia/Sydney. The browser harness held both UI-generated
+Confirm requests and released them 2.39 ms apart. One booking succeeded
+(attempt 237); the other was rejected (attempt 239). Separate identity lookups
+found exactly one appointment. It was cancelled in attempt 244, and final lookup
+245 found no match.
+
+The live check exposed a recovery defect: the rejected caller received a generic
+team-review outcome instead of available alternatives. Evidence:
+`test-results/staging-calendar-race-report.json`. The isolated database test
+reproduced the same failure (`tmp/calendar-write-race-repro.log`).
+
+The fix retains the task only for calendar booking/rescheduling operations that
+return a verified `rejected`/`slot_taken` outcome. It still records the failed
+attempt and confirmation, refreshes availability immediately and reuses the
+existing slot-recovery prompt. A new time needs a new confirmation. Other
+rejections and unknown outcomes retain their existing handling. Four focused
+database cases passed, including completing an alternative slot with retained
+identity/reason and two distinct confirmation records. All 346 offline contract
+tests passed (15 optional cases skipped).
+
+The seven related calendar regressions also passed: stale/invalid slot checks,
+detailed statement handling, and expired confirmations with available, busy,
+failed-provider, reload and changed-detail outcomes. Production build,
+TypeScript, tenant-scope checks and lint passed (three existing lint warnings).
+
+The retained live test runs three rounds at 3:00 pm, 3:30 pm and 4:00 pm. Set
+`RUN_STAGING_CALENDAR_RACE_UAT=1` in the process environment and run:
+
+```text
+npx playwright test --config=playwright.staging.config.ts calendar-recovery --grep "simultaneous booking" --max-failures=1
+```
+
+Each round requires two initially empty synthetic identities, future/free slots,
+one successful result, fresh alternatives for the other caller, retained details
+when choosing an alternative, exactly one actual booking across both identities,
+and successful cleanup. The test stops on failure. Browser release timing does
+not establish exact provider arrival ordering; this is a live concurrency sample,
+not a guarantee against every possible external calendar writer or load level.
+
+Deployed retest: pending the recovery fix deployment.

@@ -192,6 +192,166 @@ test("calendar conflict retains details and multiple-match lookup selects the ex
   }
 });
 
+for (const time of ["3:00 pm", "3:30 pm", "4:00 pm"]) {
+  test(`simultaneous booking allows one winner at ${time}`, async ({
+    browser,
+  }) => {
+    test.skip(
+      process.env.RUN_STAGING_CALENDAR_RACE_UAT !== "1",
+      "Explicit opt-in: races two synthetic staging bookings and cancels the result.",
+    );
+    test.setTimeout(300_000);
+    expect(Date.now()).toBeLessThan(Date.parse("2026-10-09T00:00:00+11:00"));
+    const appointment = `Friday, 9 October 2026 at ${time}`;
+    const reason = "synthetic simultaneous booking test";
+    const contexts: BrowserContext[] = [];
+    const open = () => openCalendarPage(browser, contexts);
+    const suffix = Date.now() % 9_999;
+    const callers = ["UAT Race Alpha", "UAT Race Beta"].map((name, index) => ({
+      name,
+      phone: `+1202555${String(suffix + index).padStart(4, "0")}`,
+    }));
+    const lookup = (caller: (typeof callers)[number]) =>
+      `I want to cancel my appointment. My name is ${caller.name} and my contact number is ${caller.phone}.`;
+    let writesAttempted = false;
+    let bookingsFound = 0;
+    try {
+      const pages: Page[] = [];
+      for (const caller of callers) {
+        const preflight = await open();
+        expect(text(await send(preflight, lookup(caller)))).toMatch(
+          /could not find a matching appointment/i,
+        );
+        await send(preflight, "Cancel");
+        const page = await open();
+        const review = await send(
+          page,
+          `I want to book an appointment on 9 October 2026 at ${time} Australia/Sydney. My name is ${caller.name}, my contact number is ${caller.phone}, and the reason is ${reason}.`,
+        );
+        expect(
+          review.replies.some((reply) => reply.intent === "confirmation"),
+        ).toBe(true);
+        expect(text(review)).toContain(appointment);
+        expect(text(review)).toContain(caller.name);
+        expect(text(review)).toContain(caller.phone);
+        expect(text(review)).toContain(reason);
+        pages.push(page);
+      }
+      // Hold both UI-generated requests until ready, then release them together.
+      let release = () => {};
+      const barrier = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const releasedAt: number[] = [];
+      let arrivals = 0;
+      const timeout = setTimeout(release, 30_000);
+      for (const page of pages) {
+        await page.route("**/api/actions/runtime", async (route) => {
+          if (
+            route.request().method() === "POST" &&
+            route.request().postDataJSON()?.text === "Confirm"
+          ) {
+            arrivals++;
+            if (arrivals === 2) release();
+            await barrier;
+            releasedAt.push(performance.now());
+          }
+          await route.continue();
+        });
+      }
+      writesAttempted = true;
+      const settled = await Promise.allSettled(
+        pages.map((page) => send(page, "Confirm")),
+      );
+      clearTimeout(timeout);
+      const results = settled.map((result) => {
+        if (result.status === "rejected") throw result.reason;
+        return result.value;
+      });
+      expect(arrivals).toBe(2);
+      const releaseSkewMs = Math.abs(releasedAt[1] - releasedAt[0]);
+      await test.info().attach("race-timing", {
+        body: JSON.stringify({ releaseSkewMs, replies: results.map(text) }),
+        contentType: "application/json",
+      });
+      expect(releaseSkewMs).toBeLessThan(100);
+      const winners = results.filter((result) =>
+        /completed[\s\S]*successfully/.test(text(result)),
+      );
+      expect(winners).toHaveLength(1);
+      const loser = results.find((result) => result !== winners[0]);
+      if (!loser) throw new Error("Expected a second caller response");
+      expect(text(loser)).toMatch(
+        /couldn't confirm availability|no longer available|not available/i,
+      );
+      const alternatives = loser.replies.flatMap(
+        (reply) => reply.payload?.options ?? [],
+      );
+      expect(alternatives.length).toBeGreaterThan(0);
+      expect(alternatives.some((option) => option.label === appointment)).toBe(
+        false,
+      );
+      for (const [index, page] of pages.entries()) {
+        await page.screenshot({
+          path: test.info().outputPath(`race-caller-${index + 1}.png`),
+          fullPage: true,
+        });
+      }
+      const loserIndex = results.indexOf(loser);
+      const alternativeReview = await send(
+        pages[loserIndex],
+        alternatives[0].label,
+      );
+      expect(
+        alternativeReview.replies.some(
+          (reply) => reply.intent === "confirmation",
+        ),
+      ).toBe(true);
+      expect(text(alternativeReview)).toContain(callers[loserIndex].name);
+      expect(text(alternativeReview)).toContain(callers[loserIndex].phone);
+      expect(text(alternativeReview)).toContain(reason);
+      expect(text(alternativeReview)).toContain(alternatives[0].label);
+      await send(pages[loserIndex], "Cancel");
+    } finally {
+      try {
+        if (writesAttempted) {
+          for (const caller of callers) {
+            const cleanup = await open();
+            const found = await send(cleanup, lookup(caller));
+            if (/could not find a matching appointment/i.test(text(found))) {
+              await send(cleanup, "Cancel");
+              continue;
+            }
+            expect(
+              found.replies.some((reply) => reply.intent === "confirmation"),
+            ).toBe(true);
+            expect(text(found)).toContain(caller.name);
+            expect(text(found)).toContain(caller.phone);
+            expect(text(found)).toContain(reason);
+            expect(text(found)).toContain(`${appointment} (Australia/Sydney)`);
+            expect(text(found)).toContain("Appointment Reference: apt_");
+            bookingsFound++;
+            expect(text(await send(cleanup, "Confirm"))).toMatch(
+              /completed[\s\S]*successfully/,
+            );
+            const empty = await open();
+            expect(text(await send(empty, lookup(caller)))).toMatch(
+              /could not find a matching appointment/i,
+            );
+            await send(empty, "Cancel");
+          }
+        }
+      } finally {
+        await Promise.all(contexts.map((context) => context.close()));
+      }
+    }
+    expect(
+      bookingsFound,
+      "Exactly one actual booking must be found across both identities",
+    ).toBe(1);
+  });
+}
+
 test.describe("delayed calendar", () => {
   test.describe.configure({ mode: "parallel" });
   for (const resumeMode of ["open", "reload"] as const) {

@@ -14,6 +14,12 @@ gate.
 
 ## Review Point
 
+2026-09-22 channel decision: the owner explicitly deferred live WhatsApp and
+Telnyx UAT until later, with Telnyx last. Neither channel is certified by the
+passing Project Chat, widget or automated adapter tests. Revisit live message
+delivery/collection/recovery for WhatsApp and the Phase 18 hosted-AI checklist
+for Telnyx when those channel tests are resumed.
+
 2026-09-22 follow-up: the owner chose to retain Hobby and prepare worker setup
 without activating a scheduler. `scripts/run-durable-worker.mjs` and
 [`DURABLE_WORKER_SETUP.md`](DURABLE_WORKER_SETUP.md) are ready; the command defaults

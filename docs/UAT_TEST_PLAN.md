@@ -38,7 +38,7 @@ Calendar evidence is in
 | Ordinary Flow Builder inputs | Passed for the configured field set; retain repeatable staging tests. | Ten live ordinary-input cases cover text, email/phone, quantity, date/time, choices, invalid input, ambiguity, corrections, branches and publication/version pinning. Seven Business Task cases also passed on this candidate. |
 | Appointment lifecycle | Live booking, reschedule, occupied-slot alternatives, cancellation and zero/one/multiple-match lookup passed. Fresh intervening-booking recovery and delayed confirmation (open chat and reload after 15 minutes 10 seconds) passed. Simultaneous provider writes remain a separate gate. | Initial lifecycle and recovery evidence is in the calendar document. On `ee9a364`, both delayed cases completed with one Confirm, verified the resulting appointment details and passed cancellation plus no-match cleanup. See `UAT_CALENDAR_2026-09-22.md` for timing, attempts and reports. |
 | Session and failure recovery | Automated regression passed across the full run and focused fixes/reruns; retain the distinct live-channel gates. | Live reload/resume, ambiguity, corrections and fresh requests after cancel/completion passed. Automated expiry/revalidation, provider failures, duplicate messages, concurrent turns and tenant isolation passed. |
-| Existing channels and UI | Embedded widget desktop/mobile passed. Configured live WhatsApp remains required before certifying that channel. | Widget validation, branch, retained fields, reload and confirmation passed. Adapter/database coverage is not live channel certification. |
+| Existing channels and UI | Embedded widget desktop/mobile passed. Live WhatsApp and Telnyx UAT are explicitly deferred by the owner; Telnyx will be tested last. | Widget validation, branch, retained fields, reload and confirmation passed. Deferred channels remain uncertified; adapter/database coverage is not live channel certification. |
 | Final release regression | All 591 selected cases accounted for across the full run and focused reruns; retain diagnostics and cost/latency boundaries below. | Full run: 572 passed, 5 failed, 14 skipped after a serial failure. Three UI harness cases and a voice-capability assertion passed after correction. All 17 shared task-runtime cases passed after fixing calendar detection's nonnumeric operation-ID query, including the 14 skipped cases. Build, type-check and lint pass (three existing lint warnings). |
 | Deferred operations | Verify automatic durable-worker scheduling and perform the backup restore drill in a disposable environment. | `P15-UAT-01` and `P14-UAT-13` remain Open in the deferred register; do not mark closed without operational evidence. |
 
@@ -112,7 +112,7 @@ their evidence remains in Git history and `FLOW_BUILDER_ROADMAP.md`.
 | 16 - Lifecycle and forms | Complete | Passed on staging under the single-tester scope. |
 | 17 - Reuse and optimization | Complete | Passed on staging under the single-tester scope on 2026-08-20. |
 | 17A - AI cost and latency | Complete | Passed on staging under the single-tester scope on 2026-08-23. |
-| 18 - Telnyx and extensions | Hosted milestones 18.9-18.13 complete; booking and duplicate protection passed in 18.14 staging preflight | Complete find, reschedule, cancel, then live hosted-assistant UAT. |
+| 18 - Telnyx and extensions | Hosted milestones 18.9-18.13 complete; current Project Chat lifecycle evidence is recorded above | Complete the current calendar race recovery retest; live WhatsApp and Telnyx are deferred, with Telnyx last. |
 
 If a check fails, mark it `Fail`, record one short defect, and stop that
 scenario. Never enter real credentials, private customer data, or production
@@ -1857,7 +1857,12 @@ Result: [ ] Pass [x] Fail
   provider-hosted model fabricated required booking reason on 2026-09-11`
 - Tester/date: `<name/date>`
 
-# Final Release Record
+# Historical Release Record (before the 2026-09-22 audit)
+
+The defect counts and pending checks below describe that earlier checkpoint.
+Use the current non-voice audit at the top of this document and its linked live
+evidence for current calendar, extraction and metrics status. The deferred live
+Telnyx gate is not closed by Project Chat results.
 
 - Phase 14: [x] Pass [ ] Fail
 - Phase 15: [x] Pass [ ] Fail [ ] In progress

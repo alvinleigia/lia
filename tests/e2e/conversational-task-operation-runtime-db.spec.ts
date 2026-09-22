@@ -1548,6 +1548,7 @@ async function verifyCalendarRuntime(
   resumeCase?: "available" | "busy" | "failed" | "reload" | "changed",
   preferenceCase?: "available" | "busy" | "failed" | "window" | "conflict",
   contextCase = false,
+  writeRaceCase = false,
 ) {
   test.setTimeout(540_000);
   if (!fixture) throw new Error("The operation fixture is not ready.");
@@ -1674,6 +1675,7 @@ async function verifyCalendarRuntime(
     });
   let mode: "available" | "busy" | "failed" = "available";
   let freeBusyCalls = 0;
+  let rejectWriteSlot = false;
   let changeDuringRefresh: typeof run | null = null;
   const originalFetch = globalThis.fetch;
   let insertedEvent: Record<string, unknown> | null = null;
@@ -1682,6 +1684,16 @@ async function verifyCalendarRuntime(
       return Response.json({ access_token: "fixture-token", expires_in: 3600 });
     if (String(url).endsWith("/freeBusy")) {
       freeBusyCalls += 1;
+      if (rejectWriteSlot) {
+        const request = JSON.parse(String(init?.body));
+        if (
+          Date.parse(request.timeMax) - Date.parse(request.timeMin) <=
+          30 * 60_000
+        ) {
+          mode = "busy";
+          rejectWriteSlot = false;
+        }
+      }
       if (changeDuringRefresh) {
         const target = changeDuringRefresh;
         changeDuringRefresh = null;
@@ -1696,7 +1708,7 @@ async function verifyCalendarRuntime(
               mode === "busy"
                 ? preferenceCase
                   ? [{ start: `${date}T15:30:00Z`, end: `${date}T16:00:00Z` }]
-                  : resumeCase
+                  : resumeCase || writeRaceCase
                     ? [{ start: `${date}T10:00:00Z`, end: `${date}T10:30:00Z` }]
                     : selectionRefreshCase
                       ? [
@@ -1733,6 +1745,12 @@ async function verifyCalendarRuntime(
       insertedEvent
     )
       return Response.json(insertedEvent);
+    if (
+      writeRaceCase &&
+      String(url).includes("/events/") &&
+      init?.method === "GET"
+    )
+      return new Response("not found", { status: 404 });
     throw new Error("Unexpected fixture network request.");
   };
   try {
@@ -2379,7 +2397,7 @@ async function verifyCalendarRuntime(
         )
           continue;
         if (
-          resumeCase &&
+          (resumeCase || writeRaceCase) &&
           (channelType !== "project_chat" || clock !== "10:00 am" || fromPrompt)
         )
           continue;
@@ -2713,6 +2731,91 @@ async function verifyCalendarRuntime(
           });
         }
         expect(insertedEvent).toBeNull();
+        if (writeRaceCase) {
+          if (!session.runtime) throw new Error("Race task missing");
+          const raceScope = { projectId, taskRunId: session.runtime.run.id };
+          rejectWriteSlot = true;
+          StructuredTurnEngine.prototype.execute = async () => {
+            throw new Error("A rejected slot must recover without a model");
+          };
+          const rejected = await runBrowserFlowText({
+            ...browserInput,
+            text: "Confirm",
+          });
+          expect(rejected.replies.at(-1)?.text).toContain(
+            "alternative appointment times",
+          );
+          expect(insertedEvent).toBeNull();
+          const recovered = await getConversationalTaskRuntime(raceScope);
+          expect(recovered?.run.status).toBe("active");
+          expect(recovered?.confirmations.at(-1)?.status).toBe("failed");
+          for (const key of [
+            "guestName",
+            "guestEmail",
+            "contactNumber",
+            "reason",
+            "preferredDate",
+          ]) {
+            expect(
+              recovered?.fields.find(({ fieldKey }) => fieldKey === key)
+                ?.canonicalValue,
+            ).toEqual(fields[key].canonicalValue);
+          }
+          const fresh = await readTaskCalendarAvailability({
+            ...raceScope,
+            binding,
+          });
+          expect(
+            fresh.allOptions.some(
+              ({ value }) => value === `${date}T10:00:00.000Z`,
+            ),
+          ).toBe(false);
+          const alternative = fresh.allOptions.find(
+            ({ value }) => value === `${date}T10:30:00.000Z`,
+          );
+          if (!alternative) throw new Error("Recovery slot missing");
+          const review = await runBrowserFlowText({
+            ...browserInput,
+            text: alternative.label,
+            selection: {
+              id: `task-field:appointmentStart:${alternative.value}`,
+              label: alternative.label,
+              value: alternative.value,
+            },
+          });
+          expect(
+            review.replies.some(({ intent }) => intent === "confirmation"),
+          ).toBe(true);
+          const completed = await runBrowserFlowText({
+            ...browserInput,
+            text: "Confirm",
+          });
+          expect(completed.replies.map(({ text }) => text).join(" ")).toContain(
+            "submitted successfully",
+          );
+          expect(insertedEvent).toMatchObject({
+            start: { dateTime: `${date}T10:30:00.000Z` },
+          });
+          const writes = await db
+            .select()
+            .from(operationAttempts)
+            .where(
+              and(
+                eq(operationAttempts.projectId, projectId),
+                eq(operationAttempts.taskRunId, raceScope.taskRunId),
+                eq(operationAttempts.operationId, booking.id),
+              ),
+            );
+          expect(writes).toHaveLength(2);
+          expect(
+            writes.map(({ responsePayload }) => responsePayload.status).sort(),
+          ).toEqual(["rejected", "success"]);
+          expect(
+            new Set(writes.map(({ taskConfirmationId }) => taskConfirmationId))
+              .size,
+          ).toBe(2);
+          continue;
+        }
         if (resumeCase) {
           if (!session.runtime) throw new Error("Resume task missing");
           const resumeScope = { projectId, taskRunId: session.runtime.run.id };
@@ -3865,6 +3968,18 @@ async function verifyCalendarRuntime(
     globalThis.fetch = originalFetch;
   }
 }
+
+test("A slot taken during the write recovers alternatives and retains task details", async () => {
+  await verifyCalendarRuntime(
+    true,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    false,
+    true,
+  );
+});
 
 test("Calendar slots use the task ledger and block arbitrary, empty, failed and stale selections", async () => {
   await verifyCalendarRuntime(false);
