@@ -4,10 +4,16 @@ This is the only active UAT document. Run the official checks at:
 
 - URL: `https://lia-staging.leigia.com/`
 - Current selected project: `Phase 16 Lifecycle UAT (#94)`
-- Current staging milestone: Phase 17A passed; Phase 18.14 appointment lifecycle preflight in progress
+- Current staging milestone: scoped Project Chat, widget and appointment lifecycle UAT passed; four owner-approved deferrals remain
 
 Checks explicitly accepted for later retesting are kept in
 [`UAT_DEFERRED_ITEMS.md`](UAT_DEFERRED_ITEMS.md).
+
+Owner decision on 2026-09-22: defer automatic durable-worker scheduling,
+the database restore drill, live WhatsApp UAT and live Telnyx UAT. Retain Vercel
+Hobby during UAT, leave scheduling inactive, and do not provision a restore
+database now. Telnyx will be tested last. These four checks remain unverified;
+their deferral does not change the recorded passing results for the current scope.
 
 ## Current Non-Voice UAT Audit — 2026-09-22
 
@@ -40,7 +46,7 @@ Calendar evidence is in
 | Session and failure recovery | Automated regression passed across the full run and focused fixes/reruns; retain the distinct live-channel gates. | Live reload/resume, ambiguity, corrections and fresh requests after cancel/completion passed. Automated expiry/revalidation, provider failures, duplicate messages, concurrent turns and tenant isolation passed. |
 | Existing channels and UI | Embedded widget desktop/mobile passed. Live WhatsApp and Telnyx UAT are explicitly deferred by the owner; Telnyx will be tested last. | Widget validation, branch, retained fields, reload and confirmation passed. Deferred channels remain uncertified; adapter/database coverage is not live channel certification. |
 | Final release regression | All 591 selected cases accounted for across the full run and focused reruns; retain diagnostics and cost/latency boundaries below. | Full run: 572 passed, 5 failed, 14 skipped after a serial failure. Three UI harness cases and a voice-capability assertion passed after correction. All 17 shared task-runtime cases passed after fixing calendar detection's nonnumeric operation-ID query, including the 14 skipped cases. Build, type-check and lint pass (three existing lint warnings). |
-| Deferred operations | Verify automatic durable-worker scheduling and perform the backup restore drill in a disposable environment. | `P15-UAT-01` and `P14-UAT-13` remain Open in the deferred register; do not mark closed without operational evidence. |
+| Deferred operations | Automatic durable-worker scheduling and the backup restore drill are explicitly deferred by the owner. Keep Hobby and scheduling inactive; no extra restore database is currently available. | `P15-UAT-01` and `P14-UAT-13` remain unverified in the deferred register, alongside live WhatsApp and Telnyx. Resume only when the owner takes up those items. |
 
 These rows describe outstanding verification, not six newly discovered product
 defects. Preserve completed phase evidence. Record each result as passed, failed,
