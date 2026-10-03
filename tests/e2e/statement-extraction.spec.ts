@@ -267,6 +267,64 @@ test("simple answers keep caller wording even if the model proposes a default", 
   expect(result.values.reason).toBe("Persistent knee pain");
 });
 
+test("noun phrases containing change or update use the requested field without model calls", async () => {
+  let calls = 0;
+  const engine = new StructuredTurnEngine({
+    provider: {
+      async generateTurn() {
+        calls += 1;
+        throw new Error("A simple requested value must not invoke the model.");
+      },
+    },
+  });
+  for (const message of ["Oil change", "Software update", "Address change"]) {
+    const result = await engine.execute(
+      input(bike, message, "serviceSubject", { customerName: "Alex Test" }),
+    );
+    expect(result.source).toBe("deterministic");
+    expect(result.attempts).toBe(0);
+    expect(result.usage.totalTokens).toBe(0);
+    expect(result.proposal.fieldCandidates).toEqual(
+      proposal({ serviceSubject: message }).fieldCandidates,
+    );
+  }
+  expect(calls).toBe(0);
+});
+
+test("correction requests still use extraction rather than filling the requested text field", async () => {
+  let calls = 0;
+  const engine = new StructuredTurnEngine({
+    provider: {
+      async generateTurn(i) {
+        calls += 1;
+        return {
+          modelId: i.modelId,
+          output: {
+            ...proposal({ bikeModel: "Honda" }),
+            turnKind: "field_correction",
+          },
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        };
+      },
+    },
+  });
+  for (const message of [
+    "Change bike model to Honda",
+    "Please correct bike model to Honda",
+    "Could you update bike model to Honda",
+    "Bike model should change to Honda",
+  ]) {
+    const result = await engine.execute(
+      input(bike, message, "serviceSubject", { bikeModel: "Yamaha" }),
+    );
+    expect(result.source).toBe("model");
+    expect(result.proposal.fieldCandidates).toEqual(
+      proposal({ bikeModel: "Honda" }).fieldCandidates,
+    );
+  }
+  expect(calls).toBe(4);
+});
+
 test("a name correction while collecting another text field still uses extraction", async () => {
   const expected = { customerName: "Sam Test" };
   const provider: StructuredTurnProvider = {

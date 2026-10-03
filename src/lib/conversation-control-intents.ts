@@ -121,8 +121,12 @@ export function isSimpleTaskTextAnswer(value: string) {
     Boolean(text) &&
     text.split(/\s+/).length <= 8 &&
     !/[,;:!?\n]|\.\s/.test(text) &&
-    !/\b(?:i|my|we|our|and|actually|instead|rather|change|correct|update)\b/i.test(
+    !/\b(?:i|my|we|our|and|actually|instead|rather)\b/i.test(text) &&
+    // Correction verbs need extraction; nouns such as "oil change" and
+    // "software update" are still valid answers to a requested text field.
+    !/^(?:(?:please|kindly)\s+|(?:can|could|would|will)\s+you\s+(?:please\s+)?)?(?:change|correct|update)\b/i.test(
       text,
-    )
+    ) &&
+    !/\b(?:change|correct|update)\s+(?:to|from)\b/i.test(text)
   );
 }

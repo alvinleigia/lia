@@ -246,9 +246,18 @@ export function findActionForTaskRecommendation(
 
 export function isExactActionTrigger(action: RuntimeAction, input: string) {
   const normalizedInput = normalizeActionText(input);
+  // A request wrapper supplies no field values. Consume it only when the
+  // entire remainder equals a published trigger; keep extra intent/details.
+  const bareRequest = normalizedInput
+    .replace(/\s+/g, " ")
+    .replace(/[.!]+$/, "")
+    .replace(/^(?:(?:i|we) (?:want|need|would like) to |please )/, "")
+    .replace(/^(?:enquire|inquire|ask) about /, "");
 
   return action.triggerPhrases.some(
-    (phrase) => normalizeActionText(phrase) === normalizedInput,
+    (phrase) =>
+      normalizeActionText(phrase) === normalizedInput ||
+      (Boolean(bareRequest) && normalizeActionText(phrase) === bareRequest),
   );
 }
 

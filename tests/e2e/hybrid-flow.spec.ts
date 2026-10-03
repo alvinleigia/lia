@@ -91,6 +91,32 @@ test("exact action triggers are control input, not task content", () => {
   ).toBe("phase thirteen booking parity");
 });
 
+test("bare enquiry requests consume only the configured trigger, preserving extra intent and fields", () => {
+  const action = {
+    triggerPhrases: ["bike service", "property enquiry", "appointment"],
+  } as RuntimeAction;
+  for (const message of [
+    "I want to enquire about bike service.",
+    "Please inquire about property enquiry.",
+    "I would like to ask about bike service",
+    "  I want to   enquire about BIKE SERVICE.  ",
+    "Please bike service",
+  ]) {
+    expect(isExactActionTrigger(action, message), message).toBe(true);
+  }
+  for (const message of [
+    "I want to enquire about bike service. My name is Alex Test.",
+    "I want to enquire about bike service for an oil change",
+    "I want to enquire about bike service prices?",
+    "I do not want to enquire about bike service",
+    "I want to enquire about bike service or property enquiry",
+    "I want to reschedule my appointment.",
+    "I want to cancel my appointment.",
+  ]) {
+    expect(isExactActionTrigger(action, message), message).toBe(false);
+  }
+});
+
 test("task recommendations resolve only to an action containing that published task", () => {
   const actions = [
     {

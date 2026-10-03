@@ -81,6 +81,24 @@ test.beforeEach(async ({ page }) => {
   expect(new URL(page.url()).origin).toBe("https://lia-staging.leigia.com");
 });
 
+test("bare enquiry starts collection and accepts a short service reason without an error", async ({
+  page,
+}) => {
+  const started = await send(page, "I want to enquire about bike service.");
+  expect(started.replies.at(-1)?.payload?.inputRequest?.fieldKey).toBe(
+    "customerName",
+  );
+  expect(started.replies.map((reply) => reply.text).join("\n")).not.toMatch(
+    /could not prepare|try again/i,
+  );
+  await send(page, "UAT Rider");
+  await send(page, "+12025550123");
+  await send(page, "Yamaha MT-15");
+  await review(page, await send(page, "Oil change"));
+  const cancelled = await send(page, "Cancel");
+  expect(cancelled.activeFlow).toBeNull();
+});
+
 test("all details in one message reach review and complete after confirmation", async ({
   page,
 }) => {
