@@ -35,6 +35,12 @@ for (const scenario of cases) {
     await page
       .getByRole("button", { name: /Phase 16 Lifecycle UAT.*94/ })
       .click();
+    await expect(
+      page.getByRole("button", {
+        name: "Selected Project: Phase 16 Lifecycle UAT (#94)",
+        exact: true,
+      }),
+    ).toBeVisible();
     await page.goto("/projects/chat");
     await expect(
       page.getByRole("button", {
