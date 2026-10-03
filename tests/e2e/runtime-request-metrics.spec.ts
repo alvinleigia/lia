@@ -27,6 +27,7 @@ test("deterministic requests record latency, outcome and zero model usage", asyn
       promptTokens: 0,
       completionTokens: 0,
       totalTokens: 0,
+      usageDetails: [],
     },
   ]);
   expect(JSON.stringify(logs)).not.toContain("private reply");

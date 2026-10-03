@@ -19,7 +19,11 @@ import {
   getLatestUserText,
 } from "@/lib/deterministic-chat-response";
 import { projectHasIndexedDocuments } from "@/lib/documents";
-import { getPlatformLanguageModel } from "@/lib/model-provider";
+import {
+  getPlatformLanguageModel,
+  PLATFORM_DEFAULT_MODEL_ID,
+} from "@/lib/model-provider";
+import { createStreamUsageRecorder } from "@/lib/model-usage";
 import { resolveApprovedKnowledgeAnswer } from "@/lib/project-ai-settings";
 import { searchDocuments } from "@/lib/search";
 
@@ -104,35 +108,17 @@ export async function POST(req: Request) {
         projectName: project.name,
       }),
       stopWhen: stepCountIs(2),
-      onFinish: async ({ usage }) => {
-        const promptTokens =
-          (usage as { inputTokens?: number; promptTokens?: number })
-            ?.inputTokens ??
-          (usage as { inputTokens?: number; promptTokens?: number })
-            ?.promptTokens ??
-          null;
-        const completionTokens =
-          (usage as { outputTokens?: number; completionTokens?: number })
-            ?.outputTokens ??
-          (usage as { outputTokens?: number; completionTokens?: number })
-            ?.completionTokens ??
-          null;
-        const totalTokens =
-          (usage as { totalTokens?: number })?.totalTokens ??
-          (promptTokens !== null && completionTokens !== null
-            ? promptTokens + completionTokens
-            : null);
-
-        await logChatRequest({
-          route: "chat",
-          projectId: project.id,
-          statusCode: 200,
-          latencyMs: Date.now() - startMs,
-          promptTokens,
-          completionTokens,
-          totalTokens,
-        });
-      },
+      ...createStreamUsageRecorder(
+        PLATFORM_DEFAULT_MODEL_ID,
+        async (usageLog) => {
+          await logChatRequest({
+            route: "chat",
+            projectId: project.id,
+            latencyMs: Date.now() - startMs,
+            ...usageLog,
+          });
+        },
+      ),
     });
 
     return result.toUIMessageStreamResponse();

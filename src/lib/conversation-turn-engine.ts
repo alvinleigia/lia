@@ -47,6 +47,11 @@ import {
   type StructuredTurnProviderResult,
 } from "@/lib/model-provider";
 import {
+  failedModelUsage,
+  type ModelUsage,
+  sumModelUsage,
+} from "@/lib/model-usage";
+import {
   type ProjectAiSettings,
   resolveApprovedKnowledgeAnswer,
 } from "@/lib/project-ai-settings";
@@ -731,7 +736,7 @@ export class StructuredTurnEngine {
           }),
         ),
         source: "deterministic",
-        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
     }
 
@@ -761,7 +766,7 @@ export class StructuredTurnEngine {
           }),
         ),
         source: "deterministic",
-        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
     }
 
@@ -780,7 +785,7 @@ export class StructuredTurnEngine {
           }),
         ),
         source: "deterministic",
-        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
     }
 
@@ -795,7 +800,7 @@ export class StructuredTurnEngine {
         modelEscalationReason: null,
         proposal: asValidatedDeterministic(deterministicProposal(admission)),
         source: "deterministic",
-        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
     }
 
@@ -838,7 +843,7 @@ export class StructuredTurnEngine {
           ),
         },
         source: "deterministic",
-        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
     }
 
@@ -849,7 +854,7 @@ export class StructuredTurnEngine {
         modelEscalationReason: null,
         proposal: asValidatedDeterministic(directField),
         source: "deterministic",
-        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
     }
 
@@ -860,7 +865,7 @@ export class StructuredTurnEngine {
         modelEscalationReason: null,
         proposal: asValidatedDeterministic(approvedKnowledgeAnswer),
         source: "deterministic",
-        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
     }
 
@@ -887,7 +892,7 @@ export class StructuredTurnEngine {
           }),
         ),
         source: "deterministic",
-        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
     }
 
@@ -915,7 +920,7 @@ export class StructuredTurnEngine {
           modelEscalationReason,
           proposal: asValidatedDeterministic(retrievalFailureProposal(input)),
           source: "deterministic",
-          usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
         };
       }
     }
@@ -926,11 +931,7 @@ export class StructuredTurnEngine {
       (modelId): modelId is string => Boolean(modelId),
     );
     let attempts = 0;
-    let lastUsage: StructuredTurnProviderResult["usage"] = {
-      inputTokens: null,
-      outputTokens: null,
-      totalTokens: null,
-    };
+    const attemptUsages: ModelUsage[] = [];
 
     const deadline = Date.now() + modelPolicy.timeoutMs;
     modelAttempts: for (const modelId of models) {
@@ -943,18 +944,22 @@ export class StructuredTurnEngine {
         const remainingMs = deadline - Date.now();
         if (remainingMs <= 0) break modelAttempts;
         attempts += 1;
+        let receivedUsage = false;
         try {
           let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
           const generated = await Promise.race([
-            measureRuntimeModelCall(input.projectId, () =>
-              this.provider.generateTurn({
-                maxOutputTokens: modelPolicy.maxOutputTokens,
-                maxRetries: modelPolicy.maxRetries,
-                messages: compiled.messages,
-                modelId,
-                system: compiled.system + repair,
-                timeoutMs: remainingMs,
-              }),
+            measureRuntimeModelCall(
+              input.projectId,
+              () =>
+                this.provider.generateTurn({
+                  maxOutputTokens: modelPolicy.maxOutputTokens,
+                  maxRetries: modelPolicy.maxRetries,
+                  messages: compiled.messages,
+                  modelId,
+                  system: compiled.system + repair,
+                  timeoutMs: remainingMs,
+                }),
+              modelId,
             ),
             new Promise<never>((_, reject) => {
               deadlineTimer = setTimeout(
@@ -963,7 +968,8 @@ export class StructuredTurnEngine {
               );
             }),
           ]).finally(() => clearTimeout(deadlineTimer));
-          lastUsage = generated.usage;
+          attemptUsages.push(generated.usage);
+          receivedUsage = true;
           const proposal = preserveAmbiguousDateWording(
             input,
             applyIntentRoutingPolicy(
@@ -1000,9 +1006,10 @@ export class StructuredTurnEngine {
               },
             },
             source: "model",
-            usage: generated.usage,
+            usage: sumModelUsage(attemptUsages),
           };
         } catch (error) {
+          if (!receivedUsage) attemptUsages.push(failedModelUsage(error));
           const codes =
             error instanceof TurnProposalValidationError
               ? error.codes
@@ -1027,7 +1034,7 @@ export class StructuredTurnEngine {
         },
       },
       source: "deterministic",
-      usage: lastUsage,
+      usage: sumModelUsage(attemptUsages),
     };
   }
 }

@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { writeAuditLog } from "@/lib/audit";
 import {
   isInactiveAccountError,
@@ -10,6 +11,7 @@ import {
   executeProjectStructuredTurn,
   PublishedTurnTaskNotFoundError,
 } from "@/lib/conversation-turn-service";
+import { measureRuntimeRequest } from "@/lib/runtime-request-metrics";
 
 class InvalidTurnRequestError extends Error {
   constructor() {
@@ -23,94 +25,89 @@ function errorResponse(status: number, message: string) {
 }
 
 export async function POST(request: Request) {
-  const startedAt = Date.now();
-  let projectId: number | null = null;
+  return measureRuntimeRequest(
+    "structured_turn",
+    async (metrics) => {
+      const startedAt = Date.now();
+      let projectId: number | null = null;
 
-  try {
-    const parsed = structuredTurnRequestV1Schema.safeParse(
-      await request.json(),
-    );
-    if (!parsed.success) {
-      throw new InvalidTurnRequestError();
-    }
-    projectId = parsed.data.projectId;
+      try {
+        const parsed = structuredTurnRequestV1Schema.safeParse(
+          await request.json(),
+        );
+        if (!parsed.success) {
+          throw new InvalidTurnRequestError();
+        }
+        const context = await resolveStrictUserAndProject(
+          parsed.data.projectId,
+        );
+        projectId = context.project.id;
+        metrics.projectId = projectId;
+        const result = await executeProjectStructuredTurn({
+          ...parsed.data,
+          companyName: context.company.name,
+          projectAiSettings: context.project.aiSettings,
+          projectName: context.project.name,
+        });
+        const latencyMs = Date.now() - startedAt;
 
-    const context = await resolveStrictUserAndProject(projectId);
-    const result = await executeProjectStructuredTurn({
-      ...parsed.data,
-      companyName: context.company.name,
-      projectAiSettings: context.project.aiSettings,
-      projectName: context.project.name,
-    });
-    const latencyMs = Date.now() - startedAt;
+        metrics.errorCode =
+          result.execution.source === "deterministic"
+            ? result.execution.proposal.safety.reasonCode
+            : null;
+        await writeAuditLog({
+          ...context,
+          action: "structured_turn.decided",
+          targetType: result.activeTask ? "conversational_task" : "project",
+          targetId: result.activeTask?.id ?? projectId,
+          metadata: buildSafeTurnDecisionSummary(result.execution, {
+            estimatedCostUnits:
+              result.execution.usage.inputTokens === null ||
+              result.execution.usage.outputTokens === null
+                ? null
+                : result.execution.usage.inputTokens +
+                  result.execution.usage.outputTokens * 4,
+            inputTokens: result.execution.usage.inputTokens,
+            latencyMs,
+            outputTokens: result.execution.usage.outputTokens,
+            totalTokens: result.execution.usage.totalTokens,
+          }),
+        });
 
-    await logChatRequest({
-      route: "structured_turn",
-      projectId,
-      statusCode: 200,
-      latencyMs,
-      promptTokens: result.execution.usage.inputTokens,
-      completionTokens: result.execution.usage.outputTokens,
-      totalTokens: result.execution.usage.totalTokens,
-      errorCode:
-        result.execution.source === "deterministic"
-          ? result.execution.proposal.safety.reasonCode
-          : null,
-    });
-    await writeAuditLog({
-      ...context,
-      action: "structured_turn.decided",
-      targetType: result.activeTask ? "conversational_task" : "project",
-      targetId: result.activeTask?.id ?? projectId,
-      metadata: buildSafeTurnDecisionSummary(result.execution, {
-        estimatedCostUnits:
-          result.execution.usage.inputTokens === null ||
-          result.execution.usage.outputTokens === null
-            ? null
-            : result.execution.usage.inputTokens +
-              result.execution.usage.outputTokens * 4,
-        inputTokens: result.execution.usage.inputTokens,
-        latencyMs,
-        outputTokens: result.execution.usage.outputTokens,
-        totalTokens: result.execution.usage.totalTokens,
-      }),
-    });
+        return Response.json(result);
+      } catch (error) {
+        const status =
+          error instanceof InvalidTurnRequestError
+            ? 400
+            : error instanceof PublishedTurnTaskNotFoundError ||
+                (error instanceof Error &&
+                  error.message === "Project not found.")
+              ? 404
+              : error instanceof Error && error.message === "Unauthorized"
+                ? 401
+                : isInactiveAccountError(error)
+                  ? 423
+                  : 500;
+        const message =
+          status === 400
+            ? "Please check the turn request."
+            : status === 401
+              ? "Sign in to continue."
+              : status === 404
+                ? "The selected project or published task was not found."
+                : status === 423
+                  ? "This account is currently disabled."
+                  : "The structured turn could not be processed.";
 
-    return Response.json(result);
-  } catch (error) {
-    const status =
-      error instanceof InvalidTurnRequestError
-        ? 400
-        : error instanceof PublishedTurnTaskNotFoundError ||
-            (error instanceof Error && error.message === "Project not found.")
-          ? 404
-          : error instanceof Error && error.message === "Unauthorized"
-            ? 401
-            : isInactiveAccountError(error)
-              ? 423
-              : 500;
-    const message =
-      status === 400
-        ? "Please check the turn request."
-        : status === 401
-          ? "Sign in to continue."
-          : status === 404
-            ? "The selected project or published task was not found."
-            : status === 423
-              ? "This account is currently disabled."
-              : "The structured turn could not be processed.";
+        if (status === 500) {
+          console.error("Structured turn failed:", error);
+        }
+        metrics.errorCode =
+          error instanceof Error ? error.name : "unknown_error";
 
-    if (status === 500) {
-      console.error("Structured turn failed:", error);
-    }
-    await logChatRequest({
-      route: "structured_turn",
-      projectId,
-      statusCode: status,
-      latencyMs: Date.now() - startedAt,
-      errorCode: error instanceof Error ? error.name : "unknown_error",
-    });
-
-    return errorResponse(status, message);
-  }
+        return errorResponse(status, message);
+      }
+    },
+    (log) => after(() => logChatRequest(log)),
+  );
 }

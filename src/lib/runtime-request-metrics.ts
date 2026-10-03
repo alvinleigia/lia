@@ -1,64 +1,71 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-
-type Usage = {
-  inputTokens: number | null;
-  outputTokens: number | null;
-  totalTokens: number | null;
-};
+import {
+  failedModelUsage,
+  type ModelUsage,
+  type ModelUsageDetail,
+  normalizeModelUsage,
+  sumModelUsage,
+  tokenLogFields,
+} from "@/lib/model-usage";
 
 type RequestMetrics = {
   projectId: number | null;
-  calls: number;
-  completedCalls: number;
-  usage: Usage;
+  errorCode?: string | null;
+  details: ModelUsageDetail[];
 };
 
 export type RuntimeRequestLog = {
-  route: "project_runtime" | "widget_runtime";
+  route: "project_runtime" | "widget_runtime" | "structured_turn";
   projectId: number | null;
   statusCode: number;
   latencyMs: number;
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
+  usageDetails: ModelUsageDetail[];
+  errorCode?: string | null;
 };
 
 const requests = new AsyncLocalStorage<RequestMetrics>();
 
-export async function measureRuntimeModelCall<T extends { usage: Usage }>(
+export async function measureRuntimeModelCall<T extends { usage: ModelUsage }>(
   projectId: number,
   generate: () => Promise<T>,
+  modelId = "unknown",
 ): Promise<T> {
   const metrics = requests.getStore();
   if (!metrics || metrics.projectId !== projectId) return generate();
-  metrics.calls += 1;
-  const result = await generate();
-  metrics.completedCalls += 1;
-  for (const key of ["inputTokens", "outputTokens", "totalTokens"] as const) {
-    const value = result.usage[key];
-    const previous = metrics.usage[key];
-    metrics.usage[key] =
-      previous !== null &&
-      value !== null &&
-      Number.isFinite(value) &&
-      value >= 0
-        ? previous + value
-        : null;
+  const detail: ModelUsageDetail = {
+    modelId,
+    purpose: "structured_turn",
+    status: "incomplete",
+    usage: normalizeModelUsage(null),
+  };
+  metrics.details.push(detail);
+  try {
+    const result = await generate();
+    detail.status = "completed";
+    detail.usage = result.usage;
+    return result;
+  } catch (error) {
+    detail.status = "failed";
+    detail.usage = failedModelUsage(error);
+    throw error;
   }
-  return result;
 }
 
 export async function measureRuntimeRequest(
   route: RuntimeRequestLog["route"],
-  handle: (metrics: { projectId: number | null }) => Promise<Response>,
+  handle: (metrics: {
+    projectId: number | null;
+    errorCode?: string | null;
+  }) => Promise<Response>,
   record: (log: RuntimeRequestLog) => void,
 ): Promise<Response> {
   const startedAt = performance.now();
   const metrics: RequestMetrics = {
     projectId: null,
-    calls: 0,
-    completedCalls: 0,
-    usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+    details: [],
   };
   let statusCode = 500;
   return requests.run(metrics, async () => {
@@ -67,16 +74,24 @@ export async function measureRuntimeRequest(
       statusCode = response.status;
       return response;
     } finally {
-      const complete = metrics.calls === metrics.completedCalls;
+      // Snapshot before scheduling: timed-out providers may finish later.
+      const usageDetails = metrics.details.map((detail) => ({
+        ...detail,
+        usage: { ...detail.usage },
+      }));
       try {
         record({
           route,
           projectId: metrics.projectId,
           statusCode,
           latencyMs: Math.round(performance.now() - startedAt),
-          promptTokens: complete ? metrics.usage.inputTokens : null,
-          completionTokens: complete ? metrics.usage.outputTokens : null,
-          totalTokens: complete ? metrics.usage.totalTokens : null,
+          ...tokenLogFields(
+            sumModelUsage(usageDetails.map((detail) => detail.usage)),
+          ),
+          usageDetails,
+          ...(metrics.errorCode !== undefined
+            ? { errorCode: metrics.errorCode }
+            : {}),
         });
       } catch {
         console.error("Failed to schedule runtime request metrics.");

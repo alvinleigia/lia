@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte, notInArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import { chatRequestLogs } from "@/lib/db-schema";
 
@@ -50,6 +50,10 @@ async function getWindowSummary(
     .where(
       and(
         eq(chatRequestLogs.projectId, projectId),
+        notInArray(chatRequestLogs.route, [
+          "embedding_query",
+          "embedding_ingest",
+        ]),
         gte(chatRequestLogs.createdAt, since),
         until ? lte(chatRequestLogs.createdAt, until) : undefined,
       ),
@@ -89,6 +93,10 @@ async function getRouteBreakdown(
     .where(
       and(
         eq(chatRequestLogs.projectId, projectId),
+        notInArray(chatRequestLogs.route, [
+          "embedding_query",
+          "embedding_ingest",
+        ]),
         gte(chatRequestLogs.createdAt, since),
         until ? lte(chatRequestLogs.createdAt, until) : undefined,
       ),

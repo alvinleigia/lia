@@ -146,6 +146,20 @@ test("runtime request metrics feed scoped analytics and distinguish unreported u
     promptTokens: 10,
     completionTokens: 4,
     totalTokens: 14,
+    usageDetails: [
+      {
+        modelId: "fixture-model",
+        purpose: "structured_turn",
+        status: "completed",
+        usage: {
+          inputTokens: 10,
+          outputTokens: 4,
+          totalTokens: 14,
+          cachedInputTokens: 2,
+          reasoningTokens: 1,
+        },
+      },
+    ],
   });
   await logChatRequest({
     route: "widget_runtime",
@@ -160,6 +174,44 @@ test("runtime request metrics feed scoped analytics and distinguish unreported u
     latencyMs: 999,
     totalTokens: 1000,
   });
+  await logChatRequest({
+    route: "embedding_query",
+    projectId,
+    statusCode: 200,
+    latencyMs: 20,
+    promptTokens: 7,
+    completionTokens: 0,
+    totalTokens: 7,
+    usageDetails: [
+      {
+        modelId: "embedding-fixture",
+        purpose: "embedding_query",
+        status: "completed",
+        usage: { inputTokens: 7, outputTokens: 0, totalTokens: 7 },
+      },
+    ],
+  });
+  const stored = await db
+    .select()
+    .from(chatRequestLogs)
+    .where(eq(chatRequestLogs.projectId, projectId));
+  expect(
+    stored.find((row) => row.route === "project_runtime")?.usageDetails,
+  ).toMatchObject([
+    {
+      modelId: "fixture-model",
+      usage: { cachedInputTokens: 2, reasoningTokens: 1 },
+    },
+  ]);
+  expect(
+    stored.find((row) => row.route === "embedding_query")?.totalTokens,
+  ).toBe(7);
+  const foreignLogs = await db
+    .select()
+    .from(chatRequestLogs)
+    .where(eq(chatRequestLogs.projectId, otherProjectId));
+  expect(foreignLogs).toHaveLength(1);
+  expect(foreignLogs[0].totalTokens).toBe(1000);
   const analytics = await getProjectChatAnalytics(projectId);
   expect(analytics.last24Hours).toMatchObject({
     totalRequests: 2,

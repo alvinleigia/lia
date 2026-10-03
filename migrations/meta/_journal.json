@@ -330,6 +330,13 @@
       "when": 1788750000000,
       "tag": "0046_google_calendar_lookup_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1790985600000,
+      "tag": "0047_model_usage_details",
+      "breakpoints": true
     }
   ]
 }

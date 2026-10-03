@@ -34,7 +34,7 @@ async function getCachedQueryEmbedding(projectId: number, query: string) {
     return cached.embedding;
   }
 
-  const embedding = await generateEmbedding(query);
+  const embedding = await generateEmbedding(projectId, query);
   embeddingCache.set(cacheKey, {
     embedding,
     expiresAt: now + EMBEDDING_CACHE_TTL_MS,

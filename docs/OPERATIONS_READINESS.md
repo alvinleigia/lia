@@ -114,6 +114,48 @@ Before beta, run both checks against staging. The clean database check proves a
 new environment can be created from migrations alone. The existing database
 check proves customer-like data survives the migration path.
 
+## Model Usage Metering (2026-10-03)
+
+Apply `0047_model_usage_details.sql` through the migration journal before
+deploying the metering changes. Local implementation and offline verification
+are complete. The owner reactivated both databases and confirmed that the local
+connection points to live. Migration `0047` was applied to both live and staging
+after checking their separate connections and migration histories and saving
+encrypted snapshots of the affected tables and migration journals outside the
+repository. Live database verification passed and temporary fixtures were
+removed. The owner authorized deployment on 2026-10-03 with staging connection
+instability recorded as an unresolved follow-up: verification from the local
+runner encounters intermittent resets, closures and timeouts on both session
+and transaction pooler connections. No saved connection settings
+were changed. The supplied staging URL requires percent-encoding its password;
+verification normalizes it in memory.
+
+`chat_request_logs.usage_details` stores model, purpose, outcome and reported
+token counts per structured generation attempt or streaming step. Cached input
+and reasoning tokens are subsets of input/output tokens, not additional totals.
+Missing usage remains null; completed attempts remain available in the details
+even when a subsequent failure makes the request total unknown. SDK transport
+retries are not separately counted, and these logs are not an invoice ledger.
+
+Query embeddings and ingestion batches use `embedding_query` and
+`embedding_ingest` rows scoped to their project. Query-cache hits and empty
+uploads make no embedding call. Embedding rows are excluded from chat request,
+latency and token summaries; include them separately in future cost reports.
+The existing 30-day retention and best-effort logging policy still apply.
+No prompts, source documents or generated answers are added to usage details.
+
+Verification: 353 offline contract tests passed; 15 opt-in OpenAI tests were
+skipped. Type checking, tenant-scope and migration-journal checks passed, as did
+the production build. The two `runtime-observability-db.spec.ts` checks passed
+against the confirmed live database using isolated temporary fixtures, verifying
+storage and analytics separation (`tmp/llm-metering-live-db-tests.log`). The
+analytics test now also asserts the foreign project's test row was persisted,
+preventing a failed best-effort log write from creating a false isolation pass.
+This stronger check passed on live (`tmp/llm-metering-live-final-tests.log`).
+Staging needs a clean rerun of the stronger check; an earlier nominal pass with
+a logged connection failure is not accepted as release evidence. No paid model
+calls were made.
+
 ## pgvector Verification
 
 The app requires pgvector for document embeddings.

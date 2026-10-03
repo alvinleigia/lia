@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   vector,
 } from "drizzle-orm/pg-core";
+import type { ModelUsageDetail } from "@/lib/model-usage";
 
 export const users = pgTable(
   "users",
@@ -1980,6 +1981,7 @@ export const chatRequestLogs = pgTable(
     promptTokens: integer("prompt_tokens"),
     completionTokens: integer("completion_tokens"),
     totalTokens: integer("total_tokens"),
+    usageDetails: jsonb("usage_details").$type<ModelUsageDetail[]>(),
     errorCode: text("error_code"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },

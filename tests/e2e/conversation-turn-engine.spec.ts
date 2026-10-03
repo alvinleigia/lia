@@ -162,6 +162,11 @@ test("invalid model identifiers are repaired before a proposal is accepted", asy
 
   expect(result.source).toBe("model");
   expect(result.attempts).toBe(2);
+  expect(result.usage).toMatchObject({
+    inputTokens: 240,
+    outputTokens: 160,
+    totalTokens: 400,
+  });
   expect(result.proposal.fieldCandidates[0]?.fieldKey).toBe(
     "serviceCategoryId",
   );

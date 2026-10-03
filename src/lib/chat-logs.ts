@@ -1,6 +1,7 @@
 import { lt } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import { chatRequestLogs } from "@/lib/db-schema";
+import type { ModelUsageDetail } from "@/lib/model-usage";
 
 type ChatLogInput = {
   route:
@@ -8,13 +9,16 @@ type ChatLogInput = {
     | "structured_turn"
     | "widget"
     | "project_runtime"
-    | "widget_runtime";
+    | "widget_runtime"
+    | "embedding_query"
+    | "embedding_ingest";
   projectId?: number | null;
   statusCode: number;
   latencyMs: number;
   promptTokens?: number | null;
   completionTokens?: number | null;
   totalTokens?: number | null;
+  usageDetails?: ModelUsageDetail[];
   errorCode?: string | null;
 };
 
@@ -46,6 +50,7 @@ export async function logChatRequest(input: ChatLogInput) {
       promptTokens: input.promptTokens ?? null,
       completionTokens: input.completionTokens ?? null,
       totalTokens: input.totalTokens ?? null,
+      usageDetails: input.usageDetails ?? null,
       errorCode: input.errorCode ?? null,
     });
 

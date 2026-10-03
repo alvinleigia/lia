@@ -1,9 +1,14 @@
 import { openai } from "@ai-sdk/openai";
-import { generateText, Output } from "ai";
+import { generateText, NoObjectGeneratedError, Output } from "ai";
 import {
   type TurnMessageV1,
   turnResultV1ProviderSchema,
 } from "@/lib/conversation-turn-contracts";
+import {
+  MeteredModelError,
+  type ModelUsage,
+  normalizeModelUsage,
+} from "@/lib/model-usage";
 
 export const PLATFORM_DEFAULT_MODEL_ID = "gpt-5-mini";
 export const PLATFORM_FALLBACK_MODEL_ID = "gpt-4.1-mini";
@@ -33,29 +38,13 @@ export type StructuredTurnProviderInput = {
 export type StructuredTurnProviderResult = {
   modelId: string;
   output: unknown;
-  usage: {
-    inputTokens: number | null;
-    outputTokens: number | null;
-    totalTokens: number | null;
-  };
+  usage: ModelUsage;
 };
 
 export interface StructuredTurnProvider {
   generateTurn(
     input: StructuredTurnProviderInput,
   ): Promise<StructuredTurnProviderResult>;
-}
-
-function readTokenCount(
-  usage: unknown,
-  names: readonly string[],
-): number | null {
-  if (!usage || typeof usage !== "object") return null;
-  for (const name of names) {
-    const value = (usage as Record<string, unknown>)[name];
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-  }
-  return null;
 }
 
 export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
@@ -84,28 +73,17 @@ export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
           }
         : undefined,
       timeout: input.timeoutMs,
+    }).catch((error: unknown) => {
+      if (NoObjectGeneratedError.isInstance(error)) {
+        throw new MeteredModelError(normalizeModelUsage(error.usage), error);
+      }
+      throw error;
     });
-    const inputTokens = readTokenCount(result.usage, [
-      "inputTokens",
-      "promptTokens",
-    ]);
-    const outputTokens = readTokenCount(result.usage, [
-      "outputTokens",
-      "completionTokens",
-    ]);
-
-    return {
-      modelId: input.modelId,
-      output: result.output,
-      usage: {
-        inputTokens,
-        outputTokens,
-        totalTokens:
-          readTokenCount(result.usage, ["totalTokens"]) ??
-          (inputTokens !== null && outputTokens !== null
-            ? inputTokens + outputTokens
-            : null),
-      },
-    };
+    const usage = normalizeModelUsage(result.totalUsage);
+    try {
+      return { modelId: input.modelId, output: result.output, usage };
+    } catch (error) {
+      throw new MeteredModelError(usage, error);
+    }
   }
 }

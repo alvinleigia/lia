@@ -91,7 +91,7 @@ export async function processUploadQueue(maxJobs = 2): Promise<QueueRunResult> {
         continue;
       }
 
-      const embeddings = await generateEmbeddings(chunks);
+      const embeddings = await generateEmbeddings(job.projectId, chunks);
       if (embeddings.length !== chunks.length) {
         await markJobFailed(
           job.id,
