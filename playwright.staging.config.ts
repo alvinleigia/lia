@@ -5,6 +5,7 @@ export default defineConfig({
   testDir: "./tests/staging",
   testMatch: [
     "bike-enquiry.spec.ts",
+    "knowledge-faq.spec.ts",
     "ordinary-collection.spec.ts",
     "widget-collection.spec.ts",
     "observability.spec.ts",

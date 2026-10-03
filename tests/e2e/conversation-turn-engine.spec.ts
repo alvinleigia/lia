@@ -5,6 +5,7 @@ import {
 } from "../../src/lib/conversation-contract-fixtures";
 import { conversationalTaskSnapshotV1Schema } from "../../src/lib/conversation-contracts";
 import { selectSelectedContactMemoryFacts } from "../../src/lib/conversation-memory";
+import { compileStructuredTurn } from "../../src/lib/conversation-turn-compiler";
 import type { TurnResultV1 } from "../../src/lib/conversation-turn-contracts";
 import {
   StructuredTurnEngine,
@@ -544,6 +545,96 @@ test("an approved no-answer uses the configured fallback without model use", asy
   });
   expect(provider.calls).toHaveLength(0);
   expect(retriever.calls).toBe(0);
+});
+
+test("FAQ paraphrases can cite approved answers without indexed documents", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      turnKind: "ordinary_question",
+      fieldCandidates: [],
+      reply: "Check-in begins at 15:00.",
+      grounding: {
+        status: "grounded",
+        excerptIds: ["project_approved_answer:1"],
+      },
+    }),
+  ]);
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    activeTask: null,
+    assistantBehavior: {
+      ...DEFAULT_PROJECT_AI_SETTINGS,
+      approvedKnowledgeAnswers: [
+        {
+          question: "What time is check-in?",
+          answer: "Check-in begins at 15:00.",
+        },
+      ],
+    },
+    stage: "knowledge",
+    visitorMessage: "At what time can I check in?",
+  });
+  expect(result.source).toBe("model");
+  expect(result.attempts).toBe(1);
+  expect(result.proposal.grounding.excerptIds).toEqual([
+    "project_approved_answer:1",
+  ]);
+  expect(provider.calls[0].system).toContain("Check-in begins at 15:00.");
+  expect(provider.calls[0].system).not.toContain(
+    "No internal source content is currently indexed",
+  );
+});
+
+test("approved FAQ references are bounded, stage-scoped and cannot cite missing answers", () => {
+  const settings = {
+    ...DEFAULT_PROJECT_AI_SETTINGS,
+    approvedKnowledgeAnswers: [
+      ...Array.from({ length: 8 }, (_, index) => ({
+        question: `Where is office ${index}?`,
+        answer: `Location ${index}`,
+      })),
+      {
+        question: "What time is check-in?",
+        answer: "Check-in begins at 15:00.",
+      },
+      { question: "Is late checkout guaranteed?", answer: null },
+    ],
+  };
+  const compile = (
+    stage: "knowledge" | "extraction",
+    visitorMessage: string,
+    assistantBehavior = settings,
+  ) =>
+    compileStructuredTurn({
+      ...engineInput(),
+      assistantBehavior,
+      stage,
+      visitorMessage,
+      retrieval: [],
+    });
+  const knowledge = compile("knowledge", "At what time can I check in?");
+  expect(knowledge.system).toContain("Check-in begins at 15:00.");
+  expect(
+    knowledge.validation.allowedExcerptIds.has("project_approved_answer:9"),
+  ).toBe(true);
+  expect(knowledge.validation.allowedExcerptIds.size).toBeLessThanOrEqual(4);
+  const missing = compile("knowledge", "Can you guarantee late checkout?");
+  expect(missing.system).toContain("Is late checkout guaranteed?");
+  expect(
+    missing.validation.allowedExcerptIds.has("project_approved_answer:10"),
+  ).toBe(false);
+  expect(missing.system).toContain(
+    "An answer of null means no approved answer",
+  );
+  const extraction = compile("extraction", "At what time can I check in?");
+  expect(extraction.system).not.toContain("Check-in begins at 15:00.");
+  expect(extraction.validation.allowedExcerptIds.size).toBe(0);
+  const otherProject = compile("knowledge", "At what time can I check in?", {
+    ...settings,
+    approvedKnowledgeAnswers: [],
+  });
+  expect(otherProject.system).not.toContain("Check-in begins at 15:00.");
+  expect(otherProject.validation.allowedExcerptIds.size).toBe(0);
 });
 
 test("rate and cost admission can deny a turn before model use", async () => {
