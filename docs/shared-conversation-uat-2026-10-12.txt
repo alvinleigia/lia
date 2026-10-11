@@ -1,0 +1,60 @@
+SHARED CONVERSATION FIX AND UAT - 12 October 2026
+
+Scope: shared knowledge retrieval and conversational-task handling for hotel,
+service and appointment enquiries. No hotel-specific extraction code was added.
+
+CAUSES AND CORRECTIONS
+- Vector-only search excluded explicit pool facts below the similarity cutoff.
+  Added project-scoped lexical retrieval alongside semantic retrieval.
+- An internal four-excerpt cap hid the sixth-ranked alternative rate plan.
+  Honour the configured excerpt count, within the existing 6,000-character budget.
+- Mixed field updates and questions followed the field-only branch. Validate and
+  retain supplied fields, answer the question using refreshed state, then resume.
+- Canonical date ranges were missing from model context. Preserve both endpoints.
+- Knowledge answers could re-extract fields instead of answering. Enforce stage
+  boundaries through validation, with the existing bounded repair path.
+- Explicit hour-only times such as "9 am" were rejected. Normalize these while
+  continuing to reject ambiguous bare hours and invalid clock values.
+- Keep procedural confirmation questions on the task path. When the last required
+  detail includes an FAQ, answer it and prepare the required operation review.
+  Preparation does not execute a booking.
+- Model instructions retain material offer restrictions and prohibit reusing an
+  old quote after its dates/occupants change or exposing internal excerpt IDs.
+
+VERIFICATION
+PASS: 366 offline contract checks.
+PASS: 7 new database checks: lexical relevance, project/tenant separation and
+mixed update/question/correction/resume/cancel cases in all three domains.
+PASS: 15 live-model statement extraction/routing checks (appointment and service).
+PASS: 6 live-model knowledge checks (all three domains, including unknown coupons).
+PASS: final-field-plus-FAQ appointment review; no calendar write before consent.
+PASS: TypeScript, production build, changed-file Biome and tenant-scope checks.
+PASS: all 68 existing runtime checks across the initial 49 passes and the corrected
+19-case recovery rerun. A reused test conversation ID was made unique. The recovery
+run also caught and corrected procedural confirmation wording being mistaken for
+an FAQ. The final-field-plus-FAQ case was then rerun separately and passed.
+Total: 462 distinct automated checks; repeated runs are not added to this count.
+Post-deployment browser results are recorded below when complete.
+
+REPRODUCING THE ADDED CHECKS (PowerShell)
+npx.cmd playwright test --config=playwright.contract.config.ts --grep-invert @live-openai --workers=2
+$env:E2E_BASE_URL='http://localhost:3000'
+npx.cmd playwright test knowledge-retrieval-db mixed-task-knowledge-db --workers=1
+$env:LIA_LIVE_STATEMENT_UAT='1'
+npx.cmd playwright test shared-knowledge-model --workers=1
+npx.cmd playwright test --config=playwright.contract.config.ts statement-extraction --grep @live-openai --workers=1
+npx.cmd playwright test --config=playwright.runtime.config.ts --workers=1
+
+Database suites create isolated fixtures and clean their own records. Live-model
+checks incur model usage. Calendar providers are mocked in runtime regression
+tests; those tests do not create real calendar appointments.
+
+BOUNDARIES
+These checks cover a defined regression matrix, not every possible utterance.
+The mixed-turn runtime checks target published conversational business tasks;
+ordinary deterministic flows have separate existing regression coverage.
+Hotel rates remain a saved JSON snapshot for 26-28 October 2026, not live prices
+or inventory. Changed dates need refreshed pricing from the reservations team.
+Extended Stay eligibility/cancellation inconsistencies must remain explicit.
+No hotel reservation, payment or external notification is performed in this UAT.
+WhatsApp, Telnyx, automatic worker scheduling and database restore remain deferred.

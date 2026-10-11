@@ -63,11 +63,117 @@ import {
   resolveHybridTaskOutcomeRoute,
   selectHybridFlowEntryNode,
   selectHybridFlowTransition,
+  shouldAnswerTaskSideQuestion,
   shouldCheckTaskAvailability,
 } from "../../src/lib/hybrid-flow-runtime";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 const outcomes = DEFAULT_CONVERSATIONAL_TASK_DEFINITION.outcomes;
+
+for (const scenario of [
+  {
+    domain: "hotel",
+    field: "adults",
+    value: "2",
+    text: "Two adults and two children. What would it cost?",
+  },
+  {
+    domain: "service",
+    field: "service",
+    value: "oil change",
+    text: "I need an oil change. Do you offer pickup?",
+  },
+  {
+    domain: "appointment",
+    field: "reason",
+    value: "knee pain",
+    text: "The reason is knee pain. Where can I park?",
+  },
+]) {
+  test(`${scenario.domain}: mixed field answers retain the knowledge question`, () => {
+    const proposal = createRequestedTaskSelectionProposal({
+      requestedFieldKey: scenario.field,
+      selectionValue: scenario.value,
+    });
+    if (!proposal) throw new Error("Missing fixture");
+    expect(
+      shouldAnswerTaskSideQuestion({
+        proposal,
+        text: scenario.text,
+        availabilityHandled: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldAnswerTaskSideQuestion({
+        proposal,
+        text: scenario.value,
+        availabilityHandled: false,
+      }),
+    ).toBe(false);
+    for (const nextAction of ["cancel", "handoff", "fail"] as const) {
+      expect(
+        shouldAnswerTaskSideQuestion({
+          proposal: { ...proposal, nextAction },
+          text: scenario.text,
+          availabilityHandled: false,
+        }),
+      ).toBe(false);
+    }
+    expect(
+      shouldAnswerTaskSideQuestion({
+        proposal: {
+          ...proposal,
+          ambiguity: { requiresClarification: true, question: "Which date?" },
+        },
+        text: scenario.text,
+        availabilityHandled: false,
+      }),
+    ).toBe(false);
+  });
+}
+
+test("calendar availability preferences keep their deterministic lookup path", () => {
+  const proposal = createRequestedTaskSelectionProposal({
+    requestedFieldKey: "time",
+    selectionValue: "15:30",
+  });
+  if (!proposal) throw new Error("Missing fixture");
+  expect(
+    shouldAnswerTaskSideQuestion({
+      proposal,
+      text: "Is 3:30 pm available?",
+      availabilityHandled: true,
+    }),
+  ).toBe(false);
+});
+
+test("a populated review asking to proceed does not become a knowledge interruption", () => {
+  const proposal = createRequestedTaskSelectionProposal({
+    requestedFieldKey: "reason",
+    selectionValue: "follow-up",
+  });
+  if (!proposal) throw new Error("Missing fixture");
+  for (const text of [
+    "Reason: follow-up. How would you like to proceed with confirmation?",
+    "Reason: follow-up. Can you confirm this?",
+    "Reason: follow-up. Shall we proceed?",
+  ]) {
+    expect(
+      shouldAnswerTaskSideQuestion({
+        proposal,
+        text,
+        availabilityHandled: false,
+      }),
+    ).toBe(false);
+  }
+  expect(
+    shouldAnswerTaskSideQuestion({
+      proposal,
+      text: "Where can I park? Can you confirm this?",
+      availabilityHandled: false,
+    }),
+  ).toBe(true);
+});
 
 test("exact action triggers are control input, not task content", () => {
   const action = {

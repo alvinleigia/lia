@@ -32,6 +32,27 @@ import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 const NOW = new Date("2026-07-25T10:00:00.000Z");
 const EXPIRES_AT = new Date("2027-07-25T10:00:00.000Z");
 
+test("shared time fields accept explicit hour-only AM/PM without guessing ambiguous hours", () => {
+  for (const [value, expected] of [
+    ["9 am", "09:00"],
+    ["9AM", "09:00"],
+    ["12 am", "00:00"],
+    ["12 pm", "12:00"],
+    ["3 pm", "15:00"],
+    ["3:30 PM", "15:30"],
+  ]) {
+    expect(validateTaskFieldValue({ field: fieldFor("time"), value })).toEqual({
+      ok: true,
+      value: expected,
+    });
+  }
+  for (const value of ["9", "13 pm", "0 am", "9:60 am", "9 am or 10 am"]) {
+    expect(validateTaskFieldValue({ field: fieldFor("time"), value }).ok).toBe(
+      false,
+    );
+  }
+});
+
 const snapshot = conversationalTaskSnapshotV1Schema.parse({
   schemaVersion: 1,
   assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,

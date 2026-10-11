@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { and, eq, inArray } from "drizzle-orm";
 import type { RuntimeActionStep } from "../../src/lib/action-runtime";
@@ -2482,7 +2482,7 @@ async function verifyCalendarRuntime(
             },
           };
         };
-        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${Boolean(pastedSummary)}-${preferenceCase ?? resumeCase ?? selectionRefreshCase ?? "default"}-${suffix}`;
+        const externalConversationId = `opening-${channelType}-${clock}-${fromPrompt}-${Boolean(pastedSummary)}-${preferenceCase ?? resumeCase ?? selectionRefreshCase ?? "default"}-${randomUUID()}`;
         const [conversation] = await db
           .insert(channelConversations)
           .values({ channelType, externalConversationId, projectId })
@@ -3141,6 +3141,55 @@ async function verifyCalendarRuntime(
                 ),
               );
             expect(writes).toHaveLength(1);
+          }
+          if (selectionRefreshCase === "fresh") {
+            StructuredTurnEngine.prototype.execute = async (turn) => ({
+              attempts: 1,
+              source: "model",
+              usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+              modelEscalationReason: null,
+              proposal: {
+                schemaVersion: 1,
+                turnKind:
+                  turn.stage === "knowledge" ? "side_question" : "field_answer",
+                reply: "Free parking is available behind the clinic.",
+                grounding: { status: "not_needed", excerptIds: [] },
+                fieldCandidates:
+                  turn.stage === "knowledge"
+                    ? []
+                    : [
+                        {
+                          fieldKey: "reason",
+                          naturalValue: "Routine follow-up",
+                          confidence: 1,
+                          source: "visitor",
+                        },
+                      ],
+                taskRecommendation: null,
+                toolRequest: null,
+                routeRecommendation: null,
+                outcomeRecommendation: null,
+                nextAction: "ask",
+                ambiguity: { requiresClarification: false, question: null },
+                safety: { decision: "allow", reasonCode: null },
+                decisionSummary: "Mixed final field and parking question",
+                validation: {
+                  accepted: true,
+                  modelAttemptCount: 1,
+                  providerModelId: "fixture",
+                },
+              },
+            });
+            const review = await runBrowserFlowText({
+              ...browserInput,
+              text: "Routine follow-up. Is parking free?",
+            });
+            expect(review.replies.at(-1)?.text).toContain("Free parking");
+            expect(review.replies.at(-1)?.text).toContain("Routine follow-up");
+            expect(review.replies.at(-1)?.payload).toMatchObject({
+              inputRequest: { fieldKey: "lia_confirmation" },
+            });
+            expect(insertedEvent).toBeNull();
           }
           continue;
         }

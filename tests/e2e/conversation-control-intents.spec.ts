@@ -51,6 +51,15 @@ test.describe("deterministic flow side questions", () => {
   test("recognizes bounded question-shaped turns", () => {
     expect(isPotentialKnowledgeSideQuestion("When is check-in?")).toBe(true);
     expect(
+      isPotentialKnowledgeSideQuestion("Is parking free? My name is Alex."),
+    ).toBe(true);
+    expect(
+      isPotentialKnowledgeSideQuestion("Two adults. Tell me the price"),
+    ).toBe(true);
+    expect(
+      isPotentialKnowledgeSideQuestion("Oil change and how long will it take"),
+    ).toBe(true);
+    expect(
       isPotentialKnowledgeSideQuestion("Is late checkout guaranteed"),
     ).toBe(true);
     expect(isPotentialKnowledgeSideQuestion("Phase Sixteen UAT Tester")).toBe(

@@ -64,12 +64,12 @@ function normalizeExplicitIntent(value: string) {
 export function isPotentialKnowledgeSideQuestion(value: string) {
   const normalized = value.trim().replace(/\s+/g, " ");
   if (!normalized) return false;
-  if (normalized.endsWith("?")) return true;
+  if (normalized.includes("?")) return true;
 
   const wordCount = normalized.split(" ").length;
   return (
     wordCount >= 3 &&
-    /^(?:what|when|where|which|who|whose|why|how|is|are|was|were|can|could|do|does|did|will|would|should|may)\b/i.test(
+    /(?:^|[.!;]\s+|\b(?:and|also)\s+)(?:what|when|where|which|who|whose|why|how|is|are|was|were|can|could|do|does|did|will|would|should|may|tell me|let me know)\b/i.test(
       normalized,
     )
   );

@@ -395,7 +395,30 @@ test("a side question during a task uses grounded knowledge retrieval", async ()
   });
   expect(provider.calls).toHaveLength(1);
   expect(retriever.calls).toBe(1);
-  expect(retriever.lastInput?.limit).toBe(4);
+  expect(retriever.lastInput?.limit).toBe(8);
+});
+
+test("knowledge stage repairs field-extraction output instead of silently dropping the question", async () => {
+  const provider = new QueueProvider([
+    baseTurn(),
+    baseTurn({
+      turnKind: "side_question",
+      fieldCandidates: [],
+      reply: "The spa is open from 9 am to 6 pm.",
+      grounding: { status: "grounded", excerptIds: ["document:12"] },
+    }),
+  ]);
+  const result = await new StructuredTurnEngine({
+    provider,
+    retriever: new FixtureRetriever(),
+  }).execute({
+    ...engineInput(),
+    stage: "knowledge",
+    visitorMessage: "Change the service to Facial. When are you open?",
+  });
+  expect(result.attempts).toBe(2);
+  expect(result.proposal.fieldCandidates).toEqual([]);
+  expect(result.proposal.reply).toContain("9 am to 6 pm");
 });
 
 test("referential knowledge questions use bounded recent visitor context for retrieval", async () => {

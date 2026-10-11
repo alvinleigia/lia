@@ -84,7 +84,7 @@ function renderJson(value: unknown) {
 
 const MAX_MODEL_CONTEXT_VALUES = 24;
 const MAX_MODEL_CONTEXT_CHARACTERS = 4_000;
-const MAX_MODEL_RETRIEVAL_EXCERPTS = 4;
+export const MAX_MODEL_RETRIEVAL_EXCERPTS = 12;
 const MAX_MODEL_RETRIEVAL_CHARACTERS = 6_000;
 const MAX_MODEL_RETRIEVAL_EXCERPT_CHARACTERS = 2_000;
 const MAX_MODEL_APPROVED_ANSWERS = 4;
@@ -103,7 +103,7 @@ Non-negotiable protocol:
 - Propose decisions only. Never claim to have changed a field, started or switched a task, called a tool, advanced a route, completed an outcome, or contacted a person.
 - Use only listed field keys, task IDs, tool IDs, stages, outcome keys, output ports, and excerpt IDs.
 - Values inferred from visitor wording are candidates with source "visitor"; they are never validated by you.
-- For an active task, extract every explicitly supplied field from the current visitor message using that task's labels, prompts, types, and normalization rules. One message can answer several fields, regardless of which field was asked. Return field_answer (or field_correction for changes) and the extracted candidates; do not put the entire sentence into one text field.
+- During the extraction stage for an active task, extract every explicitly supplied field from the current visitor message using that task's labels, prompts, types, and normalization rules. One message can answer several fields, regardless of which field was asked. Return field_answer (or field_correction for changes) and the extracted candidates; do not put the entire sentence into one text field.
 - During extraction for the active task, keep taskRecommendation null unless the visitor explicitly requests a different listed task. Continuing the current task is not a task recommendation. Return extracted candidates with nextAction "ask" and null toolRequest, routeRecommendation, and outcomeRecommendation; the server decides when validation and confirmation are ready.
 - Missing required fields during extraction are not ambiguity: keep requiresClarification false and question null, preserve the candidates that are known, and let the server request the missing field. Use ambiguity only when the meaning of a supplied value or the visitor's intent is unclear.
 - An explicitly supplied value with an invalid format is still a candidate: for example, email "not-an-email" or phone "123". Extract it verbatim with the other supplied fields and nextAction "ask"; do not discard the message, classify format validation as ambiguity, or repair the value yourself. The server rejects invalid candidates and asks for corrections while retaining the other fields.
@@ -127,6 +127,11 @@ Non-negotiable protocol:
 - When an active task exists and the visitor asks a knowledge question instead of answering the requested field, use turnKind "side_question" with no field candidates.
 - A question proposing a task value (for example "Is 3:30 pm available?") is a field answer or preference, even when another field is currently requested. Map it using the configured field meaning; never infer a missing date, an existing-record selection, or verified availability. If more than one field or value could be meant, ask one targeted clarification.
 - A side question during a task may be answered without abandoning the active task.
+- A visitor can supply fields AND ask a knowledge question in one message. During extraction, preserve all explicit field candidates even when a question is present; the server will validate them and answer the question separately.
+- During the knowledge stage for an active task, fieldCandidates must be empty and toolRequest, routeRecommendation and outcomeRecommendation must be null. Answer the visitor's question using the current validated task state and factual references. Do not extract fields again, promise a recalculation or replace the answer with a collection prompt. The server resumes collection after your answer.
+- For comparisons, consider all relevant alternatives in the supplied references and preserve eligibility conditions. A previously quoted option does not exclude other options. After dates, occupants or other quote inputs change, do not reuse an earlier price unless evidence covers the changed request.
+- Material limitations are part of the answer, even under a short-response policy: when quoting a price or option with unresolved eligibility, availability, minimum requirements or cancellation terms, explicitly state those unresolved conditions in the same reply. A saved estimate is not proof that an offer applies. Never drop these qualifications just to shorten the answer.
+- Keep internal excerpt IDs in grounding.excerptIds only, never in the visitor reply.
 - Safety refusal, clarification, or handoff cannot include field, tool, route, task, or outcome proposals.`;
 
 function mayExposeSensitiveValue(
@@ -333,7 +338,9 @@ export function compileStructuredTurn(input: CompileTurnInput): CompiledTurn {
     projectName: input.projectName,
   });
 
-  for (const binding of input.activeTask?.task.definition.tools ?? []) {
+  for (const binding of input.stage === "knowledge"
+    ? []
+    : (input.activeTask?.task.definition.tools ?? [])) {
     allowedTools.set(binding.tool.id, new Set(binding.allowedStages));
   }
 
@@ -396,10 +403,11 @@ ${renderJson(approvedAnswers)}
         ...approvedAnswers.filter(({ answer }) => answer).map(({ id }) => id),
       ]),
       allowedFieldKeys: new Set(
-        (
-          input.activeTask?.task.definition.fields ??
-          (input.stage === "extraction" ? input.collection?.fields : []) ??
-          []
+        (input.stage === "knowledge"
+          ? []
+          : (input.activeTask?.task.definition.fields ??
+            (input.stage === "extraction" ? input.collection?.fields : []) ??
+            [])
         ).map(({ key }) => key),
       ),
       allowedTaskFieldKeys: new Map(
@@ -409,12 +417,17 @@ ${renderJson(approvedAnswers)}
         ]),
       ),
       allowedOutcomeKeys: new Set(
-        input.activeTask?.task.definition.outcomes.map(({ key }) => key) ?? [],
+        input.stage === "knowledge"
+          ? []
+          : (input.activeTask?.task.definition.outcomes.map(({ key }) => key) ??
+              []),
       ),
       allowedOutputPorts: new Set(
-        input.activeTask?.task.definition.outcomes.map(
-          ({ outputPort }) => outputPort,
-        ) ?? [],
+        input.stage === "knowledge"
+          ? []
+          : (input.activeTask?.task.definition.outcomes.map(
+              ({ outputPort }) => outputPort,
+            ) ?? []),
       ),
       allowedTaskIds: new Set(
         input.projectPolicy.entry.allowTaskRecommendation

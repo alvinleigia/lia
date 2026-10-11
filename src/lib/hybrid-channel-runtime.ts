@@ -108,6 +108,7 @@ import {
   resolveHybridBoundaryNode,
   resolveHybridDeterministicContinuation,
   resolveHybridRuntimeResponseOwner,
+  shouldAnswerTaskSideQuestion,
   shouldCheckTaskAvailability,
 } from "@/lib/hybrid-flow-runtime";
 import { startHybridTaskEntry } from "@/lib/hybrid-task-entry";
@@ -409,6 +410,18 @@ function toTurnValue(value: unknown) {
     value.every((item): item is string => typeof item === "string")
   ) {
     return value;
+  }
+  // Canonical date ranges are structured fields. Preserve their two endpoints
+  // in the existing scalar model contract without exposing arbitrary objects.
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const range = value as { start?: unknown; end?: unknown };
+    if (
+      typeof range.start === "string" &&
+      typeof range.end === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(range.start) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(range.end)
+    )
+      return `${range.start} to ${range.end}`;
   }
   return null;
 }
@@ -1522,7 +1535,64 @@ async function executeTaskBoundary(input: {
   }
   let revision = session.execution.revision;
 
-  if (!clarifying && proposal.turnKind === "side_question") {
+  if (proposal.fieldCandidates.length > 0) {
+    const fieldResult = await applyConversationalTaskEvent({
+      authentication: null,
+      candidates: proposal.fieldCandidates.map((candidate) => ({
+        fieldKey: candidate.fieldKey,
+        naturalValue: candidate.naturalValue,
+        provenance: { source: "visitor" as const, sourceReference: null },
+        state: "candidate" as const,
+        validation: { code: null, message: null, valid: false },
+      })),
+      channelIdentity: {
+        externalConversationId: input.runtimeInput.externalConversationId,
+        externalUserId: input.runtimeInput.externalUserId ?? null,
+      },
+      channelType: input.runtimeInput.channelType,
+      conversationId: session.runtime.run.conversationId,
+      correction: session.runtime.fields.some(
+        (field) =>
+          proposal.fieldCandidates.some(
+            (candidate) => candidate.fieldKey === field.fieldKey,
+          ) &&
+          field.state !== "missing" &&
+          field.state !== "cleared",
+      ),
+      eventId: `channel-message:${input.runtimeInput.inboundMessageId}:fields`,
+      expectedRevision: revision,
+      occurredAt: new Date().toISOString(),
+      projectId: input.runtimeInput.projectId,
+      providerSequence: null,
+      receivedAt: new Date().toISOString(),
+      schemaVersion: 1,
+      taskRunId: session.runtime.run.id,
+      type: "field.candidates",
+    });
+    if (
+      fieldResult.disposition !== "applied" ||
+      fieldResult.revision === null
+    ) {
+      return { output: proposal, signals: [] };
+    }
+    revision = fieldResult.revision;
+  }
+
+  if (
+    shouldAnswerTaskSideQuestion({
+      proposal,
+      text: input.runtimeInput.text,
+      availabilityHandled: Boolean(calendarAnswer || earlyTimeQuestion),
+    })
+  ) {
+    // Mixed turns must answer against the newly validated fields, not the
+    // session loaded before applying the visitor's corrections.
+    const updatedSession = await getConversationTaskRuntimeSession(
+      input.runtimeInput,
+    );
+    if (!updatedSession.runtime || !updatedSession.snapshot) {
+      return { output: proposal, signals: [] };
+    }
     const now = new Date().toISOString();
     const suspended = await applyConversationalTaskEvent({
       authentication: null,
@@ -1551,24 +1621,24 @@ async function executeTaskBoundary(input: {
     let resumedRevision: number | null = null;
     try {
       const knowledgeExecution = await executeConfiguredStructuredTurn({
-        activeTask: session.snapshot,
+        activeTask: updatedSession.snapshot,
         assistantBehavior: normalizeProjectAiSettings(
-          session.snapshot.assistantBehavior,
+          updatedSession.snapshot.assistantBehavior,
         ),
         assistantIntroduced: input.history.some(
           (message) => message.role === "assistant",
         ),
         channel: input.runtimeInput.channelType,
         companyName: input.project.companyName,
-        context: toRuntimeContext(session.runtime),
+        context: toRuntimeContext(updatedSession.runtime),
         fieldState: toRuntimeFieldState({
-          runtime: session.runtime,
-          snapshot: session.snapshot,
+          runtime: updatedSession.runtime,
+          snapshot: updatedSession.snapshot,
         }),
         history: input.history,
         projectId: input.runtimeInput.projectId,
         projectName: input.project.projectName,
-        projectPolicy: session.snapshot.conversationPolicy,
+        projectPolicy: updatedSession.snapshot.conversationPolicy,
         publishedTasks: [],
         stage: "knowledge",
         visitorMessage: input.runtimeInput.text,
@@ -1646,6 +1716,22 @@ async function executeTaskBoundary(input: {
       projectId: input.runtimeInput.projectId,
       snapshot: resumedSession.snapshot,
     });
+    if (!inputRequest && proposal.fieldCandidates.length > 0) {
+      const prepared = await prepareRequiredTaskConfirmation({
+        projectId: input.runtimeInput.projectId,
+        runtime: resumedSession.runtime,
+        snapshot: resumedSession.snapshot,
+      });
+      if (prepared)
+        return {
+          inputRequest: null,
+          output: operationTurn({
+            nextAction: "confirm",
+            reply: `${knowledgeProposal.reply}\n\n${prepared.text}`,
+          }),
+          signals: [],
+        };
+    }
     await recordTaskFieldRequest({
       conversationId: resumedSession.runtime.run.conversationId,
       inputRequest,
@@ -1659,49 +1745,6 @@ async function executeTaskBoundary(input: {
       output: resumedProposal,
       signals: [],
     };
-  }
-
-  if (proposal.fieldCandidates.length > 0) {
-    const fieldResult = await applyConversationalTaskEvent({
-      authentication: null,
-      candidates: proposal.fieldCandidates.map((candidate) => ({
-        fieldKey: candidate.fieldKey,
-        naturalValue: candidate.naturalValue,
-        provenance: { source: "visitor" as const, sourceReference: null },
-        state: "candidate" as const,
-        validation: { code: null, message: null, valid: false },
-      })),
-      channelIdentity: {
-        externalConversationId: input.runtimeInput.externalConversationId,
-        externalUserId: input.runtimeInput.externalUserId ?? null,
-      },
-      channelType: input.runtimeInput.channelType,
-      conversationId: session.runtime.run.conversationId,
-      correction: session.runtime.fields.some(
-        (field) =>
-          proposal.fieldCandidates.some(
-            (candidate) => candidate.fieldKey === field.fieldKey,
-          ) &&
-          field.state !== "missing" &&
-          field.state !== "cleared",
-      ),
-      eventId: `channel-message:${input.runtimeInput.inboundMessageId}:fields`,
-      expectedRevision: revision,
-      occurredAt: new Date().toISOString(),
-      projectId: input.runtimeInput.projectId,
-      providerSequence: null,
-      receivedAt: new Date().toISOString(),
-      schemaVersion: 1,
-      taskRunId: session.runtime.run.id,
-      type: "field.candidates",
-    });
-    if (
-      fieldResult.disposition !== "applied" ||
-      fieldResult.revision === null
-    ) {
-      return { output: proposal, signals: [] };
-    }
-    revision = fieldResult.revision;
   }
 
   if (clarifying) {

@@ -302,7 +302,7 @@ function validateTime(value: unknown): ValidationResult {
   }
 
   const twelveHour = normalized.match(
-    /^(0?[1-9]|1[0-2]):([0-5]\d)\s*(am|pm)$/i,
+    /^(0?[1-9]|1[0-2])(?::([0-5]\d))?\s*(am|pm)$/i,
   );
   if (twelveHour) {
     const hour =
@@ -310,7 +310,7 @@ function validateTime(value: unknown): ValidationResult {
       (twelveHour[3].toLowerCase() === "pm" ? 12 : 0);
     return {
       ok: true,
-      value: `${String(hour).padStart(2, "0")}:${twelveHour[2]}`,
+      value: `${String(hour).padStart(2, "0")}:${twelveHour[2] ?? "00"}`,
     };
   }
   return invalid("invalid_time", "Enter a time such as 15:30 or 3:30 PM.");

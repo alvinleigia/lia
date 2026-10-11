@@ -5,6 +5,7 @@ import type {
 } from "@/lib/conversation-contracts";
 import {
   isExplicitCancellationRequest,
+  isPotentialKnowledgeSideQuestion,
   isSimpleTaskTextAnswer,
 } from "@/lib/conversation-control-intents";
 import type { TurnResultV1 } from "@/lib/conversation-turn-contracts";
@@ -208,6 +209,34 @@ export function normalizeActiveTaskQuestion(
     proposal.safety.decision === "allow"
     ? { ...proposal, turnKind: "side_question" }
     : proposal;
+}
+
+export function shouldAnswerTaskSideQuestion(input: {
+  proposal: TurnResultV1;
+  text: string;
+  availabilityHandled: boolean;
+}) {
+  const { proposal } = input;
+  if (
+    proposal.safety.decision !== "allow" ||
+    proposal.ambiguity.requiresClarification ||
+    ["cancel", "handoff", "fail"].includes(proposal.nextAction)
+  )
+    return false;
+  // A review/confirmation question attached to supplied details belongs to the
+  // task's validation and confirmation path, not factual knowledge retrieval.
+  const asksOnlyToProceed =
+    (input.text.match(/\?/g)?.length ?? 0) <= 1 &&
+    /\b(?:how would you like to proceed with confirmation|(?:shall|should|can|could|would|will) (?:i|we|you) (?:please )?(?:confirm|submit|proceed|book)(?: (?:this|it|now|the request|the booking|the appointment))*)\s*\??$/i.test(
+      input.text,
+    );
+  if (proposal.fieldCandidates.length > 0 && asksOnlyToProceed) return false;
+  return (
+    proposal.turnKind === "side_question" ||
+    (!input.availabilityHandled &&
+      proposal.fieldCandidates.length > 0 &&
+      isPotentialKnowledgeSideQuestion(input.text))
+  );
 }
 
 export function createRequestedTaskSelectionProposal(input: {

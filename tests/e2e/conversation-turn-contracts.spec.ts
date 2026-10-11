@@ -306,7 +306,25 @@ test("compiler exposes only allowed task contracts and model-visible context", (
   expect(compiled.system).toContain("guest@example.com");
   expect(compiled.system).toContain("Assistant already introduced: true");
   expect(compiled.validation.allowedTaskIds).toEqual(new Set([95]));
-  expect(compiled.validation.allowedFieldKeys.has("guestEmail")).toBe(true);
+  expect(compiled.validation.allowedFieldKeys.size).toBe(0);
+  expect(compiled.validation.allowedTools.size).toBe(0);
+  expect(compiled.validation.allowedOutcomeKeys.size).toBe(0);
+  expect(() =>
+    validateStructuredTurnProposal(
+      {
+        ...validTurn(),
+        fieldCandidates: [
+          {
+            fieldKey: "guestEmail",
+            naturalValue: "new@example.test",
+            confidence: 1,
+            source: "visitor",
+          },
+        ],
+      },
+      compiled.validation,
+    ),
+  ).toThrow(TurnProposalValidationError);
   expect(
     compiled.validation.allowedTaskFieldKeys.get(95)?.has("serviceCategoryId"),
   ).toBe(true);
@@ -372,6 +390,47 @@ test("embedding cache keys remain project scoped", () => {
   expect(createProjectEmbeddingCacheKey(94, "Same query")).not.toBe(
     createProjectEmbeddingCacheKey(1, "Same query"),
   );
+});
+
+test("compiler includes later ranked alternatives within the published excerpt and character budgets", () => {
+  for (const limit of [2, 8]) {
+    const compiled = compileStructuredTurn({
+      activeTask: null,
+      assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
+      assistantIntroduced: true,
+      channel: "project_chat",
+      companyName: "UAT",
+      context: [],
+      fieldState: [],
+      history: [],
+      projectName: "UAT",
+      publishedTasks: [],
+      projectPolicy: {
+        ...REFERENCE_BOOKING_PROJECT_POLICY,
+        knowledge: {
+          ...REFERENCE_BOOKING_PROJECT_POLICY.knowledge,
+          sourceSelection: {
+            ...REFERENCE_BOOKING_PROJECT_POLICY.knowledge.sourceSelection,
+            maxExcerpts: limit,
+          },
+        },
+      },
+      retrieval: Array.from({ length: 10 }, (_, index) => ({
+        id: `document:${index + 1}`,
+        content:
+          index === 5
+            ? "Alternative plan: INR 10,125, eligibility needs confirmation."
+            : `Reference ${index}: ${"x".repeat(500)}`,
+      })),
+      stage: "knowledge",
+      visitorMessage: "Is there a cheaper plan?",
+    });
+    expect(compiled.validation.allowedExcerptIds.size).toBe(limit);
+    expect(compiled.system.includes("Alternative plan: INR 10,125")).toBe(
+      limit === 8,
+    );
+    expect(compiled.validation.allowedExcerptIds.has("document:9")).toBe(false);
+  }
 });
 
 test("request boundary rejects forged properties and invalid stages", () => {

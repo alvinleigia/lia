@@ -13,6 +13,7 @@ import { extractLocalTaskFieldCandidates } from "@/lib/conversation-field-extrac
 import {
   compileStructuredTurn,
   type FieldCollectionContext,
+  MAX_MODEL_RETRIEVAL_EXCERPTS,
   type PublishedTaskOption,
   planOpeningTurn,
 } from "@/lib/conversation-turn-compiler";
@@ -909,7 +910,7 @@ export class StructuredTurnEngine {
         retrieval = await this.retriever.retrieve({
           limit: Math.min(
             input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
-            4,
+            MAX_MODEL_RETRIEVAL_EXCERPTS,
           ),
           projectId: input.projectId,
           query: buildKnowledgeRetrievalQuery(input),
