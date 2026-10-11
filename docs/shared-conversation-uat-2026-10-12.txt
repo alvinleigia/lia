@@ -20,9 +20,16 @@ CAUSES AND CORRECTIONS
   Preparation does not execute a booking.
 - Model instructions retain material offer restrictions and prohibit reusing an
   old quote after its dates/occupants change or exposing internal excerpt IDs.
+- Live retest exposed a redundant recommendation of the already active task.
+  Normalize confident same-task recommendations to a no-op instead of triggering
+  repair/fallback. Different targets, uncertainty and unauthorized proposals remain
+  subject to validation. The real hotel extraction then passed in one model call.
+- Re-evaluate required-field order after a mixed correction so newly required
+  dependencies (such as child ages) precede the old pending contact question.
+  Pure FAQ interruptions still resume the exact pending field.
 
 VERIFICATION
-PASS: 366 offline contract checks.
+PASS: 368 offline contract checks.
 PASS: 7 new database checks: lexical relevance, project/tenant separation and
 mixed update/question/correction/resume/cancel cases in all three domains.
 PASS: 15 live-model statement extraction/routing checks (appointment and service).
@@ -33,7 +40,7 @@ PASS: all 68 existing runtime checks across the initial 49 passes and the correc
 19-case recovery rerun. A reused test conversation ID was made unique. The recovery
 run also caught and corrected procedural confirmation wording being mistaken for
 an FAQ. The final-field-plus-FAQ case was then rerun separately and passed.
-Total: 462 distinct automated checks; repeated runs are not added to this count.
+Total: 464 distinct automated checks; repeated runs are not added to this count.
 Post-deployment browser results are recorded below when complete.
 
 REPRODUCING THE ADDED CHECKS (PowerShell)

@@ -321,6 +321,19 @@ for (const [domain, fieldKey, label, question, answer] of [
           ? { start: "2026-10-25", end: "2026-10-29" }
           : "2026-10-29",
       );
+      const invalidated = await send(
+        `Change ${label} to 2026-99-99. ${question}`,
+      );
+      expect(invalidated.replies.map((r) => r.text).join("\n")).toContain(
+        answer,
+      );
+      expect(invalidated.replies.at(-1)?.payload).toMatchObject({
+        inputRequest: { fieldKey },
+      });
+      expect(
+        (await getConversationTaskRuntimeSession(scope)).runtime?.run
+          .lastRequestedFieldKey,
+      ).toBe(fieldKey);
       const cancelled = await send("Cancel");
       expect(cancelled.replies.map((r) => r.text).join("\n")).toMatch(
         /cancel/i,

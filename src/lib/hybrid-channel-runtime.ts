@@ -1699,10 +1699,16 @@ async function executeTaskBoundary(input: {
         signals: [],
       };
     }
+    // Corrections can invalidate an earlier field or make a dependent field
+    // required. Re-evaluate collection order for mixed turns; a pure FAQ resumes
+    // exactly where it was interrupted.
+    const resumedFieldKey = proposal.fieldCandidates.length
+      ? null
+      : resumedSession.runtime.run.lastRequestedFieldKey;
     const resumedProposal = reconcileTaskSideQuestionWithRuntime({
       fields: resumedSession.runtime.fields,
       proposal: knowledgeProposal,
-      requestedFieldKey: resumedSession.runtime.run.lastRequestedFieldKey,
+      requestedFieldKey: resumedFieldKey,
       snapshot: resumedSession.snapshot,
     });
     const inputRequest = await hydrateProjectResourceInputRequest({
@@ -1710,7 +1716,7 @@ async function executeTaskBoundary(input: {
       taskRunId: resumedSession.runtime.run.id,
       inputRequest: getResumedTaskRuntimeInputRequest({
         fields: resumedSession.runtime.fields,
-        requestedFieldKey: resumedSession.runtime.run.lastRequestedFieldKey,
+        requestedFieldKey: resumedFieldKey,
         snapshot: resumedSession.snapshot,
       }),
       projectId: input.runtimeInput.projectId,

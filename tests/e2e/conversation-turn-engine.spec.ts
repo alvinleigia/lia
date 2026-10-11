@@ -129,6 +129,30 @@ function engineInput() {
   };
 }
 
+test("minimal enquiry continues the pinned task without repair or restart", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      turnKind: "task_recommendation",
+      fieldCandidates: [],
+      taskRecommendation: {
+        taskId: 95,
+        confidence: 0.95,
+        reason: "Continue enquiry",
+      },
+    }),
+  ]);
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    publishedTasks: [],
+    visitorMessage: "I would like to enquire.",
+  });
+  expect(result.attempts).toBe(1);
+  expect(result.proposal.taskRecommendation).toBeNull();
+  expect(result.proposal.fieldCandidates).toEqual([]);
+  expect(result.proposal.nextAction).toBe("ask");
+  expect(result.proposal.safety.reasonCode).toBeNull();
+});
+
 test("invalid model identifiers are repaired before a proposal is accepted", async () => {
   const provider = new QueueProvider([
     baseTurn({

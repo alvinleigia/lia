@@ -35,6 +35,25 @@ export function validateStructuredTurnProposal(
   }
 
   const proposal = parsed.data;
+  // Recommending the already pinned task is a no-op, not a task switch.
+  // Discard that redundant proposal instead of spending repair calls on it;
+  // every field/tool/route and any different target still needs validation.
+  if (
+    allowed.activeTaskId !== null &&
+    proposal.taskRecommendation?.taskId === allowed.activeTaskId &&
+    proposal.taskRecommendation.confidence >=
+      allowed.intentRouting.recommendationThreshold &&
+    !proposal.ambiguity.requiresClarification &&
+    proposal.safety.decision === "allow" &&
+    proposal.nextAction === "ask" &&
+    !["greeting", "task_switch"].includes(proposal.turnKind)
+  ) {
+    proposal.taskRecommendation = null;
+    if (proposal.turnKind === "task_recommendation")
+      proposal.turnKind = proposal.fieldCandidates.length
+        ? "field_answer"
+        : "ordinary_question";
+  }
   const issues: string[] = [];
   const hasActionProposal =
     proposal.fieldCandidates.length > 0 ||

@@ -503,6 +503,51 @@ test("validator rejects every proposal identifier outside server allowlists", ()
   );
 });
 
+test("recommending the active task is a no-op without granting other permissions", () => {
+  const context = validationContext();
+  context.allowedTaskIds = new Set();
+  const repeated = {
+    ...validTurn(),
+    turnKind: "task_recommendation" as const,
+    taskRecommendation: {
+      taskId: 95,
+      confidence: 0.95,
+      reason: "Continue enquiry",
+    },
+  };
+  expect(validateStructuredTurnProposal(repeated, context)).toMatchObject({
+    taskRecommendation: null,
+    turnKind: "ordinary_question",
+    nextAction: "ask",
+  });
+  for (const changed of [
+    {
+      ...repeated,
+      taskRecommendation: { ...repeated.taskRecommendation, taskId: 96 },
+    },
+    { ...repeated, turnKind: "task_switch" },
+    {
+      ...repeated,
+      fieldCandidates: [
+        {
+          fieldKey: "invented",
+          naturalValue: "x",
+          confidence: 1,
+          source: "visitor",
+        },
+      ],
+    },
+    {
+      ...repeated,
+      safety: { decision: "refuse", reasonCode: "unsafe" },
+      nextAction: "fail",
+    },
+  ])
+    expect(() => validateStructuredTurnProposal(changed, context)).toThrow(
+      TurnProposalValidationError,
+    );
+});
+
 test("validator rejects disallowed stages and unsafe blocked-turn payloads", () => {
   expect(
     validationCodes({
