@@ -127,6 +127,19 @@ export const turnResultV1ProviderSchema = turnResultV1BaseSchema.extend({
   }),
 });
 
+// An active task's knowledge interruption may answer, clarify or decline; it
+// cannot collect fields or propose operations. Enforce this at generation too.
+export const taskKnowledgeTurnProviderSchema =
+  turnResultV1ProviderSchema.extend({
+    turnKind: z.enum(["ordinary_question", "side_question"]),
+    fieldCandidates: z.array(turnFieldCandidateProposalV1Schema).max(0),
+    taskRecommendation: z.null(),
+    toolRequest: z.null(),
+    routeRecommendation: z.null(),
+    outcomeRecommendation: z.null(),
+    nextAction: z.enum(["ask", "clarify", "handoff", "fail"]),
+  });
+
 export const turnResultV1Schema = turnResultV1BaseSchema.superRefine(
   (result, context) => {
     if (

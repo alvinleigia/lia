@@ -12,7 +12,10 @@ import {
   conversationalTaskSnapshotV1Schema,
   DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
 } from "../../src/lib/conversation-contracts";
-import { deleteConversationRuntimeData } from "../../src/lib/conversational-task-runtime";
+import {
+  deleteConversationRuntimeData,
+  getConversationalTaskRuntime,
+} from "../../src/lib/conversational-task-runtime";
 import { getConversationTaskRuntimeSession } from "../../src/lib/conversational-task-runtime-session";
 import { db } from "../../src/lib/db-config";
 import {
@@ -230,10 +233,12 @@ for (const [domain, fieldKey, label, question, answer] of [
         const knowledge = input.system.includes("Current stage: knowledge");
         const text = input.messages.at(-1)?.content ?? "";
         const date = text.match(/2026-\d{2}-\d{2}/g)?.at(-1);
+        const suppliedName = text.includes("Alex Test");
         const proposal = createRequestedTaskSelectionProposal({
-          requestedFieldKey: fieldKey,
-          selectionValue:
-            domain === "hotel"
+          requestedFieldKey: suppliedName ? "guestName" : fieldKey,
+          selectionValue: suppliedName
+            ? "Alex Test"
+            : domain === "hotel"
               ? `2026-10-25 to ${date ?? "2026-10-26"}`
               : (date ?? "2026-10-26"),
         });
@@ -252,9 +257,24 @@ for (const [domain, fieldKey, label, question, answer] of [
                 },
                 reply: answer,
               }
-            : date
-              ? proposal
-              : { ...proposal, turnKind: "side_question", fieldCandidates: [] },
+            : text === "Submit enquiry"
+              ? {
+                  ...proposal,
+                  fieldCandidates: [],
+                  turnKind: "ordinary_question",
+                  nextAction: "complete",
+                  outcomeRecommendation: {
+                    outcomeKey: "completed",
+                    confidence: 1,
+                  },
+                }
+              : date || suppliedName
+                ? proposal
+                : {
+                    ...proposal,
+                    turnKind: "side_question",
+                    fieldCandidates: [],
+                  },
         };
       },
     );
@@ -334,6 +354,22 @@ for (const [domain, fieldKey, label, question, answer] of [
         (await getConversationTaskRuntimeSession(scope)).runtime?.run
           .lastRequestedFieldKey,
       ).toBe(fieldKey);
+      if (domain === "hotel") {
+        await send(`Change ${label} to 2026-10-29.`);
+        await send("My name is Alex Test.");
+        const ready = await getConversationTaskRuntimeSession(scope);
+        if (!ready.runtime) throw new Error("Missing ready task");
+        await send("Submit enquiry");
+        expect(
+          (
+            await getConversationalTaskRuntime({
+              projectId: scope.projectId,
+              taskRunId: ready.runtime.run.id,
+            })
+          )?.run.status,
+        ).toBe("completed");
+        return;
+      }
       const cancelled = await send("Cancel");
       expect(cancelled.replies.map((r) => r.text).join("\n")).toMatch(
         /cancel/i,

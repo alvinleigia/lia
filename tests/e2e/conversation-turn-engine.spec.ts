@@ -12,10 +12,11 @@ import {
   type TurnKnowledgeRetriever,
 } from "../../src/lib/conversation-turn-engine";
 import { buildSafeTurnDecisionSummary } from "../../src/lib/conversation-turn-safety";
-import type {
-  StructuredTurnProvider,
-  StructuredTurnProviderInput,
-  StructuredTurnProviderResult,
+import {
+  StructuredTurnOutputLimitError,
+  type StructuredTurnProvider,
+  type StructuredTurnProviderInput,
+  type StructuredTurnProviderResult,
 } from "../../src/lib/model-provider";
 import {
   buildPostConversationJobResult,
@@ -151,6 +152,38 @@ test("minimal enquiry continues the pinned task without repair or restart", asyn
   expect(result.proposal.fieldCandidates).toEqual([]);
   expect(result.proposal.nextAction).toBe("ask");
   expect(result.proposal.safety.reasonCode).toBeNull();
+  expect(result.proposal.turnKind).toBe("field_answer");
+});
+
+test("truncated structured output uses the fallback without repeating the same token cap", async () => {
+  const provider = new QueueProvider([
+    new StructuredTurnOutputLimitError({
+      inputTokens: 100,
+      outputTokens: 900,
+      totalTokens: 1000,
+    }),
+    baseTurn({
+      fieldCandidates: [],
+      turnKind: "side_question",
+      reply: "Hours are unconfirmed.",
+    }),
+  ]);
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    stage: "knowledge",
+    visitorMessage: "When is the pool open?",
+  });
+  expect(provider.calls.map((c) => c.modelId)).toEqual([
+    "gpt-5-mini",
+    "gpt-4.1-mini",
+  ]);
+  expect(provider.calls[1].maxOutputTokens).toBe(
+    provider.calls[0].maxOutputTokens,
+  );
+  expect(provider.calls[1].system).not.toContain("Repair attempt");
+  expect(result.attempts).toBe(2);
+  expect(result.proposal.reply).toBe("Hours are unconfirmed.");
+  expect(result.usage.outputTokens).toBeGreaterThanOrEqual(900);
 });
 
 test("invalid model identifiers are repaired before a proposal is accepted", async () => {

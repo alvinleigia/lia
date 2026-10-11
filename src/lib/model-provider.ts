@@ -2,6 +2,7 @@ import { openai } from "@ai-sdk/openai";
 import { generateText, NoObjectGeneratedError, Output } from "ai";
 import {
   type TurnMessageV1,
+  taskKnowledgeTurnProviderSchema,
   turnResultV1ProviderSchema,
 } from "@/lib/conversation-turn-contracts";
 import {
@@ -27,6 +28,7 @@ export function getPlatformEmbeddingModel() {
 }
 
 export type StructuredTurnProviderInput = {
+  taskKnowledgeOnly?: boolean;
   maxOutputTokens: number;
   maxRetries: number;
   messages: TurnMessageV1[];
@@ -47,6 +49,13 @@ export interface StructuredTurnProvider {
   ): Promise<StructuredTurnProviderResult>;
 }
 
+export class StructuredTurnOutputLimitError extends MeteredModelError {
+  constructor(usage: ModelUsage) {
+    super(usage, new Error("Structured turn exceeded its output token limit."));
+    this.name = "StructuredTurnOutputLimitError";
+  }
+}
+
 export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
   async generateTurn(
     input: StructuredTurnProviderInput,
@@ -57,7 +66,9 @@ export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
         name: "StructuredTurnV1",
         description:
           "A proposal-only structured conversational turn for server validation.",
-        schema: turnResultV1ProviderSchema,
+        schema: input.taskKnowledgeOnly
+          ? taskKnowledgeTurnProviderSchema
+          : turnResultV1ProviderSchema,
       }),
       system: input.system,
       messages: input.messages,
@@ -75,11 +86,19 @@ export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
       timeout: input.timeoutMs,
     }).catch((error: unknown) => {
       if (NoObjectGeneratedError.isInstance(error)) {
+        if (error.finishReason === "length")
+          throw new StructuredTurnOutputLimitError(
+            normalizeModelUsage(error.usage),
+          );
         throw new MeteredModelError(normalizeModelUsage(error.usage), error);
       }
       throw error;
     });
     const usage = normalizeModelUsage(result.totalUsage);
+    // Reasoning can exhaust the budget before any structured output exists.
+    // Preserve usage and let the engine try the configured fallback directly.
+    if (result.finishReason === "length")
+      throw new StructuredTurnOutputLimitError(usage);
     try {
       return { modelId: input.modelId, output: result.output, usage };
     } catch (error) {

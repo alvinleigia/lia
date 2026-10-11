@@ -205,6 +205,7 @@ export function normalizeActiveTaskQuestion(
     return { ...proposal, turnKind: "field_answer" };
   }
   return proposal.turnKind === "ordinary_question" &&
+    proposal.nextAction === "ask" &&
     proposal.fieldCandidates.length === 0 &&
     proposal.safety.decision === "allow"
     ? { ...proposal, turnKind: "side_question" }
@@ -220,7 +221,9 @@ export function shouldAnswerTaskSideQuestion(input: {
   if (
     proposal.safety.decision !== "allow" ||
     proposal.ambiguity.requiresClarification ||
-    ["cancel", "handoff", "fail"].includes(proposal.nextAction)
+    ["cancel", "handoff", "fail", "complete", "confirm"].includes(
+      proposal.nextAction,
+    )
   )
     return false;
   // A review/confirmation question attached to supplied details belongs to the

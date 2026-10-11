@@ -16,6 +16,7 @@ import {
 } from "../../src/lib/conversation-turn-compiler";
 import {
   structuredTurnRequestV1Schema,
+  taskKnowledgeTurnProviderSchema,
   turnResultV1ProviderSchema,
   turnResultV1Schema,
 } from "../../src/lib/conversation-turn-contracts";
@@ -228,6 +229,35 @@ test("grounded replies must reference supplied excerpts", () => {
       grounding: { status: "grounded", excerptIds: [] },
     }).success,
   ).toBe(false);
+});
+
+test("active-task knowledge schema prevents field and operation proposals at generation", async () => {
+  const answer = {
+    ...validTurn(),
+    ambiguity: { ...validTurn().ambiguity, fieldKeys: null },
+  };
+  expect(taskKnowledgeTurnProviderSchema.safeParse(answer).success).toBe(true);
+  for (const extra of [
+    {
+      fieldCandidates: [
+        {
+          fieldKey: "serviceCategoryId",
+          naturalValue: "x",
+          confidence: 1,
+          source: "visitor",
+        },
+      ],
+    },
+    { taskRecommendation: { taskId: 95, confidence: 1, reason: "start" } },
+    { nextAction: "complete" },
+    { turnKind: "field_correction" },
+  ])
+    expect(
+      taskKnowledgeTurnProviderSchema.safeParse({ ...answer, ...extra })
+        .success,
+    ).toBe(false);
+  const schema = await asSchema(taskKnowledgeTurnProviderSchema).jsonSchema;
+  expect(schema.properties?.fieldCandidates).toMatchObject({ maxItems: 0 });
 });
 
 test("compiler exposes only allowed task contracts and model-visible context", () => {
@@ -517,7 +547,7 @@ test("recommending the active task is a no-op without granting other permissions
   };
   expect(validateStructuredTurnProposal(repeated, context)).toMatchObject({
     taskRecommendation: null,
-    turnKind: "ordinary_question",
+    turnKind: "field_answer",
     nextAction: "ask",
   });
   for (const changed of [

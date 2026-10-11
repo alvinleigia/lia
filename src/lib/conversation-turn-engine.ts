@@ -44,6 +44,7 @@ import {
   PLATFORM_EXTRACTION_FALLBACK_MODEL_ID,
   PLATFORM_EXTRACTION_MODEL_ID,
   PLATFORM_FALLBACK_MODEL_ID,
+  StructuredTurnOutputLimitError,
   type StructuredTurnProvider,
   type StructuredTurnProviderResult,
 } from "@/lib/model-provider";
@@ -953,6 +954,8 @@ export class StructuredTurnEngine {
               input.projectId,
               () =>
                 this.provider.generateTurn({
+                  taskKnowledgeOnly:
+                    input.stage === "knowledge" && Boolean(input.activeTask),
                   maxOutputTokens: modelPolicy.maxOutputTokens,
                   maxRetries: modelPolicy.maxRetries,
                   messages: compiled.messages,
@@ -1011,6 +1014,9 @@ export class StructuredTurnEngine {
           };
         } catch (error) {
           if (!receivedUsage) attemptUsages.push(failedModelUsage(error));
+          // Repairing with the same output cap cannot reliably fix truncation.
+          // Keep the configured budget and move to the next allowed model.
+          if (error instanceof StructuredTurnOutputLimitError) break;
           const codes =
             error instanceof TurnProposalValidationError
               ? error.codes

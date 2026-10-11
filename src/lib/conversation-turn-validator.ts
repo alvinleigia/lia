@@ -49,10 +49,13 @@ export function validateStructuredTurnProposal(
     !["greeting", "task_switch"].includes(proposal.turnKind)
   ) {
     proposal.taskRecommendation = null;
-    if (proposal.turnKind === "task_recommendation")
-      proposal.turnKind = proposal.fieldCandidates.length
-        ? "field_answer"
-        : "ordinary_question";
+    if (
+      allowed.allowedFieldKeys.size > 0 &&
+      ["task_recommendation", "ordinary_question"].includes(proposal.turnKind)
+    )
+      proposal.turnKind = "field_answer";
+    else if (proposal.turnKind === "task_recommendation")
+      proposal.turnKind = "ordinary_question";
   }
   const issues: string[] = [];
   const hasActionProposal =

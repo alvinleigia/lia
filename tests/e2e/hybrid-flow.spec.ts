@@ -1557,6 +1557,29 @@ test("candidate-bearing task answers do not remain ordinary conversation", () =>
   }
 });
 
+test("task completion cannot be diverted into a knowledge interruption", () => {
+  const initial = createRequestedTaskSelectionProposal({
+    requestedFieldKey: "guestName",
+    selectionValue: "Alex",
+  });
+  if (!initial) throw new Error("Missing fixture");
+  const proposal = {
+    ...initial,
+    fieldCandidates: [],
+    turnKind: "ordinary_question" as const,
+    nextAction: "complete" as const,
+    outcomeRecommendation: { outcomeKey: "completed", confidence: 1 },
+  };
+  expect(normalizeActiveTaskQuestion(proposal)).toEqual(proposal);
+  expect(
+    shouldAnswerTaskSideQuestion({
+      proposal,
+      text: "Please submit my enquiry",
+      availabilityHandled: false,
+    }),
+  ).toBe(false);
+});
+
 test("requested project-resource selections can skip the model", () => {
   expect(
     createRequestedTaskSelectionProposal({
@@ -1788,6 +1811,7 @@ test("side questions resume the exact requested task field without mutations", (
     normalizeActiveTaskQuestion({
       ...proposal,
       fieldCandidates: [],
+      nextAction: "ask",
       turnKind: "ordinary_question",
     }).turnKind,
   ).toBe("side_question");
