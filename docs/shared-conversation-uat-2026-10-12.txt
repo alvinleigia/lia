@@ -35,6 +35,10 @@ CAUSES AND CORRECTIONS
 - Preserve explicit completion proposals rather than normalizing them into FAQ
   interruptions. Allow a completed outcome when the validated fields are already
   complete and the visitor explicitly requests submission; server gates still apply.
+- Ignore a stale requested-field pointer once that field is valid/confirmed.
+  This prevents a later submission sentence from overwriting a collected name.
+  Render completed task wording from the applied server outcome, rather than a
+  model proposal which might still ask for confirmation.
 
 VERIFICATION
 PASS: 371 offline contract checks.

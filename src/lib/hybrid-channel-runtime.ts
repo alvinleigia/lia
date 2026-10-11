@@ -1228,7 +1228,14 @@ async function executeTaskBoundary(input: {
   }
 
   const requestedField = session.snapshot.task.definition.fields.find(
-    (field) => field.key === session.runtime?.run.lastRequestedFieldKey,
+    (field) =>
+      field.key === runtime.run.lastRequestedFieldKey &&
+      runtime.fields.some(
+        (value) =>
+          value.fieldKey === field.key &&
+          value.state !== "valid" &&
+          value.state !== "confirmed",
+      ),
   );
   const requestedFieldIsProjectResource =
     requestedField?.type === "project_resource" ||
@@ -2196,7 +2203,13 @@ async function executeTaskBoundary(input: {
   );
 
   return {
-    output: reconciledProposal,
+    output:
+      outcomeResult.disposition === "applied" && outcome.type === "completed"
+        ? {
+            ...reconciledProposal,
+            reply: `${snapshot.task.name} is complete.`,
+          }
+        : reconciledProposal,
     signals:
       outcomeResult.disposition === "applied"
         ? [{ kind: "task_outcome", triggerKey: outcome.outputPort }]

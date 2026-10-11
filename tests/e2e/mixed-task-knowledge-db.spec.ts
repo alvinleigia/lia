@@ -268,13 +268,15 @@ for (const [domain, fieldKey, label, question, answer] of [
                     confidence: 1,
                   },
                 }
-              : date || suppliedName
-                ? proposal
-                : {
-                    ...proposal,
-                    turnKind: "side_question",
-                    fieldCandidates: [],
-                  },
+              : text === "Please proceed with my enquiry"
+                ? { ...proposal, turnKind: "field_answer", fieldCandidates: [] }
+                : date || suppliedName
+                  ? proposal
+                  : {
+                      ...proposal,
+                      turnKind: "side_question",
+                      fieldCandidates: [],
+                    },
         };
       },
     );
@@ -359,7 +361,16 @@ for (const [domain, fieldKey, label, question, answer] of [
         await send("My name is Alex Test.");
         const ready = await getConversationTaskRuntimeSession(scope);
         if (!ready.runtime) throw new Error("Missing ready task");
-        await send("Submit enquiry");
+        await send("Please proceed with my enquiry");
+        expect(
+          (await getConversationTaskRuntimeSession(scope)).runtime?.fields.find(
+            (field) => field.fieldKey === "guestName",
+          )?.canonicalValue,
+        ).toBe("Alex Test");
+        const completed = await send("Submit enquiry");
+        expect(
+          completed.replies.map((reply) => reply.text).join("\n"),
+        ).toContain(`${ready.snapshot?.task.name} is complete.`);
         expect(
           (
             await getConversationalTaskRuntime({
