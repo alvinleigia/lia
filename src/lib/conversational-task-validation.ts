@@ -84,6 +84,10 @@ export function validateConversationalTaskForPublish(input: {
   }
 
   const fieldKeys = new Set(input.definition.fields.map((field) => field.key));
+  for (const key of input.definition.priceTable?.fields ?? []) {
+    if (!fieldKeys.has(key))
+      issues.push(`Pricing references missing field ${key}.`);
+  }
   for (const field of input.definition.fields) {
     if (new Set(field.sourcePriority).size !== field.sourcePriority.length) {
       issues.push(`${field.label} contains duplicate source priorities.`);

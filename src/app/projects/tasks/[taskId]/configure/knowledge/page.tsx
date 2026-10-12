@@ -11,15 +11,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormActionBar } from "@/components/ui/form-action-bar";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { conversationalTaskIdSchema } from "@/lib/conversational-task-schema";
-import { getProjectConversationalTask } from "@/lib/conversational-tasks";
+import {
+  getProjectConversationalTask,
+  readConversationalTaskDefinition,
+} from "@/lib/conversational-tasks";
 import { getProjectDocumentStats } from "@/lib/documents";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
 } from "@/lib/protected-page";
-import { updateConversationKnowledgePolicyAction } from "../../../actions";
+import {
+  updateConversationKnowledgePolicyAction,
+  updateTaskPriceTableAction,
+} from "../../../actions";
 
 type PageProps = {
   params: Promise<{ taskId: string }>;
@@ -154,6 +161,55 @@ export default async function TaskKnowledgePage({
                     <Link href="/projects/documents">Manage Documents</Link>
                   </Button>
                 }
+              />
+            </ActionStateForm>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Mock pricing for UAT</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Match collected fields to a price table. Lia calculates totals
+              without an AI call. Publish a new task version and update its flow
+              to use saved changes.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ActionStateForm
+              action={updateTaskPriceTableAction}
+              className="space-y-4"
+            >
+              <ActionFormError />
+              <input
+                type="hidden"
+                name="projectId"
+                value={context.project.id}
+              />
+              <input type="hidden" name="taskId" value={task.id} />
+              <Label htmlFor="priceTableJson">
+                Price table JSON (leave empty to disable)
+              </Label>
+              <Textarea
+                id="priceTableJson"
+                name="priceTableJson"
+                rows={12}
+                maxLength={100_000}
+                defaultValue={
+                  readConversationalTaskDefinition(task.definition).priceTable
+                    ? JSON.stringify(
+                        readConversationalTaskDefinition(task.definition)
+                          .priceTable,
+                        null,
+                        2,
+                      )
+                    : ""
+                }
+                className="font-mono text-xs"
+              />
+              <FormSubmitButton
+                label="Save Mock Pricing"
+                pendingLabel="Saving..."
+                icon={<Save className="h-4 w-4" />}
               />
             </ActionStateForm>
           </CardContent>

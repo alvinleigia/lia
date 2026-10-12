@@ -93,6 +93,29 @@ for (const [domain, fieldKey, label, question, answer] of [
         .returning();
       const definition = {
         ...DEFAULT_CONVERSATIONAL_TASK_DEFINITION,
+        priceTable: {
+          schemaVersion: 1 as const,
+          mode: "mock" as const,
+          currency: "INR",
+          minorUnitDigits: 2,
+          fields: [fieldKey],
+          aliases: {},
+          offersMessage: "No verified coupons are configured.",
+          rows: [
+            {
+              label: `${domain} example`,
+              match: {
+                [fieldKey]:
+                  domain === "hotel"
+                    ? "2026-10-25 to 2026-10-29"
+                    : "2026-10-29",
+              },
+              lines: [
+                { quantity: 2, unitAmountMinor: 100000, unitTaxMinor: 5000 },
+              ],
+            },
+          ],
+        },
         fields: [
           {
             ...REFERENCE_BOOKING_TASK_DEFINITION.fields[4],
@@ -330,6 +353,22 @@ for (const [domain, fieldKey, label, question, answer] of [
             .split("Trusted model-visible context:")[0],
         ).toContain(date);
       }
+      const callsBeforePricing = modelCalls.length;
+      const mixedPrice = await send(
+        `Change ${label} to 2026-10-29. What is the total price?`,
+      );
+      expect(
+        mixedPrice.replies.map((reply) => reply.text).join("\n"),
+      ).toContain("INR 2,100.00 total");
+      expect(modelCalls.length).toBe(callsBeforePricing + 1);
+      const price = await send("What is the total price?");
+      expect(price.replies.map((reply) => reply.text).join("\n")).toContain(
+        "INR 2,100.00 total",
+      );
+      expect(price.replies.map((reply) => reply.text).join("\n")).toContain(
+        "What is your name?",
+      );
+      expect(modelCalls.length).toBe(callsBeforePricing + 1);
       const beforeInterruption = await getConversationTaskRuntimeSession(scope);
       const interrupted = await send(question);
       expect(interrupted.replies.map((r) => r.text).join("\n")).toContain(

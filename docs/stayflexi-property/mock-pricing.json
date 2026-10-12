@@ -1,0 +1,350 @@
+{
+  "schemaVersion": 1,
+  "mode": "mock",
+  "currency": "INR",
+  "minorUnitDigits": 2,
+  "fields": [
+    "stayDates",
+    "adults",
+    "children",
+    "roomCategory",
+    "roomCount",
+    "ratePlan"
+  ],
+  "aliases": {
+    "roomCategory": {
+      "Premium": "Premium bedroom with attached bathroom",
+      "Premium bedroom": "Premium bedroom with attached bathroom",
+      "Master Suite": "Master Suite bedroom with attached bathroom and private living area"
+    },
+    "ratePlan": {
+      "Standard": "Standard Plan",
+      "Extended Stay": "Extended Stay Plan",
+      "Sliceinn Flexi": "Sliceinn Flexi Plan"
+    }
+  },
+  "offersMessage": "No verified coupon code or extra discount is available in this saved data. The Extended Stay plan has lower saved rates, but its eligibility and cancellation rules conflict and require the reservations team to check. I cannot negotiate or promise a discount. You can request a callback for the best available price.",
+  "rows": [
+    {
+      "label": "26–28 October 2026, 2 adults, no children, 1 × Premium — Standard Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 2,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 1,
+        "ratePlan": "Standard Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1250400,
+          "unitTaxMinor": 62520
+        }
+      ]
+    },
+    {
+      "label": "26–28 October 2026, 4 adults, no children, 2 × Premium — Standard Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 4,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 2,
+        "ratePlan": "Standard Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1250400,
+          "unitTaxMinor": 62520
+        },
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1501375,
+          "unitTaxMinor": 181783
+        }
+      ]
+    },
+    {
+      "label": "26–28 October 2026, 6 adults, no children, 3 × Premium — Standard Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 6,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 3,
+        "ratePlan": "Standard Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1250400,
+          "unitTaxMinor": 62520
+        },
+        {
+          "quantity": 2,
+          "unitAmountMinor": 1501375,
+          "unitTaxMinor": 181783
+        }
+      ]
+    },
+    {
+      "label": "26–28 October 2026, 8 adults, no children, 4 × Premium — Standard Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 8,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 4,
+        "ratePlan": "Standard Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1250400,
+          "unitTaxMinor": 62520
+        },
+        {
+          "quantity": 3,
+          "unitAmountMinor": 1501375,
+          "unitTaxMinor": 181783
+        }
+      ]
+    },
+    {
+      "label": "26–28 October 2026, 2 adults, no children, 1 × Premium — Extended Stay Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 2,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 1,
+        "ratePlan": "Extended Stay Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1012500,
+          "unitTaxMinor": 50625
+        }
+      ],
+      "note": "Extended Stay eligibility and cancellation terms are unresolved in the saved source; the team must verify them. No extra percentage discount has been applied."
+    },
+    {
+      "label": "26–28 October 2026, 4 adults, no children, 2 × Premium — Extended Stay Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 4,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 2,
+        "ratePlan": "Extended Stay Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1012500,
+          "unitTaxMinor": 50625
+        },
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1012500,
+          "unitTaxMinor": 50625
+        }
+      ],
+      "note": "Extended Stay eligibility and cancellation terms are unresolved in the saved source; the team must verify them. No extra percentage discount has been applied."
+    },
+    {
+      "label": "26–28 October 2026, 6 adults, no children, 3 × Premium — Extended Stay Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 6,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 3,
+        "ratePlan": "Extended Stay Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1012500,
+          "unitTaxMinor": 50625
+        },
+        {
+          "quantity": 2,
+          "unitAmountMinor": 1012500,
+          "unitTaxMinor": 50625
+        }
+      ],
+      "note": "Extended Stay eligibility and cancellation terms are unresolved in the saved source; the team must verify them. No extra percentage discount has been applied."
+    },
+    {
+      "label": "26–28 October 2026, 8 adults, no children, 4 × Premium — Extended Stay Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 8,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 4,
+        "ratePlan": "Extended Stay Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1012500,
+          "unitTaxMinor": 50625
+        },
+        {
+          "quantity": 3,
+          "unitAmountMinor": 1012500,
+          "unitTaxMinor": 50625
+        }
+      ],
+      "note": "Extended Stay eligibility and cancellation terms are unresolved in the saved source; the team must verify them. No extra percentage discount has been applied."
+    },
+    {
+      "label": "26–28 October 2026, 2 adults, no children, 1 × Premium — Sliceinn Flexi Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 2,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 1,
+        "ratePlan": "Sliceinn Flexi Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1375440,
+          "unitTaxMinor": 68772
+        }
+      ]
+    },
+    {
+      "label": "26–28 October 2026, 4 adults, no children, 2 × Premium — Sliceinn Flexi Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 4,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 2,
+        "ratePlan": "Sliceinn Flexi Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1375440,
+          "unitTaxMinor": 68772
+        },
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1651512,
+          "unitTaxMinor": 199961
+        }
+      ]
+    },
+    {
+      "label": "26–28 October 2026, 6 adults, no children, 3 × Premium — Sliceinn Flexi Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 6,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 3,
+        "ratePlan": "Sliceinn Flexi Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1375440,
+          "unitTaxMinor": 68772
+        },
+        {
+          "quantity": 2,
+          "unitAmountMinor": 1651512,
+          "unitTaxMinor": 199961
+        }
+      ]
+    },
+    {
+      "label": "26–28 October 2026, 8 adults, no children, 4 × Premium — Sliceinn Flexi Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 8,
+        "children": 0,
+        "roomCategory": "Premium bedroom with attached bathroom",
+        "roomCount": 4,
+        "ratePlan": "Sliceinn Flexi Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1375440,
+          "unitTaxMinor": 68772
+        },
+        {
+          "quantity": 3,
+          "unitAmountMinor": 1651512,
+          "unitTaxMinor": 199961
+        }
+      ]
+    },
+    {
+      "label": "26–28 October 2026, 2 adults, no children, 1 × Master Suite — Standard Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 2,
+        "children": 0,
+        "roomCategory": "Master Suite bedroom with attached bathroom and private living area",
+        "roomCount": 1,
+        "ratePlan": "Standard Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 2402200,
+          "unitTaxMinor": 432396
+        }
+      ]
+    },
+    {
+      "label": "26–28 October 2026, 2 adults, no children, 1 × Master Suite — Extended Stay Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 2,
+        "children": 0,
+        "roomCategory": "Master Suite bedroom with attached bathroom and private living area",
+        "roomCount": 1,
+        "ratePlan": "Extended Stay Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 1620000,
+          "unitTaxMinor": 291600
+        }
+      ],
+      "note": "Extended Stay eligibility and cancellation terms are unresolved in the saved source; the team must verify them. No extra percentage discount has been applied."
+    },
+    {
+      "label": "26–28 October 2026, 2 adults, no children, 1 × Master Suite — Sliceinn Flexi Plan",
+      "match": {
+        "stayDates": "2026-10-26 to 2026-10-28",
+        "adults": 2,
+        "children": 0,
+        "roomCategory": "Master Suite bedroom with attached bathroom and private living area",
+        "roomCount": 1,
+        "ratePlan": "Sliceinn Flexi Plan"
+      },
+      "lines": [
+        {
+          "quantity": 1,
+          "unitAmountMinor": 2642420,
+          "unitTaxMinor": 475636
+        }
+      ]
+    }
+  ],
+  "alternativeField": "ratePlan"
+}

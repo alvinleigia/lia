@@ -1,0 +1,26 @@
+MOCK PRICING — UAT ONLY
+
+Source: mock-pricing.json. Saved full-stay examples from hoteldetailadvanced.json;
+not live inventory, a confirmed booking or a payable quote.
+
+Setup: Task > Knowledge > Mock pricing. Paste the JSON and save.
+Publish the task, select that version in the flow, then publish the flow.
+Start a fresh chat; existing chats keep their published snapshot.
+
+Supported: 26–28 October 2026; no children; exactly two adults per unit.
+Premium: 1–4 units. Master Suite: 1 unit.
+Plans: Standard, Extended Stay, Sliceinn Flexi.
+Other dates/occupancy are intentionally not extrapolated.
+
+Test: Four adults, no children, two Premium, Standard Plan for those dates.
+Ask "What is the total price?" Expect INR 29,960.78 including INR 2,443.03 tax.
+Ask "Any offers?" Expect the lower saved Extended Stay comparison INR 21,262.50,
+with eligibility/cancellation unresolved and no invented coupon or extra discount.
+Ask about the swimming pool: the enquiry should retain all collected details.
+Change the dates: the old price must not be reused.
+
+Money is integer minor units (INR paise). Each row matches every named field;
+line quantity × unit amount and tax are summed in code. Aliases map exact values.
+No LLM or document retrieval is used for pricing responses. Free-text field
+extraction may still use one LLM call; pure price/offer follow-ups use none.
+The same schema supports other tasks using their own field keys and rows.

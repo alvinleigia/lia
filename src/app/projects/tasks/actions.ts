@@ -66,6 +66,7 @@ import {
   updateProjectConversationalTaskDefinition,
 } from "@/lib/conversational-tasks";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
+import { taskPriceTableSchema } from "@/lib/task-price-table";
 
 const projectIdSchema = z.coerce.number().int().positive();
 const taskCompletionActionSchema = z.enum(["return_to_knowledge", "end"]);
@@ -521,6 +522,48 @@ export async function updateConversationKnowledgePolicyAction(
       noAnswerBehavior: parsed.data.noAnswerBehavior,
     },
   });
+  revalidatePath(destination);
+  redirect(`${destination}?saved=1`);
+}
+
+export async function updateTaskPriceTableAction(
+  _previousState: ActionFormState,
+  formData: FormData,
+): Promise<ActionFormState> {
+  const context = await resolveConversationalTaskMutation(formData);
+  if (context.task.isArchived)
+    return { error: "Restore the task before editing it." };
+  const definition = readConversationalTaskDefinition(context.task.definition);
+  const text = String(formData.get("priceTableJson") ?? "").trim();
+  if (text.length > 100_000)
+    return { error: "Keep the price table under 100,000 characters." };
+  let priceTable: z.infer<typeof taskPriceTableSchema> | undefined;
+  try {
+    priceTable = text
+      ? taskPriceTableSchema.parse(JSON.parse(text))
+      : undefined;
+  } catch {
+    return {
+      error:
+        "Enter a valid mock price table: every row must match all pricing fields, with unique combinations and non-negative integer amounts in minor units.",
+    };
+  }
+  const fieldKeys = new Set(definition.fields.map((field) => field.key));
+  if (priceTable?.fields.some((key) => !fieldKeys.has(key)))
+    return { error: "Pricing must reference fields defined in this task." };
+  await updateProjectConversationalTaskDefinition(
+    context.project.id,
+    context.task.id,
+    { ...definition, priceTable },
+  );
+  await writeAuditLog({
+    ...context,
+    action: "conversational_task.price_table_updated",
+    targetType: "conversational_task",
+    targetId: context.task.id,
+    metadata: { rows: priceTable?.rows.length ?? 0 },
+  });
+  const destination = `/projects/tasks/${context.task.id}/configure/knowledge`;
   revalidatePath(destination);
   redirect(`${destination}?saved=1`);
 }

@@ -8,6 +8,7 @@ import {
   AI_TONES,
   DEFAULT_PROJECT_AI_SETTINGS,
 } from "@/lib/project-ai-settings";
+import { taskPriceTableSchema } from "@/lib/task-price-table";
 
 const schemaVersion = z.literal(1);
 const optionalText = z.string().trim().max(2000).nullable();
@@ -552,6 +553,7 @@ export const conversationReturnPolicyV1Schema = z.object({
 
 export const conversationalTaskDefinitionV1Schema = z.object({
   schemaVersion,
+  priceTable: taskPriceTableSchema.optional(),
   contextVariables: z.array(contextVariableDefinitionV1Schema),
   degradedMode: z.object({
     model: z.enum(["deterministic_fallback", "handoff", "fail"]),

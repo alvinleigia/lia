@@ -66,6 +66,11 @@ import {
   measureRuntimeStage,
   type RuntimeTimingRecorder,
 } from "@/lib/runtime-stage-timing";
+import {
+  answerTaskPricing,
+  isStandaloneTaskPricingQuestion,
+  isTaskPricingQuestion,
+} from "@/lib/task-price-table";
 
 export interface TurnKnowledgeRetriever {
   retrieve(input: {
@@ -872,6 +877,8 @@ export class StructuredTurnEngine {
       input.activeTask &&
       input.stage === "extraction" &&
       (isStandaloneKnowledgeQuestion(input.visitorMessage) ||
+        (input.activeTask.task.definition.priceTable &&
+          isStandaloneTaskPricingQuestion(input.visitorMessage)) ||
         resolveApprovedKnowledgeAnswer(
           input.assistantBehavior,
           input.visitorMessage,
@@ -890,6 +897,37 @@ export class StructuredTurnEngine {
           }),
         ),
         source: "deterministic",
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      };
+    }
+
+    const priceTable = input.activeTask?.task.definition.priceTable;
+    if (
+      priceTable &&
+      input.stage === "knowledge" &&
+      isTaskPricingQuestion(input.visitorMessage) &&
+      !input.openingTurn
+    ) {
+      return {
+        attempts: 0,
+        modelEscalationReason: null,
+        proposal: asValidatedDeterministic(
+          deterministicProposal({
+            nextAction: "ask",
+            reasonCode: "configured_mock_pricing",
+            reply: answerTaskPricing({
+              table: priceTable,
+              fields: input.fieldState,
+              text: input.visitorMessage,
+            }),
+            groundingStatus: "grounded",
+            groundingExcerptIds: [
+              `task:${input.activeTask?.task.id}:price-table`,
+            ],
+            turnKind: "side_question",
+          }),
+        ),
+        source: "deterministic" as const,
         usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
     }
@@ -984,6 +1022,7 @@ export class StructuredTurnEngine {
     // runtime state and its own budget/grounding checks.
     const prefetched =
       input.prefetchKnowledge &&
+      !(priceTable && isTaskPricingQuestion(input.visitorMessage)) &&
       input.stage === "extraction" &&
       input.activeTask &&
       retriever &&
