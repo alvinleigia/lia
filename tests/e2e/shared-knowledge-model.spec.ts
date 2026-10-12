@@ -144,6 +144,41 @@ for (const [domain, question, evidence, expected] of [
     expect(result.proposal.outcomeRecommendation).toBeNull();
   });
 
+  test(`@live-openai ${domain}: saved pricing remains an estimate`, async () => {
+    test.skip(
+      process.env.LIA_LIVE_STATEMENT_UAT !== "1",
+      "Opt-in synthetic model UAT.",
+    );
+    test.setTimeout(60_000);
+    const result = await new StructuredTurnEngine({
+      retriever: {
+        async retrieve() {
+          return [
+            {
+              id: "document:1",
+              content: `Saved ${domain} rate snapshot: total INR 1,250 including tax. This is a saved comparison, not a verified current payable quote. Current availability and payable amount require provider confirmation.`,
+            },
+          ];
+        },
+      },
+    }).execute({
+      ...input,
+      stage: "knowledge",
+      visitorMessage: "What is the total price?",
+    });
+    await test.info().attach("saved-price", {
+      body: JSON.stringify(result),
+      contentType: "application/json",
+    });
+    expect(result.proposal.reply).toMatch(/1,?250/);
+    expect(result.proposal.reply).toMatch(/saved|snapshot|historical/i);
+    expect(result.proposal.reply).toMatch(
+      /not.*(?:confirmed|current|payable)|requires?.*confirm/i,
+    );
+    expect(result.proposal.toolRequest).toBeNull();
+    expect(result.proposal.outcomeRecommendation).toBeNull();
+  });
+
   test(`@live-openai ${domain}: unsupported discount does not invent a coupon`, async () => {
     test.skip(
       process.env.LIA_LIVE_STATEMENT_UAT !== "1",
