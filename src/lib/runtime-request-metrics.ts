@@ -32,6 +32,7 @@ export async function measureRuntimeModelCall<T extends { usage: ModelUsage }>(
   projectId: number,
   generate: () => Promise<T>,
   modelId = "unknown",
+  stage?: string,
 ): Promise<T> {
   const metrics = requests.getStore();
   if (!metrics || metrics.projectId !== projectId) return generate();
@@ -40,8 +41,10 @@ export async function measureRuntimeModelCall<T extends { usage: ModelUsage }>(
     purpose: "structured_turn",
     status: "incomplete",
     usage: normalizeModelUsage(null),
+    ...(stage ? { stage } : {}),
   };
   metrics.details.push(detail);
+  const startedAt = performance.now();
   try {
     const result = await generate();
     detail.status = "completed";
@@ -51,6 +54,8 @@ export async function measureRuntimeModelCall<T extends { usage: ModelUsage }>(
     detail.status = "failed";
     detail.usage = failedModelUsage(error);
     throw error;
+  } finally {
+    detail.durationMs = Math.round(performance.now() - startedAt);
   }
 }
 

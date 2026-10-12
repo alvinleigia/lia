@@ -1485,6 +1485,7 @@ async function executeTaskBoundary(input: {
         bindRequestedTaskSelection({
           proposal: (
             await executeConfiguredStructuredTurn({
+              recordTiming: input.runtimeInput.recordTiming,
               activeTask: session.snapshot,
               assistantBehavior: normalizeProjectAiSettings(
                 session.snapshot.assistantBehavior,
@@ -1636,6 +1637,7 @@ async function executeTaskBoundary(input: {
     let resumedRevision: number | null = null;
     try {
       const knowledgeExecution = await executeConfiguredStructuredTurn({
+        recordTiming: input.runtimeInput.recordTiming,
         activeTask: updatedSession.snapshot,
         assistantBehavior: normalizeProjectAiSettings(
           updatedSession.snapshot.assistantBehavior,

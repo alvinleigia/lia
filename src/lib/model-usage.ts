@@ -9,6 +9,8 @@ export type ModelUsage = {
 
 export type ModelUsageDetail = {
   modelId: string;
+  stage?: string;
+  durationMs?: number;
   purpose: "structured_turn" | "chat" | "embedding_query" | "embedding_ingest";
   status: "completed" | "failed" | "incomplete";
   usage: ModelUsage;

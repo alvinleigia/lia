@@ -7,6 +7,44 @@ import {
 
 const usage = { inputTokens: 10, outputTokens: 4, totalTokens: 14 };
 
+test("model diagnostics distinguish stage and duration on success and failure", async () => {
+  const logs: RuntimeRequestLog[] = [];
+  await measureRuntimeRequest(
+    "project_runtime",
+    async (metrics) => {
+      metrics.projectId = 17;
+      await measureRuntimeModelCall(
+        17,
+        async () => ({ usage }),
+        "model",
+        "extraction",
+      );
+      await measureRuntimeModelCall(
+        17,
+        async () => {
+          throw new Error("private input");
+        },
+        "model",
+        "knowledge",
+      ).catch(() => null);
+      return new Response();
+    },
+    (log) => logs.push(log),
+  );
+  expect(logs[0].usageDetails).toMatchObject([
+    {
+      stage: "extraction",
+      durationMs: expect.any(Number),
+      status: "completed",
+    },
+    { stage: "knowledge", durationMs: expect.any(Number), status: "failed" },
+  ]);
+  expect(
+    logs[0].usageDetails.every((detail) => (detail.durationMs ?? -1) >= 0),
+  ).toBe(true);
+  expect(JSON.stringify(logs)).not.toContain("private input");
+});
+
 test("deterministic requests record latency, outcome and zero model usage", async () => {
   const logs: RuntimeRequestLog[] = [];
   const response = await measureRuntimeRequest(

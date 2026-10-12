@@ -62,6 +62,10 @@ import {
   resolveApprovedKnowledgeAnswer,
 } from "@/lib/project-ai-settings";
 import { measureRuntimeModelCall } from "@/lib/runtime-request-metrics";
+import {
+  measureRuntimeStage,
+  type RuntimeTimingRecorder,
+} from "@/lib/runtime-stage-timing";
 
 export interface TurnKnowledgeRetriever {
   retrieve(input: {
@@ -72,6 +76,7 @@ export interface TurnKnowledgeRetriever {
 }
 
 export type ExecuteStructuredTurnInput = {
+  recordTiming?: RuntimeTimingRecorder;
   collection?: FieldCollectionContext;
   activeTask: ConversationalTaskSnapshotV1 | null;
   assistantBehavior: ProjectAiSettings;
@@ -934,8 +939,9 @@ export class StructuredTurnEngine {
     }
 
     let retrieval: TurnRetrievalExcerptV1[] = [];
+    const retriever = this.retriever;
     if (
-      this.retriever &&
+      retriever &&
       input.stage === "knowledge" &&
       !input.openingTurn &&
       input.projectPolicy.knowledge.sourceSelection.allowedSources.includes(
@@ -943,14 +949,19 @@ export class StructuredTurnEngine {
       )
     ) {
       try {
-        retrieval = await this.retriever.retrieve({
-          limit: Math.min(
-            input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
-            MAX_MODEL_RETRIEVAL_EXCERPTS,
-          ),
-          projectId: input.projectId,
-          query: buildKnowledgeRetrievalQuery(input),
-        });
+        retrieval = await measureRuntimeStage(
+          "knowledge_retrieval",
+          input.recordTiming,
+          () =>
+            retriever.retrieve({
+              limit: Math.min(
+                input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
+                MAX_MODEL_RETRIEVAL_EXCERPTS,
+              ),
+              projectId: input.projectId,
+              query: buildKnowledgeRetrievalQuery(input),
+            }),
+        );
       } catch {
         return {
           attempts: 0,
@@ -991,6 +1002,8 @@ export class StructuredTurnEngine {
                 this.provider.generateTurn({
                   taskKnowledgeOnly:
                     input.stage === "knowledge" && Boolean(input.activeTask),
+                  taskExtractionOnly:
+                    input.stage === "extraction" && Boolean(input.activeTask),
                   maxOutputTokens: modelPolicy.maxOutputTokens,
                   maxRetries: modelPolicy.maxRetries,
                   messages: compiled.messages,
@@ -999,6 +1012,7 @@ export class StructuredTurnEngine {
                   timeoutMs: remainingMs,
                 }),
               modelId,
+              input.stage,
             ),
             new Promise<never>((_, reject) => {
               deadlineTimer = setTimeout(

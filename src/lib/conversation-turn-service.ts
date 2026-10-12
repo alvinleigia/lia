@@ -18,6 +18,7 @@ import {
 } from "@/lib/conversation-turn-project";
 import { ProjectDocumentTurnRetriever } from "@/lib/conversation-turn-retrieval";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
+import { measureRuntimeStage } from "@/lib/runtime-stage-timing";
 
 export class PublishedTurnTaskNotFoundError extends Error {
   constructor() {
@@ -49,7 +50,9 @@ export async function executeConfiguredStructuredTurn(
     retriever: new ProjectDocumentTurnRetriever(),
   });
 
-  return engine.execute(input);
+  return measureRuntimeStage(`turn_${input.stage}`, input.recordTiming, () =>
+    engine.execute(input),
+  );
 }
 
 export async function executeProjectStructuredTurn(

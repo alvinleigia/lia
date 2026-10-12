@@ -1,8 +1,10 @@
 import { openai } from "@ai-sdk/openai";
 import { generateText, NoObjectGeneratedError, Output } from "ai";
 import {
+  compactTaskExtractionProviderSchema,
+  compactTaskKnowledgeProviderSchema,
+  expandCompactTaskTurn,
   type TurnMessageV1,
-  taskKnowledgeTurnProviderSchema,
   turnResultV1ProviderSchema,
 } from "@/lib/conversation-turn-contracts";
 import {
@@ -31,6 +33,7 @@ export function getPlatformEmbeddingModel() {
 
 export type StructuredTurnProviderInput = {
   taskKnowledgeOnly?: boolean;
+  taskExtractionOnly?: boolean;
   maxOutputTokens: number;
   maxRetries: number;
   messages: TurnMessageV1[];
@@ -69,10 +72,18 @@ export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
         description:
           "A proposal-only structured conversational turn for server validation.",
         schema: input.taskKnowledgeOnly
-          ? taskKnowledgeTurnProviderSchema
-          : turnResultV1ProviderSchema,
+          ? compactTaskKnowledgeProviderSchema
+          : input.taskExtractionOnly
+            ? compactTaskExtractionProviderSchema
+            : turnResultV1ProviderSchema,
       }),
-      system: input.system,
+      system:
+        input.system +
+        (input.taskExtractionOnly
+          ? "\nFor ordinary field extraction, keep reply to a brief acknowledgement (at most eight words). Do not repeat supplied values or ask for remaining fields; the server renders the next prompt. Clarifications, safety refusals and handoffs still need clear wording. Server supplies schemaVersion, decisionSummary and candidate source; omit them from your output."
+          : input.taskKnowledgeOnly
+            ? "\nServer supplies the omitted constant fields and audit summary. Return only the requested compact answer object."
+            : ""),
       messages: input.messages,
       maxOutputTokens: input.maxOutputTokens,
       maxRetries: input.maxRetries,
@@ -102,7 +113,15 @@ export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
     if (result.finishReason === "length")
       throw new StructuredTurnOutputLimitError(usage);
     try {
-      return { modelId: input.modelId, output: result.output, usage };
+      return {
+        modelId: input.modelId,
+        output: input.taskKnowledgeOnly
+          ? expandCompactTaskTurn(result.output, "knowledge")
+          : input.taskExtractionOnly
+            ? expandCompactTaskTurn(result.output, "extraction")
+            : result.output,
+        usage,
+      };
     } catch (error) {
       throw new MeteredModelError(usage, error);
     }

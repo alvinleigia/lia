@@ -15,6 +15,9 @@ import {
   type StructuredTurnValidationContext,
 } from "../../src/lib/conversation-turn-compiler";
 import {
+  compactTaskExtractionProviderSchema,
+  compactTaskKnowledgeProviderSchema,
+  expandCompactTaskTurn,
   structuredTurnRequestV1Schema,
   taskKnowledgeTurnProviderSchema,
   turnResultV1ProviderSchema,
@@ -69,6 +72,88 @@ function validTurn() {
     decisionSummary: "Answered from one retrieved business-hours excerpt.",
   };
 }
+
+test("compact knowledge keeps grounding and cannot propose task mutations", () => {
+  const compact = {
+    turnKind: "side_question",
+    reply: "The spa is open from 9 am to 6 pm.",
+    grounding: { status: "grounded", excerptIds: ["document:12"] },
+    nextAction: "ask",
+    ambiguity: {
+      requiresClarification: false,
+      question: null,
+      fieldKeys: null,
+    },
+    safety: { decision: "allow", reasonCode: null },
+  };
+  const expanded = expandCompactTaskTurn(compact, "knowledge");
+  expect(turnResultV1Schema.parse(expanded)).toMatchObject({
+    schemaVersion: 1,
+    fieldCandidates: [],
+    toolRequest: null,
+    outcomeRecommendation: null,
+    grounding: compact.grounding,
+  });
+  expect(
+    compactTaskKnowledgeProviderSchema.safeParse({
+      ...compact,
+      toolRequest: {},
+    }).success,
+  ).toBe(false);
+  expect(
+    compactTaskKnowledgeProviderSchema.safeParse({
+      ...compact,
+      nextAction: "complete",
+    }).success,
+  ).toBe(false);
+  expect(() =>
+    turnResultV1Schema.parse(
+      expandCompactTaskTurn(
+        {
+          ...compact,
+          grounding: { status: "grounded", excerptIds: [] },
+        },
+        "knowledge",
+      ),
+    ),
+  ).toThrow();
+});
+
+test("compact extraction restores visitor provenance and preserves uncertainty", () => {
+  const {
+    schemaVersion: _version,
+    decisionSummary: _summary,
+    ...base
+  } = validTurn();
+  const compact = {
+    ...base,
+    turnKind: "field_answer",
+    reply: "Which date did you mean?",
+    grounding: { status: "not_needed", excerptIds: [] },
+    nextAction: "clarify",
+    ambiguity: {
+      requiresClarification: true,
+      question: "Which date did you mean?",
+      fieldKeys: ["preferredDate"],
+    },
+    fieldCandidates: [
+      { fieldKey: "patientName", naturalValue: "Alex Test", confidence: 1 },
+    ],
+  };
+  const expanded = turnResultV1Schema.parse(
+    expandCompactTaskTurn(compact, "extraction"),
+  );
+  expect(expanded.fieldCandidates[0].source).toBe("visitor");
+  expect(expanded.ambiguity).toEqual(compact.ambiguity);
+  expect(
+    compactTaskExtractionProviderSchema.safeParse({
+      ...compact,
+      fieldCandidates: [{ ...compact.fieldCandidates[0], source: "tool" }],
+    }).success,
+  ).toBe(false);
+  const schema = asSchema(compactTaskExtractionProviderSchema).jsonSchema;
+  expect(JSON.stringify(schema)).not.toContain('"decisionSummary"');
+});
 
 function validationContext(): StructuredTurnValidationContext {
   return {

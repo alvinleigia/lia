@@ -140,6 +140,57 @@ export const taskKnowledgeTurnProviderSchema =
     nextAction: z.enum(["ask", "clarify", "handoff", "fail"]),
   });
 
+// Constants and audit wording are supplied by the server, not generated tokens.
+// Keep the full turn contract at the validation/runtime boundary.
+export const compactTaskExtractionProviderSchema = turnResultV1ProviderSchema
+  .omit({ schemaVersion: true, decisionSummary: true })
+  .extend({
+    fieldCandidates: z
+      .array(turnFieldCandidateProposalV1Schema.omit({ source: true }))
+      .max(50),
+  });
+
+export const compactTaskKnowledgeProviderSchema =
+  taskKnowledgeTurnProviderSchema.omit({
+    schemaVersion: true,
+    decisionSummary: true,
+    fieldCandidates: true,
+    taskRecommendation: true,
+    toolRequest: true,
+    routeRecommendation: true,
+    outcomeRecommendation: true,
+  });
+
+export function expandCompactTaskTurn(
+  output: unknown,
+  stage: "extraction" | "knowledge",
+) {
+  const constants = {
+    schemaVersion: STRUCTURED_TURN_SCHEMA_VERSION,
+    decisionSummary: `${stage} proposal; see structured fields.`,
+  };
+  if (stage === "knowledge") {
+    return {
+      ...compactTaskKnowledgeProviderSchema.parse(output),
+      ...constants,
+      fieldCandidates: [],
+      taskRecommendation: null,
+      toolRequest: null,
+      routeRecommendation: null,
+      outcomeRecommendation: null,
+    };
+  }
+  const proposal = compactTaskExtractionProviderSchema.parse(output);
+  return {
+    ...proposal,
+    ...constants,
+    fieldCandidates: proposal.fieldCandidates.map((candidate) => ({
+      ...candidate,
+      source: "visitor" as const,
+    })),
+  };
+}
+
 export const turnResultV1Schema = turnResultV1BaseSchema.superRefine(
   (result, context) => {
     if (
