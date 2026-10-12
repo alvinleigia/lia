@@ -156,7 +156,7 @@ for (const [domain, question, evidence, expected] of [
           return [
             {
               id: "document:1",
-              content: `Saved ${domain} rate snapshot: total INR 1,250 including tax. This is a saved comparison, not a verified current payable quote. Current availability and payable amount require provider confirmation.`,
+              content: `Saved ${domain} rate snapshot: base price INR 1,000; separate tax INR 250; combined comparison total INR 1,250. This is a saved comparison, not a verified current payable quote. Current availability and payable amount require provider confirmation.`,
             },
           ];
         },
