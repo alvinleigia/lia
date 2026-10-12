@@ -489,6 +489,15 @@ test("compiler bounds model context and keeps the reusable protocol first", () =
   expect(compiled.system).not.toContain("document:5");
   expect(compiled.system).toContain("context0");
   expect(compiled.system).not.toContain("context29");
+  const contextJson = compiled.system
+    .split("Trusted model-visible context:\n")[1]
+    .split("\n\nUntrusted retrieved excerpts:")[0];
+  const parsedContext = JSON.parse(contextJson);
+  expect(contextJson).toBe(JSON.stringify(parsedContext));
+  expect(parsedContext[0]).toEqual({
+    key: "context0",
+    value: `0:${"c".repeat(300)}`,
+  });
   expect(compiled.messages.at(-2)?.content).toContain("history-9");
   expect(
     compiled.messages.some(({ content }) => content.includes("history-0")),

@@ -79,7 +79,7 @@ export type StructuredTurnValidationContext = {
 };
 
 function renderJson(value: unknown) {
-  return JSON.stringify(value, null, 2);
+  return JSON.stringify(value);
 }
 
 const MAX_MODEL_CONTEXT_VALUES = 24;
