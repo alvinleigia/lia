@@ -329,8 +329,19 @@ function validateDateRange(
     start = record.start;
     end = record.end;
   } else if (typeof value === "string") {
-    const values = value.split(/\s+(?:to|through)\s+/i);
-    if (values.length === 2) [start, end] = values;
+    // Extraction may preserve explicit endpoint labels from the visitor.
+    // Split them locally; each endpoint still goes through date validation.
+    const labelled = value
+      .trim()
+      .match(
+        /^(?:check[ -]?in|arrival|start)(?: date)?\s*:?\s*(.+?)\s*(?:,\s*|\s+(?:and|to)\s+|\s+)(?:check[ -]?out|departure|end)(?: date)?\s*:?\s*(.+?)\.?$/i,
+      );
+    if (labelled) {
+      [, start, end] = labelled;
+    } else {
+      const values = value.split(/\s+(?:to|through)\s+/i);
+      if (values.length === 2) [start, end] = values;
+    }
   }
   const normalizedStart = validateDate(start, context);
   const normalizedEnd = validateDate(end, context);

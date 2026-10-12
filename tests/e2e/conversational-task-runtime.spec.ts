@@ -32,6 +32,29 @@ import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 const NOW = new Date("2026-07-25T10:00:00.000Z");
 const EXPIRES_AT = new Date("2027-07-25T10:00:00.000Z");
 
+test("shared date ranges accept labelled endpoints without guessing dates", () => {
+  for (const value of [
+    "Check-in 26 October 2026 and checkout 28 October 2026",
+    "Arrival: 2026-10-26, departure: 2026-10-28",
+    "Start date 26 October 2026 to end date 28 October 2026.",
+    "2026-10-26 to 2026-10-28",
+  ]) {
+    expect(
+      validateTaskFieldValue({ field: fieldFor("date_range"), value }),
+    ).toEqual({ ok: true, value: { start: "2026-10-26", end: "2026-10-28" } });
+  }
+  for (const value of [
+    "Check-in 10/11/2026 and checkout 12/11/2026",
+    "Check-in 28 October 2026 and checkout 26 October 2026",
+    "Check-in 26 October 2026",
+    "Check-in 31 November 2026 and checkout 2 December 2026",
+  ]) {
+    expect(
+      validateTaskFieldValue({ field: fieldFor("date_range"), value }).ok,
+    ).toBe(false);
+  }
+});
+
 test("shared time fields accept explicit hour-only AM/PM without guessing ambiguous hours", () => {
   for (const [value, expected] of [
     ["9 am", "09:00"],
