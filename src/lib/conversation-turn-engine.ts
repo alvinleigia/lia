@@ -8,6 +8,8 @@ import {
   isExplicitHumanHandoffRequest,
   isPotentialKnowledgeSideQuestion,
   isSimpleTaskTextAnswer,
+  isStandaloneKnowledgeQuestion,
+  stripKnowledgeDiscoursePrefix,
 } from "@/lib/conversation-control-intents";
 import { extractLocalTaskFieldCandidates } from "@/lib/conversation-field-extraction";
 import {
@@ -44,6 +46,8 @@ import {
   PLATFORM_EXTRACTION_FALLBACK_MODEL_ID,
   PLATFORM_EXTRACTION_MODEL_ID,
   PLATFORM_FALLBACK_MODEL_ID,
+  PLATFORM_KNOWLEDGE_FALLBACK_MODEL_ID,
+  PLATFORM_KNOWLEDGE_MODEL_ID,
   StructuredTurnOutputLimitError,
   type StructuredTurnProvider,
   type StructuredTurnProviderResult,
@@ -151,7 +155,10 @@ function buildKnowledgeRetrievalQuery(input: {
   history: TurnMessageV1[];
   visitorMessage: string;
 }) {
-  const visitorMessage = input.visitorMessage.trim();
+  // Discourse markers introduce a new question; their "that"/"this" does not
+  // refer to the previous question's subject. Preserve references in the actual
+  // question (e.g. "Before that, is that plan refundable?").
+  const visitorMessage = stripKnowledgeDiscoursePrefix(input.visitorMessage);
   if (!CONTEXTUAL_KNOWLEDGE_REFERENCE_PATTERN.test(visitorMessage)) {
     return visitorMessage;
   }
@@ -260,6 +267,12 @@ function resolveModelIds(
       return {
         primary: PLATFORM_EXTRACTION_MODEL_ID,
         fallback: PLATFORM_EXTRACTION_FALLBACK_MODEL_ID,
+      };
+    }
+    if (stage === "knowledge") {
+      return {
+        primary: PLATFORM_KNOWLEDGE_MODEL_ID,
+        fallback: PLATFORM_KNOWLEDGE_FALLBACK_MODEL_ID,
       };
     }
     return {
@@ -844,6 +857,28 @@ export class StructuredTurnEngine {
             }),
           ),
         },
+        source: "deterministic",
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      };
+    }
+
+    if (
+      input.activeTask &&
+      input.stage === "extraction" &&
+      isStandaloneKnowledgeQuestion(input.visitorMessage)
+    ) {
+      return {
+        attempts: 0,
+        modelEscalationReason: null,
+        proposal: asValidatedDeterministic(
+          deterministicProposal({
+            nextAction: "ask",
+            reasonCode: "standalone_knowledge_question",
+            reply: "Let me check that information.",
+            groundingStatus: "not_needed",
+            turnKind: "side_question",
+          }),
+        ),
         source: "deterministic",
         usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };

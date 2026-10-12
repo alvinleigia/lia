@@ -3,6 +3,7 @@ import {
   isExplicitCancellationRequest,
   isExplicitConfirmationRequest,
   isPotentialKnowledgeSideQuestion,
+  isStandaloneKnowledgeQuestion,
   shouldUseKnowledgeSideQuestion,
 } from "../../src/lib/conversation-control-intents";
 
@@ -48,6 +49,23 @@ test.describe("explicit conversation cancellation", () => {
 });
 
 test.describe("deterministic flow side questions", () => {
+  test("standalone FAQ fast path excludes mixed details and control requests", () => {
+    for (const question of [
+      "Before that, do you have a swimming pool?",
+      "Do you offer bike pickup?",
+      "Is there parking near the clinic?",
+    ])
+      expect(isStandaloneKnowledgeQuestion(question)).toBe(true);
+    for (const question of [
+      "Do you have a swimming pool? My name is Alex.",
+      "Do you offer pickup and change my date to tomorrow?",
+      "Do you have a slot at 3:30 pm?",
+      "Is there parking? Also two adults.",
+      "Do you have my booking reference?",
+      "Do you have rooms; please cancel the booking",
+    ])
+      expect(isStandaloneKnowledgeQuestion(question)).toBe(false);
+  });
   test("recognizes bounded question-shaped turns", () => {
     expect(isPotentialKnowledgeSideQuestion("When is check-in?")).toBe(true);
     expect(

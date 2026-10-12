@@ -75,6 +75,32 @@ export function isPotentialKnowledgeSideQuestion(value: string) {
   );
 }
 
+export function stripKnowledgeDiscoursePrefix(value: string) {
+  return value
+    .trim()
+    .replace(
+      /^(?:(?:before|after)\s+(?:that|this)|by the way)\s*[,;:]\s*/i,
+      "",
+    );
+}
+
+// Only standalone informational questions qualify. Compound replies, personal
+// details and corrections must still go through field extraction.
+export function isStandaloneKnowledgeQuestion(value: string) {
+  const question = stripKnowledgeDiscoursePrefix(value)
+    .replace(/\?$/, "")
+    .trim();
+  return (
+    /^(?:do you (?:have|offer|provide|allow)|(?:is|are) there)\s+/i.test(
+      question,
+    ) &&
+    !/[\d,;:.!?\n]/.test(question) &&
+    !/\b(?:i|me|my|we|our|and|also|but|instead|change|correct|update|book|cancel|reschedule|confirm|submit)\b/i.test(
+      question,
+    )
+  );
+}
+
 export function shouldUseKnowledgeSideQuestion(input: {
   answerIsValid: boolean;
   groundingStatus: "grounded" | "not_needed" | "no_answer";

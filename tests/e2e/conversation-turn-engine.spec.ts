@@ -174,8 +174,8 @@ test("truncated structured output uses the fallback without repeating the same t
     visitorMessage: "When is the pool open?",
   });
   expect(provider.calls.map((c) => c.modelId)).toEqual([
-    "gpt-5-mini",
     "gpt-4.1-mini",
+    "gpt-5-mini",
   ]);
   expect(provider.calls[1].maxOutputTokens).toBe(
     provider.calls[0].maxOutputTokens,
@@ -425,6 +425,24 @@ test("task field extraction skips knowledge retrieval", async () => {
   expect(retriever.calls).toBe(0);
 });
 
+test("standalone task FAQs skip extraction but still require grounded knowledge", async () => {
+  const provider = new QueueProvider([]);
+  const retriever = new FixtureRetriever();
+  const result = await new StructuredTurnEngine({
+    provider,
+    retriever,
+  }).execute({
+    ...engineInput(),
+    visitorMessage: "Before that, do you have a swimming pool?",
+  });
+  expect(result.attempts).toBe(0);
+  expect(result.proposal.turnKind).toBe("side_question");
+  expect(result.proposal.fieldCandidates).toEqual([]);
+  expect(result.proposal.toolRequest).toBeNull();
+  expect(provider.calls).toHaveLength(0);
+  expect(retriever.calls).toBe(0);
+});
+
 test("a side question during a task uses grounded knowledge retrieval", async () => {
   const provider = new QueueProvider([
     baseTurn({
@@ -518,6 +536,48 @@ test("referential knowledge questions use bounded recent visitor context for ret
       "What is its general contact number?",
       "What email address is listed?",
     ].join("\n"),
+  );
+});
+
+for (const question of [
+  "Before that, do you have a swimming pool?",
+  "After this, where can I park?",
+  "By the way, do you offer bike pickup?",
+]) {
+  test(`new topic avoids unrelated retrieval history: ${question}`, async () => {
+    const provider = new QueueProvider([
+      baseTurn({ fieldCandidates: [], turnKind: "side_question" }),
+    ]);
+    const retriever = new FixtureRetriever();
+    await new StructuredTurnEngine({ provider, retriever }).execute({
+      ...engineInput(),
+      stage: "knowledge",
+      visitorMessage: question,
+      history: [
+        {
+          role: "user",
+          content: "What is the total price for two Premium bedrooms?",
+        },
+      ],
+    });
+    expect(retriever.lastInput?.query).toBe(question.split(", ")[1]);
+    expect(provider.calls[0]?.modelId).toBe("gpt-4.1-mini");
+  });
+}
+
+test("a reference inside a new question still retains retrieval context", async () => {
+  const provider = new QueueProvider([
+    baseTurn({ fieldCandidates: [], turnKind: "side_question" }),
+  ]);
+  const retriever = new FixtureRetriever();
+  await new StructuredTurnEngine({ provider, retriever }).execute({
+    ...engineInput(),
+    stage: "knowledge",
+    visitorMessage: "Before that, is that plan refundable?",
+    history: [{ role: "user", content: "What is the Extended Stay plan?" }],
+  });
+  expect(retriever.lastInput?.query).toBe(
+    "What is the Extended Stay plan?\nis that plan refundable?",
   );
 });
 

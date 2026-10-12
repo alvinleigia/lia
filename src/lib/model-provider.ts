@@ -15,6 +15,8 @@ export const PLATFORM_DEFAULT_MODEL_ID = "gpt-5-mini";
 export const PLATFORM_FALLBACK_MODEL_ID = "gpt-4.1-mini";
 export const PLATFORM_EXTRACTION_MODEL_ID = "gpt-4.1-mini";
 export const PLATFORM_EXTRACTION_FALLBACK_MODEL_ID = "gpt-5-mini";
+export const PLATFORM_KNOWLEDGE_MODEL_ID = "gpt-4.1-mini";
+export const PLATFORM_KNOWLEDGE_FALLBACK_MODEL_ID = "gpt-5-mini";
 export const PLATFORM_EMBEDDING_MODEL_ID = "text-embedding-3-small";
 
 export function getPlatformLanguageModel(
