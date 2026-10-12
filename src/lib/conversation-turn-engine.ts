@@ -76,6 +76,7 @@ export interface TurnKnowledgeRetriever {
 }
 
 export type ExecuteStructuredTurnInput = {
+  prefetchKnowledge?: boolean;
   recordTiming?: RuntimeTimingRecorder;
   collection?: FieldCollectionContext;
   activeTask: ConversationalTaskSnapshotV1 | null;
@@ -974,6 +975,29 @@ export class StructuredTurnEngine {
     }
 
     const compiled = compileStructuredTurn({ ...input, retrieval });
+    // Retrieval depends on the visitor/history, not on model-extracted fields.
+    // Start it alongside extraction; answer generation still waits for validated
+    // runtime state and its own budget/grounding checks.
+    const prefetched =
+      input.prefetchKnowledge &&
+      input.stage === "extraction" &&
+      input.activeTask &&
+      retriever &&
+      isPotentialKnowledgeSideQuestion(input.visitorMessage) &&
+      input.projectPolicy.knowledge.sourceSelection.allowedSources.includes(
+        "project_documents",
+      )
+        ? measureRuntimeStage("knowledge_prefetch", input.recordTiming, () =>
+            retriever.retrieve({
+              projectId: input.projectId,
+              limit: Math.min(
+                input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
+                MAX_MODEL_RETRIEVAL_EXCERPTS,
+              ),
+              query: buildKnowledgeRetrievalQuery(input),
+            }),
+          ).catch(() => undefined)
+        : null;
     const modelPolicy = input.projectPolicy.assistant.modelPolicy;
     const models = [...new Set([modelIds.primary, modelIds.fallback])].filter(
       (modelId): modelId is string => Boolean(modelId),
@@ -1047,6 +1071,7 @@ export class StructuredTurnEngine {
             ]);
           }
 
+          await prefetched;
           return {
             attempts,
             modelEscalationReason,
@@ -1075,6 +1100,7 @@ export class StructuredTurnEngine {
       }
     }
 
+    await prefetched;
     const fallback =
       directFieldProposal(input, "model_unavailable") ??
       modelFailureProposal(input);

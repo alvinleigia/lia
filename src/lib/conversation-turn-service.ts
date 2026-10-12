@@ -10,6 +10,7 @@ import {
   type ExecuteStructuredTurnInput,
   StructuredTurnEngine,
   type StructuredTurnExecution,
+  type TurnKnowledgeRetriever,
 } from "@/lib/conversation-turn-engine";
 import {
   initializeTurnFieldState,
@@ -44,10 +45,11 @@ type ExecuteProjectStructuredTurnInput = StructuredTurnRequestV1 & {
 
 export async function executeConfiguredStructuredTurn(
   input: ExecuteStructuredTurnInput,
+  retriever: TurnKnowledgeRetriever = new ProjectDocumentTurnRetriever(),
 ) {
   const engine = new StructuredTurnEngine({
     budgetGate: projectTurnBudgetGate,
-    retriever: new ProjectDocumentTurnRetriever(),
+    retriever,
   });
 
   return measureRuntimeStage(`turn_${input.stage}`, input.recordTiming, () =>

@@ -11,6 +11,7 @@ import {
   StructuredTurnEngine,
   type TurnKnowledgeRetriever,
 } from "../../src/lib/conversation-turn-engine";
+import { RequestTurnKnowledgeRetriever } from "../../src/lib/conversation-turn-retrieval";
 import { buildSafeTurnDecisionSummary } from "../../src/lib/conversation-turn-safety";
 import {
   StructuredTurnOutputLimitError,
@@ -423,6 +424,115 @@ test("task field extraction skips knowledge retrieval", async () => {
   expect(result.modelEscalationReason).toBe("semantic_extraction");
   expect(provider.calls).toHaveLength(1);
   expect(retriever.calls).toBe(0);
+});
+
+test("knowledge prefetch overlaps extraction and reuses only request-scoped evidence", async () => {
+  let retrievalStarted = false;
+  let sourceCalls = 0;
+  let release: (value: { id: string; content: string }[]) => void = () => {};
+  const pending = new Promise<{ id: string; content: string }[]>((resolve) => {
+    release = resolve;
+  });
+  const retriever = new RequestTurnKnowledgeRetriever({
+    async retrieve() {
+      retrievalStarted = true;
+      sourceCalls++;
+      return pending;
+    },
+  });
+  const calls: StructuredTurnProviderInput[] = [];
+  const engine = new StructuredTurnEngine({
+    retriever,
+    provider: {
+      async generateTurn(input) {
+        calls.push(input);
+        expect(retrievalStarted).toBe(true);
+        release([{ id: "document:12", content: "The spa opens at 9 am." }]);
+        return {
+          modelId: input.modelId,
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+          output: input.taskKnowledgeOnly
+            ? baseTurn({
+                turnKind: "side_question",
+                fieldCandidates: [],
+                grounding: { status: "grounded", excerptIds: ["document:12"] },
+                reply: "The spa opens at 9 am.",
+              })
+            : baseTurn(),
+        };
+      },
+    },
+  });
+  const input = {
+    ...engineInput(),
+    visitorMessage: "I would like a facial. When do you open?",
+    prefetchKnowledge: true,
+  };
+  const extracted = await engine.execute(input);
+  expect(extracted.proposal.fieldCandidates).toHaveLength(1);
+  const answer = await engine.execute({ ...input, stage: "knowledge" });
+  expect(answer.proposal.grounding.status).toBe("grounded");
+  expect(sourceCalls).toBe(1);
+  expect(calls).toHaveLength(2);
+  expect(calls[0].system).not.toContain("The spa opens at 9 am.");
+  expect(calls[1].system).toContain("The spa opens at 9 am.");
+});
+
+test("request retrieval separates project, query, limit and inbound-message instances", async () => {
+  let calls = 0;
+  const source = {
+    async retrieve() {
+      calls++;
+      return [];
+    },
+  };
+  const retriever = new RequestTurnKnowledgeRetriever(source);
+  const input = { projectId: 17, query: "pool", limit: 8 };
+  await Promise.all([retriever.retrieve(input), retriever.retrieve(input)]);
+  expect(calls).toBe(1);
+  await retriever.retrieve({ ...input, projectId: 18 });
+  await retriever.retrieve({ ...input, query: "parking" });
+  await retriever.retrieve({ ...input, limit: 4 });
+  await new RequestTurnKnowledgeRetriever(source).retrieve(input);
+  expect(calls).toBe(5);
+});
+
+test("failed or disallowed prefetch cannot stop field collection or bypass source policy", async () => {
+  const provider = new QueueProvider([baseTurn(), baseTurn()]);
+  let calls = 0;
+  const retriever = new RequestTurnKnowledgeRetriever({
+    async retrieve() {
+      calls++;
+      throw new Error("offline");
+    },
+  });
+  const engine = new StructuredTurnEngine({ provider, retriever });
+  const input = {
+    ...engineInput(),
+    prefetchKnowledge: true,
+    visitorMessage: "I would like a facial. When do you open?",
+  };
+  expect((await engine.execute(input)).proposal.fieldCandidates).toHaveLength(
+    1,
+  );
+  const answer = await engine.execute({ ...input, stage: "knowledge" });
+  expect(answer.proposal.grounding.status).toBe("no_answer");
+  expect(provider.calls).toHaveLength(1);
+  expect(calls).toBe(1);
+  await engine.execute({
+    ...input,
+    projectPolicy: {
+      ...input.projectPolicy,
+      knowledge: {
+        ...input.projectPolicy.knowledge,
+        sourceSelection: {
+          ...input.projectPolicy.knowledge.sourceSelection,
+          allowedSources: [],
+        },
+      },
+    },
+  });
+  expect(calls).toBe(1);
 });
 
 test("standalone task FAQs skip extraction but still require grounded knowledge", async () => {

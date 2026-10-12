@@ -37,6 +37,7 @@ import type {
   TurnMessageV1,
   TurnResultV1,
 } from "@/lib/conversation-turn-contracts";
+import { RequestTurnKnowledgeRetriever } from "@/lib/conversation-turn-retrieval";
 import { executeConfiguredStructuredTurn } from "@/lib/conversation-turn-service";
 import {
   getBoundAvailabilityDefinition,
@@ -1474,6 +1475,7 @@ async function executeTaskBoundary(input: {
         fieldCandidates: localCandidates,
       }
     : null;
+  const turnRetriever = new RequestTurnKnowledgeRetriever();
   const extractedProposal = appointmentSelected
     ? operationTurn({
         nextAction: "ask",
@@ -1484,31 +1486,38 @@ async function executeTaskBoundary(input: {
       : (localProposal ??
         bindRequestedTaskSelection({
           proposal: (
-            await executeConfiguredStructuredTurn({
-              recordTiming: input.runtimeInput.recordTiming,
-              activeTask: session.snapshot,
-              assistantBehavior: normalizeProjectAiSettings(
-                session.snapshot.assistantBehavior,
-              ),
-              assistantIntroduced: input.history.some(
-                (message) => message.role === "assistant",
-              ),
-              channel: input.runtimeInput.channelType,
-              companyName: input.project.companyName,
-              context: toRuntimeContext(session.runtime),
-              fieldState: toRuntimeFieldState({
-                runtime: session.runtime,
-                snapshot: session.snapshot,
-              }),
-              history: input.history,
-              projectId: input.runtimeInput.projectId,
-              projectName: input.project.projectName,
-              projectPolicy: session.snapshot.conversationPolicy,
-              publishedTasks: [],
-              requestedFieldKey: requestedField?.key ?? null,
-              stage: "extraction",
-              visitorMessage: requestedAnswer,
-            })
+            await executeConfiguredStructuredTurn(
+              {
+                prefetchKnowledge:
+                  !calendar &&
+                  !pendingAppointment &&
+                  !isExplicitConfirmationRequest(requestedAnswer),
+                recordTiming: input.runtimeInput.recordTiming,
+                activeTask: session.snapshot,
+                assistantBehavior: normalizeProjectAiSettings(
+                  session.snapshot.assistantBehavior,
+                ),
+                assistantIntroduced: input.history.some(
+                  (message) => message.role === "assistant",
+                ),
+                channel: input.runtimeInput.channelType,
+                companyName: input.project.companyName,
+                context: toRuntimeContext(session.runtime),
+                fieldState: toRuntimeFieldState({
+                  runtime: session.runtime,
+                  snapshot: session.snapshot,
+                }),
+                history: input.history,
+                projectId: input.runtimeInput.projectId,
+                projectName: input.project.projectName,
+                projectPolicy: session.snapshot.conversationPolicy,
+                publishedTasks: [],
+                requestedFieldKey: requestedField?.key ?? null,
+                stage: "extraction",
+                visitorMessage: requestedAnswer,
+              },
+              turnRetriever,
+            )
           ).proposal,
           requestedFieldKey: selectionValue
             ? (requestedField?.key ?? null)
@@ -1636,30 +1645,33 @@ async function executeTaskBoundary(input: {
     let knowledgeProposal: TurnResultV1;
     let resumedRevision: number | null = null;
     try {
-      const knowledgeExecution = await executeConfiguredStructuredTurn({
-        recordTiming: input.runtimeInput.recordTiming,
-        activeTask: updatedSession.snapshot,
-        assistantBehavior: normalizeProjectAiSettings(
-          updatedSession.snapshot.assistantBehavior,
-        ),
-        assistantIntroduced: input.history.some(
-          (message) => message.role === "assistant",
-        ),
-        channel: input.runtimeInput.channelType,
-        companyName: input.project.companyName,
-        context: toRuntimeContext(updatedSession.runtime),
-        fieldState: toRuntimeFieldState({
-          runtime: updatedSession.runtime,
-          snapshot: updatedSession.snapshot,
-        }),
-        history: input.history,
-        projectId: input.runtimeInput.projectId,
-        projectName: input.project.projectName,
-        projectPolicy: updatedSession.snapshot.conversationPolicy,
-        publishedTasks: [],
-        stage: "knowledge",
-        visitorMessage: input.runtimeInput.text,
-      });
+      const knowledgeExecution = await executeConfiguredStructuredTurn(
+        {
+          recordTiming: input.runtimeInput.recordTiming,
+          activeTask: updatedSession.snapshot,
+          assistantBehavior: normalizeProjectAiSettings(
+            updatedSession.snapshot.assistantBehavior,
+          ),
+          assistantIntroduced: input.history.some(
+            (message) => message.role === "assistant",
+          ),
+          channel: input.runtimeInput.channelType,
+          companyName: input.project.companyName,
+          context: toRuntimeContext(updatedSession.runtime),
+          fieldState: toRuntimeFieldState({
+            runtime: updatedSession.runtime,
+            snapshot: updatedSession.snapshot,
+          }),
+          history: input.history,
+          projectId: input.runtimeInput.projectId,
+          projectName: input.project.projectName,
+          projectPolicy: updatedSession.snapshot.conversationPolicy,
+          publishedTasks: [],
+          stage: "knowledge",
+          visitorMessage: input.runtimeInput.text,
+        },
+        turnRetriever,
+      );
       knowledgeProposal = knowledgeExecution.proposal;
     } finally {
       const resolvedAt = new Date().toISOString();
