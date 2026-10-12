@@ -330,10 +330,22 @@ for (const [domain, fieldKey, label, question, answer] of [
             .split("Trusted model-visible context:")[0],
         ).toContain(date);
       }
+      const beforeInterruption = await getConversationTaskRuntimeSession(scope);
       const interrupted = await send(question);
       expect(interrupted.replies.map((r) => r.text).join("\n")).toContain(
         answer,
       );
+      const afterInterruption = await getConversationTaskRuntimeSession(scope);
+      expect(
+        afterInterruption.runtime?.audit.filter(
+          (event) => event.eventType === "field.requested",
+        ).length,
+      ).toBe(
+        beforeInterruption.runtime?.audit.filter(
+          (event) => event.eventType === "field.requested",
+        ).length,
+      );
+      expect(afterInterruption.execution?.responseOwner).toBe("task");
       expect(
         (await getConversationTaskRuntimeSession(scope)).runtime?.fields.find(
           (f) => f.fieldKey === fieldKey,

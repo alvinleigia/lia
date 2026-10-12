@@ -77,7 +77,10 @@ import {
   getConversationalTaskRuntime,
   startConversationalTaskRun,
 } from "@/lib/conversational-task-runtime";
-import { getConversationTaskRuntimeSession } from "@/lib/conversational-task-runtime-session";
+import {
+  type ConversationTaskRuntimeSession,
+  getConversationTaskRuntimeSession,
+} from "@/lib/conversational-task-runtime-session";
 import { db } from "@/lib/db-config";
 import {
   conversationalTaskVersions,
@@ -1076,17 +1079,20 @@ async function ensureDirectTaskEntry(input: {
   node: Extract<HybridFlowNodeV1, { kind: "conversational_task" }>;
   project: ProjectTurnContext;
   runtimeInput: HybridChannelRuntimeInput;
+  session?: ConversationTaskRuntimeSession;
 }) {
-  const existing = await measureRuntimeStage(
-    "task_session_lookup",
-    input.runtimeInput.recordTiming,
-    () =>
-      getConversationTaskRuntimeSession({
-        channelType: input.runtimeInput.channelType,
-        externalConversationId: input.runtimeInput.externalConversationId,
-        projectId: input.runtimeInput.projectId,
-      }),
-  );
+  const existing =
+    input.session ??
+    (await measureRuntimeStage(
+      "task_session_lookup",
+      input.runtimeInput.recordTiming,
+      () =>
+        getConversationTaskRuntimeSession({
+          channelType: input.runtimeInput.channelType,
+          externalConversationId: input.runtimeInput.externalConversationId,
+          projectId: input.runtimeInput.projectId,
+        }),
+    ));
   if (existing.execution?.activeTaskRunId) {
     return existing;
   }
@@ -1139,11 +1145,13 @@ async function executeTaskBoundary(input: {
   node: Extract<HybridFlowNodeV1, { kind: "conversational_task" }>;
   project: ProjectTurnContext;
   runtimeInput: HybridChannelRuntimeInput;
+  session?: ConversationTaskRuntimeSession;
 }): Promise<HybridBoundaryExecution<TurnResultV1>> {
   let session = await ensureDirectTaskEntry({
     node: input.node,
     project: input.project,
     runtimeInput: input.runtimeInput,
+    session: input.session,
   });
   if (
     !session.execution?.activeTaskRunId ||
@@ -1594,9 +1602,9 @@ async function executeTaskBoundary(input: {
   ) {
     // Mixed turns must answer against the newly validated fields, not the
     // session loaded before applying the visitor's corrections.
-    const updatedSession = await getConversationTaskRuntimeSession(
-      input.runtimeInput,
-    );
+    const updatedSession = proposal.fieldCandidates.length
+      ? await getConversationTaskRuntimeSession(input.runtimeInput)
+      : session;
     if (!updatedSession.runtime || !updatedSession.snapshot) {
       return { output: proposal, signals: [] };
     }
@@ -1745,13 +1753,19 @@ async function executeTaskBoundary(input: {
           signals: [],
         };
     }
-    await recordTaskFieldRequest({
-      conversationId: resumedSession.runtime.run.conversationId,
-      inputRequest,
-      revision: resumedSession.execution.revision,
-      runtimeInput: input.runtimeInput,
-      taskRunId: resumedSession.runtime.run.id,
-    });
+    // A pure FAQ resumes the same persisted question. Recording it again adds
+    // a transaction without changing the field or the conversation position.
+    if (
+      inputRequest?.fieldKey !==
+      resumedSession.runtime.run.lastRequestedFieldKey
+    )
+      await recordTaskFieldRequest({
+        conversationId: resumedSession.runtime.run.conversationId,
+        inputRequest,
+        revision: resumedSession.execution.revision,
+        runtimeInput: input.runtimeInput,
+        taskRunId: resumedSession.runtime.run.id,
+      });
 
     return {
       inputRequest,
@@ -2347,6 +2361,7 @@ async function runHybridChannelBoundaryInternal(
       node: sourceNode,
       project,
       runtimeInput: input,
+      session,
     });
     if (
       !taskSession.execution?.activeTaskRunId ||
@@ -2420,6 +2435,7 @@ async function runHybridChannelBoundaryInternal(
             node,
             project,
             runtimeInput: input,
+            session,
           }).catch(async (error) =>
             recoverCalendarSlot({
               error,
@@ -2473,6 +2489,7 @@ async function runHybridChannelBoundaryInternal(
         node: dispatch.targetNode,
         project,
         runtimeInput: { ...input, consumeTriggerMessage: false },
+        session: taskSession,
       });
       replyProposal = entered.output;
       inputRequest = entered.inputRequest ?? null;
