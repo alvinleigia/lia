@@ -7,6 +7,7 @@ import {
   formatApprovedKnowledgeAnswers,
   normalizeProjectAiSettings,
   parseApprovedKnowledgeAnswersText,
+  resolveApprovedKnowledgeAnswer,
 } from "../../src/lib/project-ai-settings";
 
 test("approved knowledge answers parse and format without losing no-answer entries", () => {
@@ -55,6 +56,36 @@ test("stored approved knowledge answers are normalized safely", () => {
     { question: "What time is check-in?", answer: "15:00" },
     { question: "Is late checkout guaranteed?", answer: null },
   ]);
+});
+
+test("approved FAQs accept discourse prefixes but retain qualifiers and extra requests", () => {
+  const settings = {
+    approvedKnowledgeAnswers: [
+      {
+        question: "Do you have a swimming pool?",
+        answer: "A pool is listed; hours are unconfirmed.",
+      },
+    ],
+  };
+  for (const question of [
+    "Before that, do you have a swimming pool?",
+    "By the way: DO YOU HAVE A SWIMMING POOL?",
+    "After this; do you have a swimming pool?",
+  ]) {
+    expect(resolveApprovedKnowledgeAnswer(settings, question)?.reply).toBe(
+      "A pool is listed; hours are unconfirmed.",
+    );
+    expect(resolveApprovedKnowledgeAnswer(null, question)).toBeNull();
+  }
+  for (const question of [
+    "Before that, do you have a swimming pool open tonight?",
+    "Before that, do you not have a swimming pool?",
+    "My name is Alex. Do you have a swimming pool?",
+    "Before that, do you have a swimming pool? And parking?",
+    "Before that, do you have a swimming pool for children?",
+  ]) {
+    expect(resolveApprovedKnowledgeAnswer(settings, question)).toBeNull();
+  }
 });
 
 test("deterministic chat responses use the latest visitor text and UI stream", async () => {

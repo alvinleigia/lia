@@ -1,3 +1,5 @@
+import { stripKnowledgeDiscoursePrefix } from "@/lib/conversation-control-intents";
+
 export const AI_ASSISTANT_ROLES = [
   "general",
   "sales",
@@ -276,10 +278,21 @@ export function resolveApprovedKnowledgeAnswer(
   const normalizedQuestion = normalizeKnowledgeQuestion(question);
   if (!normalizedQuestion) return null;
 
-  const matchIndex = settings.approvedKnowledgeAnswers.findIndex(
+  let matchIndex = settings.approvedKnowledgeAnswers.findIndex(
     (candidate) =>
       normalizeKnowledgeQuestion(candidate.question) === normalizedQuestion,
   );
+  // Ignore only the shared, meaning-neutral conversational prefix. Keep every
+  // word of the question: qualifiers, negation and extra requests must not match.
+  if (matchIndex < 0) {
+    const standaloneQuestion = normalizeKnowledgeQuestion(
+      stripKnowledgeDiscoursePrefix(question),
+    );
+    matchIndex = settings.approvedKnowledgeAnswers.findIndex(
+      (candidate) =>
+        normalizeKnowledgeQuestion(candidate.question) === standaloneQuestion,
+    );
+  }
   if (matchIndex < 0) return null;
 
   const match = settings.approvedKnowledgeAnswers[matchIndex];

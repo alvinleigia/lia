@@ -871,7 +871,11 @@ export class StructuredTurnEngine {
     if (
       input.activeTask &&
       input.stage === "extraction" &&
-      isStandaloneKnowledgeQuestion(input.visitorMessage)
+      (isStandaloneKnowledgeQuestion(input.visitorMessage) ||
+        resolveApprovedKnowledgeAnswer(
+          input.assistantBehavior,
+          input.visitorMessage,
+        ) !== null)
     ) {
       return {
         attempts: 0,

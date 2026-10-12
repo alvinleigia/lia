@@ -762,6 +762,41 @@ test("an approved exact answer bypasses retrieval and model use", async () => {
   expect(retriever.calls).toBe(0);
 });
 
+test("approved FAQ interruptions bypass both model stages without collecting the question as a field", async () => {
+  for (const [question, answer] of [
+    ["What time is check-in?", "Check-in begins at 15:00."],
+    [
+      "Do you offer bike pickup?",
+      "Pickup is available within five kilometres.",
+    ],
+    [
+      "Where can I park?",
+      "Parking is behind the clinic, subject to availability.",
+    ],
+  ]) {
+    const provider = new QueueProvider([]);
+    const retriever = new FixtureRetriever();
+    const engine = new StructuredTurnEngine({ provider, retriever });
+    const input = {
+      ...engineInput(),
+      assistantBehavior: {
+        ...DEFAULT_PROJECT_AI_SETTINGS,
+        approvedKnowledgeAnswers: [{ question, answer }],
+      },
+      visitorMessage: `Before that, ${question}`,
+    };
+    const extraction = await engine.execute(input);
+    expect(extraction.proposal.turnKind).toBe("side_question");
+    expect(extraction.proposal.fieldCandidates).toEqual([]);
+    const knowledge = await engine.execute({ ...input, stage: "knowledge" });
+    expect(knowledge.proposal.reply).toBe(answer);
+    expect(knowledge.proposal.toolRequest).toBeNull();
+    expect(knowledge.proposal.outcomeRecommendation).toBeNull();
+    expect(provider.calls).toHaveLength(0);
+    expect(retriever.calls).toBe(0);
+  }
+});
+
 test("an approved no-answer uses the configured fallback without model use", async () => {
   const provider = new QueueProvider([baseTurn()]);
   const retriever = new FixtureRetriever();
