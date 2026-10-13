@@ -1,0 +1,64 @@
+WHATSAPP QUICK CONNECT — OPERATOR SETUP
+
+Clients use Projects > Channels > WhatsApp > Connect WhatsApp. They enter a
+six-digit security PIN, continue to Meta, authorize their business/number, and
+return to Lia. Secrets and technical IDs are handled by Lia. A connection check
+does not replace an inbound-and-outbound message test.
+
+One-time Meta setup (per deployment)
+1. Use a Meta business app with WhatsApp and Facebook Login for Business.
+   Complete applicable business verification, Tech Provider onboarding and App
+   Review/Advanced Access before onboarding unrelated clients. App-role users
+   can be used for development testing, subject to Meta's restrictions.
+2. Create a standard Cloud API Embedded Signup configuration returning a code
+   and granting whatsapp_business_management and whatsapp_business_messaging.
+   Add the exact HTTPS Lia domain/page to Meta's allowed SDK domains and OAuth
+   redirect settings. Use the same supported Graph version on both sides.
+3. Configure these SERVER environment variables in the intended deployment:
+   WHATSAPP_META_APP_ID
+   WHATSAPP_META_APP_SECRET
+   WHATSAPP_SIGNUP_CONFIG_ID
+   WHATSAPP_GRAPH_API_VERSION (for example, the supported version selected in Meta)
+   WHATSAPP_WEBHOOK_VERIFY_TOKEN (random value, at least 32 characters)
+   NEXT_PUBLIC_APP_URL (existing deployment URL; live is https://lia.leigia.com)
+   Existing provider-secret encryption configuration is also required.
+   Never commit credentials or send them in chat.
+4. Deploy. In Meta configure the callback:
+   https://lia.leigia.com/api/whatsapp/webhook
+   Use WHATSAPP_WEBHOOK_VERIFY_TOKEN and subscribe to the messages field.
+   Quick connect preflights the exact callback before opening signup.
+   Use separate Meta apps for staging and live to prevent callback conflicts.
+5. Connect an authorized test number, then send an inbound WhatsApp message
+   from the test phone. Verify Lia replies and preserves task context. The
+   existing Send Test form can check outbound delivery inside the service window.
+
+Implemented safeguards
+- Authenticated, permission-checked actions with explicit project scope.
+- Browser/user/project-bound signed, expiring signup state and one-time Meta code.
+- Exact Meta message origins; handles either callback/event order and duplicates.
+- Server-side token/app/permission checks and number membership verification.
+- Verified phone registration and WABA message subscription before activation.
+- Encrypted token storage, scoped audit event, safe errors and reconnect.
+- Serialized phone claims prevent a number routing to multiple Lia projects.
+- Manual setup remains available under Advanced manual setup.
+
+Current limits
+- Standard Cloud API signup only. WhatsApp Business mobile-app coexistence and
+  migration from another provider are not implemented by this launcher; unsupported
+  completion events are rejected rather than changing the number's registration.
+- No automatic billing setup, provider credit sharing or template approval.
+- Meta approval, credentials and real device delivery require a live-account UAT.
+- Automatic worker scheduling remains deferred; this change does not enable it.
+
+Verification (14 October 2026)
+- 11 provider/security contract tests and 6 real-component browser tests passed
+  using mocked Meta responses; both callback orders and failure recovery covered.
+- Database test passed with isolated fixtures and cleanup: competing claims from
+  different tenants, encrypted secrets, reconnect, and number replacement guard.
+- Shared contract suite: 410 passed, 15 existing skips. Tenant scope check passed.
+- Real Meta authorization and device delivery remain pending platform setup.
+
+References checked 14 October 2026:
+https://github.com/fbsamples/business-messaging-sample-tech-provider-app
+https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/implementation
+https://www.postman.com/meta/whatsapp-business-platform/documentation/du6gzjv/embedded-signup

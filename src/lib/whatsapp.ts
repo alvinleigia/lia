@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import {
   ChannelDeliveryError,
   type ChannelReplyAdapter,
@@ -43,6 +43,7 @@ export type WhatsAppChannelConfig = {
   accessToken?: string;
   appSecret?: string;
   verifyToken?: string;
+  apiVersion?: string;
 };
 
 export type WhatsAppWebhookMessage = {
@@ -210,6 +211,7 @@ export function normalizeWhatsAppConfig(
     accessToken: decryptSecretValue(config.accessToken) ?? "",
     appSecret: decryptSecretValue(config.appSecret) ?? "",
     verifyToken: decryptSecretValue(config.verifyToken) ?? "",
+    apiVersion: typeof config.apiVersion === "string" ? config.apiVersion : "",
   } satisfies Required<WhatsAppChannelConfig>;
 }
 
@@ -255,65 +257,125 @@ export async function upsertProjectWhatsAppChannel(input: {
   name: string;
   status: "active" | "disabled";
   config: WhatsAppChannelConfig;
+  preserveExistingNumber?: boolean;
 }) {
-  const existing = await getProjectWhatsAppChannel(input.projectId);
-  const existingConfig = normalizeWhatsAppConfig(existing?.config);
-  const mergedConfig: Required<WhatsAppChannelConfig> = {
-    businessAccountId: input.config.businessAccountId ?? "",
-    phoneNumberId: input.config.phoneNumberId ?? "",
-    displayPhoneNumber: input.config.displayPhoneNumber ?? "",
-    businessName: input.config.businessName ?? "",
-    accessToken: input.config.accessToken || existingConfig.accessToken,
-    appSecret: input.config.appSecret || existingConfig.appSecret,
-    verifyToken: input.config.verifyToken || existingConfig.verifyToken,
-  };
-  const storedConfig = {
-    ...mergedConfig,
-    accessToken: mergedConfig.accessToken
-      ? encryptSecretValue(mergedConfig.accessToken)
-      : "",
-    appSecret: mergedConfig.appSecret
-      ? encryptSecretValue(mergedConfig.appSecret)
-      : "",
-    verifyToken: mergedConfig.verifyToken
-      ? encryptSecretValue(mergedConfig.verifyToken)
-      : "",
-  };
+  return db.transaction(async (tx) => {
+    // Serializes reconnects and phone claims across all callers, including manual setup.
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext('whatsapp_project'), ${input.projectId})`,
+    );
+    if (input.config.phoneNumberId) {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext('whatsapp_phone'), hashtext(${input.config.phoneNumberId}))`,
+      );
+      if (
+        await isWhatsAppPhoneLinkedToOtherProject(
+          input.projectId,
+          input.config.phoneNumberId,
+          tx,
+        )
+      )
+        throw new Error(
+          "This WhatsApp number is already linked to another project.",
+        );
+    }
+    const [existing] = await tx
+      .select()
+      .from(projectChannels)
+      .where(
+        and(
+          eq(projectChannels.projectId, input.projectId),
+          eq(projectChannels.channelType, "whatsapp"),
+        ),
+      )
+      .limit(1);
+    if (
+      input.preserveExistingNumber &&
+      existing?.externalId &&
+      existing.externalId !== input.config.phoneNumberId
+    ) {
+      throw new Error("This project already has a different WhatsApp number.");
+    }
+    const existingConfig = normalizeWhatsAppConfig(existing?.config);
+    const mergedConfig: Required<WhatsAppChannelConfig> = {
+      businessAccountId: input.config.businessAccountId ?? "",
+      phoneNumberId: input.config.phoneNumberId ?? "",
+      displayPhoneNumber: input.config.displayPhoneNumber ?? "",
+      businessName: input.config.businessName ?? "",
+      accessToken: input.config.accessToken || existingConfig.accessToken,
+      appSecret: input.config.appSecret || existingConfig.appSecret,
+      verifyToken: input.config.verifyToken || existingConfig.verifyToken,
+      apiVersion: input.config.apiVersion ?? existingConfig.apiVersion,
+    };
+    const storedConfig = {
+      ...mergedConfig,
+      accessToken: mergedConfig.accessToken
+        ? encryptSecretValue(mergedConfig.accessToken)
+        : "",
+      appSecret: mergedConfig.appSecret
+        ? encryptSecretValue(mergedConfig.appSecret)
+        : "",
+      verifyToken: mergedConfig.verifyToken
+        ? encryptSecretValue(mergedConfig.verifyToken)
+        : "",
+    };
 
-  if (existing) {
-    const [channel] = await db
-      .update(projectChannels)
-      .set({
+    if (existing) {
+      const [channel] = await tx
+        .update(projectChannels)
+        .set({
+          name: input.name,
+          status: input.status,
+          externalId: mergedConfig.phoneNumberId || null,
+          config: storedConfig,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(projectChannels.id, existing.id),
+            eq(projectChannels.projectId, input.projectId),
+          ),
+        )
+        .returning();
+
+      return channel;
+    }
+
+    const [channel] = await tx
+      .insert(projectChannels)
+      .values({
+        projectId: input.projectId,
+        channelType: "whatsapp",
         name: input.name,
         status: input.status,
         externalId: mergedConfig.phoneNumberId || null,
         config: storedConfig,
-        updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(projectChannels.id, existing.id),
-          eq(projectChannels.projectId, input.projectId),
-        ),
-      )
       .returning();
 
     return channel;
-  }
+  });
+}
 
-  const [channel] = await db
-    .insert(projectChannels)
-    .values({
-      projectId: input.projectId,
-      channelType: "whatsapp",
-      name: input.name,
-      status: input.status,
-      externalId: mergedConfig.phoneNumberId || null,
-      config: storedConfig,
-    })
-    .returning();
-
-  return channel;
+// Global uniqueness lookup returns only a boolean; it never exposes another tenant's channel.
+// Include disabled/archived channels so reconnect cannot silently steal their routing identity.
+export async function isWhatsAppPhoneLinkedToOtherProject(
+  projectId: number,
+  phoneNumberId: string,
+  client: Pick<typeof db, "select"> = db,
+) {
+  const [claimed] = await client
+    .select({ id: projectChannels.id })
+    .from(projectChannels)
+    .where(
+      and(
+        eq(projectChannels.channelType, "whatsapp"),
+        eq(projectChannels.externalId, phoneNumberId),
+        ne(projectChannels.projectId, projectId),
+      ),
+    )
+    .limit(1);
+  return Boolean(claimed);
 }
 
 export async function getActiveWhatsAppChannelByPhoneNumberId(
@@ -588,7 +650,8 @@ export function verifyWhatsAppSignature(input: {
 function getWhatsAppMessageEndpoint(channel: SelectProjectChannel) {
   const config = normalizeWhatsAppConfig(channel.config);
   const phoneNumberId = config.phoneNumberId || channel.externalId || "";
-  const apiVersion = process.env.WHATSAPP_GRAPH_API_VERSION ?? "v20.0";
+  const apiVersion =
+    config.apiVersion || process.env.WHATSAPP_GRAPH_API_VERSION || "v20.0";
 
   if (!phoneNumberId || !config.accessToken) {
     throw new Error("WhatsApp phone number id or access token is missing.");
@@ -602,7 +665,8 @@ function getWhatsAppMessageEndpoint(channel: SelectProjectChannel) {
 
 function getWhatsAppGraphEndpoint(channel: SelectProjectChannel) {
   const config = normalizeWhatsAppConfig(channel.config);
-  const apiVersion = process.env.WHATSAPP_GRAPH_API_VERSION ?? "v20.0";
+  const apiVersion =
+    config.apiVersion || process.env.WHATSAPP_GRAPH_API_VERSION || "v20.0";
 
   if (!config.accessToken) {
     throw new Error("WhatsApp access token is missing.");

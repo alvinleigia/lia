@@ -9,6 +9,7 @@ import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { WhatsAppOnboarding } from "@/components/whatsapp-onboarding";
 import { assertPermission } from "@/lib/access-control";
 import {
   getActiveProjectIdCookie,
@@ -19,6 +20,7 @@ import {
   getWhatsAppWebhookUrl,
   normalizeWhatsAppConfig,
 } from "@/lib/whatsapp";
+import { getWhatsAppSignupSettings } from "@/lib/whatsapp-embedded-signup";
 import {
   sendWhatsAppTestMessageAction,
   updateWhatsAppChannelAction,
@@ -70,10 +72,28 @@ export default async function WhatsAppChannelPage({
   const webhookUrl = getWhatsAppWebhookUrl();
   const status = channel?.status ?? "disabled";
   const channelName = channel?.name ?? `${project.name} WhatsApp`;
+  const signup = getWhatsAppSignupSettings();
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-5xl mx-auto space-y-6">
+        <WhatsAppOnboarding
+          key={project.id}
+          projectId={project.id}
+          connected={
+            status === "active" &&
+            Boolean(config.accessToken && config.phoneNumberId)
+          }
+          settings={
+            signup
+              ? {
+                  appId: signup.appId,
+                  configId: signup.configId,
+                  apiVersion: signup.apiVersion,
+                }
+              : null
+          }
+        />
         <Card>
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -119,149 +139,155 @@ export default async function WhatsAppChannelPage({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5" />
-              Meta Webhook
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="webhookUrl">Callback URL</Label>
-              <Input id="webhookUrl" value={webhookUrl} readOnly />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Use this callback URL in Meta's WhatsApp webhook setup. The verify
-              token is stored below and used by the GET verification endpoint.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <Save className="h-5 w-5" />
-              Channel Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ActionStateForm
-              action={updateWhatsAppChannelAction}
-              className="space-y-4"
-            >
-              <ActionFormError />
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Channel Name</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    defaultValue={channelName}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <select
-                    id="status"
-                    name="status"
-                    className={selectClassName}
-                    defaultValue={status}
-                  >
-                    <option value="active">active</option>
-                    <option value="disabled">disabled</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="businessName">Business Name</Label>
-                  <Input
-                    id="businessName"
-                    name="businessName"
-                    defaultValue={config.businessName}
-                    placeholder="Lia AI"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="displayPhoneNumber">
-                    Display Phone Number
-                  </Label>
-                  <Input
-                    id="displayPhoneNumber"
-                    name="displayPhoneNumber"
-                    defaultValue={config.displayPhoneNumber}
-                    placeholder="+91..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="businessAccountId">
-                    WhatsApp Business Account ID
-                  </Label>
-                  <Input
-                    id="businessAccountId"
-                    name="businessAccountId"
-                    defaultValue={config.businessAccountId}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phoneNumberId">Phone Number ID</Label>
-                  <Input
-                    id="phoneNumberId"
-                    name="phoneNumberId"
-                    defaultValue={config.phoneNumberId}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="verifyToken">Webhook Verify Token</Label>
-                  <Input
-                    id="verifyToken"
-                    name="verifyToken"
-                    type="password"
-                    placeholder={
-                      config.verifyToken
-                        ? "Stored. Leave blank to keep current token."
-                        : "Paste a strong verification token"
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="appSecret">Meta App Secret</Label>
-                  <Input
-                    id="appSecret"
-                    name="appSecret"
-                    type="password"
-                    placeholder={
-                      config.appSecret
-                        ? "Stored. Leave blank to keep current secret."
-                        : "Paste Meta app secret"
-                    }
-                  />
-                </div>
-              </div>
-
+        <details className="space-y-4 rounded-xl border bg-white p-4">
+          <summary className="cursor-pointer font-medium">
+            Advanced manual setup
+          </summary>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5" />
+                Meta Webhook
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
               <div className="space-y-2">
-                <Label htmlFor="accessToken">Cloud API Access Token</Label>
-                <Textarea
-                  id="accessToken"
-                  name="accessToken"
-                  rows={3}
-                  placeholder={
-                    config.accessToken
-                      ? "Stored. Leave blank to keep current token."
-                      : "Paste a WhatsApp Cloud API token"
-                  }
-                />
+                <Label htmlFor="webhookUrl">Callback URL</Label>
+                <Input id="webhookUrl" value={webhookUrl} readOnly />
               </div>
+              <p className="text-sm text-muted-foreground">
+                Use this callback URL in Meta's WhatsApp webhook setup. The
+                verify token is stored below and used by the GET verification
+                endpoint.
+              </p>
+            </CardContent>
+          </Card>
 
-              <FormSubmitButton
-                label="Save WhatsApp Settings"
-                pendingLabel="Saving..."
-                icon={<Save className="h-4 w-4" />}
-              />
-            </ActionStateForm>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Save className="h-5 w-5" />
+                Channel Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ActionStateForm
+                action={updateWhatsAppChannelAction}
+                className="space-y-4"
+              >
+                <ActionFormError />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Channel Name</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      defaultValue={channelName}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <select
+                      id="status"
+                      name="status"
+                      className={selectClassName}
+                      defaultValue={status}
+                    >
+                      <option value="active">active</option>
+                      <option value="disabled">disabled</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="businessName">Business Name</Label>
+                    <Input
+                      id="businessName"
+                      name="businessName"
+                      defaultValue={config.businessName}
+                      placeholder="Lia AI"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="displayPhoneNumber">
+                      Display Phone Number
+                    </Label>
+                    <Input
+                      id="displayPhoneNumber"
+                      name="displayPhoneNumber"
+                      defaultValue={config.displayPhoneNumber}
+                      placeholder="+91..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="businessAccountId">
+                      WhatsApp Business Account ID
+                    </Label>
+                    <Input
+                      id="businessAccountId"
+                      name="businessAccountId"
+                      defaultValue={config.businessAccountId}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumberId">Phone Number ID</Label>
+                    <Input
+                      id="phoneNumberId"
+                      name="phoneNumberId"
+                      defaultValue={config.phoneNumberId}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="verifyToken">Webhook Verify Token</Label>
+                    <Input
+                      id="verifyToken"
+                      name="verifyToken"
+                      type="password"
+                      placeholder={
+                        config.verifyToken
+                          ? "Stored. Leave blank to keep current token."
+                          : "Paste a strong verification token"
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="appSecret">Meta App Secret</Label>
+                    <Input
+                      id="appSecret"
+                      name="appSecret"
+                      type="password"
+                      placeholder={
+                        config.appSecret
+                          ? "Stored. Leave blank to keep current secret."
+                          : "Paste Meta app secret"
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="accessToken">Cloud API Access Token</Label>
+                  <Textarea
+                    id="accessToken"
+                    name="accessToken"
+                    rows={3}
+                    placeholder={
+                      config.accessToken
+                        ? "Stored. Leave blank to keep current token."
+                        : "Paste a WhatsApp Cloud API token"
+                    }
+                  />
+                </div>
+
+                <FormSubmitButton
+                  label="Save WhatsApp Settings"
+                  pendingLabel="Saving..."
+                  icon={<Save className="h-4 w-4" />}
+                />
+              </ActionStateForm>
+            </CardContent>
+          </Card>
+        </details>
 
         <Card>
           <CardHeader>
@@ -271,6 +297,11 @@ export default async function WhatsAppChannelPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              First send a WhatsApp message from your test phone to your
+              business number. Then use this form to check the reply within the
+              24-hour service window.
+            </p>
             <ActionStateForm
               action={sendWhatsAppTestMessageAction}
               className="space-y-4"

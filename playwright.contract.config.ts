@@ -39,6 +39,8 @@ export default defineConfig({
     "model-usage.spec.ts",
     "telnyx-voice.spec.ts",
     "whatsapp-template-contracts.spec.ts",
+    "whatsapp-onboarding.spec.ts",
+    "whatsapp-onboarding-ui.spec.ts",
   ],
   timeout: 30_000,
 });

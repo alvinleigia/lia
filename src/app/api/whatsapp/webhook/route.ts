@@ -34,6 +34,7 @@ import {
   verifyWhatsAppSignature,
   type WhatsAppWebhookPayload,
 } from "@/lib/whatsapp";
+import { matchesPlatformWhatsAppVerifyToken } from "@/lib/whatsapp-embedded-signup";
 
 const WHATSAPP_FLOW_SOURCE = "whatsapp_chat";
 
@@ -50,8 +51,11 @@ export async function GET(req: Request) {
     );
   }
 
-  const channel = await getActiveWhatsAppChannelByVerifyToken(verifyToken);
-  if (!channel) {
+  // Embedded Signup uses one platform app callback, even before the first channel exists.
+  const verified =
+    matchesPlatformWhatsAppVerifyToken(verifyToken) ||
+    Boolean(await getActiveWhatsAppChannelByVerifyToken(verifyToken));
+  if (!verified) {
     return NextResponse.json({ error: "Verification failed" }, { status: 403 });
   }
 

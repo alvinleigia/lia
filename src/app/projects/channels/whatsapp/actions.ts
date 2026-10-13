@@ -53,20 +53,32 @@ export async function updateWhatsAppChannelAction(
   const context = await resolveUserAndProject();
   assertPermission(context.membership, "company.widget.manage");
 
-  const channel = await upsertProjectWhatsAppChannel({
-    projectId: context.project.id,
-    name: parsed.data.name,
-    status: parsed.data.status,
-    config: {
-      businessAccountId: parsed.data.businessAccountId,
-      phoneNumberId: parsed.data.phoneNumberId,
-      displayPhoneNumber: parsed.data.displayPhoneNumber,
-      businessName: parsed.data.businessName,
-      accessToken: parsed.data.accessToken,
-      appSecret: parsed.data.appSecret,
-      verifyToken: parsed.data.verifyToken,
-    },
-  });
+  let channel: Awaited<ReturnType<typeof upsertProjectWhatsAppChannel>>;
+  try {
+    channel = await upsertProjectWhatsAppChannel({
+      projectId: context.project.id,
+      name: parsed.data.name,
+      status: parsed.data.status,
+      config: {
+        businessAccountId: parsed.data.businessAccountId,
+        phoneNumberId: parsed.data.phoneNumberId,
+        displayPhoneNumber: parsed.data.displayPhoneNumber,
+        businessName: parsed.data.businessName,
+        accessToken: parsed.data.accessToken,
+        appSecret: parsed.data.appSecret,
+        verifyToken: parsed.data.verifyToken,
+      },
+    });
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error &&
+        error.message ===
+          "This WhatsApp number is already linked to another project."
+          ? error.message
+          : "WhatsApp settings could not be saved. Please try again.",
+    };
+  }
 
   await writeAuditLog({
     ...context,
