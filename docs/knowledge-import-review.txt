@@ -63,3 +63,25 @@ Authorised test conversation 5541, channel 147:
 Observed transport-inclusive FAQ replies were about 3.4-5.3 seconds in this
 small check; this is not a general latency guarantee.
 Sanitised evidence: tmp/knowledge-import-live-2026-10-20/whatsapp-results.json.
+
+CLEANUP AUDIT - 20 OCTOBER 2026
+Checked application source for hotel names, project-ID branches, Wi-Fi/pool
+answers, imported FAQ helpers, legacy answer matching and pricing behavior.
+No hardcoded hotel/Wi-Fi runtime branches were found. All import helpers have
+active callers. Live projects currently have zero manual approved FAQ lists.
+
+Removed one redundant amenity-specific prompt instruction. Shared direct-answer,
+business-voice and factual-limit rules remain for every business domain.
+Removed duplicated stay dates and cheapest-unit pricing facts from hotel
+project 1895's answer guidance; the source document and configured price table
+remain authoritative. Category/plan presentation, offers-on-request and
+submission/callback rules remain intentional business configuration.
+Republished task 916 as v6 (978) and action 1154 as v6 with routes preserved.
+
+Kept the shared exact-answer matcher because source-imported answers use it.
+Kept compatibility schemas/settings and immutable old versions; these are not
+hardcoded customer overrides. Tests containing awkward source wording exercise
+import/retrieval regressions and must not be mistaken for live answers.
+Original source JSON/text and unrelated local files were not deleted.
+Verification: 70 focused contract checks, TypeScript, targeted Biome and
+production build passed. Build log: tmp/knowledge-cleanup-build-2026-10-20.txt.
