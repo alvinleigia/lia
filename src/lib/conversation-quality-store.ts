@@ -188,7 +188,6 @@ export async function getConversationQualityEvidence(
         id: conversationInboundEvents.id,
         status: conversationInboundEvents.status,
         receivedAt: conversationInboundEvents.receivedAt,
-        processedAt: conversationInboundEvents.processedAt,
       })
       .from(conversationInboundEvents)
       .where(
@@ -217,12 +216,12 @@ export async function getConversationQualityEvidence(
         ? String(summary.groundingStatus)
         : null,
     })),
+    // Runtime events can stamp received/processed at the same logical instant;
+    // their difference is not a measurement of reply processing time.
     timings: timings.map((t) => ({
       id: t.id,
       status: t.status,
-      durationMs: t.processedAt
-        ? Math.max(0, t.processedAt.getTime() - t.receivedAt.getTime())
-        : null,
+      receivedAt: t.receivedAt,
     })),
   };
 }

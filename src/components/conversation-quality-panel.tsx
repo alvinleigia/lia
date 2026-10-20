@@ -255,8 +255,7 @@ export function ConversationQualityReview({
           </p>
           {evidence.timings.slice(0, 10).map((t) => (
             <p key={t.id}>
-              Event #{t.id}: {t.status}; processing{" "}
-              {t.durationMs === null ? "not recorded" : `${t.durationMs} ms`}
+              Event #{t.id}: {t.status}; received {t.receivedAt.toISOString()}
             </p>
           ))}
           {evidence.events.slice(0, 10).map((e) => (
