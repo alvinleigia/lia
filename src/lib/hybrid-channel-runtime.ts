@@ -1488,6 +1488,7 @@ async function executeTaskBoundary(input: {
           proposal: (
             await executeConfiguredStructuredTurn(
               {
+                conversationId: input.runtimeInput.channelConversationId,
                 prefetchKnowledge:
                   !calendar &&
                   !pendingAppointment &&
@@ -1648,6 +1649,7 @@ async function executeTaskBoundary(input: {
     try {
       const knowledgeExecution = await executeConfiguredStructuredTurn(
         {
+          conversationId: input.runtimeInput.channelConversationId,
           recordTiming: input.runtimeInput.recordTiming,
           activeTask: updatedSession.snapshot,
           assistantBehavior: normalizeProjectAiSettings(
@@ -2262,6 +2264,7 @@ async function executeKnowledgeBoundary(input: {
     }),
   ]);
   const execution = await executeConfiguredStructuredTurn({
+    conversationId: input.runtimeInput.channelConversationId,
     activeTask: null,
     assistantBehavior: normalizeProjectAiSettings(
       input.project.projectAiSettings,

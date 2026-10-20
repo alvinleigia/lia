@@ -123,7 +123,7 @@ const automationNavigationGroups: NavigationItem[][] = [
     {
       href: "/projects/diagnostics",
       icon: ScanSearch,
-      label: "Conversation Diagnostics",
+      label: "Conversation Quality",
     },
     {
       href: "/projects/submissions",

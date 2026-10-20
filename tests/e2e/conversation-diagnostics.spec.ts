@@ -155,6 +155,7 @@ test("tester findings require a supported category and useful note", () => {
     conversationId: 12,
     category: "routing",
     note: "The reply used the wrong branch after a valid choice.",
+    messageId: null,
   });
 
   expect(

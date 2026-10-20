@@ -950,6 +950,7 @@ export const conversationDiagnosticFindings = pgTable(
       .notNull()
       .references(() => users.id),
     category: text("category").notNull(),
+    messageId: integer("message_id"),
     note: text("note").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },

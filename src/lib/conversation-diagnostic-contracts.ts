@@ -8,6 +8,11 @@ export const CONVERSATION_DIAGNOSTIC_CATEGORIES = [
   "privacy",
   "performance",
   "other",
+  "correct",
+  "wrong_answer",
+  "unnecessary_detail",
+  "missed_intent",
+  "ai_review",
 ] as const;
 
 export type ConversationDiagnosticCategory =
@@ -24,6 +29,11 @@ export const CONVERSATION_DIAGNOSTIC_CATEGORY_LABELS: Record<
   privacy: "Privacy",
   performance: "Performance",
   other: "Other",
+  correct: "Correct",
+  wrong_answer: "Wrong answer",
+  unnecessary_detail: "Unnecessary detail",
+  missed_intent: "Missed intent",
+  ai_review: "AI review draft",
 };
 
 export const conversationDiagnosticFindingSchema = z.object({
@@ -31,6 +41,10 @@ export const conversationDiagnosticFindingSchema = z.object({
   conversationId: z.coerce.number().int().positive(),
   category: z.enum(CONVERSATION_DIAGNOSTIC_CATEGORIES),
   note: z.string().trim().min(10).max(2000),
+  messageId: z.preprocess(
+    (value) => (value === "" || value === undefined ? null : value),
+    z.coerce.number().int().positive().nullable(),
+  ),
 });
 
 export const conversationRegressionCaseSchema = z.object({

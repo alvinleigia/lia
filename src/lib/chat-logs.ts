@@ -12,6 +12,7 @@ type ChatLogInput = {
     | "widget_runtime"
     | "embedding_query"
     | "knowledge_import_review"
+    | "conversation_quality_review"
     | "embedding_ingest";
   projectId?: number | null;
   statusCode: number;

@@ -1,0 +1,34 @@
+Conversation Quality
+
+Open a project, then Automation > Conversation Quality.
+
+1. Open Needs review, or use the 10% sample to inspect ordinary conversations.
+2. Read the redacted transcript and recorded processing evidence.
+3. Select a bot reply and mark Correct, Wrong answer, Unnecessary detail or
+   Missed intent. Add a short note describing the expected behaviour.
+4. Optional: Prepare AI review draft for a flagged or sampled conversation.
+   This makes one metered model call; its suggestions need human review.
+5. Turn a finding into a synthetic regression case. Test the proposed knowledge
+   or workflow correction before publishing it.
+
+Rules refresh on page load, across the latest 50 conversations and their latest
+100 messages. They flag possible fallbacks, repeated questions, slow replies,
+failed actions and active enquiries idle for 24 hours. They do not prove an
+error or automatically fix anything. Expected FAQ interruptions can be valid.
+
+The detailed transcript contains up to 200 recent messages. AI review receives
+up to 30 redacted messages. Redaction reduces exposure but is not a guarantee
+that every personal detail is detected; do not enter personal data in notes.
+
+New structured channel turns record stage, processing duration, attempts,
+tokens and grounding reference IDs. These records do not contain prompts,
+field values or private reasoning. document IDs reference retrieved chunks;
+project_approved_answer indexes are local to the turn, not durable source IDs.
+Historical usage may be unavailable. Token counts are not dollar costs.
+
+No automatic scheduler or live knowledge/workflow editing is enabled.
+Review data stays scoped to its project.
+
+Deployment: additive migration 0049 adds the reviewed reply reference.
+Live migration applied. Staging is deferred: apply 0048 and 0049 before
+resuming its deployments.

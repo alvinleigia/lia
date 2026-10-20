@@ -323,6 +323,7 @@ async function tryAnswerDeterministicFlowQuestion(input: {
         : Promise.resolve([]),
     ]);
     const execution = await executeConfiguredStructuredTurn({
+      conversationId: input.channelConversationId,
       activeTask: null,
       assistantBehavior: normalizeProjectAiSettings(project.projectAiSettings),
       assistantIntroduced: true,
@@ -1741,6 +1742,7 @@ async function interpretFlowFieldAnswer(input: {
           : Promise.resolve([]),
       ]);
       const { proposal } = await executeConfiguredStructuredTurn({
+        conversationId: input.channelConversationId,
         activeTask: null,
         collection: { name: input.action.name, fields },
         assistantBehavior: normalizeProjectAiSettings(
@@ -2507,6 +2509,7 @@ export async function processChannelFlowText(input: {
     ]);
     if (project) {
       const { proposal } = await executeConfiguredStructuredTurn({
+        conversationId: input.channelConversationId,
         activeTask: null,
         assistantBehavior: normalizeProjectAiSettings(
           project.projectAiSettings,

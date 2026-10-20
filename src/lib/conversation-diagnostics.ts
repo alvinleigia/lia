@@ -252,7 +252,7 @@ export async function getProjectConversationDiagnostics(
             eq(channelMessages.conversationId, conversationId),
           ),
         )
-        .orderBy(asc(channelMessages.createdAt), asc(channelMessages.id))
+        .orderBy(desc(channelMessages.createdAt), desc(channelMessages.id))
         .limit(200),
       db
         .select({
@@ -361,7 +361,7 @@ export async function getProjectConversationDiagnostics(
     ]),
   ];
   const publicChoiceValues = collectDiagnosticPublicChoiceValues(messageRows);
-  const messages = messageRows.map((message) => ({
+  const messages = messageRows.reverse().map((message) => ({
     ...message,
     text: redactDiagnosticMessage(message, collectedFields, publicChoiceValues),
   }));

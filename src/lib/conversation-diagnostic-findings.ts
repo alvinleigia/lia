@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db-config";
 import {
   channelConversations,
+  channelMessages,
   conversationDiagnosticFindings,
   conversationRegressionCases,
   users,
@@ -44,6 +45,7 @@ export async function createConversationDiagnosticFinding(input: {
   conversationId: number;
   note: string;
   projectId: number;
+  messageId?: number | null;
 }) {
   const [conversation] = await db
     .select({ id: channelConversations.id })
@@ -60,6 +62,22 @@ export async function createConversationDiagnosticFinding(input: {
     throw new Error(
       "The selected conversation does not belong to this project.",
     );
+  }
+
+  if (input.messageId) {
+    const [message] = await db
+      .select({ id: channelMessages.id })
+      .from(channelMessages)
+      .where(
+        and(
+          eq(channelMessages.id, input.messageId),
+          eq(channelMessages.projectId, input.projectId),
+          eq(channelMessages.conversationId, input.conversationId),
+          eq(channelMessages.direction, "outbound"),
+        ),
+      )
+      .limit(1);
+    if (!message) throw new Error("Select a bot reply from this conversation.");
   }
 
   const [finding] = await db

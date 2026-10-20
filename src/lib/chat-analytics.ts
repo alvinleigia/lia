@@ -53,6 +53,8 @@ async function getWindowSummary(
         notInArray(chatRequestLogs.route, [
           "embedding_query",
           "embedding_ingest",
+          "knowledge_import_review",
+          "conversation_quality_review",
         ]),
         gte(chatRequestLogs.createdAt, since),
         until ? lte(chatRequestLogs.createdAt, until) : undefined,
@@ -96,6 +98,8 @@ async function getRouteBreakdown(
         notInArray(chatRequestLogs.route, [
           "embedding_query",
           "embedding_ingest",
+          "knowledge_import_review",
+          "conversation_quality_review",
         ]),
         gte(chatRequestLogs.createdAt, since),
         until ? lte(chatRequestLogs.createdAt, until) : undefined,

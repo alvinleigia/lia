@@ -12,6 +12,10 @@ import {
   promoteConversationRegressionCase,
   recordConversationDiagnosticFinding,
 } from "@/app/projects/diagnostics/actions";
+import {
+  ConversationQualityOverview,
+  ConversationQualityReview,
+} from "@/components/conversation-quality-panel";
 import { NoProjectState } from "@/components/no-project-state";
 import {
   ActionFormError,
@@ -34,6 +38,11 @@ import {
   getProjectConversationDiagnostics,
   listProjectDiagnosticConversations,
 } from "@/lib/conversation-diagnostics";
+import { qualityNextStep } from "@/lib/conversation-quality";
+import {
+  getConversationQualityEvidence,
+  getProjectQualityDashboard,
+} from "@/lib/conversation-quality-store";
 import {
   getActiveProjectIdCookie,
   resolveOptionalPageUserAndProject,
@@ -45,6 +54,7 @@ type DiagnosticsPageProps = {
     conversationId?: string;
     findingRecorded?: string;
     regressionPromoted?: string;
+    quality?: string;
   }>;
 };
 
@@ -72,9 +82,10 @@ export default async function DiagnosticsPage({
   }
 
   const { project } = context;
-  const [conversationRows, analytics] = await Promise.all([
+  const [conversationRows, analytics, qualityRows] = await Promise.all([
     listProjectDiagnosticConversations(project.id),
     getProjectChatAnalytics(project.id),
+    getProjectQualityDashboard(project.id),
   ]);
   const requestedConversationId = params.conversationId
     ? Number.parseInt(params.conversationId, 10)
@@ -103,6 +114,15 @@ export default async function DiagnosticsPage({
     : [];
 
   const health = analytics.last24Hours;
+  const evidence = diagnostics
+    ? await getConversationQualityEvidence(
+        project.id,
+        diagnostics.conversation.id,
+      )
+    : null;
+  const qualityFilter = ["pending", "sample"].includes(params.quality ?? "")
+    ? (params.quality ?? "all")
+    : "all";
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">
@@ -111,7 +131,7 @@ export default async function DiagnosticsPage({
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-2xl">
               <ScanSearch className="size-6" />
-              Conversation Diagnostics: {project.name}
+              Conversation Quality: {project.name}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -157,6 +177,10 @@ export default async function DiagnosticsPage({
           </CardContent>
         </Card>
 
+        <ConversationQualityOverview
+          rows={qualityRows}
+          filter={qualityFilter}
+        />
         <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
           <Card className="h-fit">
             <CardHeader>
@@ -218,6 +242,17 @@ export default async function DiagnosticsPage({
             </Card>
           ) : (
             <div className="space-y-6">
+              {evidence && (
+                <ConversationQualityReview
+                  projectId={project.id}
+                  conversationId={diagnostics.conversation.id}
+                  row={qualityRows.find(
+                    (r) => r.id === diagnostics.conversation.id,
+                  )}
+                  messages={diagnostics.messages}
+                  evidence={evidence}
+                />
+              )}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -346,7 +381,7 @@ export default async function DiagnosticsPage({
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                               <span className="font-medium capitalize">
-                                {message.direction}
+                                {message.direction} #{message.id}
                               </span>
                               <span className="rounded-md border px-2 py-1 text-xs capitalize">
                                 {formatLabel(message.messageType)}
@@ -512,7 +547,7 @@ export default async function DiagnosticsPage({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Bug className="size-5" />
-                    Tester Findings & Regression Cases
+                    Findings & Regression Cases
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -555,17 +590,17 @@ export default async function DiagnosticsPage({
                           id="diagnostic-category"
                           name="category"
                         >
-                          {CONVERSATION_DIAGNOSTIC_CATEGORIES.map(
-                            (category) => (
-                              <option key={category} value={category}>
-                                {
-                                  CONVERSATION_DIAGNOSTIC_CATEGORY_LABELS[
-                                    category
-                                  ]
-                                }
-                              </option>
-                            ),
-                          )}
+                          {CONVERSATION_DIAGNOSTIC_CATEGORIES.filter(
+                            (category) => category !== "ai_review",
+                          ).map((category) => (
+                            <option key={category} value={category}>
+                              {
+                                CONVERSATION_DIAGNOSTIC_CATEGORY_LABELS[
+                                  category
+                                ]
+                              }
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div className="space-y-2">
@@ -608,6 +643,14 @@ export default async function DiagnosticsPage({
                                 {CONVERSATION_DIAGNOSTIC_CATEGORY_LABELS[
                                   finding.category as ConversationDiagnosticCategory
                                 ] ?? formatLabel(finding.category)}
+                              </p>
+                              {finding.messageId && (
+                                <p className="text-xs">
+                                  Reply #{finding.messageId}
+                                </p>
+                              )}
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {qualityNextStep(finding.category)}
                               </p>
                               <p className="mt-1 text-xs text-muted-foreground">
                                 {author.name ?? author.email} -{" "}

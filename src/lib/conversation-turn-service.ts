@@ -1,5 +1,6 @@
 import { loadSelectedContactMemory } from "@/lib/conversation-memory";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
+import { recordConversationQualityTurn } from "@/lib/conversation-quality-telemetry";
 import { projectTurnBudgetGate } from "@/lib/conversation-turn-budget";
 import type {
   StructuredTurnRequestV1,
@@ -45,9 +46,10 @@ type ExecuteProjectStructuredTurnInput = StructuredTurnRequestV1 & {
 };
 
 export async function executeConfiguredStructuredTurn(
-  input: ExecuteStructuredTurnInput,
+  input: ExecuteStructuredTurnInput & { conversationId?: number | null },
   retriever: TurnKnowledgeRetriever = new ProjectDocumentTurnRetriever(),
 ) {
+  const startedAt = performance.now();
   if (
     (input.stage === "knowledge" || input.prefetchKnowledge) &&
     input.projectPolicy.knowledge.sourceSelection.allowedSources.includes(
@@ -75,9 +77,20 @@ export async function executeConfiguredStructuredTurn(
     retriever,
   });
 
-  return measureRuntimeStage(`turn_${input.stage}`, input.recordTiming, () =>
-    engine.execute(input),
+  const execution = await measureRuntimeStage(
+    `turn_${input.stage}`,
+    input.recordTiming,
+    () => engine.execute(input),
   );
+  if (input.conversationId)
+    await recordConversationQualityTurn({
+      projectId: input.projectId,
+      conversationId: input.conversationId,
+      stage: input.stage,
+      latencyMs: performance.now() - startedAt,
+      execution,
+    });
+  return execution;
 }
 
 export async function executeProjectStructuredTurn(
