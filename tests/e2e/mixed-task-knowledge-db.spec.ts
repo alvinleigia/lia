@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mock } from "node:test";
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
+import type { RuntimeActionStep } from "../../src/lib/action-runtime";
 import { startChannelFlow } from "../../src/lib/channel-flow-runtime";
 import { recordChannelInboundMessage } from "../../src/lib/channels";
 import {
@@ -27,6 +28,7 @@ import {
   contacts,
   conversationalTasks,
   conversationalTaskVersions,
+  conversationExecutionStates,
   projectActions,
   projects,
   users,
@@ -137,6 +139,20 @@ for (const [domain, fieldKey, label, question, answer] of [
             dependsOn: [],
             normalization: null,
           },
+          ...(domain === "hotel"
+            ? [
+                {
+                  ...REFERENCE_BOOKING_TASK_DEFINITION.fields[4],
+                  id: randomUUID(),
+                  key: "contactNumber",
+                  label: "Contact Number",
+                  type: "phone" as const,
+                  prompt: "What phone number can we use?",
+                  dependsOn: [],
+                  normalization: null,
+                },
+              ]
+            : []),
         ],
       };
       const [task] = await tx
@@ -183,7 +199,7 @@ for (const [domain, fieldKey, label, question, answer] of [
           triggerPhrases: ["Start enquiry"],
         })
         .returning();
-      const steps = [
+      const steps: RuntimeActionStep[] = [
         {
           id: 1,
           stepType: "conversational_task",
@@ -211,12 +227,26 @@ for (const [domain, fieldKey, label, question, answer] of [
               transferFieldKeys: [],
               transferContextKeys: [],
               outcomeRoutes: Object.fromEntries(
-                snapshot.task.definition.outcomes.map((o) => [o.key, "end"]),
+                snapshot.task.definition.outcomes.map((o) => [
+                  o.key,
+                  domain === "hotel" && o.type === "completed" ? 2 : "end",
+                ]),
               ),
             },
           },
         },
       ];
+      if (domain === "hotel") {
+        steps.push({
+          ...steps[0],
+          id: 2,
+          sortOrder: 2,
+          stepType: "handoff",
+          label: "Team review",
+          prompt: "Enquiry saved for team review.",
+          settings: { handoffNotifyTeam: false },
+        });
+      }
       const graph = compileHybridFlowGraph({ steps, branchRules: [] }).graph;
       const [flowVersion] = await tx
         .insert(actionFlowVersions)
@@ -243,9 +273,12 @@ for (const [domain, fieldKey, label, question, answer] of [
     const externalConversationId = `mixed-${randomUUID()}`;
     const scope = {
       projectId: fixture.project.id,
-      channelType: "project_chat" as const,
+      channelType:
+        domain === "hotel" ? ("whatsapp" as const) : ("project_chat" as const),
       externalConversationId,
+      externalUserId: domain === "hotel" ? "61491570006" : null,
     };
+    const source = domain === "hotel" ? "whatsapp_chat" : "project_chat";
     let conversationId: number | null = null;
     const modelCalls: StructuredTurnProviderInput[] = [];
     const provider = mock.method(
@@ -313,7 +346,7 @@ for (const [domain, fieldKey, label, question, answer] of [
         action,
         conversationId: externalConversationId,
         projectId: scope.projectId,
-        source: "project_chat",
+        source,
       });
       const send = async (text: string, consumeTriggerMessage = false) => {
         const inbound = await recordChannelInboundMessage({ ...scope, text });
@@ -323,7 +356,7 @@ for (const [domain, fieldKey, label, question, answer] of [
           channelConversationId: inbound.conversation.id,
           inboundMessageId: inbound.message.id,
           boundaryNodeId: "step:1",
-          source: "project_chat",
+          source,
           text,
           consumeTriggerMessage,
         });
@@ -410,8 +443,17 @@ for (const [domain, fieldKey, label, question, answer] of [
       if (domain === "hotel") {
         await send(`Change ${label} to 2026-10-29.`);
         await send("My name is Alex Test.");
+        const contact = await send("Please use my WhatsApp number.");
+        expect(contact.replies.map((reply) => reply.text).join("\n")).toContain(
+          "Reply Confirm to submit",
+        );
         const ready = await getConversationTaskRuntimeSession(scope);
         if (!ready.runtime) throw new Error("Missing ready task");
+        expect(
+          ready.runtime.fields.find(
+            (field) => field.fieldKey === "contactNumber",
+          )?.canonicalValue,
+        ).toBe("+61491570006");
         await send("Please proceed with my enquiry");
         expect(
           (await getConversationTaskRuntimeSession(scope)).runtime?.fields.find(
@@ -430,6 +472,36 @@ for (const [domain, fieldKey, label, question, answer] of [
             })
           )?.run.status,
         ).toBe("completed");
+        await startChannelFlow({
+          action,
+          conversationId: externalConversationId,
+          projectId: scope.projectId,
+          source,
+        });
+        await db
+          .update(conversationExecutionStates)
+          .set({ responseOwner: "human" })
+          .where(eq(conversationExecutionStates.projectId, scope.projectId));
+        expect((await send("Start enquiry", true)).replies).toEqual([]);
+        expect(
+          (await getConversationTaskRuntimeSession(scope)).runtime?.run.id,
+        ).toBe(ready.runtime.run.id);
+        await db
+          .update(conversationExecutionStates)
+          .set({ responseOwner: "deterministic" })
+          .where(eq(conversationExecutionStates.projectId, scope.projectId));
+        const restarted = await send("Start enquiry", true);
+        expect(restarted.replies.at(-1)?.payload).toMatchObject({
+          inputRequest: { fieldKey },
+        });
+        const fresh = await getConversationTaskRuntimeSession(scope);
+        expect(fresh.runtime?.run.id).not.toBe(ready.runtime.run.id);
+        expect(
+          fresh.runtime?.fields.find(
+            (field) => field.fieldKey === "contactNumber",
+          )?.state,
+        ).toBe("missing");
+        await send("Cancel");
         return;
       }
       const cancelled = await send("Cancel");

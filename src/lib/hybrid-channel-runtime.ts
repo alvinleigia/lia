@@ -2319,7 +2319,7 @@ async function runHybridChannelBoundaryInternal(
     return { replies: [] };
   }
 
-  const [project, session] = await measureRuntimeStage(
+  const [project, initialSession] = await measureRuntimeStage(
     "hybrid_context",
     input.recordTiming,
     () =>
@@ -2336,6 +2336,31 @@ async function runHybridChannelBoundaryInternal(
     return { replies: [] };
   }
 
+  let session = initialSession;
+  const requestedTaskNode = graph.nodes.find(
+    (
+      node,
+    ): node is Extract<HybridFlowNodeV1, { kind: "conversational_task" }> =>
+      node.id === input.boundaryNodeId &&
+      node.kind === "conversational_task" &&
+      node.sourceStepId === input.submission.currentStepId,
+  );
+  // The persisted flow step authorizes entry after deterministic continuation,
+  // including a new enquiry on the same chat. Do not reuse a terminal task's
+  // old node or override an active task, pause, or human owner.
+  if (
+    requestedTaskNode &&
+    !session.execution?.activeTaskRunId &&
+    session.execution?.responseOwner === "deterministic" &&
+    ["active", "closed"].includes(session.execution.status)
+  ) {
+    session = await ensureDirectTaskEntry({
+      node: requestedTaskNode,
+      project,
+      runtimeInput: input,
+      session,
+    });
+  }
   let sourceNode = resolveHybridBoundaryNode({
     actionVersionId: input.action.versionId,
     activeActionVersionId: session.execution?.activeActionVersionId,
