@@ -18,6 +18,7 @@ import {
   selectModelVisibleTurnContext,
 } from "@/lib/conversation-turn-project";
 import { ProjectDocumentTurnRetriever } from "@/lib/conversation-turn-retrieval";
+import { getImportedKnowledgeAnswers } from "@/lib/knowledge-import-store";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 import { measureRuntimeStage } from "@/lib/runtime-stage-timing";
 
@@ -47,6 +48,28 @@ export async function executeConfiguredStructuredTurn(
   input: ExecuteStructuredTurnInput,
   retriever: TurnKnowledgeRetriever = new ProjectDocumentTurnRetriever(),
 ) {
+  if (
+    (input.stage === "knowledge" || input.prefetchKnowledge) &&
+    input.projectPolicy.knowledge.sourceSelection.allowedSources.includes(
+      "project_documents",
+    )
+  ) {
+    const importedAnswers = await getImportedKnowledgeAnswers(
+      input.projectId,
+      input.visitorMessage,
+    );
+    if (importedAnswers.length)
+      input = {
+        ...input,
+        assistantBehavior: {
+          ...input.assistantBehavior,
+          approvedKnowledgeAnswers: [
+            ...importedAnswers,
+            ...input.assistantBehavior.approvedKnowledgeAnswers,
+          ],
+        },
+      };
+  }
   const engine = new StructuredTurnEngine({
     budgetGate: projectTurnBudgetGate,
     retriever,

@@ -6,6 +6,7 @@ export default defineConfig({
   reporter: [["list"]],
   testDir: "./tests/e2e",
   testMatch: [
+    "knowledge-import.spec.ts",
     "catalog-resource-dependencies.spec.ts",
     "channel-adapter-conformance.spec.ts",
     "channel-adapter.spec.ts",

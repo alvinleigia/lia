@@ -2033,6 +2033,10 @@ export const sourceDocuments = pgTable(
     fileHash: text("file_hash"),
     processingStatus: text("processing_status").notNull().default("queued"),
     processingError: text("processing_error"),
+    importReview:
+      jsonb("import_review").$type<
+        import("@/lib/knowledge-import").KnowledgeImportReview
+      >(),
     processedAt: timestamp("processed_at"),
     mimeType: text("mime_type"),
     sizeBytes: bigint("size_bytes", { mode: "number" }),

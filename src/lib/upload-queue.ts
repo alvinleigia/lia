@@ -3,6 +3,10 @@ import { chunkContent } from "@/lib/chunking";
 import { db } from "@/lib/db-config";
 import { documents, sourceDocuments, uploadJobs } from "@/lib/db-schema";
 import { generateEmbeddings } from "@/lib/embeddings";
+import {
+  extractKnowledgeAnswers,
+  knowledgeImportReviewSchema,
+} from "@/lib/knowledge-import";
 
 type QueueRunResult = {
   processed: number;
@@ -10,12 +14,17 @@ type QueueRunResult = {
   idle: boolean;
 };
 
-async function claimNextQueuedJob() {
+async function claimNextQueuedJob(projectId?: number) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const [candidate] = await db
       .select()
       .from(uploadJobs)
-      .where(eq(uploadJobs.status, "queued"))
+      .where(
+        and(
+          eq(uploadJobs.status, "queued"),
+          projectId ? eq(uploadJobs.projectId, projectId) : undefined,
+        ),
+      )
       .orderBy(asc(uploadJobs.id))
       .limit(1);
 
@@ -48,6 +57,7 @@ async function claimNextQueuedJob() {
 async function markJobFailed(
   jobId: number,
   sourceDocumentId: number,
+  projectId: number,
   message: string,
 ) {
   await db
@@ -58,7 +68,7 @@ async function markJobFailed(
       finishedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(uploadJobs.id, jobId));
+    .where(and(eq(uploadJobs.id, jobId), eq(uploadJobs.projectId, projectId)));
 
   await db
     .update(sourceDocuments)
@@ -66,36 +76,67 @@ async function markJobFailed(
       processingStatus: "failed",
       processingError: message,
     })
-    .where(eq(sourceDocuments.id, sourceDocumentId));
+    .where(
+      and(
+        eq(sourceDocuments.id, sourceDocumentId),
+        eq(sourceDocuments.projectId, projectId),
+      ),
+    );
 }
 
-export async function processUploadQueue(maxJobs = 2): Promise<QueueRunResult> {
+export async function processUploadQueue(
+  maxJobs = 2,
+  projectId?: number,
+  embed: typeof generateEmbeddings = generateEmbeddings,
+): Promise<QueueRunResult> {
   let processed = 0;
   let failed = 0;
 
   for (let i = 0; i < maxJobs; i += 1) {
-    const job = await claimNextQueuedJob();
+    const job = await claimNextQueuedJob(projectId);
     if (!job) {
       break;
     }
 
     try {
+      const [source] = await db
+        .select()
+        .from(sourceDocuments)
+        .where(
+          and(
+            eq(sourceDocuments.id, job.sourceDocumentId),
+            eq(sourceDocuments.projectId, job.projectId),
+          ),
+        );
+      if (!source) throw new Error("Source document not found.");
+      const review = source.importReview
+        ? knowledgeImportReviewSchema.parse(source.importReview)
+        : null;
+      if (
+        review &&
+        (!review.approvedAt ||
+          !review.approvedByUserId ||
+          review.draftText !== job.textContent)
+      )
+        throw new Error("This document needs approval before indexing.");
       const chunks = await chunkContent(job.textContent);
       if (chunks.length === 0) {
         await markJobFailed(
           job.id,
           job.sourceDocumentId,
+          job.projectId,
           "No text chunks could be created from this document.",
         );
         failed += 1;
         continue;
       }
 
-      const embeddings = await generateEmbeddings(job.projectId, chunks);
+      const embeddings = await embed(job.projectId, chunks);
       if (embeddings.length !== chunks.length) {
         await markJobFailed(
           job.id,
           job.sourceDocumentId,
+          job.projectId,
           "Embedding generation did not complete for all chunks.",
         );
         failed += 1;
@@ -110,6 +151,28 @@ export async function processUploadQueue(maxJobs = 2): Promise<QueueRunResult> {
       }));
 
       await db.transaction(async (tx) => {
+        const [current] = await tx
+          .select({ id: sourceDocuments.id })
+          .from(sourceDocuments)
+          .where(
+            and(
+              eq(sourceDocuments.id, job.sourceDocumentId),
+              eq(sourceDocuments.projectId, job.projectId),
+            ),
+          )
+          .for("update");
+        if (!current)
+          throw new Error("Source document was removed during indexing.");
+        // Replace only this source's published content once all embeddings exist.
+        // Failed processing leaves its previous published content available.
+        await tx
+          .delete(documents)
+          .where(
+            and(
+              eq(documents.projectId, job.projectId),
+              eq(documents.sourceDocumentId, job.sourceDocumentId),
+            ),
+          );
         await tx.insert(documents).values(records);
 
         await tx
@@ -118,10 +181,31 @@ export async function processUploadQueue(maxJobs = 2): Promise<QueueRunResult> {
             processingStatus: "done",
             processingError: null,
             processedAt: new Date(),
+            ...(review
+              ? {
+                  importReview: {
+                    ...review,
+                    publishedText: job.textContent,
+                    publishedAnswers: extractKnowledgeAnswers(job.textContent),
+                  },
+                }
+              : {}),
           })
-          .where(eq(sourceDocuments.id, job.sourceDocumentId));
+          .where(
+            and(
+              eq(sourceDocuments.id, job.sourceDocumentId),
+              eq(sourceDocuments.projectId, job.projectId),
+            ),
+          );
 
-        await tx.delete(uploadJobs).where(eq(uploadJobs.id, job.id));
+        await tx
+          .delete(uploadJobs)
+          .where(
+            and(
+              eq(uploadJobs.id, job.id),
+              eq(uploadJobs.projectId, job.projectId),
+            ),
+          );
       });
 
       processed += 1;
@@ -130,7 +214,7 @@ export async function processUploadQueue(maxJobs = 2): Promise<QueueRunResult> {
         error instanceof Error
           ? error.message
           : "Unknown queue processing error.";
-      await markJobFailed(job.id, job.sourceDocumentId, message);
+      await markJobFailed(job.id, job.sourceDocumentId, job.projectId, message);
       failed += 1;
     }
   }

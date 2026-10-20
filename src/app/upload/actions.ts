@@ -8,14 +8,21 @@ import pdf from "pdf-parse";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
 import { writeAuditLog } from "@/lib/audit";
-import { resolveUserAndProject } from "@/lib/auth-project";
+import {
+  resolveStrictUserAndProject,
+  resolveUserAndProject,
+} from "@/lib/auth-project";
 import { db } from "@/lib/db-config";
-import { sourceDocuments, uploadJobs } from "@/lib/db-schema";
+import { sourceDocuments } from "@/lib/db-schema";
 import {
   deleteAllDocumentsFromProject,
   deleteSourceDocumentFromProject,
   getSourceDocumentByFileHash,
 } from "@/lib/documents";
+import {
+  createKnowledgeImportReview,
+  MAX_KNOWLEDGE_TEXT_LENGTH,
+} from "@/lib/knowledge-import";
 import { processUploadQueue } from "@/lib/upload-queue";
 
 const MAX_DOCUMENT_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -49,7 +56,9 @@ function isPdfDocument(file: File, lowerName: string) {
 
 export async function processDocumentFile(formData: FormData) {
   try {
-    const context = await resolveUserAndProject(formData.get("projectId"));
+    const context = await resolveStrictUserAndProject(
+      formData.get("projectId"),
+    );
     assertPermission(context.membership, "company.documents.manage");
     const file = (formData.get("document") ?? formData.get("pdf")) as File;
 
@@ -110,33 +119,33 @@ export async function processDocumentFile(formData: FormData) {
       };
     }
 
-    let sourceDocumentId: number | null = null;
-    await db.transaction(async (tx) => {
+    if (textContent.length > MAX_KNOWLEDGE_TEXT_LENGTH) {
+      return {
+        success: false,
+        error:
+          "Split this document into files of at most 200,000 text characters for review.",
+      };
+    }
+    const sourceDocumentId = await db.transaction(async (tx) => {
       const [uploadedDocument] = await tx
         .insert(sourceDocuments)
         .values({
           projectId: context.project.id,
           title: file.name || "Uploaded Document",
           fileHash,
-          processingStatus: "queued",
+          processingStatus: "review",
+          importReview: createKnowledgeImportReview(textContent),
           processingError: null,
           processedAt: null,
           mimeType: file.type || null,
           sizeBytes: Number.isFinite(file.size) ? file.size : null,
         })
         .returning();
-      sourceDocumentId = uploadedDocument.id;
-
-      await tx.insert(uploadJobs).values({
-        projectId: context.project.id,
-        sourceDocumentId: uploadedDocument.id,
-        textContent,
-        status: "queued",
-      });
+      return uploadedDocument.id;
     });
     await writeAuditLog({
       ...context,
-      action: "document.upload_queued",
+      action: "document.review_created",
       targetType: "source_document",
       targetId: sourceDocumentId,
       metadata: {
@@ -148,8 +157,9 @@ export async function processDocumentFile(formData: FormData) {
 
     return {
       success: true,
+      sourceDocumentId,
       message:
-        "Document queued for background processing. It will appear in chat after indexing completes.",
+        "Document ready for review. Check the wording and facts before publishing it to chat.",
     };
   } catch (error) {
     console.error("PDF processing error:", error);
@@ -228,11 +238,12 @@ export async function processQueuedDocumentsAction(formData: FormData) {
     redirect("/projects/documents?error=Invalid%20project%20for%20processing.");
   }
 
-  await resolveUserAndProject(parsed.data);
+  const context = await resolveStrictUserAndProject(parsed.data);
+  assertPermission(context.membership, "company.documents.manage");
 
   let result: Awaited<ReturnType<typeof processUploadQueue>>;
   try {
-    result = await processUploadQueue(10);
+    result = await processUploadQueue(10, context.project.id);
   } catch (error) {
     console.error("Queue processing action failed:", error);
     redirect(

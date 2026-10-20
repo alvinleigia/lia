@@ -1,6 +1,6 @@
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db-config";
-import { documents, sourceDocuments } from "@/lib/db-schema";
+import { documents, sourceDocuments, uploadJobs } from "@/lib/db-schema";
 
 export async function projectHasIndexedDocuments(projectId: number) {
   const [row] = await db
@@ -89,28 +89,57 @@ export async function deleteSourceDocumentFromProject(
   projectId: number,
   sourceDocumentId: number,
 ) {
-  await db
-    .delete(documents)
-    .where(
-      and(
-        eq(documents.projectId, projectId),
-        eq(documents.sourceDocumentId, sourceDocumentId),
-      ),
-    );
+  await db.transaction(async (tx) => {
+    await tx
+      .select({ id: sourceDocuments.id })
+      .from(sourceDocuments)
+      .where(
+        and(
+          eq(sourceDocuments.id, sourceDocumentId),
+          eq(sourceDocuments.projectId, projectId),
+        ),
+      )
+      .for("update");
+    await tx
+      .delete(uploadJobs)
+      .where(
+        and(
+          eq(uploadJobs.projectId, projectId),
+          eq(uploadJobs.sourceDocumentId, sourceDocumentId),
+        ),
+      );
+    await tx
+      .delete(documents)
+      .where(
+        and(
+          eq(documents.projectId, projectId),
+          eq(documents.sourceDocumentId, sourceDocumentId),
+        ),
+      );
 
-  await db
-    .delete(sourceDocuments)
-    .where(
-      and(
-        eq(sourceDocuments.id, sourceDocumentId),
-        eq(sourceDocuments.projectId, projectId),
-      ),
-    );
+    await tx
+      .delete(sourceDocuments)
+      .where(
+        and(
+          eq(sourceDocuments.id, sourceDocumentId),
+          eq(sourceDocuments.projectId, projectId),
+        ),
+      );
+  });
 }
 
 export async function deleteAllDocumentsFromProject(projectId: number) {
-  await db.delete(documents).where(eq(documents.projectId, projectId));
-  await db
-    .delete(sourceDocuments)
-    .where(eq(sourceDocuments.projectId, projectId));
+  await db.transaction(async (tx) => {
+    await tx
+      .select({ id: sourceDocuments.id })
+      .from(sourceDocuments)
+      .where(eq(sourceDocuments.projectId, projectId))
+      .orderBy(asc(sourceDocuments.id))
+      .for("update");
+    await tx.delete(uploadJobs).where(eq(uploadJobs.projectId, projectId));
+    await tx.delete(documents).where(eq(documents.projectId, projectId));
+    await tx
+      .delete(sourceDocuments)
+      .where(eq(sourceDocuments.projectId, projectId));
+  });
 }

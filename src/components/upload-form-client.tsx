@@ -47,10 +47,13 @@ export function UploadFormClient({
           text: result.message || "Document processed successfully",
         });
         e.target.value = "";
-        setTimeout(() => {
+        if (result.sourceDocumentId) {
+          router.push(
+            `/projects/documents/${result.sourceDocumentId}/review?projectId=${projectId}`,
+          );
+        } else {
           router.refresh();
-        }, 1500);
-        router.refresh();
+        }
       } else {
         setMessage({
           type: "error",

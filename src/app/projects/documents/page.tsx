@@ -1,4 +1,5 @@
 import { Files, ListChecks, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { processQueuedDocumentsAction } from "@/app/upload/actions";
 import { DocumentDeleteButton } from "@/components/document-delete-button";
 import { NoProjectState } from "@/components/no-project-state";
@@ -138,6 +139,12 @@ export default async function ProjectDocumentsPage({
                       <p className="text-muted-foreground">
                         {Number(doc.chunkCount)} chunks
                       </p>
+                      <Link
+                        className="underline"
+                        href={`/projects/documents/${doc.id}/review?projectId=${selectedProject.id}`}
+                      >
+                        Review knowledge
+                      </Link>
                       <p className="text-xs text-muted-foreground">
                         Status:{" "}
                         {doc.processingStatus === "queued"

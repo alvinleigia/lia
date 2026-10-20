@@ -1,0 +1,40 @@
+KNOWLEDGE IMPORT REVIEW
+
+For any business domain:
+1. Open Project > Documents and upload PDF, Markdown or text.
+2. Review flagged wording, uncertain details, test labels and claims.
+3. Edit the draft, or use optional AI wording suggestions, then save.
+4. Compare against the original and verify the business facts.
+5. Approve the saved draft, then process approved documents.
+
+Nothing new enters chat before approval and successful indexing. Editing or a
+failed indexing attempt keeps the previous published content available.
+
+Use Q: Question A: Answer or Question => Answer for explicit FAQ answers.
+Published FAQs belong to their document, not project-specific runtime code.
+Exact questions and supported discourse prefixes reuse them without an LLM.
+Paraphrases and other questions continue through the shared knowledge runtime.
+Deleting the source removes its imported FAQ answers and indexed content.
+
+Rules flag issues; they do not prove every statement is true or find every
+semantic contradiction. Conflicting answers to the same normalized question
+and source-report wording block publication. Owners must verify other flags.
+AI suggestions process at most 12 flagged lines per request, with recorded usage.
+They are never automatically approved and must not turn unknowns into promises.
+
+Older documents remain available. "Review knowledge" prepares a draft from
+their indexed text when no original was retained; replace overlapping passages
+with the original document text before approval where possible.
+
+DEPLOYMENT
+Apply migration 0048 to each environment before deploying this release.
+Live migration and isolated runtime/browser tests passed on 20 October 2026.
+Staging migration requires a valid STAGING_DATABASE_URL; the current local
+value is invalid and Vercel's stored secret cannot be revealed.
+
+After deployment, migrate the existing hotel's approved FAQ overrides into its
+reviewed source, index and verify them, then clear the matching project-setting
+overrides and republish affected business tasks/flows. Do not remove overrides
+before the replacement is available. Historical immutable versions stay intact.
+The Wi-Fi example was removed from shared instructions; no hotel-specific
+knowledge rewrite or answer rule was added to runtime code.
