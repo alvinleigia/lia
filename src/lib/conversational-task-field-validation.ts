@@ -339,8 +339,18 @@ function validateDateRange(
     if (labelled) {
       [, start, end] = labelled;
     } else {
-      const values = value.split(/\s+(?:to|through)\s+/i);
-      if (values.length === 2) [start, end] = values;
+      const sharedMonth = value
+        .trim()
+        .match(
+          /^(\d{1,2}(?:st|nd|rd|th)?)\s*(?:to|through|[-–—])\s*(\d{1,2}(?:st|nd|rd|th)?)\s+([a-z]+)\s+(\d{4})\.?$/i,
+        );
+      if (sharedMonth) {
+        start = `${sharedMonth[1]} ${sharedMonth[3]} ${sharedMonth[4]}`;
+        end = `${sharedMonth[2]} ${sharedMonth[3]} ${sharedMonth[4]}`;
+      } else {
+        const values = value.split(/\s+(?:to|through)\s+/i);
+        if (values.length === 2) [start, end] = values;
+      }
     }
   }
   const normalizedStart = validateDate(start, context);

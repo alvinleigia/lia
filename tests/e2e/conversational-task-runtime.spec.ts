@@ -38,6 +38,9 @@ test("shared date ranges accept labelled endpoints without guessing dates", () =
     "Arrival: 2026-10-26, departure: 2026-10-28",
     "Start date 26 October 2026 to end date 28 October 2026.",
     "2026-10-26 to 2026-10-28",
+    "26 to 28 October 2026",
+    "26th through 28th Oct 2026",
+    "26–28 October 2026",
   ]) {
     expect(
       validateTaskFieldValue({ field: fieldFor("date_range"), value }),
@@ -48,6 +51,10 @@ test("shared date ranges accept labelled endpoints without guessing dates", () =
     "Check-in 28 October 2026 and checkout 26 October 2026",
     "Check-in 26 October 2026",
     "Check-in 31 November 2026 and checkout 2 December 2026",
+    "28 to 26 October 2026",
+    "26 to 28 October",
+    "30 to 31 February 2026",
+    "26 to 28 October 2026 or November 2026",
   ]) {
     expect(
       validateTaskFieldValue({ field: fieldFor("date_range"), value }).ok,
