@@ -153,8 +153,8 @@ export function answerTaskPricing(input: {
   });
   if (missing.length) {
     return asksOffers
-      ? `Mock pricing for UAT. ${table.offersMessage}`
-      : `To calculate the mock price, I still need: ${missing
+      ? `These are indicative estimates; our team will confirm applicable offers before booking. ${table.offersMessage}`
+      : `To estimate the price, I still need: ${missing
           .slice(0, 6)
           .map((key) => fields.get(key)?.label ?? key)
           .join(
@@ -169,7 +169,7 @@ export function answerTaskPricing(input: {
     ),
   );
   if (matches.length !== 1) {
-    return `I don't have a mock rate for these exact details. The team will need to confirm the price.${asksOffers ? ` ${table.offersMessage}` : ""}`;
+    return `I can't quote a price for these exact details yet. Our team will need to confirm the price.${asksOffers ? ` ${table.offersMessage}` : ""}`;
   }
   const row = matches[0];
   const base = row.lines.reduce(
@@ -206,7 +206,7 @@ export function answerTaskPricing(input: {
           .sort((a, b) => a.total - b.total)
           .slice(0, 2)
       : [];
-    return `Mock pricing for UAT. ${table.offersMessage}${alternatives.map(({ candidate, total }) => `\nLower saved rate — ${candidate.label}: ${money(total)} including tax.${candidate.note ? ` ${candidate.note}` : ""}`).join("")}`;
+    return `These are indicative estimates; our team will confirm applicable offers before booking. ${table.offersMessage}${alternatives.map(({ candidate, total }) => `\nLower estimated rate — ${candidate.label}: ${money(total)} including tax.${candidate.note ? ` ${candidate.note}` : ""}`).join("")}`;
   }
-  return `${row.label}: ${money(base + tax)} total (${money(base)} + ${money(tax)} tax). Mock estimate for UAT; availability and final price require confirmation.${row.note ? ` ${row.note}` : ""}`;
+  return `${row.label}: ${money(base + tax)} total (${money(base)} + ${money(tax)} tax). This is an indicative estimate. Our team will confirm availability and the final price before booking.${row.note ? ` ${row.note}` : ""}`;
 }

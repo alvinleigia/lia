@@ -76,7 +76,11 @@ test("hotel price uses distinct saved tiers, tax and full-stay amounts", () => {
   expect(reply).toContain(
     "INR 29,960.78 total (INR 27,517.75 + INR 2,443.03 tax)",
   );
-  expect(reply).toContain("Mock estimate for UAT");
+  expect(reply).toContain("This is an indicative estimate.");
+  expect(reply).toContain(
+    "Our team will confirm availability and the final price before booking.",
+  );
+  expect(reply).not.toMatch(/\bmock\b|\bUAT\b/i);
   expect(reply).not.toMatch(/Extended|coupon|discount/);
   const extended = answerTaskPricing({
     table,
@@ -102,7 +106,7 @@ test("changed dates, occupancy and quantities cannot reuse an old quote", () => 
       fields: fields({ ...selected.match, ...change }),
       text: "What is the price?",
     });
-    expect(reply).toContain("don't have a mock rate");
+    expect(reply).toContain("can't quote a price for these exact details yet");
     expect(reply).not.toContain("29,960");
   }
   const changed = answerTaskPricing({
