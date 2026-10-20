@@ -11,7 +11,10 @@ import {
   isStandaloneKnowledgeQuestion,
   stripKnowledgeDiscoursePrefix,
 } from "@/lib/conversation-control-intents";
-import { extractLocalTaskFieldCandidates } from "@/lib/conversation-field-extraction";
+import {
+  extractLocalTaskFieldCandidates,
+  resolveChannelPhoneReference,
+} from "@/lib/conversation-field-extraction";
 import {
   compileStructuredTurn,
   type FieldCollectionContext,
@@ -81,6 +84,8 @@ export interface TurnKnowledgeRetriever {
 }
 
 export type ExecuteStructuredTurnInput = {
+  // Server-provided channel identity; never taken from a model response.
+  externalUserId?: string | null;
   prefetchKnowledge?: boolean;
   recordTiming?: RuntimeTimingRecorder;
   collection?: FieldCollectionContext;
@@ -778,6 +783,21 @@ export class StructuredTurnEngine {
   async execute(
     input: ExecuteStructuredTurnInput,
   ): Promise<StructuredTurnExecution> {
+    if (input.stage === "extraction") {
+      input = {
+        ...input,
+        visitorMessage: resolveChannelPhoneReference({
+          channel: input.channel,
+          externalUserId: input.externalUserId,
+          fields:
+            input.activeTask?.task.definition.fields ??
+            input.collection?.fields ??
+            [],
+          requestedFieldKey: input.requestedFieldKey,
+          text: input.visitorMessage,
+        }),
+      };
+    }
     if (isExplicitTaskCancellation(input)) {
       return {
         attempts: 0,

@@ -5,6 +5,41 @@ import {
   validateTaskFieldValue,
 } from "@/lib/conversational-task-field-validation";
 
+// Resolve only an explicit request to use this channel's sender number.
+// Never infer a phone from browser identity or choose between competing fields.
+export function resolveChannelPhoneReference(input: {
+  channel: string;
+  externalUserId?: string | null;
+  fields: TaskFieldDefinition[];
+  requestedFieldKey?: string | null;
+  text: string;
+}): string {
+  if (
+    input.channel !== "whatsapp" ||
+    !input.externalUserId ||
+    !/^\+?[1-9]\d{6,14}$/.test(input.externalUserId) ||
+    /\b(?:not|don't|instead|rather|or)\b/i.test(input.text)
+  )
+    return input.text;
+  const fields = input.fields.filter(
+    (field) =>
+      field.type === "phone" &&
+      field.cardinality === "single" &&
+      field.sourcePriority.includes("visitor") &&
+      !field.optionSource,
+  );
+  const field =
+    fields.find(({ key }) => key === input.requestedFieldKey) ??
+    (fields.length === 1 ? fields[0] : null);
+  if (!field) return input.text;
+  const phone = `+${input.externalUserId.replace(/^\+/, "")}`;
+  const reference =
+    /(^|[.!?;\n]\s*|\band\s+)(?:(?:please|can you|could you)\s+)?(?:use|call me on|contact me on|reach me on)\s+(?:my|this)\s+whatsapp (?:phone )?number\b/gi;
+  return input.text.replace(reference, (_, prefix: string) => {
+    return `${prefix}${field.key}: ${phone}`;
+  });
+}
+
 // Unscoped ambiguity is deliberately conservative. A model's confidence cannot
 // override an explicitly uncertain field or choose between duplicate candidates.
 export function getClearCandidatesDuringClarification(

@@ -1501,6 +1501,7 @@ async function executeTaskBoundary(input: {
                   (message) => message.role === "assistant",
                 ),
                 channel: input.runtimeInput.channelType,
+                externalUserId: input.runtimeInput.externalUserId,
                 companyName: input.project.companyName,
                 context: toRuntimeContext(session.runtime),
                 fieldState: toRuntimeFieldState({

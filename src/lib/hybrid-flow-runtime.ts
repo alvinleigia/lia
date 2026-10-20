@@ -464,6 +464,31 @@ export function reconcileTaskTurnWithRuntime(
         toolRequest: null,
       };
     }
+    if (
+      !requiredOperation &&
+      !input.snapshot.toolDefinitions.some(
+        (tool) => tool.requiredForCompletion,
+      ) &&
+      input.snapshot.task.definition.outcomes.some(
+        (outcome) => outcome.type === "completed",
+      ) &&
+      ["field_answer", "field_correction"].includes(input.proposal.turnKind) &&
+      ["ask", "confirm"].includes(input.proposal.nextAction) &&
+      input.proposal.safety.decision === "allow" &&
+      !input.proposal.ambiguity.requiresClarification &&
+      !input.proposal.toolRequest
+    ) {
+      return {
+        ...input.proposal,
+        fieldCandidates: [],
+        decisionSummary: "All required fields are valid; requested submission.",
+        nextAction: "confirm",
+        reply: `I have the required details for ${input.snapshot.task.name}. Reply Confirm to submit this request, or Cancel to stop.`,
+        outcomeRecommendation: null,
+        routeRecommendation: null,
+        taskRecommendation: null,
+      };
+    }
     return input.proposal;
   }
   const { definition, runtimeField: unresolvedField } = unresolved;

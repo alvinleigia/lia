@@ -1748,6 +1748,7 @@ async function interpretFlowFieldAnswer(input: {
         ),
         assistantIntroduced: true,
         channel: getChannelTypeForFlowSource(input.source),
+        externalUserId: input.submission.conversationId,
         companyName: project.companyName,
         context: [
           {
@@ -2493,6 +2494,38 @@ export async function processChannelFlowText(input: {
   const triggeredAction = findTriggeredAction(actions, input.text);
 
   if (!triggeredAction) {
+    const [project, projectPolicy, history] = await Promise.all([
+      getProjectTurnContext(input.projectId),
+      getConversationProjectPolicy(input.projectId),
+      input.channelConversationId
+        ? listRecentChannelMessages({
+            beforeMessageId: input.inboundMessageId,
+            conversationId: input.channelConversationId,
+            projectId: input.projectId,
+          }).then(toTurnHistory)
+        : Promise.resolve([]),
+    ]);
+    if (project) {
+      const { proposal } = await executeConfiguredStructuredTurn({
+        activeTask: null,
+        assistantBehavior: normalizeProjectAiSettings(
+          project.projectAiSettings,
+        ),
+        assistantIntroduced: history.some(({ role }) => role === "assistant"),
+        channel: getChannelTypeForFlowSource(input.source),
+        companyName: project.companyName,
+        context: [],
+        fieldState: [],
+        history,
+        projectId: input.projectId,
+        projectName: project.projectName,
+        projectPolicy,
+        publishedTasks: [],
+        stage: "knowledge",
+        visitorMessage: input.text,
+      });
+      return { replies: [createTextReply(proposal.reply)] };
+    }
     return {
       replies: [
         createTextReply(

@@ -19,6 +19,7 @@ import {
 } from "../../src/lib/db-schema";
 import { readFlowFieldCandidates } from "../../src/lib/flow-field-collection";
 import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
+import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 import { getRuntimeProjectAction } from "../../src/lib/runtime-actions";
 
 const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -29,6 +30,51 @@ let fixture: {
   userId: number;
   workspaceId: number;
 };
+
+test("standalone WhatsApp knowledge uses project answers without starting a flow", async () => {
+  const answers = [
+    { question: "Do you have a swimming pool?", answer: "A pool is listed." },
+    { question: "Do you offer bike pickup?", answer: "Pickup is available." },
+    { question: "Is parking free?", answer: "Parking is free." },
+  ];
+  await db
+    .update(projects)
+    .set({
+      aiSettings: {
+        ...DEFAULT_PROJECT_AI_SETTINGS,
+        approvedKnowledgeAnswers: answers,
+      },
+    })
+    .where(eq(projects.id, fixture.projectId));
+  const submissions = await db
+    .select()
+    .from(actionSubmissions)
+    .where(eq(actionSubmissions.projectId, fixture.projectId));
+  try {
+    for (const { question, answer } of answers) {
+      const result = await processChannelFlowText({
+        activeSubmission: null,
+        conversationId: `${suffix}-standalone`,
+        projectId: fixture.projectId,
+        source: "whatsapp_chat",
+        text: question,
+      });
+      expect(result.replies.map(({ text }) => text)).toEqual([answer]);
+      expect(result.boundaryNodeId).toBeUndefined();
+    }
+    expect(
+      await db
+        .select()
+        .from(actionSubmissions)
+        .where(eq(actionSubmissions.projectId, fixture.projectId)),
+    ).toHaveLength(submissions.length);
+  } finally {
+    await db
+      .update(projects)
+      .set({ aiSettings: DEFAULT_PROJECT_AI_SETTINGS })
+      .where(eq(projects.id, fixture.projectId));
+  }
+});
 
 function step(id: number, stepType: string): RuntimeActionStep {
   return {

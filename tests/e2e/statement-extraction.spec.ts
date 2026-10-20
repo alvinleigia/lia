@@ -11,6 +11,7 @@ import {
 import {
   extractLocalTaskFieldCandidates,
   getClearCandidatesDuringClarification,
+  resolveChannelPhoneReference,
 } from "../../src/lib/conversation-field-extraction";
 import { compileStructuredTurn } from "../../src/lib/conversation-turn-compiler";
 import type { TurnResultV1 } from "../../src/lib/conversation-turn-contracts";
@@ -112,6 +113,159 @@ const appointmentMessage =
   "I want to book an appointment on 22 September 2026 at 10:00 am Australia/Sydney. My name is Alex Test, my contact number is +61491570006, and the reason is persistent knee pain.";
 const bikeMessage =
   "Book my Yamaha MT-15 for an oil change on 25 September 2026 at 9 am. I am Alex Test, and my number is +61491570006.";
+
+for (const [name, phoneKey] of [
+  ["Hotel enquiry", "guestPhone"],
+  ["Service enquiry", "customerPhone"],
+  ["Appointment enquiry", "contactNumber"],
+]) {
+  test(`${name}: explicitly reuse WhatsApp sender and prompt to submit without a model`, async () => {
+    const snapshot = task(name, [[phoneKey, "Contact Number", "phone"]]);
+    snapshot.task.definition.tools = [];
+    snapshot.toolDefinitions = [];
+    let modelCalls = 0;
+    const engine = new StructuredTurnEngine({
+      provider: {
+        async generateTurn() {
+          modelCalls++;
+          throw new Error("This explicit phone request needs no model.");
+        },
+      },
+    });
+    const message = "Please use my WhatsApp number.";
+    const result = await engine.execute({
+      ...input(snapshot, message, phoneKey),
+      channel: "whatsapp",
+      externalUserId: "61491570006",
+    });
+    const saved = await reconcile(snapshot, result.proposal, message, phoneKey);
+    expect(modelCalls).toBe(0);
+    expect(saved.values[phoneKey]).toBe("+61491570006");
+    expect(saved.next.nextAction).toBe("confirm");
+    expect(saved.next.reply).toContain("Reply Confirm to submit");
+    expect(saved.next.outcomeRecommendation).toBeNull();
+  });
+}
+
+test("WhatsApp number references preserve other details and respect channel, consent and field ambiguity", () => {
+  const fields = appointment.task.definition.fields;
+  const base = {
+    channel: "whatsapp",
+    externalUserId: "61491570006",
+    fields,
+    text: "My name is Alex Test. Please use my WhatsApp number for a callback tomorrow.",
+  };
+  expect(resolveChannelPhoneReference(base)).toBe(
+    "My name is Alex Test. contactNumber: +61491570006 for a callback tomorrow.",
+  );
+  for (const change of [
+    { channel: "project_chat" },
+    { externalUserId: null },
+    { externalUserId: "visitor-123" },
+    { text: "Do not use my WhatsApp number." },
+    { text: "Don't use my WhatsApp number." },
+    { text: "Can you tell me my WhatsApp number?" },
+    { text: "Use my WhatsApp number or my office number." },
+  ]) {
+    const value = { ...base, ...change };
+    expect(resolveChannelPhoneReference(value)).toBe(value.text);
+  }
+  const competing = {
+    ...base,
+    text: "Use my WhatsApp number",
+    fields: [...fields, { ...fields[1], key: "otherPhone" }],
+  };
+  expect(resolveChannelPhoneReference(competing)).toBe(competing.text);
+  expect(
+    resolveChannelPhoneReference({
+      ...competing,
+      requestedFieldKey: "otherPhone",
+    }),
+  ).toBe("otherPhone: +61491570006");
+});
+
+test("mixed callback details retain the explicit sender number during model extraction", async () => {
+  const snapshot = task("Hotel callback", [
+    ["guestName", "Guest Name", "text"],
+    ["phone", "Contact Number", "phone"],
+    ["callbackWindow", "Callback Window", "text"],
+  ]);
+  snapshot.task.definition.tools = [];
+  snapshot.toolDefinitions = [];
+  const message =
+    "My name is Hotel Test. Please use my WhatsApp number for a callback on 21 October 2026 between 2 pm and 4 pm.";
+  let calls = 0;
+  const engine = new StructuredTurnEngine({
+    provider: {
+      async generateTurn(request) {
+        calls++;
+        expect(request.messages.at(-1)?.content).toContain(
+          "phone: +61491570006 for a callback",
+        );
+        return {
+          modelId: request.modelId,
+          output: proposal({
+            guestName: "Hotel Test",
+            phone: "+61491570006",
+            callbackWindow: "21 October 2026 between 2 pm and 4 pm",
+          }),
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        };
+      },
+    },
+  });
+  const result = await engine.execute({
+    ...input(snapshot, message, "guestName"),
+    channel: "whatsapp",
+    externalUserId: "61491570006",
+  });
+  const saved = await reconcile(
+    snapshot,
+    result.proposal,
+    message,
+    "guestName",
+  );
+  expect(calls).toBe(1);
+  expect(saved.values).toMatchObject({
+    guestName: "Hotel Test",
+    phone: "+61491570006",
+    callbackWindow: "21 October 2026 between 2 pm and 4 pm",
+  });
+  expect(saved.next.reply).toContain("Reply Confirm to submit");
+});
+
+test("submission prompting preserves missing-field and clarification gates", () => {
+  const snapshot = task("Callback enquiry", [
+    ["guestName", "Guest Name", "text"],
+    ["phone", "Contact Number", "phone"],
+  ]);
+  snapshot.task.definition.tools = [];
+  snapshot.toolDefinitions = [];
+  const fields = snapshot.task.definition.fields.map((field) => ({
+    fieldKey: field.key,
+    isRequired: true,
+    state: "valid",
+    validation: {},
+  }));
+  const raw = proposal({});
+  expect(
+    reconcileTaskTurnWithRuntime({
+      snapshot,
+      fields: fields.map((field) =>
+        field.fieldKey === "phone" ? { ...field, state: "missing" } : field,
+      ),
+      proposal: raw,
+    }).reply,
+  ).toBe("Please provide Contact Number.");
+  const ambiguous = {
+    ...raw,
+    nextAction: "clarify" as const,
+    ambiguity: { requiresClarification: true, question: "Which number?" },
+  };
+  expect(
+    reconcileTaskTurnWithRuntime({ snapshot, fields, proposal: ambiguous }),
+  ).toEqual(ambiguous);
+});
 
 function input(
   snapshot: ConversationalTaskSnapshotV1,
