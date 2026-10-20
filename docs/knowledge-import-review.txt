@@ -28,13 +28,38 @@ with the original document text before approval where possible.
 
 DEPLOYMENT
 Apply migration 0048 to each environment before deploying this release.
-Live migration and isolated runtime/browser tests passed on 20 October 2026.
-Staging migration requires a valid STAGING_DATABASE_URL; the current local
-value is invalid and Vercel's stored secret cannot be revealed.
+Live migration, isolated runtime/browser tests and deployment passed on
+20 October 2026. Live release: 14b3664.
+https://vercel.com/alvin-araujos-projects/lia/tH6pkYitLDe3EyNod9CVBWobohjs
 
-After deployment, migrate the existing hotel's approved FAQ overrides into its
-reviewed source, index and verify them, then clear the matching project-setting
-overrides and republish affected business tasks/flows. Do not remove overrides
-before the replacement is available. Historical immutable versions stay intact.
-The Wi-Fi example was removed from shared instructions; no hotel-specific
-knowledge rewrite or answer rule was added to runtime code.
+The user deferred staging and authorised live deployment. Before pushing,
+lia-staging's Vercel Ignored Build Step was changed from Automatic to
+"Don't build anything" (exit 0). Its previous 43fa34c release remains live.
+Before resuming staging: obtain its valid connection, apply migration 0048,
+restore Ignored Build Step to Automatic, then deploy and verify.
+No environment files or credentials were changed.
+
+LIVE KNOWLEDGE MIGRATION
+Hotel project 1895, source 172: approved revision 2 indexed successfully,
+with 47 explicit FAQ answers and 21 search chunks. The reviewed text is in
+docs/stayflexi-property/hotel-knowledge-reviewed.txt.
+All eight old project FAQ overrides matched the published source answers before
+they were cleared. Task 916 v5 (977) and action 1154 v5 now use the new settings.
+Completion routes remain completed -> step 2556 and cancelled -> end.
+Historical immutable versions retain their previous configuration.
+The Wi-Fi example was removed from shared instructions. Hotel answers now live
+in the source document; no hotel-specific runtime answer rule was added.
+
+LIVE WHATSAPP VERIFICATION
+Authorised test conversation 5541, channel 147:
+- Wi-Fi answer: "Yes, we offer Wi-Fi." (4499).
+- Room service answer uses business wording and preserves unconfirmed details
+  (4501).
+- Fresh enquiry uses task version 977; pricing remains INR 29,960.78 with its
+  indicative-estimate qualification (4508).
+- Room-service interruption answers the FAQ, then resumes guestName (4510).
+- Wi-Fi speed remains unconfirmed and resumes guestName (4512).
+- Cancel ends test run 1289 without booking or callback submission (4514).
+Observed transport-inclusive FAQ replies were about 3.4-5.3 seconds in this
+small check; this is not a general latency guarantee.
+Sanitised evidence: tmp/knowledge-import-live-2026-10-20/whatsapp-results.json.
