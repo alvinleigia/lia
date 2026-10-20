@@ -85,3 +85,16 @@ import/retrieval regressions and must not be mistaken for live answers.
 Original source JSON/text and unrelated local files were not deleted.
 Verification: 70 focused contract checks, TypeScript, targeted Biome and
 production build passed. Build log: tmp/knowledge-cleanup-build-2026-10-20.txt.
+Final code release 96cf5cd is Ready. The shared exact-question rule now explicitly
+keeps limitations relevant to the request, without amenity-specific examples.
+The follow-up contract run passed 62 checks.
+WhatsApp test run 1290 used task version 978; price 4521 retained INR 29,960.78,
+FAQ interruption 4523 resumed guestName, and Cancel 4525 ended the test.
+Evidence: tmp/knowledge-import-live-2026-10-20/cleanup-results.json.
+
+Remaining finding: paraphrased internet-access questions still received
+unrequested speed/continuity caveats in WhatsApp (4529) and a fresh project
+chat after the final release. Exact imported questions remain concise.
+The generic prompt clarification alone did not resolve this. Do not claim
+paraphrase wording is fully fixed or add another client-specific override.
+A separate shared retrieval/answer-selection investigation is needed.
