@@ -136,10 +136,37 @@ function engineInput() {
 }
 
 test("selected source answers replace model embellishment across combined questions", async () => {
-  for (const [question, answers] of [
+  for (const [question, answers, expected] of [
     [
       "Do you have Wi-Fi and a swimming pool?",
       ["Yes, we offer Wi-Fi.", "Yes, we have a swimming pool."],
+      "Yes, we offer Wi-Fi, and we have a swimming pool.",
+    ],
+    [
+      "Do you provide installation and repairs?",
+      ["Yes, we provide installation.", "Yes, we offer repairs."],
+      "Yes, we provide installation, and we offer repairs.",
+    ],
+    [
+      "Can you collect and repair my bicycle?",
+      ["Yes, we collect bicycles within 5 km.", "Yes, we repair bicycles."],
+      "Yes, we collect bicycles within 5 km, and we repair bicycles.",
+    ],
+    [
+      "Do you offer remote and evening consultations?",
+      [
+        "Yes, we offer remote consultations.",
+        "No, evening appointments are unavailable.",
+      ],
+      "Yes, we offer remote consultations.\nNo, evening appointments are unavailable.",
+    ],
+    [
+      "Do you collect and repair bicycles?",
+      [
+        "Yes, we collect bicycles. Other areas cost INR 200.",
+        "Yes, we repair bicycles; parts cost extra.",
+      ],
+      "Yes, we collect bicycles. Other areas cost INR 200.\nYes, we repair bicycles; parts cost extra.",
     ],
     [
       "Can you collect and repair my bicycle?",
@@ -147,6 +174,7 @@ test("selected source answers replace model embellishment across combined questi
         "We collect bicycles within 5 km.",
         "We repair bicycles; parts cost extra.",
       ],
+      "We collect bicycles within 5 km.\nWe repair bicycles; parts cost extra.",
     ],
     [
       "Are evening consultations and remote appointments available?",
@@ -154,6 +182,7 @@ test("selected source answers replace model embellishment across combined questi
         "Evening consultations are available on Tuesdays.",
         "Remote appointments require an initial assessment.",
       ],
+      "Evening consultations are available on Tuesdays.\nRemote appointments require an initial assessment.",
     ],
   ] as const) {
     const provider = new QueueProvider([
@@ -195,7 +224,7 @@ test("selected source answers replace model embellishment across combined questi
         })),
       },
     });
-    expect(result.proposal.reply).toBe(answers.join("\n"));
+    expect(result.proposal.reply).toBe(expected);
     expect(result.source).toBe("model");
     expect(provider.calls).toHaveLength(1);
     expect(result.proposal.fieldCandidates).toEqual([]);

@@ -21,6 +21,21 @@ function schemaIssueCode(path: PropertyKey[], message: string) {
   return `schema:${location}:${message}`;
 }
 
+function composeApprovedAnswers(answers: string[]) {
+  if (answers.length === 2) {
+    const [first, second] = answers.map((answer) =>
+      /^Yes, we ([^.!?;,:\n]+)\.$/i.exec(answer.trim()),
+    );
+    if (first && second) {
+      // Keep each clause's subject so a qualification on one fact does not
+      // become a shared qualification. Only remove the repeated affirmation.
+      return `Yes, we ${first[1]}, and we ${second[1]}.`;
+    }
+  }
+  // Preserve longer answers, lists, negatives and their conditions verbatim.
+  return answers.join("\n");
+}
+
 export function validateStructuredTurnProposal(
   value: unknown,
   allowed: StructuredTurnValidationContext,
@@ -220,7 +235,9 @@ export function validateStructuredTurnProposal(
     else if (
       proposal.answerSelections.every((part) => part.answerId !== null)
     ) {
-      selectedReply = [...new Set(answers)].join("\n");
+      selectedReply = composeApprovedAnswers([
+        ...new Set(answers.filter((answer) => answer !== undefined)),
+      ]);
       selectedIds = ids;
       // Never truncate an approved condition to fit the reply limit.
       if (selectedReply.length > 2_000)
