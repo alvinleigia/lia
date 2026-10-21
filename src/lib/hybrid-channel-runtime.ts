@@ -230,19 +230,25 @@ async function buildHybridChannelResumeRepliesInternal(input: {
 
 function formatConfirmationValue(value: unknown) {
   if (Array.isArray(value)) return value.map(String).join(", ");
+  if (typeof value === "boolean") return value ? "Yes" : "No";
   if (
-    typeof value === "boolean" ||
-    typeof value === "number" ||
-    typeof value === "string"
-  ) {
+    value &&
+    typeof value === "object" &&
+    "start" in value &&
+    "end" in value &&
+    typeof value.start === "string" &&
+    typeof value.end === "string"
+  )
+    return `${value.start} to ${value.end}`;
+  if (typeof value === "number" || typeof value === "string") {
     return String(value);
   }
   return value === null || value === undefined ? "" : JSON.stringify(value);
 }
 
-async function buildTaskConfirmationText(input: {
+export async function buildTaskConfirmationText(input: {
   confirmationSummary: unknown;
-  operationName: string;
+  operationName: string | null;
   projectId: number;
   runtime: NonNullable<
     Awaited<ReturnType<typeof getConversationTaskRuntimeSession>>["runtime"]
@@ -314,7 +320,9 @@ async function buildTaskConfirmationText(input: {
     ...lines,
     ...appointmentReviewLines(input.confirmationSummary),
     "",
-    `Confirm to submit this request through ${input.operationName}, or Cancel to stop.`,
+    input.operationName
+      ? `Confirm to submit this request through ${input.operationName}, or Cancel to stop.`
+      : "Reply Confirm to submit this request for review, or Cancel to stop.",
   ].join("\n");
 }
 
@@ -2129,6 +2137,16 @@ async function executeTaskBoundary(input: {
           signals: [],
         };
       }
+      reconciledProposal = {
+        ...reconciledProposal,
+        reply: await buildTaskConfirmationText({
+          confirmationSummary: null,
+          operationName: null,
+          projectId: input.runtimeInput.projectId,
+          runtime: canonicalSession.runtime,
+          snapshot: canonicalSession.snapshot,
+        }),
+      };
     }
     const baseInputRequest =
       canonicalSession.runtime && canonicalSession.snapshot

@@ -114,6 +114,14 @@ function normalizeValue(
 }
 
 export function isTaskPricingQuestion(text: string) {
+  // A price mention does not make an inclusion/policy question arithmetic.
+  // Keep these on grounded knowledge rather than repeating a numeric quote.
+  if (
+    /\b(?:includes?|included|inclusions?|covers?|covered|refundable|refunds?|cancellation|polic(?:y|ies))\b/i.test(
+      text,
+    )
+  )
+    return false;
   return /\b(?:prices?|pricing|rates?|costs?|totals?|quotes?|discounts?|offers|coupons?|cheaper|bargain|how much|percent off)\b|%\s*off\b/i.test(
     text,
   );

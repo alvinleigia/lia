@@ -15,10 +15,29 @@ import { validateConversationalTaskForPublish } from "../../src/lib/conversation
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 import {
   answerTaskPricing,
+  isTaskPricingQuestion,
   taskPriceTableSchema,
 } from "../../src/lib/task-price-table";
 
 const table = taskPriceTableSchema.parse(mockPrices);
+
+test("price inclusion and policy questions do not trigger arithmetic across domains", () => {
+  for (const text of [
+    "Does that price include breakfast?",
+    "Does the service price cover replacement parts?",
+    "Is the consultation fee refundable?",
+    "What is included in that rate?",
+    "What is the cancellation policy for this price?",
+  ])
+    expect(isTaskPricingQuestion(text)).toBe(false);
+  for (const text of [
+    "What is the total price?",
+    "What is the price including tax?",
+    "Any cheaper rates?",
+    "Change checkout to 29 October. What is the price now?",
+  ])
+    expect(isTaskPricingQuestion(text)).toBe(true);
+});
 const selected = table.rows.filter(
   (row) => row.match.roomCount === 2 && row.match.ratePlan === "Standard Plan",
 )[0];

@@ -28,6 +28,7 @@ import {
   type ToolDefinitionV1,
 } from "../../src/lib/conversation-contracts";
 import type { SelectActionSubmission } from "../../src/lib/db-schema";
+import { buildTaskConfirmationText } from "../../src/lib/hybrid-channel-runtime";
 import { runAutomatedHybridFlowTest } from "../../src/lib/hybrid-flow-automated-test";
 import { runBehavioralHybridFlowTest } from "../../src/lib/hybrid-flow-behavioral-test";
 import { runCombinationHybridFlowTest } from "../../src/lib/hybrid-flow-combination-test";
@@ -72,6 +73,72 @@ import {
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 const outcomes = DEFAULT_CONVERSATIONAL_TASK_DEFINITION.outcomes;
+
+test("enquiry confirmation renders validated fields without requiring a write operation", async () => {
+  const fields = [
+    {
+      ...REFERENCE_BOOKING_TASK_DEFINITION.fields[0],
+      key: "stayDates",
+      label: "Stay Dates",
+      type: "date_range",
+      optionSource: null,
+    },
+    {
+      ...REFERENCE_BOOKING_TASK_DEFINITION.fields[0],
+      key: "callbackRequested",
+      label: "Callback Requested",
+      type: "boolean",
+      optionSource: null,
+    },
+    {
+      ...REFERENCE_BOOKING_TASK_DEFINITION.fields[0],
+      key: "guestName",
+      label: "Guest Name",
+      type: "text",
+      optionSource: null,
+    },
+  ];
+  const snapshot = conversationalTaskSnapshotV1Schema.parse({
+    ...taskSnapshot,
+    toolDefinitions: [],
+    task: {
+      ...taskSnapshot.task,
+      definition: { ...taskSnapshot.task.definition, fields, tools: [] },
+    },
+  });
+  const runtime = {
+    run: { id: 1 },
+    fields: [
+      {
+        fieldKey: "stayDates",
+        state: "valid",
+        canonicalValue: { start: "2026-10-26", end: "2026-10-29" },
+      },
+      {
+        fieldKey: "callbackRequested",
+        state: "confirmed",
+        canonicalValue: true,
+      },
+      {
+        fieldKey: "guestName",
+        state: "invalid",
+        canonicalValue: "Do not display invalid values",
+      },
+    ],
+  } as Parameters<typeof buildTaskConfirmationText>[0]["runtime"];
+  const reply = await buildTaskConfirmationText({
+    snapshot,
+    runtime,
+    projectId: 194,
+    confirmationSummary: null,
+    operationName: null,
+  });
+  expect(reply).toContain("Stay Dates: 2026-10-26 to 2026-10-29");
+  expect(reply).toContain("Callback Requested: Yes");
+  expect(reply).not.toContain("Guest Name");
+  expect(reply).toContain("Reply Confirm to submit this request for review");
+  expect(reply).not.toContain("through null");
+});
 
 for (const scenario of [
   {
