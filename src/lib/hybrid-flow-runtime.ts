@@ -167,11 +167,23 @@ export function bindRequestedTaskTextAnswer(input: {
     !isSimpleTaskTextAnswer(value) &&
     typeof candidate?.naturalValue === "string" &&
     candidate.naturalValue.trim() &&
+    !isPotentialKnowledgeSideQuestion(candidate.naturalValue) &&
     value
       .toLocaleLowerCase()
       .includes(candidate.naturalValue.trim().toLocaleLowerCase())
   ) {
     return input.proposal;
+  }
+
+  // A question must not become a free-text value just because extraction
+  // classified the turn as a field answer. Explicit extracted details above
+  // still survive mixed answers and questions.
+  if (isPotentialKnowledgeSideQuestion(value)) {
+    return {
+      ...input.proposal,
+      fieldCandidates: [],
+      turnKind: "side_question",
+    };
   }
 
   // The current channel message is authoritative for a requested free-text

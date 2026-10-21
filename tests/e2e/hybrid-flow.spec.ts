@@ -1664,6 +1664,41 @@ test("direct answers bind the requested text field to the exact visitor message"
   ).toEqual({ ...proposal, turnKind: "side_question" });
 });
 
+test("misclassified questions cannot populate the requested text field", () => {
+  const proposal = createRequestedTaskSelectionProposal({
+    requestedFieldKey: "guestName",
+    selectionValue: "Alex Test",
+  });
+  if (!proposal) throw new Error("Missing fixture");
+  for (const text of [
+    "Does that price include breakfast?",
+    "Does the service price cover parts",
+    "Is the consultation refundable?",
+  ]) {
+    for (const naturalValue of [null, text, "Invented Guest"]) {
+      const result = bindRequestedTaskTextAnswer({
+        proposal: {
+          ...proposal,
+          fieldCandidates: naturalValue
+            ? [{ ...proposal.fieldCandidates[0], naturalValue }]
+            : [],
+        },
+        requestedFieldKey: "guestName",
+        text,
+      });
+      expect(result.fieldCandidates).toEqual([]);
+      expect(result.turnKind).toBe("side_question");
+    }
+  }
+  expect(
+    bindRequestedTaskTextAnswer({
+      proposal,
+      requestedFieldKey: "guestName",
+      text: "My name is Alex Test; does that price include breakfast?",
+    }).fieldCandidates,
+  ).toEqual(proposal.fieldCandidates);
+});
+
 test("multi-field answers preserve extracted values while waiting for text", () => {
   const proposal = createRequestedTaskSelectionProposal({
     requestedFieldKey: "guestName",
