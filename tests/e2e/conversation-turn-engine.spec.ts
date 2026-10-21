@@ -470,6 +470,18 @@ test("@live-openai detailed pricing requests can enter a published channel task 
   // this routing reply; only validated task fields reach the price calculator.
 });
 
+test("cancelling an enquiry cannot become the requested name", async () => {
+  const provider = new QueueProvider([]);
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    requestedFieldKey: "guestName",
+    visitorMessage: "Cancel this enquiry.",
+  });
+  expect(result.proposal.nextAction).toBe("cancel");
+  expect(result.proposal.fieldCandidates).toEqual([]);
+  expect(provider.calls).toHaveLength(0);
+});
+
 test("minimal enquiry continues the pinned task without repair or restart", async () => {
   const provider = new QueueProvider([
     baseTurn({

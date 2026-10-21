@@ -120,7 +120,10 @@ export function isExplicitCancellationRequest(
   const normalized = normalizeExplicitIntent(value);
   return (
     (options.allowBareNo === true && normalized === "no") ||
-    EXPLICIT_CANCELLATION_PHRASES.has(normalized)
+    EXPLICIT_CANCELLATION_PHRASES.has(normalized) ||
+    /^(?:please )?(?:cancel|stop|end|abort) (?:(?:this|the|my) )?(?:enquiry|inquiry)$/.test(
+      normalized,
+    )
   );
 }
 
@@ -148,9 +151,9 @@ export function isSimpleTaskTextAnswer(value: string) {
     text.split(/\s+/).length <= 8 &&
     !/[,;:!?\n]|\.\s/.test(text) &&
     !/\b(?:i|my|we|our|and|actually|instead|rather)\b/i.test(text) &&
-    // Correction verbs need extraction; nouns such as "oil change" and
+    // Control/correction verbs need interpretation; nouns such as "oil change" and
     // "software update" are still valid answers to a requested text field.
-    !/^(?:(?:please|kindly)\s+|(?:can|could|would|will)\s+you\s+(?:please\s+)?)?(?:change|correct|update)\b/i.test(
+    !/^(?:(?:please|kindly)\s+|(?:can|could|would|will)\s+you\s+(?:please\s+)?)?(?:cancel|stop|end|abort|change|correct|update)\b/i.test(
       text,
     ) &&
     !/\b(?:change|correct|update)\s+(?:to|from)\b/i.test(text)

@@ -3,6 +3,7 @@ import {
   isExplicitCancellationRequest,
   isExplicitConfirmationRequest,
   isPotentialKnowledgeSideQuestion,
+  isSimpleTaskTextAnswer,
   isStandaloneKnowledgeQuestion,
   shouldUseKnowledgeSideQuestion,
 } from "../../src/lib/conversation-control-intents";
@@ -29,6 +30,13 @@ test.describe("explicit conversation cancellation", () => {
       true,
     );
     expect(isExplicitCancellationRequest("Never mind")).toBe(true);
+    for (const phrase of [
+      "Cancel this enquiry.",
+      "Please cancel my inquiry",
+      "Stop the enquiry",
+      "End this inquiry",
+    ])
+      expect(isExplicitCancellationRequest(phrase)).toBe(true);
   });
 
   test("does not cancel negated or incidental mentions", () => {
@@ -39,6 +47,12 @@ test.describe("explicit conversation cancellation", () => {
       isExplicitCancellationRequest("What is your cancellation policy?"),
     ).toBe(false);
     expect(isExplicitCancellationRequest("No")).toBe(false);
+    expect(isExplicitCancellationRequest("Do not cancel this enquiry")).toBe(
+      false,
+    );
+    expect(isExplicitCancellationRequest("Can I cancel my enquiry?")).toBe(
+      false,
+    );
   });
 
   test("allows a bare no only at confirmation boundaries", () => {
@@ -46,6 +60,18 @@ test.describe("explicit conversation cancellation", () => {
       true,
     );
   });
+});
+
+test("control instructions are never treated as simple free-text field answers", () => {
+  for (const phrase of [
+    "Cancel this enquiry.",
+    "Please stop this process",
+    "End this conversation",
+    "Could you cancel it",
+  ])
+    expect(isSimpleTaskTextAnswer(phrase)).toBe(false);
+  expect(isSimpleTaskTextAnswer("Alex Test")).toBe(true);
+  expect(isSimpleTaskTextAnswer("oil change")).toBe(true);
 });
 
 test.describe("deterministic flow side questions", () => {

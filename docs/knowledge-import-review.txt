@@ -146,3 +146,28 @@ older GitHub deployment. WhatsApp message 4962 in conversation 5541 delivered:
 No extra hours, charges or contact advice appeared. Evidence:
 tmp/natural-faq-whatsapp.json. This is a narrow composition improvement;
 other answer structures retain their original approved wording.
+
+FRESH CHANNEL PRICING ENQUIRIES - 21 OCTOBER 2026
+WhatsApp message 4963 arrived after cancellation without a literal action
+trigger. The channel knowledge fallback exposed no published tasks, so the
+request never reached deterministic pricing and exhausted three model attempts.
+Channel fallback now offers only uniquely mapped, published task entry flows,
+using the pinned version and channel-specific entry. It preserves the visitor's
+whole statement for normal task extraction and discards the routing draft.
+FAQ selection explicitly defers personalized pricing to a matching task.
+No calculator, price data, tenant boundary or confirmation rule was changed.
+
+Verification: 151 contract/engine/flow/pricing checks, eight metered scenarios
+(hotel/service/appointment FAQs and pricing entry), tenant scope and build passed.
+Live release fb8f49c returned INR 29,960.78 including tax for the exact request
+in message 4967. Task 1292 retained all six inputs. The pricing step used zero
+model calls (9 ms); routing and extraction each used one model attempt.
+WhatsApp round trip was about 13 seconds, not a general latency improvement.
+FAQ interruption 4969 preserved all six validated inputs and resumed guest name.
+
+Cleanup exposed a separate control gap: "Cancel this enquiry" was treated as
+a text field answer. A bare "Cancel" closed only test task 1292 (message 4973).
+The follow-up handles explicit enquiry/inquiry cancellation locally and excludes
+control instructions from the free-text shortcut. Its 140 relevant checks pass.
+Evidence: tmp/pricing-entry-whatsapp.json, tmp/pricing-entry-live.txt,
+tmp/pricing-entry-tests.txt and tmp/pricing-cancel-tests.txt.
