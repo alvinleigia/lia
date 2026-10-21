@@ -117,3 +117,16 @@ No extra model-review call, schema migration or knowledge republishing is needed
 Sources without approved FAQs still use grounded generation; semantic selection
 is not a guarantee of factual correctness. Continue reviewing flagged replies.
 New evidence references have the form document:<chunk>:answer:<published index>.
+
+Verification: 150 contract/engine/pricing/hybrid checks and 6 database checks
+passed, along with the production build and tenant-scope check. Seven metered
+model scenarios passed (hotel, service and appointment), each in one attempt.
+Live release febd67d is Ready. Vercel's GitHub-delay notice required manually
+launching the exact commit to Production; staging was not changed.
+WhatsApp conversation 5541: combined answers 4945/4951 contain only the two
+requested facts; paraphrase 4947 is concise; explicit hours/fee question 4949
+retains the relevant uncertainty. During test enquiry 1291, answer 4958 resumes
+the adult-count question after preserving the stay dates. Cancel 4960 ended
+that test run without a booking. Evidence: tmp/answer-selection-whatsapp.json.
+Transport-inclusive replies in this check took about 4-10 seconds; this change
+does not claim a general latency improvement or perfect semantic matching.
