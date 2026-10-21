@@ -104,9 +104,24 @@ export function extractLocalTaskFieldCandidates(input: {
       labelled.length = 0;
       break;
     }
+    const naturalValue = part.slice(separator + 1).trim();
+    // A scalar followed by prose may contain another answer or instruction.
+    // Let extraction separate the clauses instead of swallowing them into one
+    // invalid field. Simple invalid values still reach deterministic validation.
+    if (
+      matching[0].type !== "text" &&
+      /\s+\p{L}/u.test(naturalValue) &&
+      !validateTaskFieldValue({
+        field: matching[0],
+        value: naturalValue,
+        referenceDate: input.referenceDate,
+        contextValues: new Map([["lia_timezone", input.timezone]]),
+      }).ok
+    )
+      return null;
     labelled.push({
       fieldKey: matching[0].key,
-      naturalValue: part.slice(separator + 1).trim(),
+      naturalValue,
       confidence: 1,
       source: "visitor",
     });

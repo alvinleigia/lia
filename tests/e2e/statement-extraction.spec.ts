@@ -199,55 +199,57 @@ test("WhatsApp number references preserve other details and respect channel, con
   ).toBe("otherPhone: +61491570006");
 });
 
-test("mixed callback details retain the explicit sender number during model extraction", async () => {
-  const snapshot = task("Hotel callback", [
-    ["guestName", "Guest Name", "text"],
-    ["phone", "Contact Number", "phone"],
-    ["callbackWindow", "Callback Window", "text"],
-  ]);
-  snapshot.task.definition.tools = [];
-  snapshot.toolDefinitions = [];
-  const message =
-    "My name is Hotel Test. Please use my WhatsApp number for a callback on 21 October 2026 between 2 pm and 4 pm.";
-  let calls = 0;
-  const engine = new StructuredTurnEngine({
-    provider: {
-      async generateTurn(request) {
-        calls++;
-        expect(request.messages.at(-1)?.content).toContain(
-          "phone: +61491570006 for a callback",
-        );
-        return {
-          modelId: request.modelId,
-          output: proposal({
-            guestName: "Hotel Test",
-            phone: "+61491570006",
-            callbackWindow: "21 October 2026 between 2 pm and 4 pm",
-          }),
-          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-        };
+for (const leadingName of [true, false])
+  test(`mixed callback details retain the explicit sender number (${leadingName ? "name first" : "phone first"})`, async () => {
+    const snapshot = task("Hotel callback", [
+      ["guestName", "Guest Name", "text"],
+      ["phone", "Contact Number", "phone"],
+      ["callbackWindow", "Callback Window", "text"],
+    ]);
+    snapshot.task.definition.tools = [];
+    snapshot.toolDefinitions = [];
+    const message = leadingName
+      ? "My name is Hotel Test. Please use my WhatsApp number for a callback on 21 October 2026 between 2 pm and 4 pm."
+      : "You may use my WhatsApp number. Please call on 21 October 2026 between 2 pm and 4 pm. My name is Hotel Test.";
+    let calls = 0;
+    const engine = new StructuredTurnEngine({
+      provider: {
+        async generateTurn(request) {
+          calls++;
+          expect(request.messages.at(-1)?.content).toContain(
+            "phone: +61491570006",
+          );
+          return {
+            modelId: request.modelId,
+            output: proposal({
+              guestName: "Hotel Test",
+              phone: "+61491570006",
+              callbackWindow: "21 October 2026 between 2 pm and 4 pm",
+            }),
+            usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        },
       },
-    },
+    });
+    const result = await engine.execute({
+      ...input(snapshot, message, "guestName"),
+      channel: "whatsapp",
+      externalUserId: "61491570006",
+    });
+    const saved = await reconcile(
+      snapshot,
+      result.proposal,
+      message,
+      "guestName",
+    );
+    expect(calls).toBe(1);
+    expect(saved.values).toMatchObject({
+      guestName: "Hotel Test",
+      phone: "+61491570006",
+      callbackWindow: "21 October 2026 between 2 pm and 4 pm",
+    });
+    expect(saved.next.reply).toContain("Reply Confirm to submit");
   });
-  const result = await engine.execute({
-    ...input(snapshot, message, "guestName"),
-    channel: "whatsapp",
-    externalUserId: "61491570006",
-  });
-  const saved = await reconcile(
-    snapshot,
-    result.proposal,
-    message,
-    "guestName",
-  );
-  expect(calls).toBe(1);
-  expect(saved.values).toMatchObject({
-    guestName: "Hotel Test",
-    phone: "+61491570006",
-    callbackWindow: "21 October 2026 between 2 pm and 4 pm",
-  });
-  expect(saved.next.reply).toContain("Reply Confirm to submit");
-});
 
 test("submission prompting preserves missing-field and clarification gates", () => {
   const snapshot = task("Callback enquiry", [
