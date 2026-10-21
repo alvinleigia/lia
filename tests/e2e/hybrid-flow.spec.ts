@@ -48,6 +48,7 @@ import {
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   classifyRequestedTaskAnswer,
+  createCollectionTaskConfirmationProposal,
   createMismatchedTaskSelectionProposal,
   createRequestedTaskSelectionProposal,
   dispatchHybridFlowBoundary,
@@ -692,6 +693,69 @@ const taskSnapshotWithRequiredOperation =
       },
     },
   });
+
+test("collection confirmation uses validated state and the normal completion gate", () => {
+  const snapshot = structuredClone(taskSnapshot);
+  snapshot.toolDefinitions = [];
+  snapshot.task.definition.outcomes = structuredClone(outcomes);
+  const fields = snapshot.task.definition.fields.map((field) => ({
+    fieldKey: field.key,
+    isRequired: true,
+    state: "valid",
+    validation: {},
+  }));
+  const proposal = createCollectionTaskConfirmationProposal({
+    fields,
+    snapshot,
+    text: "Confirm",
+  });
+  expect(proposal?.nextAction).toBe("complete");
+  expect(proposal?.fieldCandidates).toEqual([]);
+  expect(proposal?.toolRequest).toBeNull();
+  if (!proposal) throw new Error("Missing confirmation proposal");
+  expect(
+    reconcileTaskTurnWithRuntime({ fields, snapshot, proposal }).nextAction,
+  ).toBe("complete");
+  expect(
+    shouldAnswerTaskSideQuestion({
+      proposal,
+      text: "Confirm",
+      availabilityHandled: false,
+    }),
+  ).toBe(false);
+  for (const text of [
+    "Can you confirm the price?",
+    "Don't confirm",
+    "Confirm, but change the date to tomorrow",
+  ]) {
+    expect(
+      createCollectionTaskConfirmationProposal({ fields, snapshot, text }),
+    ).toBeNull();
+  }
+  for (const state of ["missing", "invalid", "candidate", "cleared"]) {
+    expect(
+      createCollectionTaskConfirmationProposal({
+        fields: [{ ...fields[0], state }, ...fields.slice(1)],
+        snapshot,
+        text: "Confirm",
+      }),
+    ).toBeNull();
+  }
+  expect(
+    createCollectionTaskConfirmationProposal({
+      fields: fields.slice(1),
+      snapshot,
+      text: "Confirm",
+    }),
+  ).toBeNull();
+  expect(
+    createCollectionTaskConfirmationProposal({
+      fields,
+      snapshot: taskSnapshotWithRequiredOperation,
+      text: "Confirm",
+    }),
+  ).toBeNull();
+});
 
 test("compiler publishes a reachable knowledge-task-deterministic graph", () => {
   const result = compileHybridFlowGraph({

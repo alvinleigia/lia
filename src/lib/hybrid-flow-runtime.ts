@@ -5,6 +5,7 @@ import type {
 } from "@/lib/conversation-contracts";
 import {
   isExplicitCancellationRequest,
+  isExplicitConfirmationRequest,
   isPotentialKnowledgeSideQuestion,
   isSimpleTaskTextAnswer,
 } from "@/lib/conversation-control-intents";
@@ -414,6 +415,48 @@ export function getResumedTaskRuntimeInputRequest(input: {
   return unresolved
     ? createTaskRuntimeInputRequest(unresolved.definition)
     : null;
+}
+
+export function createCollectionTaskConfirmationProposal(input: {
+  fields: HybridTaskRuntimeField[];
+  snapshot: ConversationalTaskSnapshotV1;
+  text: string;
+}): TurnResultV1 | null {
+  if (
+    !isExplicitConfirmationRequest(input.text) ||
+    input.snapshot.toolDefinitions.some((tool) => tool.requiredForCompletion) ||
+    input.snapshot.task.definition.fields.some((definition) => {
+      const field = input.fields.find(
+        ({ fieldKey }) => fieldKey === definition.key,
+      );
+      return (
+        !field ||
+        (field.isRequired && !["valid", "confirmed"].includes(field.state))
+      );
+    })
+  )
+    return null;
+  const completed = input.snapshot.task.definition.outcomes.filter(
+    (outcome) => outcome.type === "completed" && !outcome.condition,
+  );
+  if (completed.length !== 1) return null;
+  // This is only a proposal. The normal runtime still validates completion,
+  // applies the idempotent event and follows the published outcome route.
+  return {
+    ambiguity: { question: null, requiresClarification: false },
+    decisionSummary: "The visitor explicitly confirmed the collected details.",
+    fieldCandidates: [],
+    grounding: { excerptIds: [], status: "not_needed" },
+    nextAction: "complete",
+    outcomeRecommendation: { outcomeKey: completed[0].key, confidence: 1 },
+    reply: "I will submit these details for review.",
+    routeRecommendation: null,
+    safety: { decision: "allow", reasonCode: null },
+    schemaVersion: 1,
+    taskRecommendation: null,
+    toolRequest: null,
+    turnKind: "field_answer",
+  };
 }
 
 export function reconcileTaskSideQuestionWithRuntime(input: {

@@ -98,6 +98,7 @@ import {
   buildHybridGraphTaskReturnTarget,
   buildKnowledgeBoundarySignals,
   classifyRequestedTaskAnswer,
+  createCollectionTaskConfirmationProposal,
   createMismatchedTaskSelectionProposal,
   createRequestedTaskSelectionProposal,
   dispatchHybridFlowBoundary,
@@ -1491,7 +1492,12 @@ async function executeTaskBoundary(input: {
       })
     : selectionProposal
       ? selectionProposal
-      : (localProposal ??
+      : (createCollectionTaskConfirmationProposal({
+          fields: runtime.fields,
+          snapshot,
+          text: requestedAnswer,
+        }) ??
+        localProposal ??
         bindRequestedTaskSelection({
           proposal: (
             await executeConfiguredStructuredTurn(
