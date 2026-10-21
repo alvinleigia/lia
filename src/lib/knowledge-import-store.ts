@@ -290,3 +290,46 @@ export async function getImportedKnowledgeAnswers(
   if (new Set(rows.map((row) => row.answer)).size > 1) return [];
   return rows.slice(0, 2);
 }
+
+// Retrieval identifies candidate chunks. Use complete published FAQ answers
+// from their owning sources, never truncated chunk answers or draft text.
+export async function getPublishedKnowledgeAnswersForChunks(
+  projectId: number,
+  chunkIds: number[],
+) {
+  if (!chunkIds.length) return [];
+  const rows = await db.execute<{
+    chunkId: number;
+    content: string;
+    answers: unknown;
+  }>(sql`
+    select d.id as "chunkId", d.content, s.import_review->'publishedAnswers' as answers
+    from ${documents} d join ${sourceDocuments} s on s.id = d.source_document_id
+    where d.project_id = ${projectId} and s.project_id = ${projectId}
+      and d.id in (${sql.join(
+        chunkIds.slice(0, 12).map((id) => sql`${id}`),
+        sql`, `,
+      )})
+  `);
+  return rows.flatMap((row) => {
+    const parsed = knowledgeImportReviewSchema.shape.publishedAnswers.safeParse(
+      row.answers,
+    );
+    if (!parsed.success) return [];
+    const chunk = normalizeKnowledgeQuestion(row.content);
+    return parsed.data.flatMap((answer, index) =>
+      answer.answer.length <= 1_000 &&
+      answer.question.length <= 240 &&
+      chunk.includes(normalizeKnowledgeQuestion(answer.question))
+        ? [
+            {
+              chunkId: row.chunkId,
+              id: `document:${row.chunkId}:answer:${index + 1}`,
+              question: answer.question,
+              answer: answer.answer,
+            },
+          ]
+        : [],
+    );
+  });
+}

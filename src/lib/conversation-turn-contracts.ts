@@ -49,6 +49,19 @@ export const turnFieldCandidateProposalV1Schema = z
   })
   .strict();
 
+export const approvedAnswerSelectionSchema = z
+  .array(
+    z
+      .object({
+        question: z.string().min(1).max(240),
+        answerId: z.string().min(1).max(120).nullable(),
+      })
+      .strict(),
+  )
+  .min(1)
+  .max(4)
+  .nullable();
+
 export const turnTaskRecommendationV1Schema = z
   .object({
     taskId: z.number().int().positive(),
@@ -79,6 +92,7 @@ const turnResultV1BaseSchema = z
     schemaVersion: z.literal(STRUCTURED_TURN_SCHEMA_VERSION),
     turnKind: z.enum(TURN_KINDS),
     reply: z.string().trim().min(1).max(2_000),
+    answerSelections: approvedAnswerSelectionSchema.optional(),
     grounding: z
       .object({
         status: z.enum(["grounded", "not_needed", "no_answer"]),
@@ -122,6 +136,7 @@ const turnResultV1BaseSchema = z
 
 // Providers require every property; older deterministic proposals remain valid.
 export const turnResultV1ProviderSchema = turnResultV1BaseSchema.extend({
+  answerSelections: approvedAnswerSelectionSchema,
   ambiguity: turnResultV1BaseSchema.shape.ambiguity.extend({
     fieldKeys: z.array(stableKey).max(50).nullable(),
   }),
@@ -171,7 +186,9 @@ export function expandCompactTaskTurn(
   };
   if (stage === "knowledge") {
     return {
-      ...compactTaskKnowledgeProviderSchema.parse(output),
+      ...compactTaskKnowledgeProviderSchema
+        .partial({ answerSelections: true })
+        .parse(output),
       ...constants,
       fieldCandidates: [],
       taskRecommendation: null,
@@ -180,7 +197,9 @@ export function expandCompactTaskTurn(
       outcomeRecommendation: null,
     };
   }
-  const proposal = compactTaskExtractionProviderSchema.parse(output);
+  const proposal = compactTaskExtractionProviderSchema
+    .partial({ answerSelections: true })
+    .parse(output);
   return {
     ...proposal,
     ...constants,
@@ -306,6 +325,18 @@ export const turnRetrievalExcerptV1Schema = z
   .object({
     id: z.string().trim().min(1).max(120),
     content: z.string().trim().min(1).max(4_000),
+    approvedAnswers: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1).max(120),
+            question: z.string().min(1).max(240),
+            answer: z.string().min(1).max(1_000),
+          })
+          .strict(),
+      )
+      .max(100)
+      .optional(),
   })
   .strict();
 

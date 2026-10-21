@@ -34,6 +34,7 @@ export function getPlatformEmbeddingModel() {
 export type StructuredTurnProviderInput = {
   taskKnowledgeOnly?: boolean;
   taskExtractionOnly?: boolean;
+  selectApprovedAnswers?: boolean;
   maxOutputTokens: number;
   maxRetries: number;
   messages: TurnMessageV1[];
@@ -71,11 +72,12 @@ export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
         name: "StructuredTurnV1",
         description:
           "A proposal-only structured conversational turn for server validation.",
-        schema: input.taskKnowledgeOnly
+        schema: (input.taskKnowledgeOnly
           ? compactTaskKnowledgeProviderSchema
           : input.taskExtractionOnly
             ? compactTaskExtractionProviderSchema
-            : turnResultV1ProviderSchema,
+            : turnResultV1ProviderSchema
+        ).omit(input.selectApprovedAnswers ? {} : { answerSelections: true }),
       }),
       system:
         input.system +

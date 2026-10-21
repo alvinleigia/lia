@@ -98,3 +98,22 @@ chat after the final release. Exact imported questions remain concise.
 The generic prompt clarification alone did not resolve this. Do not claim
 paraphrase wording is fully fixed or add another client-specific override.
 A separate shared retrieval/answer-selection investigation is needed.
+
+SHARED ANSWER SELECTION - 21 OCTOBER 2026
+The investigation found that combined/paraphrased questions bypassed exact FAQ
+matching and used broad chunks containing both the requested fact and unrelated
+conditions. Generic wording instructions alone were insufficient.
+
+Retrieved chunks now carry complete FAQ answers from their published source.
+The existing structured model call accounts for each requested aspect and picks
+a matching answer ID, or null if that aspect is not covered. If every aspect is
+covered, the server renders the selected approved answers without model-added
+commentary. It retains all conditions inside those approved answers. A partial
+match keeps the normal reply so unknown details are not silently dropped.
+
+This is shared across domains and channels: no hotel, Wi-Fi or pool branch was
+added. Exact imported FAQ answers and configured pricing remain deterministic.
+No extra model-review call, schema migration or knowledge republishing is needed.
+Sources without approved FAQs still use grounded generation; semantic selection
+is not a guarantee of factual correctness. Continue reviewing flagged replies.
+New evidence references have the form document:<chunk>:answer:<published index>.

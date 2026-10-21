@@ -11,9 +11,13 @@ import {
   StructuredTurnEngine,
   type TurnKnowledgeRetriever,
 } from "../../src/lib/conversation-turn-engine";
-import { RequestTurnKnowledgeRetriever } from "../../src/lib/conversation-turn-retrieval";
+import {
+  ProjectDocumentTurnRetriever,
+  RequestTurnKnowledgeRetriever,
+} from "../../src/lib/conversation-turn-retrieval";
 import { buildSafeTurnDecisionSummary } from "../../src/lib/conversation-turn-safety";
 import {
+  AiSdkStructuredTurnProvider,
   StructuredTurnOutputLimitError,
   type StructuredTurnProvider,
   type StructuredTurnProviderInput,
@@ -130,6 +134,242 @@ function engineInput() {
     visitorMessage: "I would like a facial.",
   };
 }
+
+test("selected source answers replace model embellishment across combined questions", async () => {
+  for (const [question, answers] of [
+    [
+      "Do you have Wi-Fi and a swimming pool?",
+      ["Yes, we offer Wi-Fi.", "Yes, we have a swimming pool."],
+    ],
+    [
+      "Can you collect and repair my bicycle?",
+      [
+        "We collect bicycles within 5 km.",
+        "We repair bicycles; parts cost extra.",
+      ],
+    ],
+    [
+      "Are evening consultations and remote appointments available?",
+      [
+        "Evening consultations are available on Tuesdays.",
+        "Remote appointments require an initial assessment.",
+      ],
+    ],
+  ] as const) {
+    const provider = new QueueProvider([
+      baseTurn({
+        turnKind: "side_question",
+        fieldCandidates: [],
+        reply:
+          "Extra opening hours, charges and contact advice must not be sent.",
+        grounding: {
+          status: "grounded",
+          excerptIds: [
+            "project_approved_answer:1",
+            "project_approved_answer:2",
+          ],
+        },
+        ...{
+          answerSelections: [
+            {
+              question: "First requested service",
+              answerId: "project_approved_answer:1",
+            },
+            {
+              question: "Second requested service",
+              answerId: "project_approved_answer:2",
+            },
+          ],
+        },
+      }),
+    ]);
+    const result = await new StructuredTurnEngine({ provider }).execute({
+      ...engineInput(),
+      stage: "knowledge",
+      visitorMessage: question,
+      assistantBehavior: {
+        ...DEFAULT_PROJECT_AI_SETTINGS,
+        approvedKnowledgeAnswers: answers.map((answer, i) => ({
+          question: `Supported service ${i + 1}?`,
+          answer,
+        })),
+      },
+    });
+    expect(result.proposal.reply).toBe(answers.join("\n"));
+    expect(result.source).toBe("model");
+    expect(provider.calls).toHaveLength(1);
+    expect(result.proposal.fieldCandidates).toEqual([]);
+  }
+});
+
+test("@live-openai approved answer selection handles paraphrases, combined requests and relevant conditions", async () => {
+  test.skip(
+    process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",
+    "Opt-in metered verification only.",
+  );
+  test.setTimeout(300_000);
+  const livePolicy = {
+    ...REFERENCE_BOOKING_PROJECT_POLICY,
+    assistant: {
+      ...REFERENCE_BOOKING_PROJECT_POLICY.assistant,
+      modelPolicy: {
+        ...REFERENCE_BOOKING_PROJECT_POLICY.assistant.modelPolicy,
+        timeoutMs: 45_000,
+        maxRetries: 0,
+      },
+    },
+  };
+  const provider = new AiSdkStructuredTurnProvider();
+  const hotel = new StructuredTurnEngine({
+    retriever: new ProjectDocumentTurnRetriever(),
+    provider,
+  });
+  for (const [question, expected, excluded, selected] of [
+    [
+      "Do you have Wi-Fi and a swimming pool?",
+      /wi-fi[\s\S]*swimming pool/i,
+      /hours|charges|team|speed/i,
+      true,
+    ],
+    [
+      "Is internet access available at the property?",
+      /wi-fi/i,
+      /speed|guarantee|team/i,
+      true,
+    ],
+    [
+      "What are the pool hours and charges?",
+      /team.*confirm/i,
+      /free|24.hour/i,
+      true,
+    ],
+    [
+      "Is the Wi-Fi fast enough for video calls?",
+      /can.t confirm|cannot confirm|clarify/i,
+      /yes.*fast|guaranteed.*speed/i,
+      true,
+    ],
+    [
+      "Do you have Wi-Fi and a rooftop helipad?",
+      /wi-fi/i,
+      /helipad is (?:available|provided)/i,
+      false,
+    ],
+  ] as const) {
+    const result = await hotel.execute({
+      ...engineInput(),
+      activeTask: null,
+      projectPolicy: livePolicy,
+      publishedTasks: [],
+      projectId: 1895,
+      stage: "knowledge",
+      companyName: "Hotel",
+      projectName: "Stayflexi Hotel UAT",
+      visitorMessage: question,
+    });
+    console.log(
+      JSON.stringify({
+        question,
+        reply: result.proposal.reply,
+        selected: result.proposal.answerSelections,
+        attempts: result.attempts,
+        tokens: result.usage.totalTokens,
+      }),
+    );
+    expect(result.proposal.reply).toMatch(expected);
+    expect(result.proposal.reply).not.toMatch(excluded);
+    if (!selected)
+      expect(result.proposal.reply).toMatch(
+        /(?:can.t confirm|cannot confirm|unconfirmed)[^.]*helipad/i,
+      );
+    expect(
+      Boolean(
+        result.proposal.answerSelections?.length &&
+          result.proposal.answerSelections.every(
+            (part) => part.answerId !== null,
+          ),
+      ),
+    ).toBe(selected);
+    expect(result.attempts).toBe(1);
+  }
+  for (const [question, faqs] of [
+    [
+      "Could you pick up and fix my bike?",
+      [
+        {
+          question: "Do you collect bicycles?",
+          answer: "We collect bicycles within 5 km.",
+        },
+        {
+          question: "Do you repair bicycles?",
+          answer: "We repair bicycles; parts cost extra.",
+        },
+        {
+          question: "What are your opening hours?",
+          answer: "We open from 9 am to 5 pm.",
+        },
+      ],
+    ],
+    [
+      "Can I get an evening consultation or a remote appointment?",
+      [
+        {
+          question: "Are evening consultations available?",
+          answer: "Evening consultations are available on Tuesdays.",
+        },
+        {
+          question: "Are remote appointments available?",
+          answer: "Remote appointments require an initial assessment.",
+        },
+        {
+          question: "What is the cancellation fee?",
+          answer: "Late cancellation costs INR 500.",
+        },
+      ],
+    ],
+  ] as const) {
+    const engine = new StructuredTurnEngine({
+      provider,
+      retriever: {
+        async retrieve() {
+          return [
+            {
+              id: "document:12",
+              content: faqs
+                .map((f) => `Q: ${f.question} A: ${f.answer}`)
+                .join("\n"),
+              approvedAnswers: faqs.map((f, i) => ({
+                ...f,
+                id: `document:12:answer:${i + 1}`,
+              })),
+            },
+          ];
+        },
+      },
+    });
+    const result = await engine.execute({
+      ...engineInput(),
+      stage: "knowledge",
+      projectPolicy: livePolicy,
+      visitorMessage: question,
+    });
+    console.log(
+      JSON.stringify({
+        question,
+        reply: result.proposal.reply,
+        selected: result.proposal.answerSelections,
+        attempts: result.attempts,
+      }),
+    );
+    expect(result.proposal.reply).toBe(
+      faqs
+        .slice(0, 2)
+        .map((f) => f.answer)
+        .join("\n"),
+    );
+    expect(result.attempts).toBe(1);
+  }
+});
 
 test("minimal enquiry continues the pinned task without repair or restart", async () => {
   const provider = new QueueProvider([
@@ -902,7 +1142,7 @@ test("approved FAQ references are bounded, stage-scoped and cannot cite missing 
   expect(
     knowledge.validation.allowedExcerptIds.has("project_approved_answer:9"),
   ).toBe(true);
-  expect(knowledge.validation.allowedExcerptIds.size).toBeLessThanOrEqual(4);
+  expect(knowledge.validation.allowedExcerptIds.size).toBeLessThanOrEqual(12);
   const missing = compile("knowledge", "Can you guarantee late checkout?");
   expect(missing.system).toContain("Is late checkout guaranteed?");
   expect(

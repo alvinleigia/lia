@@ -197,11 +197,52 @@ export function validateStructuredTurnProposal(
     }
   }
 
+  let selectedReply: string | null = null;
+  let selectedIds: string[] = [];
+  if (proposal.answerSelections) {
+    const ids = [
+      ...new Set(
+        proposal.answerSelections.flatMap((part) =>
+          part.answerId ? [part.answerId] : [],
+        ),
+      ),
+    ];
+    const answers = ids.map((id) => allowed.approvedAnswers?.get(id));
+    if (
+      answers.some((answer) => !answer) ||
+      hasActionProposal ||
+      proposal.nextAction !== "ask" ||
+      !["ordinary_question", "side_question"].includes(proposal.turnKind) ||
+      proposal.safety.decision !== "allow" ||
+      proposal.ambiguity.requiresClarification
+    )
+      issues.push("invalid_approved_answer_selection");
+    else if (
+      proposal.answerSelections.every((part) => part.answerId !== null)
+    ) {
+      selectedReply = [...new Set(answers)].join("\n");
+      selectedIds = ids;
+      // Never truncate an approved condition to fit the reply limit.
+      if (selectedReply.length > 2_000)
+        issues.push("approved_answers_too_long");
+    }
+  }
+
   if (issues.length > 0) {
     throw new TurnProposalValidationError([...new Set(issues)]);
   }
 
-  return proposal;
+  return selectedReply === null
+    ? proposal
+    : {
+        ...proposal,
+        reply: selectedReply,
+        // Ground the actual server-rendered answer, not discarded model prose.
+        grounding: {
+          status: "grounded",
+          excerptIds: selectedIds,
+        },
+      };
 }
 
 export function applyIntentRoutingPolicy(

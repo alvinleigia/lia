@@ -48,6 +48,7 @@ const snapshot = conversationalTaskSnapshotV1Schema.parse({
 
 function validTurn() {
   return {
+    answerSelections: null,
     schemaVersion: 1 as const,
     turnKind: "ordinary_question" as const,
     reply: "The spa is open from 9 am to 6 pm.",
@@ -72,6 +73,104 @@ function validTurn() {
     decisionSummary: "Answered from one retrieved business-hours excerpt.",
   };
 }
+
+test("FAQ selection validates IDs and cannot replace a partial, ambiguous or actionable answer", () => {
+  const compiled = compileStructuredTurn({
+    activeTask: null,
+    assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
+    assistantIntroduced: true,
+    channel: "whatsapp",
+    companyName: "Test",
+    projectName: "Test",
+    projectPolicy: REFERENCE_BOOKING_PROJECT_POLICY,
+    context: [],
+    fieldState: [],
+    history: [],
+    publishedTasks: [],
+    stage: "knowledge",
+    visitorMessage: "Can you collect my bicycle?",
+    retrieval: [
+      {
+        id: "document:12",
+        content: "Collection and other unrelated policies.",
+        approvedAnswers: [
+          {
+            id: "document:12:answer:1",
+            question: "Do you collect bicycles?",
+            answer: "Yes, within 5 km. Other areas cost INR 200.",
+          },
+        ],
+      },
+    ],
+  });
+  const selected = {
+    ...validTurn(),
+    answerSelections: [
+      {
+        question: "Can you collect my bicycle?",
+        answerId: "document:12:answer:1",
+      },
+    ],
+    grounding: { status: "grounded", excerptIds: ["document:12:answer:1"] },
+  };
+  expect(
+    validateStructuredTurnProposal(selected, compiled.validation).reply,
+  ).toBe("Yes, within 5 km. Other areas cost INR 200.");
+  for (const override of [
+    {
+      answerSelections: [
+        {
+          question: "Can you collect my bicycle?",
+          answerId: "document:999:answer:1",
+        },
+      ],
+    },
+    { grounding: { status: "grounded", excerptIds: ["document:999"] } },
+    {
+      nextAction: "clarify",
+      ambiguity: { requiresClarification: true, question: "Which service?" },
+    },
+    {
+      fieldCandidates: [
+        {
+          fieldKey: "guestName",
+          naturalValue: "Test",
+          confidence: 1,
+          source: "visitor",
+        },
+      ],
+    },
+  ])
+    expect(() =>
+      validateStructuredTurnProposal(
+        { ...selected, ...override },
+        compiled.validation,
+      ),
+    ).toThrow();
+  const partial = {
+    ...validTurn(),
+    answerSelections: [
+      {
+        question: "Can you collect my bicycle?",
+        answerId: "document:12:answer:1",
+      },
+      { question: "Do you provide another service?", answerId: null },
+    ],
+    reply:
+      "We collect bicycles within 5 km. I cannot confirm the other requested service.",
+  };
+  expect(
+    validateStructuredTurnProposal(partial, compiled.validation).reply,
+  ).toBe(partial.reply);
+  const extraction = { ...compiled.validation, approvedAnswers: new Map() };
+  expect(() => validateStructuredTurnProposal(selected, extraction)).toThrow();
+  expect(() =>
+    validateStructuredTurnProposal(selected, {
+      ...compiled.validation,
+      approvedAnswers: new Map([["document:12:answer:1", "x".repeat(2001)]]),
+    }),
+  ).toThrow("validation");
+});
 
 test("compact knowledge keeps grounding and cannot propose task mutations", () => {
   const compact = {

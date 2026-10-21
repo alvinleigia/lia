@@ -157,7 +157,13 @@ const turnEvidenceSchema = z.object({
   latencyMs: z.number().nonnegative(),
   totalTokens: z.number().nonnegative().nullable(),
   referenceIds: z
-    .array(z.string().regex(/^(?:document|project_approved_answer):\d+$/))
+    .array(
+      z
+        .string()
+        .regex(
+          /^(?:document:\d+(?::answer:\d+)?|project_approved_answer:\d+)$/,
+        ),
+    )
     .max(8),
 });
 

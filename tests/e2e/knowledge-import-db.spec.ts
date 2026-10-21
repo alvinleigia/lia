@@ -22,6 +22,7 @@ import {
   approveKnowledgeImport,
   getImportedKnowledgeAnswers,
   getKnowledgeImport,
+  getPublishedKnowledgeAnswersForChunks,
   saveKnowledgeDraft,
 } from "../../src/lib/knowledge-import-store";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
@@ -107,6 +108,47 @@ async function approve(documentId: number, revision = 1) {
     userId: scope.userId,
   });
 }
+
+test("retrieved FAQ references use full published answers and remain project scoped", async () => {
+  const doc = await upload(
+    "Q: Is collection available? A: Yes, within 5 km.\nOutside this area, collection costs INR 200.",
+  );
+  await approve(doc.id);
+  await processUploadQueue(1, scope.projectId, embed);
+  const [chunk] = await db
+    .select()
+    .from(documents)
+    .where(eq(documents.sourceDocumentId, doc.id));
+  // Simulate a retrieval chunk ending before a material condition.
+  await db
+    .update(documents)
+    .set({ content: "Q: Is collection available? A: Yes, within 5 km." })
+    .where(eq(documents.id, chunk.id));
+  const published = await getPublishedKnowledgeAnswersForChunks(
+    scope.projectId,
+    [chunk.id],
+  );
+  expect(published).toHaveLength(1);
+  expect(published[0].answer).toContain("INR 200");
+  expect(
+    await getPublishedKnowledgeAnswersForChunks(scope.otherProjectId, [
+      chunk.id,
+    ]),
+  ).toEqual([]);
+  await saveKnowledgeDraft({
+    projectId: scope.projectId,
+    documentId: doc.id,
+    revision: 1,
+    text: "Q: Is collection available? A: Free everywhere.",
+  });
+  expect(
+    await getPublishedKnowledgeAnswersForChunks(scope.projectId, [chunk.id]),
+  ).toEqual(published);
+  await deleteSourceDocumentFromProject(scope.projectId, doc.id);
+  expect(
+    await getPublishedKnowledgeAnswersForChunks(scope.projectId, [chunk.id]),
+  ).toEqual([]);
+});
 
 test("drafts stay private, tenant scope is enforced, approval blocks wording and stale revisions", async () => {
   const doc = await upload("Q: Is delivery available? A: Delivery is listed.");
