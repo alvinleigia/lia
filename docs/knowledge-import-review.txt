@@ -130,3 +130,19 @@ the adult-count question after preserving the stay dates. Cancel 4960 ended
 that test run without a booking. Evidence: tmp/answer-selection-whatsapp.json.
 Transport-inclusive replies in this check took about 4-10 seconds; this change
 does not claim a general latency improvement or perfect semantic matching.
+
+NATURAL COMBINED ANSWERS - 21 OCTOBER 2026
+The shared renderer now joins two simple "Yes, we ..." answers into one
+sentence without repeating "Yes". Each clause retains its subject and full
+predicate, including qualifications. Longer, mixed yes/no or multi-sentence
+answers retain their original wording and separation. This is grammatical
+composition, with no business-specific phrases or additional model call.
+Verification: 81 contract/engine checks passed (one metered test skipped),
+including hotel, service, appointment and condition-preservation cases.
+The production build and targeted formatting/lint checks passed.
+Live release 9ea1286 is Ready and current after promoting it over a delayed
+older GitHub deployment. WhatsApp message 4962 in conversation 5541 delivered:
+"Yes, we offer Wi-Fi, and we have a swimming pool."
+No extra hours, charges or contact advice appeared. Evidence:
+tmp/natural-faq-whatsapp.json. This is a narrow composition improvement;
+other answer structures retain their original approved wording.
