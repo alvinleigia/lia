@@ -171,3 +171,7 @@ The follow-up handles explicit enquiry/inquiry cancellation locally and excludes
 control instructions from the free-text shortcut. Its 140 relevant checks pass.
 Evidence: tmp/pricing-entry-whatsapp.json, tmp/pricing-entry-live.txt,
 tmp/pricing-entry-tests.txt and tmp/pricing-cancel-tests.txt.
+Final release 77b283d is Ready/current. WhatsApp 4976 repeated the correct
+estimate; "Cancel this enquiry" then closed test task 1293 via task.cancel
+with zero model calls (4978), without collecting a name or creating a booking.
+Evidence: tmp/pricing-entry-final-whatsapp.json. Final production build passed.
