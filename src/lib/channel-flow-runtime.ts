@@ -82,6 +82,10 @@ import {
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { executeConfiguredStructuredTurn } from "@/lib/conversation-turn-service";
 import { validateTaskFieldValue } from "@/lib/conversational-task-field-validation";
+import {
+  listPublishedConversationalTaskOptions,
+  type PublishedConversationalTaskOption,
+} from "@/lib/conversational-tasks";
 import type { SelectActionSubmission } from "@/lib/db-schema";
 import {
   type FlowContentBlock,
@@ -2409,6 +2413,46 @@ async function continueChannelFlowMedia(input: {
   });
 }
 
+export function getChannelTaskRecommendations(
+  actions: RuntimeAction[],
+  versions: PublishedConversationalTaskOption[],
+  channelType: string,
+) {
+  const candidates = actions.flatMap((action) => {
+    const graph = action.hybridGraph;
+    if (!graph || !action.versionId) return [];
+    const entryId = selectHybridFlowEntryNode({ graph, channelType });
+    const node = graph.nodes.find((node) => node.id === entryId);
+    // Do not jump past deterministic gates or into a task elsewhere in a flow.
+    if (node?.kind !== "conversational_task") return [];
+    const version = versions.find(
+      (version) =>
+        version.taskVersionId === node.settings.task.taskVersionId &&
+        version.taskId === node.settings.task.taskId,
+    );
+    return version
+      ? [
+          {
+            action,
+            task: {
+              id: version.taskId,
+              name: version.name,
+              objective: version.objective,
+              aliases: [action.name, node.label],
+              candidateFieldKeys: version.fieldKeys,
+            },
+          },
+        ]
+      : [];
+  });
+  // A task ID alone cannot distinguish multiple published entry flows.
+  return candidates.filter(
+    (candidate) =>
+      candidates.filter((other) => other.task.id === candidate.task.id)
+        .length === 1,
+  );
+}
+
 export async function processChannelFlowText(input: {
   activeSubmission: SelectActionSubmission | null;
   channelConversationId?: number | null;
@@ -2496,7 +2540,7 @@ export async function processChannelFlowText(input: {
   const triggeredAction = findTriggeredAction(actions, input.text);
 
   if (!triggeredAction) {
-    const [project, projectPolicy, history] = await Promise.all([
+    const [project, projectPolicy, history, taskVersions] = await Promise.all([
       getProjectTurnContext(input.projectId),
       getConversationProjectPolicy(input.projectId),
       input.channelConversationId
@@ -2506,8 +2550,16 @@ export async function processChannelFlowText(input: {
             projectId: input.projectId,
           }).then(toTurnHistory)
         : Promise.resolve([]),
+      actions.some((action) => action.hybridGraph)
+        ? listPublishedConversationalTaskOptions(input.projectId)
+        : Promise.resolve([]),
     ]);
     if (project) {
+      const recommendations = getChannelTaskRecommendations(
+        actions,
+        taskVersions,
+        getChannelTypeForFlowSource(input.source),
+      );
       const { proposal } = await executeConfiguredStructuredTurn({
         conversationId: input.channelConversationId,
         activeTask: null,
@@ -2523,10 +2575,32 @@ export async function processChannelFlowText(input: {
         projectId: input.projectId,
         projectName: project.projectName,
         projectPolicy,
-        publishedTasks: [],
+        publishedTasks: recommendations.map(({ task }) => task),
         stage: "knowledge",
         visitorMessage: input.text,
       });
+      const recommendedAction = recommendations.find(
+        ({ task }) => task.id === proposal.taskRecommendation?.taskId,
+      )?.action;
+      if (
+        recommendedAction &&
+        proposal.nextAction === "ask" &&
+        proposal.safety.decision === "allow" &&
+        !proposal.ambiguity.requiresClarification
+      ) {
+        // Start through the normal flow entry and revalidate the original
+        // visitor statement; model candidates never become trusted state.
+        const result = await startChannelFlow({
+          action: recommendedAction,
+          openingMessage: input.text,
+          contactId: input.contactId ?? null,
+          conversationId: input.conversationId,
+          projectId: input.projectId,
+          source: input.source,
+          traceId: input.traceId,
+        });
+        return { ...result, consumeTriggerMessage: false };
+      }
       return { replies: [createTextReply(proposal.reply)] };
     }
     return {

@@ -14,7 +14,10 @@ import {
   type RuntimeAction,
   type RuntimeActionStep,
 } from "../../src/lib/action-runtime";
-import { buildChannelFlowResumeReplies } from "../../src/lib/channel-flow-runtime";
+import {
+  buildChannelFlowResumeReplies,
+  getChannelTaskRecommendations,
+} from "../../src/lib/channel-flow-runtime";
 import {
   REFERENCE_BOOKING_PROJECT_POLICY,
   REFERENCE_BOOKING_TASK_DEFINITION,
@@ -249,6 +252,86 @@ test("task recommendations resolve only to an action containing that published t
 
   expect(findActionForTaskRecommendation(actions, 41)).toBe(actions[1]);
   expect(findActionForTaskRecommendation(actions, 99)).toBeNull();
+});
+
+test("channel recommendations respect published versions, entry gates and ambiguous flow mappings", () => {
+  const graph = compileHybridFlowGraph({ branchRules, steps }).graph;
+  const action = {
+    id: 1,
+    versionId: 500,
+    name: "Service enquiry",
+    hybridGraph: {
+      ...graph,
+      entryPolicy: { ...graph.entryPolicy, normalNodeId: "step:2" },
+    },
+  } as RuntimeAction;
+  const version = {
+    taskId: 40,
+    taskVersionId: 80,
+    versionNumber: 1,
+    name: "Service enquiry",
+    objective: "Collect service details and provide an estimate.",
+    fieldKeys: ["serviceId"],
+    contextKeys: [],
+    outcomes,
+  };
+  expect(
+    getChannelTaskRecommendations([action], [version], "whatsapp"),
+  ).toEqual([
+    {
+      action,
+      task: expect.objectContaining({
+        id: 40,
+        candidateFieldKeys: ["serviceId"],
+      }),
+    },
+  ]);
+  expect(getChannelTaskRecommendations([action], [], "whatsapp")).toEqual([]);
+  expect(
+    getChannelTaskRecommendations(
+      [action],
+      [{ ...version, taskVersionId: 81 }],
+      "whatsapp",
+    ),
+  ).toEqual([]);
+  expect(
+    getChannelTaskRecommendations(
+      [{ ...action, versionId: null }],
+      [version],
+      "whatsapp",
+    ),
+  ).toEqual([]);
+  expect(
+    getChannelTaskRecommendations(
+      [action, { ...action, id: 2 }],
+      [version],
+      "whatsapp",
+    ),
+  ).toEqual([]);
+  expect(
+    getChannelTaskRecommendations(
+      [{ ...action, hybridGraph: graph }],
+      [version],
+      "whatsapp",
+    ),
+  ).toEqual([]);
+  const channelGated = {
+    ...action,
+    hybridGraph: {
+      ...graph,
+      entryPolicy: {
+        ...graph.entryPolicy,
+        normalNodeId: "step:2",
+        channelRoutes: { whatsapp: "step:1" },
+      },
+    },
+  };
+  expect(
+    getChannelTaskRecommendations([channelGated], [version], "whatsapp"),
+  ).toEqual([]);
+  expect(
+    getChannelTaskRecommendations([channelGated], [version], "widget"),
+  ).toHaveLength(1);
 });
 
 test("publishing activates drafts without reactivating archived actions", () => {

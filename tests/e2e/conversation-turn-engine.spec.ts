@@ -400,6 +400,76 @@ test("@live-openai approved answer selection handles paraphrases, combined reque
   }
 });
 
+test("@live-openai detailed pricing requests can enter a published channel task after cancellation", async () => {
+  test.skip(
+    process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",
+    "Opt-in metered verification only.",
+  );
+  test.setTimeout(120_000);
+  const { getChannelTaskRecommendations } = await import(
+    "../../src/lib/channel-flow-runtime"
+  );
+  const { listPublishedConversationalTaskOptions } = await import(
+    "../../src/lib/conversational-tasks"
+  );
+  const { listRuntimeProjectActions } = await import(
+    "../../src/lib/runtime-actions"
+  );
+  const { getConversationProjectPolicy } = await import(
+    "../../src/lib/conversation-project-policies"
+  );
+  const options = getChannelTaskRecommendations(
+    await listRuntimeProjectActions(1895),
+    await listPublishedConversationalTaskOptions(1895),
+    "whatsapp",
+  );
+  expect(options).toHaveLength(1);
+  const provider = new AiSdkStructuredTurnProvider();
+  const result = await new StructuredTurnEngine({
+    retriever: new ProjectDocumentTurnRetriever(),
+    provider: {
+      generateTurn: async (input) => {
+        const repairs = input.system.match(/Repair attempt[^\n]+/g);
+        if (repairs) console.log(repairs);
+        const generated = await provider.generateTurn(input);
+        const output = generated.output as TurnResultV1;
+        console.log({
+          turnKind: output.turnKind,
+          answerSelections: output.answerSelections,
+          taskId: output.taskRecommendation?.taskId,
+        });
+        return generated;
+      },
+    },
+  }).execute({
+    ...engineInput(),
+    activeTask: null,
+    projectId: 1895,
+    projectPolicy: await getConversationProjectPolicy(1895),
+    publishedTasks: options.map(({ task }) => task),
+    stage: "knowledge",
+    history: [
+      { role: "user", content: "Cancel this enquiry." },
+      {
+        role: "assistant",
+        content: "Your enquiry has been cancelled as requested.",
+      },
+    ],
+    visitorMessage:
+      "Check-in 26 October 2026 and checkout 28 October 2026. Four adults, no children. We prefer the Premium category, two bedrooms, on the Standard Plan. What is the total estimate?",
+  });
+  console.log({
+    attempts: result.attempts,
+    nextAction: result.proposal.nextAction,
+    taskId: result.proposal.taskRecommendation?.taskId,
+  });
+  expect(result.proposal.taskRecommendation?.taskId).toBe(options[0].task.id);
+  expect(result.proposal.ambiguity.requiresClarification).toBe(false);
+  expect(result.attempts).toBe(1);
+  // The channel hands the original message to the selected task and discards
+  // this routing reply; only validated task fields reach the price calculator.
+});
+
 test("minimal enquiry continues the pinned task without repair or restart", async () => {
   const provider = new QueueProvider([
     baseTurn({
