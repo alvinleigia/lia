@@ -34,7 +34,7 @@ export function resolveChannelPhoneReference(input: {
   if (!field) return input.text;
   const phone = `+${input.externalUserId.replace(/^\+/, "")}`;
   const reference =
-    /(^|[.!?;\n]\s*|\band\s+)(?:(?:please|can you|could you)\s+)?(?:use|call me on|contact me on|reach me on)\s+(?:my|this)\s+whatsapp (?:phone )?number\b/gi;
+    /(^|[.!?;\n]\s*|\band\s+)(?:(?:please|can you|could you|you may|you can)\s+)?(?:use|call me on|contact me on|reach me on)\s+(?:my|this)\s+whatsapp (?:phone )?number\b/gi;
   return input.text.replace(reference, (_, prefix: string) => {
     return `${prefix}${field.key}: ${phone}`;
   });

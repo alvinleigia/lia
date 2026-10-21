@@ -132,7 +132,12 @@ for (const [name, phoneKey] of [
         },
       },
     });
-    const message = "Please use my WhatsApp number.";
+    const message =
+      name === "Hotel enquiry"
+        ? "You may use my WhatsApp number."
+        : name === "Service enquiry"
+          ? "You can use my WhatsApp number."
+          : "Please use my WhatsApp number.";
     const result = await engine.execute({
       ...input(snapshot, message, phoneKey),
       channel: "whatsapp",
@@ -158,12 +163,22 @@ test("WhatsApp number references preserve other details and respect channel, con
   expect(resolveChannelPhoneReference(base)).toBe(
     "My name is Alex Test. contactNumber: +61491570006 for a callback tomorrow.",
   );
+  expect(
+    resolveChannelPhoneReference({
+      ...base,
+      text: "You may use my WhatsApp number. Please call on 22 October 2026 between 2 pm and 4 pm Asia/Kolkata.",
+    }),
+  ).toBe(
+    "contactNumber: +61491570006. Please call on 22 October 2026 between 2 pm and 4 pm Asia/Kolkata.",
+  );
   for (const change of [
     { channel: "project_chat" },
     { externalUserId: null },
     { externalUserId: "visitor-123" },
     { text: "Do not use my WhatsApp number." },
     { text: "Don't use my WhatsApp number." },
+    { text: "You may not use my WhatsApp number." },
+    { text: "You cannot use my WhatsApp number." },
     { text: "Can you tell me my WhatsApp number?" },
     { text: "Use my WhatsApp number or my office number." },
   ]) {
