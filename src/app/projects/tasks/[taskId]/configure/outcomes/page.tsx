@@ -320,6 +320,56 @@ export default async function TaskOutcomesPage({
                 </div>
               </div>
               <Accordion type="multiple" className="rounded-md border px-4">
+                <AccordionItem value="follow-up">
+                  <AccordionTrigger>Team follow-up</AccordionTrigger>
+                  <AccordionContent forceMount className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Offer follow-up when Lia cannot answer a question. Choose
+                      existing fields to save consent and the question with the
+                      enquiry. Name and contact must be required. Connect the
+                      completed result to a Human Handoff step to enable offers.
+                      The visitor still confirms before submitting; no callback
+                      is promised automatically.
+                    </p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {(
+                        [
+                          ["consentField", "Follow-up consent", ["boolean"]],
+                          ["reasonField", "Question for the team", ["text"]],
+                          ["nameField", "Visitor name", ["text"]],
+                          [
+                            "contactField",
+                            "Contact details",
+                            ["phone", "email"],
+                          ],
+                        ] as const
+                      ).map(([key, label, types]) => (
+                        <div key={key} className="space-y-2">
+                          <Label htmlFor={`followUp-${key}`}>{label}</Label>
+                          <select
+                            id={`followUp-${key}`}
+                            name={`followUp-${key}`}
+                            className={selectClass}
+                            defaultValue={definition.followUp?.[key] ?? ""}
+                          >
+                            <option value="">Not configured</option>
+                            {definition.fields
+                              .filter((field) =>
+                                (types as readonly string[]).includes(
+                                  field.type,
+                                ),
+                              )
+                              .map((field) => (
+                                <option key={field.key} value={field.key}>
+                                  {field.label}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
                 <AccordionItem value="wording">
                   <AccordionTrigger>Optional wording</AccordionTrigger>
                   <AccordionContent forceMount className="space-y-4">

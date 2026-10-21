@@ -6,6 +6,7 @@ import {
   conversationProjectPolicyV1Schema,
   TASK_EXECUTION_STAGES,
 } from "@/lib/conversation-contracts";
+import { validateTaskFollowUp } from "@/lib/task-follow-up";
 
 function duplicateValues(values: string[]) {
   const seen = new Set<string>();
@@ -84,6 +85,7 @@ export function validateConversationalTaskForPublish(input: {
   }
 
   const fieldKeys = new Set(input.definition.fields.map((field) => field.key));
+  issues.push(...validateTaskFollowUp(input.definition));
   for (const key of input.definition.priceTable?.fields ?? []) {
     if (!fieldKeys.has(key))
       issues.push(`Pricing references missing field ${key}.`);

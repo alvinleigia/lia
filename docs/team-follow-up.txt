@@ -1,0 +1,25 @@
+Team follow-up during an enquiry
+
+In Business Task > Behavior > Team follow-up, map four existing fields:
+- Consent: an optional Yes/No field.
+- Question for the team: an optional text field.
+- Visitor name: a required text field.
+- Contact: a required phone or email field.
+
+Connect the completed task result directly to a Human Handoff step, then publish
+the task and the flow. Without this destination, Lia does not offer follow-up.
+
+When an answer is unavailable or refers a question to the team, Lia retains the
+question and asks whether the visitor wants follow-up. Yes/No is handled locally.
+Yes requests missing name/contact details with their purpose; known details and
+the active enquiry remain intact. No resumes the enquiry without requesting a
+callback. Ordinary FAQ answers retain their normal collection behavior.
+
+This collects a follow-up request as part of the current enquiry. Required enquiry
+fields and final confirmation still apply. The question and consent reach the
+existing team queue after submission. It does not promise a call, notify a team
+without a configured notification, or mark a booking confirmed.
+
+UAT: unanswered question -> Yes -> contact details -> Confirm -> inspect team
+queue. Repeat with No, a FAQ interruption, and Cancel. Check that a Yes to the
+follow-up offer cannot submit a request, even when all other fields are present.

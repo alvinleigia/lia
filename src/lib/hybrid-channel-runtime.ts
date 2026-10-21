@@ -131,6 +131,15 @@ import {
   measureRuntimeStage,
   type RuntimeTimingRecorder,
 } from "@/lib/runtime-stage-timing";
+import {
+  appendTaskFollowUpQuestion,
+  FOLLOW_UP_CONSENT_PROMPT,
+  hasTaskFollowUpDestination,
+  isPendingTaskFollowUp,
+  parseTaskFollowUpConsent,
+  shouldOfferTaskFollowUp,
+  taskFollowUpConsent,
+} from "@/lib/task-follow-up";
 import { getTaskOperationOutcome } from "@/lib/task-operation-outcome";
 
 export type HybridChannelBoundaryResult = {
@@ -1215,16 +1224,28 @@ async function executeTaskBoundary(input: {
   }
   const runtime = session.runtime;
   const snapshot = session.snapshot;
-
-  const confirmationExecution = await executeTaskConfirmation({
-    runtimeInput: input.runtimeInput,
-    session,
+  const pendingFollowUp = isPendingTaskFollowUp({
+    definition: snapshot.task.definition,
+    fields: runtime.fields,
+    requestedFieldKey: runtime.run.lastRequestedFieldKey,
   });
+  const followUpAnswer = pendingFollowUp
+    ? parseTaskFollowUpConsent(appointmentAnswer)
+    : null;
+
+  // Consent to follow up is not authorization to submit the enquiry or run a write.
+  const confirmationExecution = pendingFollowUp
+    ? null
+    : await executeTaskConfirmation({
+        runtimeInput: input.runtimeInput,
+        session,
+      });
   if (confirmationExecution) return confirmationExecution;
 
   // "Yes" cannot authorize a write without a saved review. Recover the review
   // from validated state instead of asking the model to interpret confirmation.
   if (
+    !pendingFollowUp &&
     isExplicitConfirmationRequest(appointmentAnswer) &&
     !getResumedTaskRuntimeInputRequest({
       fields: runtime.fields,
@@ -1436,6 +1457,7 @@ async function executeTaskBoundary(input: {
     }
   } else if (
     !appointmentSelected &&
+    !pendingFollowUp &&
     !calendarAnswer &&
     requestedAnswerKind === "static_selection" &&
     input.runtimeInput.selection
@@ -1450,8 +1472,14 @@ async function executeTaskBoundary(input: {
     selectionValue = selectedOption.value;
   }
   const selectionProposal = createRequestedTaskSelectionProposal({
-    requestedFieldKey: selectionValue ? (requestedField?.key ?? null) : null,
-    selectionValue,
+    requestedFieldKey:
+      followUpAnswer !== null
+        ? (snapshot.task.definition.followUp?.consentField ?? null)
+        : selectionValue
+          ? (requestedField?.key ?? null)
+          : null,
+    selectionValue:
+      followUpAnswer !== null ? String(followUpAnswer) : selectionValue,
   });
   const timezone = calendar?.timezone ?? input.project.companyTimeZone ?? "UTC";
   // A narrowly recognized time question can arrive before the appointment/date
@@ -1492,11 +1520,13 @@ async function executeTaskBoundary(input: {
       })
     : selectionProposal
       ? selectionProposal
-      : (createCollectionTaskConfirmationProposal({
-          fields: runtime.fields,
-          snapshot,
-          text: requestedAnswer,
-        }) ??
+      : ((!pendingFollowUp
+          ? createCollectionTaskConfirmationProposal({
+              fields: runtime.fields,
+              snapshot,
+              text: requestedAnswer,
+            })
+          : null) ??
         localProposal ??
         bindRequestedTaskSelection({
           proposal: (
@@ -1717,7 +1747,7 @@ async function executeTaskBoundary(input: {
       return { output: knowledgeProposal, signals: [] };
     }
 
-    const resumedSession = await getConversationTaskRuntimeSession({
+    let resumedSession = await getConversationTaskRuntimeSession({
       channelType: input.runtimeInput.channelType,
       externalConversationId: input.runtimeInput.externalConversationId,
       projectId: input.runtimeInput.projectId,
@@ -1744,6 +1774,104 @@ async function executeTaskBoundary(input: {
         }),
         signals: [],
       };
+    }
+    const followUp = resumedSession.snapshot.task.definition.followUp;
+    const consent = taskFollowUpConsent(
+      resumedSession.snapshot.task.definition,
+      resumedSession.runtime.fields,
+    );
+    if (
+      followUp &&
+      consent !== false &&
+      shouldOfferTaskFollowUp(knowledgeProposal) &&
+      hasTaskFollowUpDestination({
+        definition: resumedSession.snapshot.task.definition,
+        node: input.node,
+        graph: input.runtimeInput.action
+          .hybridGraph as CompiledHybridFlowGraphV1,
+      })
+    ) {
+      const previousReason = resumedSession.runtime.fields.find(
+        ({ fieldKey }) => fieldKey === followUp.reasonField,
+      )?.canonicalValue;
+      const recorded = await applyConversationalTaskEvent({
+        authentication: null,
+        candidates: [
+          {
+            fieldKey: followUp.reasonField,
+            naturalValue: appendTaskFollowUpQuestion(
+              previousReason,
+              input.runtimeInput.text,
+            ),
+            provenance: { source: "visitor", sourceReference: null },
+            state: "candidate",
+            validation: { code: null, message: null, valid: false },
+          },
+        ],
+        channelIdentity: {
+          externalConversationId: input.runtimeInput.externalConversationId,
+          externalUserId: input.runtimeInput.externalUserId ?? null,
+        },
+        channelType: input.runtimeInput.channelType,
+        conversationId: resumedSession.runtime.run.conversationId,
+        correction: Boolean(previousReason),
+        eventId: `channel-message:${input.runtimeInput.inboundMessageId}:follow-up-question`,
+        expectedRevision: resumedSession.execution.revision,
+        occurredAt: new Date().toISOString(),
+        projectId: input.runtimeInput.projectId,
+        providerSequence: null,
+        receivedAt: new Date().toISOString(),
+        schemaVersion: 1,
+        taskRunId: resumedSession.runtime.run.id,
+        type: "field.candidates",
+      });
+      if (recorded.disposition !== "applied")
+        return { output: knowledgeProposal, signals: [] };
+      resumedSession = await getConversationTaskRuntimeSession(
+        input.runtimeInput,
+      );
+      if (
+        !resumedSession.execution ||
+        !resumedSession.runtime ||
+        !resumedSession.snapshot
+      )
+        return { output: knowledgeProposal, signals: [] };
+      const consentDefinition =
+        resumedSession.snapshot.task.definition.fields.find(
+          ({ key }) => key === followUp.consentField,
+        );
+      const reason = resumedSession.runtime.fields.find(
+        ({ fieldKey }) => fieldKey === followUp.reasonField,
+      );
+      if (
+        consent === null &&
+        consentDefinition &&
+        reason &&
+        ["valid", "confirmed"].includes(reason.state)
+      ) {
+        const inputRequest = createTaskRuntimeInputRequest(consentDefinition);
+        await recordTaskFieldRequest({
+          conversationId: resumedSession.runtime.run.conversationId,
+          inputRequest,
+          revision: resumedSession.execution.revision,
+          runtimeInput: input.runtimeInput,
+          taskRunId: resumedSession.runtime.run.id,
+        });
+        return {
+          inputRequest,
+          output: {
+            ...knowledgeProposal,
+            nextAction: "ask",
+            fieldCandidates: [],
+            toolRequest: null,
+            outcomeRecommendation: null,
+            routeRecommendation: null,
+            taskRecommendation: null,
+            reply: `${knowledgeProposal.reply}\n\n${FOLLOW_UP_CONSENT_PROMPT}`,
+          },
+          signals: [],
+        };
+      }
     }
     // Corrections can invalidate an earlier field or make a dependent field
     // required. Re-evaluate collection order for mixed turns; a pure FAQ resumes
@@ -2190,6 +2318,11 @@ async function executeTaskBoundary(input: {
     }
     if (inputRequest && preferredOptions?.length)
       inputRequest.options = preferredOptions;
+    if (followUpAnswer === false)
+      reconciledProposal = {
+        ...reconciledProposal,
+        reply: `No problem; I won't request a follow-up.\n\n${reconciledProposal.reply}`,
+      };
     if (
       canonicalSession.execution &&
       canonicalSession.runtime &&

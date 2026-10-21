@@ -194,6 +194,11 @@ export function findTaskFieldReferences(
   const references: string[] = [];
   if (definition.priceTable?.fields.includes(fieldKey))
     references.push("price table");
+  if (
+    definition.followUp &&
+    Object.values(definition.followUp).includes(fieldKey)
+  )
+    references.push("team follow-up");
   for (const field of definition.fields) {
     if (field.key === fieldKey) continue;
     if (

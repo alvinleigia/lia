@@ -19,6 +19,7 @@ import {
 import {
   CUSTOM_CONTEXT_SOURCES,
   contextVariableDefinitionV1Schema,
+  conversationalTaskDefinitionV1Schema,
   conversationProjectPolicyV1Schema,
   FIELD_TYPES,
   normalizeConversationProjectPolicy,
@@ -66,6 +67,7 @@ import {
   updateProjectConversationalTaskDefinition,
 } from "@/lib/conversational-tasks";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
+import { validateTaskFollowUp } from "@/lib/task-follow-up";
 import { taskPriceTableSchema } from "@/lib/task-price-table";
 
 const projectIdSchema = z.coerce.number().int().positive();
@@ -1203,11 +1205,36 @@ export async function updateConversationalTaskSafetyAction(
     return { error: "Please check the policy values." };
   }
 
+  const followUpValues = Object.fromEntries(
+    ["consentField", "reasonField", "nameField", "contactField"].map((key) => [
+      key,
+      String(formData.get(`followUp-${key}`) ?? "").trim(),
+    ]),
+  );
+  const followUp =
+    conversationalTaskDefinitionV1Schema.shape.followUp.safeParse(
+      !formData.has("followUp-consentField")
+        ? definition.followUp
+        : Object.values(followUpValues).some(Boolean)
+          ? followUpValues
+          : undefined,
+    );
+  if (!followUp.success)
+    return {
+      error: "Choose all four follow-up fields, or leave all four blank.",
+    };
+  const followUpIssues = validateTaskFollowUp({
+    ...definition,
+    followUp: followUp.data,
+  });
+  if (followUpIssues.length) return { error: followUpIssues.join(" ") };
+
   await updateProjectConversationalTaskDefinition(
     context.project.id,
     context.task.id,
     {
       ...definition,
+      followUp: followUp.data,
       taskPolicy: {
         consentRequirement: parsed.data.consentRequirement,
         fallbackMessage: parsed.data.fallbackMessage,

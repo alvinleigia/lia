@@ -553,6 +553,14 @@ export const conversationReturnPolicyV1Schema = z.object({
 
 export const conversationalTaskDefinitionV1Schema = z.object({
   schemaVersion,
+  followUp: z
+    .object({
+      consentField: stableKey,
+      reasonField: stableKey,
+      nameField: stableKey,
+      contactField: stableKey,
+    })
+    .optional(),
   priceTable: taskPriceTableSchema.optional(),
   contextVariables: z.array(contextVariableDefinitionV1Schema),
   degradedMode: z.object({

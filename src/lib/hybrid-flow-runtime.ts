@@ -21,6 +21,11 @@ import {
   createTaskRuntimeInputRequest,
   type RuntimeInputRequest,
 } from "@/lib/runtime-input-request";
+import {
+  taskFollowUpFieldOrder,
+  taskFollowUpPrompt,
+  unresolvedTaskFollowUpConsent,
+} from "@/lib/task-follow-up";
 
 const TRANSITION_PRECEDENCE = {
   deterministic: 4,
@@ -57,6 +62,7 @@ export function buildKnowledgeBoundarySignals(
 }
 
 type HybridTaskRuntimeField = {
+  canonicalValue?: unknown;
   fieldKey: string;
   isRequired: boolean;
   state: string;
@@ -342,7 +348,11 @@ function findUnresolvedTaskField(input: TaskRuntimeReconciliationInput) {
     .find((field) => field?.state === "invalid");
   const runtimeField =
     proposedInvalidField ??
-    input.snapshot.task.definition.fields
+    unresolvedTaskFollowUpConsent(
+      input.snapshot.task.definition,
+      input.fields,
+    ) ??
+    taskFollowUpFieldOrder(input.snapshot.task.definition, input.fields)
       .map((field) => runtimeFields.get(field.key))
       .find(
         (field) =>
@@ -376,7 +386,7 @@ function findRequestedOrUnresolvedTaskField(input: {
     requestedField.state !== "valid" &&
     requestedField.state !== "confirmed"
       ? requestedField
-      : input.snapshot.task.definition.fields
+      : taskFollowUpFieldOrder(input.snapshot.task.definition, input.fields)
           .map((field) => runtimeFields.get(field.key))
           .find(
             (field) =>
@@ -424,6 +434,10 @@ export function createCollectionTaskConfirmationProposal(input: {
 }): TurnResultV1 | null {
   if (
     !isExplicitConfirmationRequest(input.text) ||
+    unresolvedTaskFollowUpConsent(
+      input.snapshot.task.definition,
+      input.fields,
+    ) ||
     input.snapshot.toolDefinitions.some((tool) => tool.requiredForCompletion) ||
     input.snapshot.task.definition.fields.some((definition) => {
       const field = input.fields.find(
@@ -467,7 +481,12 @@ export function reconcileTaskSideQuestionWithRuntime(input: {
 }): TurnResultV1 {
   const unresolved = findRequestedOrUnresolvedTaskField(input);
   const resumePrompt = unresolved
-    ? (unresolved.definition.prompt ??
+    ? (taskFollowUpPrompt({
+        definition: input.snapshot.task.definition,
+        fields: input.fields,
+        fieldKey: unresolved.definition.key,
+      }) ??
+      unresolved.definition.prompt ??
       `Please provide ${unresolved.definition.label}.`)
     : null;
 
@@ -558,7 +577,13 @@ export function reconcileTaskTurnWithRuntime(
     validationCode !== "project_resource_not_found" &&
     validationMessage
       ? validationMessage
-      : (definition.prompt ?? `Please provide ${definition.label}.`);
+      : (taskFollowUpPrompt({
+          definition: input.snapshot.task.definition,
+          fields: input.fields,
+          fieldKey: definition.key,
+        }) ??
+        definition.prompt ??
+        `Please provide ${definition.label}.`);
 
   return {
     ...input.proposal,
