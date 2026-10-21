@@ -23,7 +23,7 @@
       "Sliceinn Flexi": "Sliceinn Flexi Plan"
     }
   },
-  "offersMessage": "No verified coupon code or extra discount is available in this saved data. The Extended Stay plan has lower saved rates, but its eligibility and cancellation rules conflict and require the reservations team to check. I cannot negotiate or promise a discount. You can request a callback for the best available price.",
+  "offersMessage": "I don't have a confirmed coupon to apply.",
   "rows": [
     {
       "label": "26–28 October 2026, 2 adults, no children, 1 × Premium — Standard Plan",
@@ -129,7 +129,7 @@
           "unitTaxMinor": 50625
         }
       ],
-      "note": "Extended Stay eligibility and cancellation terms are unresolved in the saved source; the team must verify them. No extra percentage discount has been applied."
+      "note": "Our team needs to confirm eligibility and cancellation terms before booking."
     },
     {
       "label": "26–28 October 2026, 4 adults, no children, 2 × Premium — Extended Stay Plan",
@@ -153,7 +153,7 @@
           "unitTaxMinor": 50625
         }
       ],
-      "note": "Extended Stay eligibility and cancellation terms are unresolved in the saved source; the team must verify them. No extra percentage discount has been applied."
+      "note": "Our team needs to confirm eligibility and cancellation terms before booking."
     },
     {
       "label": "26–28 October 2026, 6 adults, no children, 3 × Premium — Extended Stay Plan",
@@ -177,7 +177,7 @@
           "unitTaxMinor": 50625
         }
       ],
-      "note": "Extended Stay eligibility and cancellation terms are unresolved in the saved source; the team must verify them. No extra percentage discount has been applied."
+      "note": "Our team needs to confirm eligibility and cancellation terms before booking."
     },
     {
       "label": "26–28 October 2026, 8 adults, no children, 4 × Premium — Extended Stay Plan",
@@ -201,7 +201,7 @@
           "unitTaxMinor": 50625
         }
       ],
-      "note": "Extended Stay eligibility and cancellation terms are unresolved in the saved source; the team must verify them. No extra percentage discount has been applied."
+      "note": "Our team needs to confirm eligibility and cancellation terms before booking."
     },
     {
       "label": "26–28 October 2026, 2 adults, no children, 1 × Premium — Sliceinn Flexi Plan",
@@ -325,7 +325,7 @@
           "unitTaxMinor": 291600
         }
       ],
-      "note": "Extended Stay eligibility and cancellation terms are unresolved in the saved source; the team must verify them. No extra percentage discount has been applied."
+      "note": "Our team needs to confirm eligibility and cancellation terms before booking."
     },
     {
       "label": "26–28 October 2026, 2 adults, no children, 1 × Master Suite — Sliceinn Flexi Plan",

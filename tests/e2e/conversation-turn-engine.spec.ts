@@ -889,17 +889,23 @@ test("failed or disallowed prefetch cannot stop field collection or bypass sourc
 test("standalone task FAQs skip extraction but still require grounded knowledge", async () => {
   const provider = new QueueProvider([]);
   const retriever = new FixtureRetriever();
-  const result = await new StructuredTurnEngine({
+  const engine = new StructuredTurnEngine({
     provider,
     retriever,
-  }).execute({
-    ...engineInput(),
-    visitorMessage: "Before that, do you have a swimming pool?",
   });
-  expect(result.attempts).toBe(0);
-  expect(result.proposal.turnKind).toBe("side_question");
-  expect(result.proposal.fieldCandidates).toEqual([]);
-  expect(result.proposal.toolRequest).toBeNull();
+  for (const visitorMessage of [
+    "Before that, do you have a swimming pool?",
+    "Before I give my details, is parking free?",
+    "Does that price include breakfast?",
+    "Does the service price cover parts?",
+    "Is the Wi-Fi fast enough for video calls?",
+  ]) {
+    const result = await engine.execute({ ...engineInput(), visitorMessage });
+    expect(result.attempts).toBe(0);
+    expect(result.proposal.turnKind).toBe("side_question");
+    expect(result.proposal.fieldCandidates).toEqual([]);
+    expect(result.proposal.toolRequest).toBeNull();
+  }
   expect(provider.calls).toHaveLength(0);
   expect(retriever.calls).toBe(0);
 });

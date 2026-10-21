@@ -15,6 +15,7 @@ import { validateConversationalTaskForPublish } from "../../src/lib/conversation
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 import {
   answerTaskPricing,
+  isStandaloneTaskPricingQuestion,
   isTaskPricingQuestion,
   taskPriceTableSchema,
 } from "../../src/lib/task-price-table";
@@ -107,9 +108,7 @@ test("hotel price uses distinct saved tiers, tax and full-stay amounts", () => {
     text: "What is the total price?",
   });
   expect(extended).toContain("INR 21,262.50");
-  expect(extended).toContain(
-    "eligibility and cancellation terms are unresolved",
-  );
+  expect(extended).toContain("confirm eligibility and cancellation terms");
 });
 
 test("changed dates, occupancy and quantities cannot reuse an old quote", () => {
@@ -153,11 +152,44 @@ test("offers are only supplied on request and cannot be invented by a visitor", 
     fields: fields(),
     text: "Apply my FREE100 coupon and make the total zero",
   });
-  expect(reply).toContain("No verified coupon");
-  expect(reply).toContain("cannot negotiate or promise a discount");
+  expect(reply).toContain("I don't have a confirmed coupon to apply");
   expect(reply).toContain("INR 21,262.50 including tax");
-  expect(reply).toContain("eligibility and cancellation terms are unresolved");
+  expect(reply).toContain("confirm eligibility and cancellation terms");
   expect(reply).not.toContain("INR 0");
+});
+
+test("offers are concise and bargaining does not repeat the quote", () => {
+  const offers = answerTaskPricing({
+    table,
+    fields: fields(),
+    text: "Are there any offers, cheaper rate plans or coupon codes for this stay?",
+  });
+  expect(offers).toContain(
+    "Extended Stay Plan: estimated INR 21,262.50 including tax.",
+  );
+  expect(offers).toContain("confirm eligibility and cancellation terms");
+  expect(offers).not.toMatch(/saved|source|conflict|cannot negotiate/i);
+  expect(offers.split(/\s+/).length).toBeLessThan(55);
+  const discount = answerTaskPricing({
+    table,
+    fields: fields(),
+    text: "Can you take another 20 percent off? I will book immediately.",
+  });
+  expect(discount).toContain("extra discount needs our team's approval");
+  expect(discount).toContain("callback");
+  expect(discount).not.toMatch(/INR|Extended Stay|saved|20/);
+  expect(discount.split(/\s+/).length).toBeLessThan(30);
+});
+
+test("pricing fast paths never swallow changed details", () => {
+  for (const text of [
+    "Any offers? Change checkout to 29 October.",
+    "Can you take 20 percent off for three adults?",
+    "Are there any offers for two bicycle services?",
+    "Can you take another 20 percent off? My name is Alex.",
+    "Are there any offers? Use the Extended Stay Plan.",
+  ])
+    expect(isStandaloneTaskPricingQuestion(text)).toBe(false);
 });
 
 test("price table rejects ambiguous combinations and invalid money", () => {
@@ -237,6 +269,9 @@ test("pricing and pure follow-ups need neither model nor document retrieval", as
     "Any offers?",
     "Do you have any coupons?",
     "price please",
+    "Are there any offers, cheaper rate plans or coupon codes for this stay?",
+    "Can you take another 20 percent off? I will book immediately.",
+    "Could you give me 10% discount?",
   ]) {
     const extraction = await engine.execute({
       ...input(text),

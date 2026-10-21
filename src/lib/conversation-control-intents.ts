@@ -79,7 +79,7 @@ export function stripKnowledgeDiscoursePrefix(value: string) {
   return value
     .trim()
     .replace(
-      /^(?:(?:before|after)\s+(?:that|this)|by the way)\s*[,;:]\s*/i,
+      /^(?:(?:before|after)\s+(?:that|this)|before I (?:give|share|provide) (?:my )?details|by the way)\s*[,;:]\s*/i,
       "",
     );
 }
@@ -91,9 +91,10 @@ export function isStandaloneKnowledgeQuestion(value: string) {
     .replace(/\?$/, "")
     .trim();
   return (
-    /^(?:do you (?:have|offer|provide|allow)|(?:is|are) there)\s+/i.test(
+    (/^(?:do you (?:have|offer|provide|allow)|(?:is|are) (?:there|the|your|this|that)|does (?:this|that|the) (?:price|rate|cost|service|plan))\s+/i.test(
       question,
-    ) &&
+    ) ||
+      /^(?:is|are) .+ (?:free|complimentary|refundable)$/i.test(question)) &&
     !/[\d,;:.!?\n]/.test(question) &&
     !/\b(?:i|me|my|we|our|and|also|but|instead|change|correct|update|book|cancel|reschedule|confirm|submit)\b/i.test(
       question,

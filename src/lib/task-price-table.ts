@@ -131,6 +131,10 @@ export function isTaskPricingQuestion(text: string) {
 // use the normal field extraction and validation path before pricing.
 export function isStandaloneTaskPricingQuestion(text: string) {
   return (
+    isStandaloneDiscountRequest(text) ||
+    /^(?:are there|do you have|show me|any)\s+(?:any\s+)?(?:offers?|discounts?|cheaper (?:rate plans?|rates?|options?)|coupon codes?)(?:(?:,\s*|\s+(?:or|and)\s+)(?:offers?|discounts?|cheaper (?:rate plans?|rates?|options?)|coupon codes?))*(?:\s+(?:available|for (?:this|that)(?: stay|booking|request|service)?))?[.!?]*$/i.test(
+      text.trim(),
+    ) ||
     /^(?:please\s+)?(?:(?:what(?:'s| is| are)|how much is|tell me|show me|give me)\s+)?(?:the\s+)?(?:(?:total|normal|best|available|applicable|current)\s+)*(?:price|rates?|cost|total|quote|offers?|discounts?|coupons?)(?:\s+(?:please|for (?:this|that|the stay)|available))?[.!?]*$/i.test(
       text.trim(),
     ) ||
@@ -140,12 +144,21 @@ export function isStandaloneTaskPricingQuestion(text: string) {
   );
 }
 
+function isStandaloneDiscountRequest(text: string) {
+  return /^(?:please\s+)?(?:can|could|would) you (?:take|give|offer|apply|do|make)(?: me)?(?: an? extra| another| an additional)? \d+(?:\.\d+)?\s*(?:percent|%)(?: off| discount| reduction)(?:\s+please)?[.!?]*(?:\s+I(?: will|'ll) book (?:immediately|now|today)[.!?]*)?$/i.test(
+    text.trim(),
+  );
+}
+
 export function answerTaskPricing(input: {
   table: TaskPriceTable;
   fields: TurnFieldStateV1[];
   text: string;
 }) {
   const { table } = input;
+  if (isStandaloneDiscountRequest(input.text)) {
+    return "Any extra discount needs our team's approval. I can request a callback for the best available price.";
+  }
   const asksOffers =
     /\b(?:discounts?|offers|coupons?|cheaper|bargain|percent off|%\s*off)\b/i.test(
       input.text,
@@ -161,7 +174,7 @@ export function answerTaskPricing(input: {
   });
   if (missing.length) {
     return asksOffers
-      ? `These are indicative estimates; our team will confirm applicable offers before booking. ${table.offersMessage}`
+      ? table.offersMessage
       : `To estimate the price, I still need: ${missing
           .slice(0, 6)
           .map((key) => fields.get(key)?.label ?? key)
@@ -214,7 +227,13 @@ export function answerTaskPricing(input: {
           .sort((a, b) => a.total - b.total)
           .slice(0, 2)
       : [];
-    return `These are indicative estimates; our team will confirm applicable offers before booking. ${table.offersMessage}${alternatives.map(({ candidate, total }) => `\nLower estimated rate — ${candidate.label}: ${money(total)} including tax.${candidate.note ? ` ${candidate.note}` : ""}`).join("")}`;
+    return [
+      ...alternatives.map(
+        ({ candidate, total }) =>
+          `${table.alternativeField ? candidate.match[table.alternativeField] : candidate.label}: estimated ${money(total)} including tax.${candidate.note ? ` ${candidate.note}` : " Our team will confirm eligibility and the final price."}`,
+      ),
+      table.offersMessage,
+    ].join("\n");
   }
   return `${row.label}: ${money(base + tax)} total (${money(base)} + ${money(tax)} tax). This is an indicative estimate. Our team will confirm availability and the final price before booking.${row.note ? ` ${row.note}` : ""}`;
 }

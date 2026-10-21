@@ -80,6 +80,11 @@ test.describe("deterministic flow side questions", () => {
       "Before that, do you have a swimming pool?",
       "Do you offer bike pickup?",
       "Is there parking near the clinic?",
+      "Before I give my details, is parking free?",
+      "Does that price include breakfast?",
+      "Does the service price cover parts?",
+      "Is the Wi-Fi fast enough for video calls?",
+      "Is the consultation refundable?",
     ])
       expect(isStandaloneKnowledgeQuestion(question)).toBe(true);
     for (const question of [
@@ -89,6 +94,9 @@ test.describe("deterministic flow side questions", () => {
       "Is there parking? Also two adults.",
       "Do you have my booking reference?",
       "Do you have rooms; please cancel the booking",
+      "Is the Wi-Fi fast enough? We are four adults.",
+      "Does that price include breakfast? Change checkout to tomorrow.",
+      "Is my appointment on 22 October?",
     ])
       expect(isStandaloneKnowledgeQuestion(question)).toBe(false);
   });
