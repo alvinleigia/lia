@@ -849,9 +849,13 @@ async function executeTaskConfirmation(input: {
     });
     return {
       output: operationTurn({
-        nextAction: "cancel",
-        outcomeKey: outcome?.key,
-        reply: "No problem. I cancelled this request.",
+        nextAction: cancelled.disposition === "applied" ? "cancel" : "ask",
+        outcomeKey:
+          cancelled.disposition === "applied" ? outcome?.key : undefined,
+        reply:
+          cancelled.disposition === "applied"
+            ? "No problem. I cancelled this request."
+            : "I couldn't confirm that cancellation completed. Please try again.",
       }),
       signals:
         cancelled.disposition === "applied" && outcome
@@ -1652,6 +1656,23 @@ async function executeTaskBoundary(input: {
   }
   let revision = session.execution.revision;
 
+  // Contact collection must not replace already saved substantive questions
+  // with a pronoun-only callback request. New unanswered questions are appended
+  // by the knowledge path; explicit field corrections remain editable.
+  const followUpConfig = snapshot.task.definition.followUp;
+  if (followUpConfig && proposal.turnKind === "follow_up_request") {
+    const savedReason = runtime.fields.find(
+      (field) =>
+        field.fieldKey === followUpConfig.reasonField &&
+        ["valid", "confirmed"].includes(field.state) &&
+        field.canonicalValue,
+    );
+    if (savedReason)
+      proposal.fieldCandidates = proposal.fieldCandidates.filter(
+        (candidate) => candidate.fieldKey !== followUpConfig.reasonField,
+      );
+  }
+
   if (proposal.fieldCandidates.length > 0) {
     const fieldResult = await applyConversationalTaskEvent({
       authentication: null,
@@ -1761,6 +1782,7 @@ async function executeTaskBoundary(input: {
           projectPolicy: updatedSession.snapshot.conversationPolicy,
           publishedTasks: [],
           stage: "knowledge",
+          knowledgeRequest: proposal.knowledgeRequest,
           visitorMessage: input.runtimeInput.text,
         },
         turnRetriever,
@@ -1847,7 +1869,7 @@ async function executeTaskBoundary(input: {
             fieldKey: followUp.reasonField,
             naturalValue: appendTaskFollowUpQuestion(
               previousReason,
-              input.runtimeInput.text,
+              proposal.knowledgeRequest?.query ?? input.runtimeInput.text,
             ),
             provenance: { source: "visitor", sourceReference: null },
             state: "candidate",
@@ -2297,6 +2319,15 @@ async function executeTaskBoundary(input: {
             ))
           : null;
   if (!outcome) {
+    if (["cancel", "complete"].includes(reconciledProposal.nextAction))
+      return {
+        output: operationTurn({
+          nextAction: "ask",
+          reply:
+            "I couldn't confirm that action completed. Please try again.",
+        }),
+        signals: [],
+      };
     if (
       reconciledProposal.nextAction === "confirm" &&
       canonicalSession.runtime &&
@@ -2438,12 +2469,23 @@ async function executeTaskBoundary(input: {
 
   return {
     output:
-      outcomeResult.disposition === "applied" && outcome.type === "completed"
-        ? {
-            ...reconciledProposal,
-            reply: `${snapshot.task.name} is complete.`,
-          }
-        : reconciledProposal,
+      outcomeResult.disposition !== "applied"
+        ? operationTurn({
+            nextAction: "ask",
+            reply:
+              "I couldn't confirm that action completed. Please try again.",
+          })
+        : outcome.type === "cancelled"
+          ? {
+              ...reconciledProposal,
+              reply: "No problem. I cancelled this request.",
+            }
+          : outcome.type === "completed"
+            ? {
+                ...reconciledProposal,
+                reply: `${snapshot.task.name} is complete.`,
+              }
+            : reconciledProposal,
     signals:
       outcomeResult.disposition === "applied"
         ? [{ kind: "task_outcome", triggerKey: outcome.outputPort }]

@@ -84,6 +84,7 @@ export interface TurnKnowledgeRetriever {
 }
 
 export type ExecuteStructuredTurnInput = {
+  knowledgeRequest?: TurnResultV1["knowledgeRequest"];
   // Server-provided channel identity; never taken from a model response.
   externalUserId?: string | null;
   prefetchKnowledge?: boolean;
@@ -930,7 +931,8 @@ export class StructuredTurnEngine {
     if (
       priceTable &&
       input.stage === "knowledge" &&
-      isTaskPricingQuestion(input.visitorMessage) &&
+      (input.knowledgeRequest?.pricingIntent ||
+        isTaskPricingQuestion(input.visitorMessage)) &&
       !input.openingTurn
     ) {
       return {
@@ -944,6 +946,7 @@ export class StructuredTurnEngine {
               table: priceTable,
               fields: input.fieldState,
               text: input.visitorMessage,
+              intent: input.knowledgeRequest?.pricingIntent,
             }),
             groundingStatus: "grounded",
             groundingExcerptIds: [
@@ -1027,7 +1030,9 @@ export class StructuredTurnEngine {
                 MAX_MODEL_RETRIEVAL_EXCERPTS,
               ),
               projectId: input.projectId,
-              query: buildKnowledgeRetrievalQuery(input),
+              query:
+                input.knowledgeRequest?.query ??
+                buildKnowledgeRetrievalQuery(input),
             }),
         );
       } catch {
@@ -1041,7 +1046,29 @@ export class StructuredTurnEngine {
       }
     }
 
-    const compiled = compileStructuredTurn({ ...input, retrieval });
+    const channelPhoneFieldKeys =
+      input.stage === "extraction" &&
+      input.channel === "whatsapp" &&
+      /^\+?[1-9]\d{6,14}$/.test(input.externalUserId ?? "")
+        ? (
+            input.activeTask?.task.definition.fields ??
+            input.collection?.fields ??
+            []
+          )
+            .filter(
+              (field) =>
+                field.type === "phone" &&
+                field.cardinality === "single" &&
+                field.sourcePriority.includes("visitor") &&
+                !field.optionSource,
+            )
+            .map((field) => field.key)
+        : [];
+    let compiled = compileStructuredTurn({
+      ...input,
+      retrieval,
+      channelPhoneFieldKeys,
+    });
     // Retrieval depends on the visitor/history, not on model-extracted fields.
     // Start it alongside extraction; answer generation still waits for validated
     // runtime state and its own budget/grounding checks.
@@ -1071,6 +1098,7 @@ export class StructuredTurnEngine {
       (modelId): modelId is string => Boolean(modelId),
     );
     let attempts = 0;
+    let retrievalRephrased = false;
     const attemptUsages: ModelUsage[] = [];
 
     const deadline = Date.now() + modelPolicy.timeoutMs;
@@ -1130,6 +1158,55 @@ export class StructuredTurnEngine {
               compiled.validation,
             ),
           );
+          // The model identifies permission/reference; only the server supplies
+          // the channel identity. A browser session never supplies this value.
+          proposal.fieldCandidates = proposal.fieldCandidates.map(
+            (candidate) =>
+              candidate.valueReference === "channel_sender_phone"
+                ? {
+                    ...candidate,
+                    naturalValue: `+${input.externalUserId!.replace(/^\+/, "")}`,
+                    valueReference: null,
+                  }
+                : candidate,
+          );
+          // A semantic query can recover a terse paraphrase whose first search
+          // missed the relevant evidence. Retry once, in the same project and
+          // within the existing model time/repair budget; never invent facts.
+          if (
+            !retrievalRephrased &&
+            repairAttempt < modelPolicy.maxRepairAttempts &&
+            retriever &&
+            input.stage === "knowledge" &&
+            proposal.grounding.status === "no_answer" &&
+            proposal.knowledgeRequest &&
+            !proposal.taskRecommendation &&
+            proposal.nextAction === "ask" &&
+            input.projectPolicy.knowledge.sourceSelection.allowedSources.includes(
+              "project_documents",
+            ) &&
+            proposal.knowledgeRequest.query !==
+              (input.knowledgeRequest?.query ?? input.visitorMessage)
+          ) {
+            retrievalRephrased = true;
+            retrieval = await retriever.retrieve({
+              projectId: input.projectId,
+              limit: Math.min(
+                input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
+                MAX_MODEL_RETRIEVAL_EXCERPTS,
+              ),
+              query: proposal.knowledgeRequest.query,
+            });
+            compiled = compileStructuredTurn({
+              ...input,
+              knowledgeRequest: proposal.knowledgeRequest,
+              retrieval,
+              channelPhoneFieldKeys,
+            });
+            repair =
+              "\nThe first search did not establish the answer. Reassess using the refreshed references; use no_answer if still unsupported.";
+            continue;
+          }
           if (
             channelPhoneCandidate &&
             proposal.nextAction === "ask" &&

@@ -50,6 +50,7 @@ const snapshot = conversationalTaskSnapshotV1Schema.parse({
 
 function validTurn() {
   return {
+    knowledgeRequest: null,
     answerSelections: null,
     schemaVersion: 1 as const,
     turnKind: "ordinary_question" as const,
@@ -176,6 +177,7 @@ test("FAQ selection validates IDs and cannot replace a partial, ambiguous or act
 
 test("compact knowledge keeps grounding and cannot propose task mutations", () => {
   const compact = {
+    knowledgeRequest: null,
     turnKind: "side_question",
     reply: "The spa is open from 9 am to 6 pm.",
     grounding: { status: "grounded", excerptIds: ["document:12"] },
@@ -235,7 +237,12 @@ test("compact knowledge routing preserves task choice and forbids operations", (
     ambiguity: { ...base.ambiguity, fieldKeys: null },
     grounding: { status: "not_needed", excerptIds: [] },
     fieldCandidates: [
-      { fieldKey: "patientName", naturalValue: "Alex", confidence: 1 },
+      {
+        fieldKey: "patientName",
+        naturalValue: "Alex",
+        confidence: 1,
+        valueReference: null,
+      },
     ],
     taskRecommendation: {
       taskId: 95,
@@ -280,7 +287,12 @@ test("compact extraction restores visitor provenance and preserves uncertainty",
       fieldKeys: ["preferredDate"],
     },
     fieldCandidates: [
-      { fieldKey: "patientName", naturalValue: "Alex Test", confidence: 1 },
+      {
+        fieldKey: "patientName",
+        naturalValue: "Alex Test",
+        confidence: 1,
+        valueReference: null,
+      },
     ],
   };
   const expanded = turnResultV1Schema.parse(

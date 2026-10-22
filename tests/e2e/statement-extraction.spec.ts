@@ -34,7 +34,7 @@ config({ path: ".env.local", quiet: true });
 type FieldSpec = [
   string,
   string,
-  "text" | "email" | "phone" | "date" | "time" | "boolean",
+  "text" | "email" | "phone" | "date" | "date_range" | "time" | "boolean",
 ];
 function task(name: string, specs: FieldSpec[]) {
   return conversationalTaskSnapshotV1Schema.parse({
@@ -375,6 +375,127 @@ test("@live-openai mixed follow-up keeps name, authorized phone and callback win
       expect(execution.proposal.ambiguity.requiresClarification).toBe(false);
     }
   }
+});
+
+test("@live-openai paraphrased contact permission and cancellation work across domains", async () => {
+  test.skip(
+    process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",
+    "Opt-in metered verification only.",
+  );
+  test.setTimeout(180_000);
+  for (const domain of ["Hotel stay", "Repair service", "Appointment"]) {
+    const snapshot = task(domain, [
+      ["name", "Customer Name", "text"],
+      ["phone", "Contact Number", "phone"],
+      ["window", "Callback Window", "text"],
+      ["consent", "Callback Requested", "boolean"],
+      ["question", "Question for Team", "text"],
+    ]);
+    snapshot.task.definition.followUp = {
+      nameField: "name",
+      contactField: "phone",
+      consentField: "consent",
+      reasonField: "question",
+    };
+    const engine = new StructuredTurnEngine();
+    const request = {
+      ...input(
+        snapshot,
+        "I'm Alex Test. You can reach me on the number I'm messaging from. Could someone call on 24 October 2026, sometime from 2 to 4 in the afternoon, India time?",
+        "name",
+      ),
+      channel: "whatsapp" as const,
+      externalUserId: "12025550123",
+      history: [
+        { role: "user" as const, content: "Can you accommodate a wheelchair?" },
+        {
+          role: "assistant" as const,
+          content:
+            "Our team can confirm accessibility. Would you like us to follow up?",
+        },
+      ],
+    };
+    const result = await engine.execute(request);
+    const values = Object.fromEntries(
+      result.proposal.fieldCandidates.map((field) => [
+        field.fieldKey,
+        field.naturalValue,
+      ]),
+    );
+    console.log(
+      JSON.stringify({
+        domain,
+        proposal: result.proposal,
+        attempts: result.attempts,
+      }),
+    );
+    expect(values.name).toBe("Alex Test");
+    expect(values.phone).toBe("+12025550123");
+    expect(String(values.window)).toMatch(/24/);
+    expect(String(values.question)).toMatch(/wheelchair|accessib/i);
+    expect(result.proposal.knowledgeRequest).toBeNull();
+    const denied = await engine.execute({
+      ...request,
+      visitorMessage:
+        "Don't use the number I'm messaging from. I'll give you a different one.",
+    });
+    console.log(JSON.stringify({ domain, denied: denied.proposal }));
+    expect(
+      denied.proposal.fieldCandidates.some(
+        (field) => field.fieldKey === "phone",
+      ),
+    ).toBe(false);
+    const cancelled = await engine.execute({
+      ...request,
+      visitorMessage:
+        "Please drop this new request; I don't want to continue with it.",
+    });
+    expect(cancelled.proposal.nextAction).toBe("cancel");
+    expect(cancelled.proposal.turnKind).toBe("cancellation");
+  }
+});
+
+test("@live-openai date range paraphrases retain complete endpoints and partial corrections", async () => {
+  test.skip(
+    process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",
+    "Opt-in metered verification only.",
+  );
+  test.setTimeout(90_000);
+  const snapshot = task("Equipment rental", [
+    ["rentalDates", "Rental Start and End Dates", "date_range"],
+    ["name", "Customer Name", "text"],
+  ]);
+  const engine = new StructuredTurnEngine();
+  const result = await engine.execute(
+    input(
+      snapshot,
+      "I'd like the equipment from 26 October to 28 October 2026, please.",
+      "rentalDates",
+    ),
+  );
+  const saved = await reconcile(
+    snapshot,
+    result.proposal,
+    "I'd like the equipment from 26 October to 28 October 2026, please.",
+    "rentalDates",
+  );
+  expect(saved.values.rentalDates).toEqual({
+    start: "2026-10-26",
+    end: "2026-10-28",
+  });
+  const changed = await engine.execute(
+    input(snapshot, "Actually, return it on 25 October 2026 instead.", "name", {
+      rentalDates: "2026-10-26 to 2026-10-28",
+    }),
+  );
+  const invalid = await reconcile(
+    snapshot,
+    changed.proposal,
+    "Actually, return it on 25 October 2026 instead.",
+    "name",
+    { rentalDates: "2026-10-26 to 2026-10-28" },
+  );
+  expect(invalid.next.reply).toContain("end date must be on or after");
 });
 
 function proposal(values: Record<string, string>): TurnResultV1 {

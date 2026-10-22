@@ -87,6 +87,33 @@ function input(text: string): ExecuteStructuredTurnInput {
   };
 }
 
+test("semantic pricing intents use configured calculations without a model or keyword match", async () => {
+  const engine = new StructuredTurnEngine({
+    provider: {
+      async generateTurn() {
+        throw new Error("Arithmetic must not call the model");
+      },
+    },
+  });
+  for (const [text, intent, expected] of [
+    ["How much would that come to altogether?", "quote", /29,960.78/],
+    [
+      "Is there a less expensive plan for those same dates?",
+      "offers",
+      /21,262.50/,
+    ],
+    ["Could you knock a fifth off?", "discount", /team's approval/],
+  ] as const) {
+    const result = await engine.execute({
+      ...input(text),
+      knowledgeRequest: { query: text, pricingIntent: intent },
+    });
+    expect(result.source).toBe("deterministic");
+    expect(result.proposal.reply).toMatch(expected);
+    expect(result.usage.totalTokens).toBe(0);
+  }
+});
+
 test("hotel price uses distinct saved tiers, tax and full-stay amounts", () => {
   const reply = answerTaskPricing({
     table,

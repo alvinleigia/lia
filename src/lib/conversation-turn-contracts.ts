@@ -47,6 +47,7 @@ export const turnFieldCandidateProposalV1Schema = z
     naturalValue: proposalValue,
     confidence,
     source: z.literal("visitor"),
+    valueReference: z.literal("channel_sender_phone").nullable().optional(),
   })
   .strict();
 
@@ -61,6 +62,14 @@ export const approvedAnswerSelectionSchema = z
   )
   .min(1)
   .max(4)
+  .nullable();
+
+export const turnKnowledgeRequestSchema = z
+  .object({
+    query: z.string().trim().min(1).max(500),
+    pricingIntent: z.enum(["quote", "offers", "discount"]).nullable(),
+  })
+  .strict()
   .nullable();
 
 export const turnTaskRecommendationV1Schema = z
@@ -94,6 +103,7 @@ const turnResultV1BaseSchema = z
     turnKind: z.enum(TURN_KINDS),
     reply: z.string().trim().min(1).max(2_000),
     answerSelections: approvedAnswerSelectionSchema.optional(),
+    knowledgeRequest: turnKnowledgeRequestSchema.optional(),
     grounding: z
       .object({
         status: z.enum(["grounded", "not_needed", "no_answer"]),
@@ -138,6 +148,14 @@ const turnResultV1BaseSchema = z
 // Providers require every property; older deterministic proposals remain valid.
 export const turnResultV1ProviderSchema = turnResultV1BaseSchema.extend({
   answerSelections: approvedAnswerSelectionSchema,
+  knowledgeRequest: turnKnowledgeRequestSchema,
+  fieldCandidates: z
+    .array(
+      turnFieldCandidateProposalV1Schema.extend({
+        valueReference: z.literal("channel_sender_phone").nullable(),
+      }),
+    )
+    .max(50),
   ambiguity: turnResultV1BaseSchema.shape.ambiguity.extend({
     fieldKeys: z.array(stableKey).max(50).nullable(),
   }),
@@ -162,7 +180,11 @@ export const compactTaskExtractionProviderSchema = turnResultV1ProviderSchema
   .omit({ schemaVersion: true, decisionSummary: true })
   .extend({
     fieldCandidates: z
-      .array(turnFieldCandidateProposalV1Schema.omit({ source: true }))
+      .array(
+        turnResultV1ProviderSchema.shape.fieldCandidates.element.omit({
+          source: true,
+        }),
+      )
       .max(50),
   });
 

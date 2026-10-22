@@ -247,7 +247,8 @@ export function shouldAnswerTaskSideQuestion(input: {
     return false;
   // The model distinguishes a request for the team to act from a factual FAQ.
   // Its fields still pass normal validation and final submission confirmation.
-  if (proposal.turnKind === "follow_up_request") return false;
+  if (proposal.turnKind === "follow_up_request" && !proposal.knowledgeRequest)
+    return false;
   // A review/confirmation question attached to supplied details belongs to the
   // task's validation and confirmation path, not factual knowledge retrieval.
   const asksOnlyToProceed =
@@ -257,6 +258,7 @@ export function shouldAnswerTaskSideQuestion(input: {
     );
   if (proposal.fieldCandidates.length > 0 && asksOnlyToProceed) return false;
   return (
+    (Boolean(proposal.knowledgeRequest) && !input.availabilityHandled) ||
     proposal.turnKind === "side_question" ||
     (!input.availabilityHandled &&
       proposal.fieldCandidates.length > 0 &&

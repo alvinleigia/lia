@@ -141,6 +141,129 @@ test("repairs a model array for a configured single text field before visitor va
   expect(provider.calls[1].system).toContain("field_shape:details");
 });
 
+test("repairs a cancellation outcome incorrectly proposed as completion", async () => {
+  const cancelled = snapshot.task.definition.outcomes.find(
+    (outcome) => outcome.type === "cancelled",
+  )!;
+  const wrong = baseTurn({
+    turnKind: "cancellation",
+    nextAction: "complete",
+    fieldCandidates: [],
+    outcomeRecommendation: { outcomeKey: cancelled.key, confidence: 1 },
+  });
+  const provider = new QueueProvider([
+    wrong,
+    { ...wrong, nextAction: "cancel" },
+  ]);
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    visitorMessage:
+      "Please drop this new request; I don't want to continue with it.",
+  });
+  expect(result.attempts).toBe(2);
+  expect(result.proposal.nextAction).toBe("cancel");
+  expect(provider.calls[1].system).toContain("outcome_action_mismatch");
+});
+
+test("semantic sender references resolve only to a permitted server channel identity", async () => {
+  const activeTask = structuredClone(snapshot);
+  const phone = {
+    ...activeTask.task.definition.fields[0],
+    key: "callbackPhone",
+    label: "Callback Number",
+    type: "phone" as const,
+    cardinality: "single" as const,
+    optionSource: null,
+    sourcePriority: ["visitor" as const],
+  };
+  activeTask.task.definition.fields = [phone];
+  const referenced = baseTurn({
+    fieldCandidates: [
+      {
+        fieldKey: phone.key,
+        confidence: 1,
+        source: "visitor",
+        naturalValue: "",
+        valueReference: "channel_sender_phone",
+      },
+    ],
+  });
+  const provider = new QueueProvider([referenced]);
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    activeTask,
+    channel: "whatsapp",
+    externalUserId: "12025550123",
+    visitorMessage: "You can reach me on the number I'm messaging from.",
+  });
+  expect(result.proposal.fieldCandidates[0].naturalValue).toBe("+12025550123");
+  const denied = new QueueProvider([
+    referenced,
+    baseTurn({ fieldCandidates: [], reply: "Which number may we use?" }),
+  ]);
+  const withoutIdentity = await new StructuredTurnEngine({
+    provider: denied,
+  }).execute({
+    ...engineInput(),
+    activeTask,
+    visitorMessage: "You can reach me on the number I'm messaging from.",
+  });
+  expect(withoutIdentity.proposal.fieldCandidates).toEqual([]);
+  expect(denied.calls[1].system).toContain(
+    "unavailable_channel_phone_reference",
+  );
+});
+
+test("rephrases a failed knowledge search once and validates the refreshed evidence", async () => {
+  const queries: string[] = [];
+  const missing = baseTurn({
+    turnKind: "ordinary_question",
+    fieldCandidates: [],
+    grounding: { status: "no_answer", excerptIds: [] },
+    knowledgeRequest: {
+      query: "Business location and address",
+      pricingIntent: null,
+    },
+  });
+  const provider = new QueueProvider([
+    missing,
+    {
+      ...missing,
+      reply: "We are at 12 Orchard Road.",
+      grounding: { status: "grounded", excerptIds: ["document:13"] },
+    },
+  ]);
+  const engine = new StructuredTurnEngine({
+    provider,
+    retriever: {
+      async retrieve(request) {
+        expect(request.projectId).toBe(194);
+        queries.push(request.query);
+        return queries.length === 1
+          ? []
+          : [
+              {
+                id: "document:13",
+                content: "Business address: 12 Orchard Road.",
+              },
+            ];
+      },
+    },
+  });
+  const result = await engine.execute({
+    ...engineInput(),
+    activeTask: null,
+    stage: "knowledge",
+    visitorMessage: "Hi! Where exactly are you based?",
+  });
+  expect(queries).toEqual([
+    "Hi! Where exactly are you based?",
+    "Business location and address",
+  ]);
+  expect(result.proposal.reply).toContain("12 Orchard Road");
+  expect(result.attempts).toBe(2);
+});
+
 function engineInput() {
   return {
     activeTask: snapshot,

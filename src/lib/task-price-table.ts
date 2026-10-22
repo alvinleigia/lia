@@ -154,15 +154,20 @@ export function answerTaskPricing(input: {
   table: TaskPriceTable;
   fields: TurnFieldStateV1[];
   text: string;
+  intent?: "quote" | "offers" | "discount" | null;
 }) {
   const { table } = input;
-  if (isStandaloneDiscountRequest(input.text)) {
+  if (
+    input.intent === "discount" ||
+    (!input.intent && isStandaloneDiscountRequest(input.text))
+  ) {
     return "Any extra discount needs our team's approval. I can request a callback for the best available price.";
   }
-  const asksOffers =
-    /\b(?:discounts?|offers|coupons?|cheaper|bargain|percent off|%\s*off)\b/i.test(
-      input.text,
-    );
+  const asksOffers = input.intent
+    ? input.intent === "offers"
+    : /\b(?:discounts?|offers|coupons?|cheaper|bargain|percent off|%\s*off)\b/i.test(
+        input.text,
+      );
   const fields = new Map(input.fields.map((field) => [field.fieldKey, field]));
   const missing = table.fields.filter((key) => {
     const field = fields.get(key);

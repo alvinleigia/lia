@@ -73,6 +73,27 @@ export function validateStructuredTurnProposal(
       proposal.turnKind = "ordinary_question";
   }
   const issues: string[] = [];
+  if (proposal.turnKind === "cancellation" && proposal.nextAction !== "cancel")
+    issues.push(
+      "cancellation_action_mismatch: propose nextAction cancel; the server must persist cancellation before confirming it",
+    );
+  if (proposal.outcomeRecommendation) {
+    const type = allowed.outcomeTypes?.get(
+      proposal.outcomeRecommendation.outcomeKey,
+    );
+    const action =
+      type === "cancelled"
+        ? "cancel"
+        : type === "completed"
+          ? "complete"
+          : type === "handoff"
+            ? "handoff"
+            : null;
+    if (action && proposal.nextAction !== action)
+      issues.push(
+        `outcome_action_mismatch: selected outcome requires nextAction ${action}`,
+      );
+  }
   const hasActionProposal =
     proposal.fieldCandidates.length > 0 ||
     proposal.taskRecommendation !== null ||
@@ -96,6 +117,21 @@ export function validateStructuredTurnProposal(
     }
   }
   for (const candidate of proposal.fieldCandidates) {
+    if (
+      !candidate.valueReference &&
+      typeof candidate.naturalValue === "string" &&
+      !candidate.naturalValue.trim()
+    )
+      issues.push(
+        "empty_field_candidate: omit missing or refused values; an empty string is only valid with an available valueReference",
+      );
+    if (
+      candidate.valueReference &&
+      !allowed.channelPhoneFieldKeys?.has(candidate.fieldKey)
+    )
+      issues.push(
+        "unavailable_channel_phone_reference: ask for a contact number instead; do not invent one",
+      );
     const allowedFields =
       allowed.activeTaskId === null &&
       !allowed.fieldCollectionOnly &&
