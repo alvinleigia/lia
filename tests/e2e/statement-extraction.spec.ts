@@ -200,7 +200,7 @@ test("WhatsApp number references preserve other details and respect channel, con
 });
 
 for (const leadingName of [true, false])
-  test(`mixed callback details retain the explicit sender number (${leadingName ? "name first" : "phone first"})`, async () => {
+  test(`mixed callback details retain the sender number even when the model omits it (${leadingName ? "name first" : "phone first"})`, async () => {
     const snapshot = task("Hotel callback", [
       ["guestName", "Guest Name", "text"],
       ["phone", "Contact Number", "phone"],
@@ -223,7 +223,6 @@ for (const leadingName of [true, false])
             modelId: request.modelId,
             output: proposal({
               guestName: "Hotel Test",
-              phone: "+61491570006",
               callbackWindow: "21 October 2026 between 2 pm and 4 pm",
             }),
             usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },

@@ -14,13 +14,19 @@ export function resolveChannelPhoneReference(input: {
   requestedFieldKey?: string | null;
   text: string;
 }): string {
+  return extractChannelPhoneReference(input)?.text ?? input.text;
+}
+
+export function extractChannelPhoneReference(
+  input: Parameters<typeof resolveChannelPhoneReference>[0],
+) {
   if (
     input.channel !== "whatsapp" ||
     !input.externalUserId ||
     !/^\+?[1-9]\d{6,14}$/.test(input.externalUserId) ||
     /\b(?:not|don't|instead|rather|or)\b/i.test(input.text)
   )
-    return input.text;
+    return null;
   const fields = input.fields.filter(
     (field) =>
       field.type === "phone" &&
@@ -31,13 +37,24 @@ export function resolveChannelPhoneReference(input: {
   const field =
     fields.find(({ key }) => key === input.requestedFieldKey) ??
     (fields.length === 1 ? fields[0] : null);
-  if (!field) return input.text;
+  if (!field) return null;
   const phone = `+${input.externalUserId.replace(/^\+/, "")}`;
   const reference =
     /(^|[.!?;\n]\s*|\band\s+)(?:(?:please|can you|could you|you may|you can)\s+)?(?:use|call me on|contact me on|reach me on)\s+(?:my|this)\s+whatsapp (?:phone )?number\b/gi;
-  return input.text.replace(reference, (_, prefix: string) => {
+  const text = input.text.replace(reference, (_, prefix: string) => {
     return `${prefix}${field.key}: ${phone}`;
   });
+  return text === input.text
+    ? null
+    : {
+        text,
+        candidate: {
+          fieldKey: field.key,
+          naturalValue: phone,
+          confidence: 1,
+          source: "visitor" as const,
+        },
+      };
 }
 
 // Unscoped ambiguity is deliberately conservative. A model's confidence cannot

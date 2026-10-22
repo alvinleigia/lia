@@ -13,7 +13,7 @@ import {
 } from "@/lib/conversation-control-intents";
 import {
   extractLocalTaskFieldCandidates,
-  resolveChannelPhoneReference,
+  extractChannelPhoneReference,
 } from "@/lib/conversation-field-extraction";
 import {
   compileStructuredTurn,
@@ -783,19 +783,24 @@ export class StructuredTurnEngine {
   async execute(
     input: ExecuteStructuredTurnInput,
   ): Promise<StructuredTurnExecution> {
+    let channelPhoneCandidate:
+      | TurnResultV1["fieldCandidates"][number]
+      | undefined;
     if (input.stage === "extraction") {
+      const reference = extractChannelPhoneReference({
+        channel: input.channel,
+        externalUserId: input.externalUserId,
+        fields:
+          input.activeTask?.task.definition.fields ??
+          input.collection?.fields ??
+          [],
+        requestedFieldKey: input.requestedFieldKey,
+        text: input.visitorMessage,
+      });
+      channelPhoneCandidate = reference?.candidate;
       input = {
         ...input,
-        visitorMessage: resolveChannelPhoneReference({
-          channel: input.channel,
-          externalUserId: input.externalUserId,
-          fields:
-            input.activeTask?.task.definition.fields ??
-            input.collection?.fields ??
-            [],
-          requestedFieldKey: input.requestedFieldKey,
-          text: input.visitorMessage,
-        }),
+        visitorMessage: reference?.text ?? input.visitorMessage,
       };
     }
     if (isExplicitTaskCancellation(input)) {
@@ -1113,7 +1118,7 @@ export class StructuredTurnEngine {
           ]).finally(() => clearTimeout(deadlineTimer));
           attemptUsages.push(generated.usage);
           receivedUsage = true;
-          const proposal = preserveAmbiguousDateWording(
+          let proposal = preserveAmbiguousDateWording(
             input,
             applyIntentRoutingPolicy(
               validateStructuredTurnProposal(
@@ -1123,6 +1128,37 @@ export class StructuredTurnEngine {
               compiled.validation,
             ),
           );
+          if (
+            channelPhoneCandidate &&
+            proposal.nextAction === "ask" &&
+            proposal.safety.decision === "allow" &&
+            !proposal.ambiguity.requiresClarification &&
+            !proposal.taskRecommendation &&
+            !proposal.toolRequest &&
+            !proposal.routeRecommendation &&
+            !proposal.outcomeRecommendation
+          ) {
+            // Explicit channel-number consent was resolved before the model.
+            // Do not let an omitted model candidate discard that known value.
+            proposal = validateStructuredTurnProposal(
+              {
+                ...proposal,
+                turnKind: ["ordinary_question", "side_question"].includes(
+                  proposal.turnKind,
+                )
+                  ? "field_answer"
+                  : proposal.turnKind,
+                fieldCandidates: [
+                  ...proposal.fieldCandidates.filter(
+                    (candidate) =>
+                      candidate.fieldKey !== channelPhoneCandidate.fieldKey,
+                  ),
+                  channelPhoneCandidate,
+                ],
+              },
+              compiled.validation,
+            );
+          }
           if (hasUnsafeTurnOutput(proposal.reply)) {
             throw new TurnProposalValidationError(["unsafe_output"]);
           }
