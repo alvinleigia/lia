@@ -18,7 +18,6 @@ import {
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 import {
   appendTaskFollowUpQuestion,
-  FOLLOW_UP_CONSENT_PROMPT,
   hasTaskFollowUpDestination,
   isPendingTaskFollowUp,
   parseTaskFollowUpConsent,
@@ -167,7 +166,9 @@ test("pending consent survives interruptions and cannot become final submission"
   ).toBe(true);
   expect(
     reconcileTaskTurnWithRuntime({ snapshot, fields, proposal }).reply,
-  ).toBe(FOLLOW_UP_CONSENT_PROMPT);
+  ).toBe(
+    "Would you like our team to follow up on your earlier unanswered question?",
+  );
   expect(
     getTaskRuntimeInputRequest({ snapshot, fields, proposal })?.fieldKey,
   ).toBe("helpWanted");
@@ -182,7 +183,9 @@ test("pending consent survives interruptions and cannot become final submission"
     requestedFieldKey: "helpWanted",
     proposal: { ...proposal, reply: "We open at 9 am." },
   });
-  expect(side.reply).toBe(`We open at 9 am.\n\n${FOLLOW_UP_CONSENT_PROMPT}`);
+  expect(side.reply).toBe(
+    "We open at 9 am.\n\nWould you like our team to follow up on your earlier unanswered question?",
+  );
   expect(parseTaskFollowUpConsent("Yes please")).toBe(true);
   expect(parseTaskFollowUpConsent("No thanks")).toBe(false);
   expect(parseTaskFollowUpConsent("Maybe, what does it cost?")).toBeNull();

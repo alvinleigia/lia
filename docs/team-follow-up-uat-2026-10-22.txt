@@ -1,0 +1,32 @@
+TEAM FOLLOW-UP UAT - 22 OCTOBER 2026
+
+Live project: Stayflexi Hotel UAT (#1895).
+Published task: 916, version 8 (#980). Flow: 1154, version 8 (#699).
+
+Passed in WhatsApp:
+- An unanswered Wi-Fi speed question offered team follow-up instead of asking
+  for the enquiry name immediately.
+- Yes please asked for name, then contact details, with their purpose explained.
+  It did not submit the enquiry.
+- Contact permission and a callback window in one message reached confirmation.
+- Stay dates, occupants, category and plan survived the interruption and pause.
+- Confirm saved submission #1249 to Hotel Reservations UAT, Under Review.
+  Its linked completed task #1302 shows consent, contact details, callback window
+  and the original Wi-Fi question. No booking or guaranteed callback was claimed.
+- A separate test answered an amenities FAQ while consent was pending. It kept
+  the original question. No thanks recorded false and resumed the enquiry.
+- Cancelling that test cancelled task #1303 / submission #1250 only.
+
+Found and fixed during testing:
+- Explicit "You may use my WhatsApp number" permission was not recognized.
+- A phone-first message swallowed callback timing into the phone value.
+- The resumed offer now refers to the earlier unanswered question.
+
+Verification: 162 shared regression checks passed; 17 opt-in checks skipped.
+The final wording change passed all 7 focused follow-up checks. TypeScript passed.
+Automated tests also cover generic service/appointment fields, email contacts,
+known details, missing team destinations, ambiguity and consent boundaries.
+
+Scope: Follow-up is part of the configured enquiry, with final confirmation.
+The current UAT queue uses manual review; no team notification or call was sent.
+Reply latency was variable; this change does not resolve overall response speed.

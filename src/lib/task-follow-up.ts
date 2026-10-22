@@ -129,7 +129,7 @@ export function taskFollowUpPrompt(input: {
     input.fieldKey === config.consentField &&
     taskFollowUpConsent(input.definition, input.fields) === null
   )
-    return FOLLOW_UP_CONSENT_PROMPT;
+    return "Would you like our team to follow up on your earlier unanswered question?";
   if (taskFollowUpConsent(input.definition, input.fields) !== true) return null;
   if (input.fieldKey === config.nameField)
     return "What is your name so our team can follow up with you?";
