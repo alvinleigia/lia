@@ -401,6 +401,84 @@ test("@live-openai approved answer selection handles paraphrases, combined reque
   }
 });
 
+test("@live-openai uncertain inclusions stay uncertain across domains and plan scopes", async () => {
+  test.skip(
+    process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",
+    "Opt-in metered verification only.",
+  );
+  test.setTimeout(180_000);
+  const provider = new AiSdkStructuredTurnProvider();
+  for (const scenario of [
+    {
+      previous: "The Standard Plan estimate is INR 29,960.78.",
+      question: "Does that price include breakfast?",
+      evidence:
+        "Breakfast is available. Breakfast availability does not mean breakfast is included in your rate. We cannot confirm inclusion. Sliceinn Flexi does not include meals.",
+      expected:
+        /(?:can.t|cannot|can not|unable to) confirm|unconfirmed|not (?:been )?confirmed|needs? (?:to be )?confirm|team.*confirm/i,
+      excluded:
+        /(?:breakfast|meals|it) (?:is|are) not included|does not include|doesn't include|costs? extra/i,
+    },
+    {
+      previous: "You selected the Standard repair service.",
+      question: "Is the warranty included in that?",
+      evidence:
+        "Warranty inclusion for Standard is unconfirmed. The Basic repair service excludes warranty coverage.",
+      expected:
+        /(?:can.t|cannot|can not|unable to) confirm|unconfirmed|not (?:been )?confirmed|needs? (?:to be )?confirm|team.*confirm/i,
+      excluded:
+        /warranty (?:is )?not included|does not include|doesn't include|costs? extra/i,
+    },
+    {
+      previous: "You selected an in-person consultation.",
+      question: "Does insurance cover that appointment?",
+      evidence:
+        "Insurance coverage for in-person consultations has not been confirmed. Remote consultations are not covered.",
+      expected:
+        /(?:can.t|cannot|can not|unable to) confirm|unconfirmed|not (?:been )?confirmed|needs? (?:to be )?confirm|team.*confirm/i,
+      excluded:
+        /in-person consultations are not covered|appointment is not covered|insurance does not cover/i,
+    },
+    {
+      previous: "You selected the Basic repair service.",
+      question: "Is the warranty included in the Basic repair service?",
+      evidence:
+        "Warranty inclusion for Standard is unconfirmed. The Basic repair service excludes warranty coverage.",
+      expected:
+        /not include|doesn't include|not covered|excluded|excludes|without.*warranty/i,
+      excluded: /(?:cannot|can't) confirm[^.]*Basic|Basic[^.]*unconfirmed/i,
+    },
+  ]) {
+    const engine = new StructuredTurnEngine({
+      provider,
+      retriever: {
+        async retrieve() {
+          return [{ id: "document:12", content: scenario.evidence }];
+        },
+      },
+    });
+    const result = await engine.execute({
+      ...engineInput(),
+      activeTask: null,
+      publishedTasks: [],
+      stage: "knowledge",
+      history: [
+        { role: "user", content: "Please tell me about my selected option." },
+        { role: "assistant", content: scenario.previous },
+      ],
+      visitorMessage: scenario.question,
+    });
+    console.log(
+      JSON.stringify({
+        question: scenario.question,
+        reply: result.proposal.reply,
+      }),
+    );
+    expect(result.proposal.reply).toMatch(scenario.expected);
+    expect(result.proposal.reply).not.toMatch(scenario.excluded);
+  }
+});
+
 test("@live-openai detailed pricing requests can enter a published channel task after cancellation", async () => {
   test.skip(
     process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",
