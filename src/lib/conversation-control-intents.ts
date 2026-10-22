@@ -154,7 +154,7 @@ export function isSimpleTaskTextAnswer(value: string) {
     !/\b(?:i|my|we|our|and|actually|instead|rather)\b/i.test(text) &&
     // Control/correction verbs need interpretation; nouns such as "oil change" and
     // "software update" are still valid answers to a requested text field.
-    !/^(?:(?:please|kindly)\s+|(?:can|could|would|will)\s+you\s+(?:please\s+)?)?(?:cancel|stop|end|abort|change|correct|update)\b/i.test(
+    !/^(?:(?:please|kindly)\s+|(?:can|could|would|will)\s+(?:you|u)\s+(?:please\s+)?)?(?:cancel|stop|end|abort|change|correct|update|check|ask|contact|call|confirm|follow up)\b/i.test(
       text,
     ) &&
     !/\b(?:change|correct|update)\s+(?:to|from)\b/i.test(text)

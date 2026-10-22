@@ -1126,6 +1126,35 @@ export class StructuredTurnEngine {
           if (hasUnsafeTurnOutput(proposal.reply)) {
             throw new TurnProposalValidationError(["unsafe_output"]);
           }
+          const followUp = input.activeTask?.task.definition.followUp;
+          if (
+            input.stage === "extraction" &&
+            followUp &&
+            !proposal.ambiguity.requiresClarification &&
+            proposal.nextAction === "ask" &&
+            proposal.fieldCandidates.some(
+              (candidate) =>
+                candidate.fieldKey === followUp.consentField &&
+                /^(?:true|yes)$/i.test(String(candidate.naturalValue)),
+            ) &&
+            !proposal.fieldCandidates.some(
+              (candidate) => candidate.fieldKey === followUp.reasonField,
+            ) &&
+            !input.fieldState.some(
+              (field) =>
+                field.fieldKey === followUp.reasonField &&
+                ["valid", "confirmed"].includes(field.state),
+            ) &&
+            input.history.some(
+              (message) =>
+                message.role === "user" &&
+                isPotentialKnowledgeSideQuestion(message.content),
+            )
+          ) {
+            throw new TurnProposalValidationError([
+              "missing_follow_up_question: resolve the referenced visitor question from history, or ask clarification if its meaning is ambiguous",
+            ]);
+          }
           if (
             proposal.fieldCandidates.length === 0 &&
             proposal.nextAction === "ask" &&

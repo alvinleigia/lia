@@ -28,6 +28,7 @@ import {
   postConversationJobPayloadSchema,
 } from "../../src/lib/post-conversation-jobs";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
+import { createConversationalTaskDefinitionFromTemplate } from "../../src/lib/conversational-task-templates";
 import {
   measureRuntimeRequest,
   type RuntimeRequestLog,
@@ -480,6 +481,47 @@ test("cancelling an enquiry cannot become the requested name", async () => {
   expect(result.proposal.nextAction).toBe("cancel");
   expect(result.proposal.fieldCandidates).toEqual([]);
   expect(provider.calls).toHaveLength(0);
+});
+
+test("follow-up consent missing its referenced question requests model repair", async () => {
+  const followUpSnapshot = conversationalTaskSnapshotV1Schema.parse({
+    ...snapshot,
+    task: {
+      ...snapshot.task,
+      definition:
+        createConversationalTaskDefinitionFromTemplate("team_follow_up"),
+    },
+  });
+  const consent = {
+    fieldKey: "callbackRequested",
+    naturalValue: true,
+    confidence: 1,
+    source: "visitor" as const,
+  };
+  const question = {
+    fieldKey: "followUpQuestion",
+    naturalValue: "Can you repair my basin?",
+    confidence: 1,
+    source: "visitor" as const,
+  };
+  const provider = new QueueProvider([
+    baseTurn({ fieldCandidates: [consent] }),
+    baseTurn({ fieldCandidates: [consent, question] }),
+  ]);
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    activeTask: followUpSnapshot,
+    publishedTasks: [],
+    requestedFieldKey: "contactName",
+    history: [
+      { role: "user", content: question.naturalValue },
+      { role: "assistant", content: "Our team can check." },
+    ],
+    visitorMessage: "Please check with them.",
+  });
+  expect(result.proposal.fieldCandidates).toEqual([consent, question]);
+  expect(provider.calls).toHaveLength(2);
+  expect(provider.calls[1].system).toContain("missing_follow_up_question");
 });
 
 test("minimal enquiry continues the pinned task without repair or restart", async () => {

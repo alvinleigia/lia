@@ -8,6 +8,7 @@ export const CONVERSATIONAL_TASK_TEMPLATE_KEYS = [
   "booking",
   "lead_capture",
   "support_intake",
+  "team_follow_up",
   "custom",
 ] as const;
 
@@ -40,6 +41,14 @@ export const CONVERSATIONAL_TASK_TEMPLATES = [
     defaultName: "Create a Support Request",
     defaultObjective:
       "Collect the information the support team needs to review an issue.",
+  },
+  {
+    key: "team_follow_up",
+    name: "Team Follow-up",
+    description: "Collect a question and contact details for a callback.",
+    defaultName: "Request Team Follow-up",
+    defaultObjective:
+      "Arrange a callback or team follow-up when visitors ask us to check, confirm with the team, or get back to them about a question. No booking details are needed.",
   },
   {
     key: "custom",
@@ -323,6 +332,57 @@ function supportIntakeDefinition(
   };
 }
 
+function teamFollowUpDefinition(
+  createId: () => string,
+): ConversationalTaskDefinitionV1 {
+  const definition = baseDefinition(createId);
+  return {
+    ...definition,
+    followUp: {
+      consentField: "callbackRequested",
+      reasonField: "followUpQuestion",
+      nameField: "contactName",
+      contactField: "contactNumber",
+    },
+    fields: [
+      field(createId, {
+        key: "contactName",
+        label: "Name",
+        type: "text",
+        prompt: "What is your name so our team can follow up with you?",
+        sensitivity: "personal",
+      }),
+      field(createId, {
+        key: "contactNumber",
+        label: "Callback Number",
+        type: "phone",
+        prompt:
+          "Which phone number, including country code, may our team use to follow up with you?",
+        sensitivity: "personal",
+      }),
+      field(createId, {
+        key: "followUpQuestion",
+        label: "Question for the Team",
+        type: "text",
+        prompt: "What would you like our team to check?",
+        sensitivity: "personal",
+      }),
+      field(createId, {
+        key: "callbackRequested",
+        label: "Follow-up Requested",
+        type: "boolean",
+        prompt: "Would you like our team to follow up on this question?",
+        required: false,
+      }),
+    ],
+    taskPolicy: {
+      ...definition.taskPolicy,
+      instructions:
+        "Collect the visitor's question, name and callback number. Resolve the question from recent conversation when the visitor asks us to check with the team. An explicit request for follow-up is consent. Ask only for missing details, without requiring booking or purchase details. Do not reuse contact details from a cancelled request without permission. Never promise an answer, availability, callback time or that anyone has been contacted. The server requires confirmation before saving the request.",
+    },
+  };
+}
+
 export function createConversationalTaskDefinitionFromTemplate(
   templateKey: ConversationalTaskTemplateKey,
   createId: () => string = () => crypto.randomUUID(),
@@ -334,7 +394,9 @@ export function createConversationalTaskDefinitionFromTemplate(
         ? leadCaptureDefinition(createId)
         : templateKey === "support_intake"
           ? supportIntakeDefinition(createId)
-          : baseDefinition(createId);
+          : templateKey === "team_follow_up"
+            ? teamFollowUpDefinition(createId)
+            : baseDefinition(createId);
 
   return conversationalTaskDefinitionV1Schema.parse(definition);
 }

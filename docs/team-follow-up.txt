@@ -23,3 +23,16 @@ without a configured notification, or mark a booking confirmed.
 UAT: unanswered question -> Yes -> contact details -> Confirm -> inspect team
 queue. Repeat with No, a FAQ interruption, and Cancel. Check that a Yes to the
 follow-up offer cannot submit a request, even when all other fields are present.
+
+Standalone callbacks (no active enquiry)
+
+Create a task using the Team Follow-up template. Connect its completed result to
+your Human Handoff queue, publish the task and the entry flow. It collects only
+the visitor's question, name and callback number, followed by final confirmation.
+It does not require stay dates, a service selection or appointment details.
+
+Shared semantic routing uses the LLM to distinguish a factual question from
+"can you check with them?" using recent context. Explicit follow-up requests
+count as consent; an ordinary FAQ or refusal of contact does not. The referenced
+question is retained. Cancelled requests are not restarted or used as permission
+to reuse personal details. Validation and saving remain server-controlled.
