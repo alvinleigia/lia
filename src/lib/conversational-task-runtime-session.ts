@@ -18,6 +18,7 @@ export function getTaskRuntimeTestConversationId(userId: number) {
 }
 
 export async function getConversationTaskRuntimeSession(input: {
+  includeAudit?: boolean;
   channelType: ChannelType;
   externalConversationId: string;
   projectId: number;
@@ -58,21 +59,23 @@ export async function getConversationTaskRuntimeSession(input: {
       .orderBy(desc(conversationalTaskRuns.id))
       .limit(1)
       .then(([row]) => row ?? null),
-    db
-      .select({
-        createdAt: conversationalTaskAuditEvents.createdAt,
-        eventType: conversationalTaskAuditEvents.eventType,
-        id: conversationalTaskAuditEvents.id,
-      })
-      .from(conversationalTaskAuditEvents)
-      .where(
-        and(
-          eq(conversationalTaskAuditEvents.projectId, input.projectId),
-          eq(conversationalTaskAuditEvents.conversationId, conversation.id),
-        ),
-      )
-      .orderBy(desc(conversationalTaskAuditEvents.id))
-      .limit(50),
+    input.includeAudit === false
+      ? Promise.resolve([])
+      : db
+          .select({
+            createdAt: conversationalTaskAuditEvents.createdAt,
+            eventType: conversationalTaskAuditEvents.eventType,
+            id: conversationalTaskAuditEvents.id,
+          })
+          .from(conversationalTaskAuditEvents)
+          .where(
+            and(
+              eq(conversationalTaskAuditEvents.projectId, input.projectId),
+              eq(conversationalTaskAuditEvents.conversationId, conversation.id),
+            ),
+          )
+          .orderBy(desc(conversationalTaskAuditEvents.id))
+          .limit(50),
   ]);
   const taskRunId = execution?.activeTaskRunId ?? latestRun?.id ?? null;
   if (!taskRunId) {
@@ -87,6 +90,7 @@ export async function getConversationTaskRuntimeSession(input: {
   }
 
   const runtime = await getConversationalTaskRuntime({
+    includeAudit: input.includeAudit,
     projectId: input.projectId,
     taskRunId,
   });

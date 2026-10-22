@@ -578,6 +578,30 @@ test("certifies identical booking fields and outcomes across live channel types"
         projectId: fixture?.projectId as number,
         taskRunId: started.taskRunId as number,
       });
+      const sessionInput = {
+        channelType,
+        externalConversationId,
+        projectId: fixture?.projectId as number,
+      };
+      const fullSession = await getConversationTaskRuntimeSession(sessionInput);
+      const chatSession = await getConversationTaskRuntimeSession({
+        ...sessionInput,
+        includeAudit: false,
+      });
+      expect(fullSession.safeAudit.length).toBeGreaterThan(0);
+      expect(fullSession.runtime?.audit.length).toBeGreaterThan(0);
+      expect(chatSession).toEqual({
+        ...fullSession,
+        safeAudit: [],
+        runtime: { ...fullSession.runtime, audit: [] },
+      });
+      expect(
+        await getConversationTaskRuntimeSession({
+          ...sessionInput,
+          projectId: fixture?.otherProjectId as number,
+          includeAudit: false,
+        }),
+      ).toMatchObject({ runtime: null, snapshot: null });
       expect(startedRuntime?.context).toContainEqual(
         expect.objectContaining({
           key: "lia_timezone",

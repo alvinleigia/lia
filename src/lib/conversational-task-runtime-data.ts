@@ -68,6 +68,7 @@ export async function listConversationalTaskRunsForWindow(input: {
 }
 
 export async function getConversationalTaskRuntime(input: {
+  includeAudit?: boolean;
   projectId: number;
   taskRunId: number;
 }) {
@@ -136,16 +137,18 @@ export async function getConversationalTaskRuntime(input: {
           ),
         )
         .orderBy(desc(conversationalTaskConfirmations.createdAt)),
-      db
-        .select()
-        .from(conversationalTaskAuditEvents)
-        .where(
-          and(
-            eq(conversationalTaskAuditEvents.projectId, input.projectId),
-            eq(conversationalTaskAuditEvents.taskRunId, run.id),
-          ),
-        )
-        .orderBy(asc(conversationalTaskAuditEvents.createdAt)),
+      input.includeAudit === false
+        ? Promise.resolve([])
+        : db
+            .select()
+            .from(conversationalTaskAuditEvents)
+            .where(
+              and(
+                eq(conversationalTaskAuditEvents.projectId, input.projectId),
+                eq(conversationalTaskAuditEvents.taskRunId, run.id),
+              ),
+            )
+            .orderBy(asc(conversationalTaskAuditEvents.createdAt)),
     ]);
 
   return { audit, confirmations, context, execution, fields, run, tools };

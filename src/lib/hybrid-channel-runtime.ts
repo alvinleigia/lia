@@ -80,7 +80,7 @@ import {
 } from "@/lib/conversational-task-runtime";
 import {
   type ConversationTaskRuntimeSession,
-  getConversationTaskRuntimeSession,
+  getConversationTaskRuntimeSession as loadConversationTaskRuntimeSession,
 } from "@/lib/conversational-task-runtime-session";
 import { db } from "@/lib/db-config";
 import {
@@ -146,6 +146,14 @@ import { getTaskOperationOutcome } from "@/lib/task-operation-outcome";
 export type HybridChannelBoundaryResult = {
   replies: RuntimeReply[];
 };
+
+// Chat decisions need current state, not the full diagnostic audit history.
+// Audit writes and the default diagnostic/export reads remain unchanged.
+function getConversationTaskRuntimeSession(
+  input: Parameters<typeof loadConversationTaskRuntimeSession>[0],
+) {
+  return loadConversationTaskRuntimeSession({ ...input, includeAudit: false });
+}
 
 export async function buildHybridChannelResumeReplies(input: {
   channelType: ChannelType;
@@ -364,6 +372,7 @@ async function prepareRequiredTaskConfirmation(input: {
   });
   // Preparation can refresh mapped fields; render the review from that state.
   const refreshedRuntime = await getConversationalTaskRuntime({
+    includeAudit: false,
     projectId: input.projectId,
     taskRunId: input.runtime.run.id,
   });
