@@ -31,7 +31,11 @@ import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 config({ path: ".env.local", quiet: true });
 
-type FieldSpec = [string, string, "text" | "email" | "phone" | "date" | "time"];
+type FieldSpec = [
+  string,
+  string,
+  "text" | "email" | "phone" | "date" | "time" | "boolean",
+];
 function task(name: string, specs: FieldSpec[]) {
   return conversationalTaskSnapshotV1Schema.parse({
     schemaVersion: 1,
@@ -316,6 +320,63 @@ function input(
     })),
   };
 }
+test("@live-openai mixed follow-up keeps name, authorized phone and callback window across domains", async () => {
+  test.skip(
+    process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",
+    "Opt-in metered verification only.",
+  );
+  test.setTimeout(120_000);
+  for (const domain of ["Hotel stay", "Repair service", "Appointment"]) {
+    const snapshot = task(domain, [
+      ["name", "Customer Name", "text"],
+      ["phone", "Contact Number", "phone"],
+      ["callbackWindow", "Callback Date Time and Timezone", "text"],
+      ["consent", "Callback Requested", "boolean"],
+      ["question", "Question for Team Follow-up", "text"],
+    ]);
+    snapshot.task.definition.followUp = {
+      nameField: "name",
+      contactField: "phone",
+      consentField: "consent",
+      reasonField: "question",
+    };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const execution = await new StructuredTurnEngine({
+        provider: new AiSdkStructuredTurnProvider(),
+      }).execute({
+        ...input(
+          snapshot,
+          "My name is Alex Test. Use my WhatsApp number as my contact number. Please request a callback on 23 October 2026 between 2 pm and 4 pm Asia/Kolkata for the best available price.",
+          "consent",
+          { question: "Can the team confirm the final price?" },
+        ),
+        channel: "whatsapp",
+        externalUserId: "12025550123",
+        history: [
+          { role: "user", content: "Can the team confirm the final price?" },
+          {
+            role: "assistant",
+            content: "Would you like our team to follow up on this question?",
+          },
+        ],
+      });
+      const values = Object.fromEntries(
+        execution.proposal.fieldCandidates.map((field) => [
+          field.fieldKey,
+          field.naturalValue,
+        ]),
+      );
+      expect(values.name).toBe("Alex Test");
+      expect(values.phone).toBe("+12025550123");
+      expect(String(values.consent)).toMatch(/true|yes/i);
+      expect(String(values.callbackWindow)).toMatch(/23/);
+      expect(String(values.callbackWindow)).toMatch(/2.*4|14.*16/);
+      expect(String(values.callbackWindow)).toContain("Asia/Kolkata");
+      expect(execution.proposal.ambiguity.requiresClarification).toBe(false);
+    }
+  }
+});
+
 function proposal(values: Record<string, string>): TurnResultV1 {
   return {
     schemaVersion: 1,
