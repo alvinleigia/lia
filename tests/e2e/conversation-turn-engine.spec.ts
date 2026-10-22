@@ -773,6 +773,112 @@ test("@live-openai detailed pricing requests can enter a published channel task 
   // this routing reply; only validated task fields reach the price calculator.
 });
 
+test("independent intent review rejects cancellation inferred from an unrelated current question", async () => {
+  const queue = new QueueProvider([
+    baseTurn({
+      turnKind: "cancellation",
+      nextAction: "cancel",
+      fieldCandidates: [],
+    }),
+    baseTurn({
+      turnKind: "side_question",
+      fieldCandidates: [],
+      knowledgeRequest: {
+        query: "Can the price be reduced?",
+        pricingIntent: "discount",
+      },
+    }),
+  ]);
+  let reviewed = 0;
+  const result = await new StructuredTurnEngine({
+    provider: {
+      generateTurn: queue.generateTurn.bind(queue),
+      async reviewInterpretation(input) {
+        expect(input.kind).toBe("cancellation");
+        reviewed += 1;
+        return {
+          matches: false,
+          query: "Visitor is requesting a price reduction",
+          usage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },
+        };
+      },
+    },
+  }).execute({
+    ...engineInput(),
+    visitorMessage: "Could you lower that amount if I commit now?",
+  });
+  expect(result.proposal.nextAction).toBe("ask");
+  expect(result.proposal.knowledgeRequest?.pricingIntent).toBe("discount");
+  expect(reviewed).toBe(1);
+  expect(result.usage.totalTokens).toBe(420);
+});
+
+test("a related FAQ rejected by semantic review searches the actual question instead", async () => {
+  const queue = new QueueProvider([
+    baseTurn({
+      turnKind: "ordinary_question",
+      fieldCandidates: [],
+      answerSelections: [
+        { question: "Where are you?", answerId: "document:12:answer:1" },
+      ],
+      grounding: { status: "grounded", excerptIds: ["document:12:answer:1"] },
+    }),
+    baseTurn({
+      turnKind: "ordinary_question",
+      fieldCandidates: [],
+      answerSelections: null,
+      reply: "We are at 12 Orchard Road.",
+      grounding: { status: "grounded", excerptIds: ["document:13"] },
+    }),
+  ]);
+  const queries: string[] = [];
+  const result = await new StructuredTurnEngine({
+    provider: {
+      generateTurn: queue.generateTurn.bind(queue),
+      async reviewInterpretation(input) {
+        expect(input.kind).toBe("knowledge_selection");
+        return {
+          matches: false,
+          query: "business street address",
+          usage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },
+        };
+      },
+    },
+    retriever: {
+      async retrieve(input) {
+        queries.push(input.query);
+        return queries.length === 1
+          ? [
+              {
+                id: "document:12",
+                content: "Travel directions.",
+                approvedAnswers: [
+                  {
+                    id: "document:12:answer:1",
+                    question: "How far is the airport?",
+                    answer: "Our team can advise on journey times.",
+                  },
+                ],
+              },
+            ]
+          : [{ id: "document:13", content: "Address: 12 Orchard Road." }];
+      },
+    },
+  }).execute({
+    ...engineInput(),
+    activeTask: null,
+    stage: "knowledge",
+    visitorMessage: "Where exactly are you based?",
+  });
+  expect(queries).toEqual([
+    "Where exactly are you based?",
+    "business street address",
+  ]);
+  expect(result.proposal.reply).toBe("We are at 12 Orchard Road.");
+  expect(result.attempts).toBe(3);
+  expect(result.usage.totalTokens).toBe(420);
+});
+
 test("cancelling an enquiry cannot become the requested name", async () => {
   const provider = new QueueProvider([]);
   const result = await new StructuredTurnEngine({ provider }).execute({

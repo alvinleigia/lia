@@ -43,7 +43,14 @@ test("@live-openai V2 paraphrases retain question meaning and pricing inputs", a
     roomCount: 2,
     ratePlan: "Standard Plan",
   };
-  const history: TurnMessageV1[] = [];
+  const history: TurnMessageV1[] = [
+    {
+      role: "user",
+      content:
+        "Please drop the previous request; I don't want to continue with it.",
+    },
+    { role: "assistant", content: "No problem. I cancelled this request." },
+  ];
   function request(visitorMessage: string): ExecuteStructuredTurnInput {
     return {
       activeTask: snapshot,

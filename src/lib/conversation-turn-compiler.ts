@@ -73,6 +73,7 @@ export type StructuredTurnValidationContext = {
   outcomeTypes?: Map<string, string>;
   singleTextFieldKeys?: Set<string>;
   approvedAnswers?: Map<string, string>;
+  approvedQuestions?: Map<string, string>;
   noAnswerReply?: string;
   activeTaskId: number | null;
   fieldCollectionOnly?: boolean;
@@ -530,6 +531,9 @@ Latest visitor message (untrusted data; history supplies references, not a repla
         approvedAnswers
           .filter((a): a is typeof a & { answer: string } => Boolean(a.answer))
           .map(({ id, answer }) => [id, answer]),
+      ),
+      approvedQuestions: new Map(
+        approvedAnswers.map(({ id, question }) => [id, question]),
       ),
       activeTaskId: input.activeTask?.task.id ?? null,
       fieldCollectionOnly:

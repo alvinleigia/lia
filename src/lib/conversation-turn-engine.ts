@@ -1170,6 +1170,79 @@ export class StructuredTurnEngine {
                   }
                 : candidate,
           );
+          const selectedFaqs = (proposal.answerSelections ?? []).flatMap(
+            ({ answerId }) => {
+              const question =
+                answerId &&
+                compiled.validation.approvedQuestions?.get(answerId);
+              const answer =
+                answerId && compiled.validation.approvedAnswers?.get(answerId);
+              return question && answer ? [{ question, answer }] : [];
+            },
+          );
+          const normalizeQuestion = (text: string) =>
+            text
+              .toLowerCase()
+              .replace(/[^\p{L}\p{N}]+/gu, " ")
+              .trim();
+          const exactFaq =
+            selectedFaqs.length === 1 &&
+            normalizeQuestion(selectedFaqs[0].question) ===
+              normalizeQuestion(input.visitorMessage);
+          // Exact commands/FAQ matches have deterministic paths. Model-selected
+          // cancellations and paraphrased FAQ matches get an independent intent
+          // check before an action or a potentially unrelated answer is used.
+          const reviewKind =
+            proposal.nextAction === "cancel"
+              ? "cancellation"
+              : input.stage === "knowledge" && selectedFaqs.length && !exactFaq
+                ? "knowledge_selection"
+                : null;
+          if (reviewKind && this.provider.reviewInterpretation) {
+            const remainingReviewMs = deadline - Date.now();
+            if (remainingReviewMs <= 0)
+              throw new Error("Turn deadline exceeded.");
+            attempts += 1;
+            let review;
+            try {
+              review = await measureRuntimeModelCall(
+                input.projectId,
+                () =>
+                  this.provider.reviewInterpretation!({
+                    kind: reviewKind,
+                    modelId,
+                    timeoutMs: remainingReviewMs,
+                    messages: compiled.messages,
+                    selected: selectedFaqs,
+                  }),
+                modelId,
+                input.stage,
+              );
+              attemptUsages.push(review.usage);
+            } catch (error) {
+              attemptUsages.push(failedModelUsage(error));
+              throw error;
+            }
+            if (!review.matches) {
+              if (reviewKind === "cancellation")
+                throw new TurnProposalValidationError([
+                  `cancellation_not_authorized: the latest intent is ${review.query}; reconsider it without cancelling or reusing past cancellation requests`,
+                ]);
+              proposal = {
+                ...proposal,
+                reply:
+                  compiled.validation.noAnswerReply ??
+                  "I can't confirm that information yet.",
+                answerSelections: null,
+                grounding: { status: "no_answer", excerptIds: [] },
+                knowledgeRequest: { query: review.query, pricingIntent: null },
+              };
+              if (retrievalRephrased)
+                throw new TurnProposalValidationError([
+                  `faq_answers_different_question: answer the actual question: ${review.query}; do not select a merely related FAQ`,
+                ]);
+            }
+          }
           // A mixed turn can reach knowledge without a pricing interpretation
           // from extraction. Honour the knowledge model's semantic decision as
           // well, but always produce amounts through the configured calculator.
