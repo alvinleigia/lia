@@ -269,6 +269,7 @@ export async function listRecentChannelMessages(input: {
 }) {
   const rows = await db
     .select({
+      createdAt: channelMessages.createdAt,
       direction: channelMessages.direction,
       id: channelMessages.id,
       messageType: channelMessages.messageType,

@@ -2707,6 +2707,9 @@ async function runHybridChannelBoundaryInternal(
       conversationId: input.channelConversationId,
       projectId: input.projectId,
     }),
+    sourceNode.kind === "conversational_task"
+      ? session.runtime?.run.createdAt
+      : undefined,
   );
   const dispatch = await dispatchHybridFlowBoundary<TurnResultV1>({
     execute: (node) =>
