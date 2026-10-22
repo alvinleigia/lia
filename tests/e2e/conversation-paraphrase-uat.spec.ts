@@ -81,6 +81,8 @@ test("@live-openai V2 paraphrases retain question meaning and pricing inputs", a
       case: "location",
       reply: location.proposal.reply,
       attempts: location.attempts,
+      query: location.proposal.knowledgeRequest,
+      grounding: location.proposal.grounding,
     }),
   );
   expect(location.proposal.reply).toMatch(/Devanahalli|Bengaluru/i);
@@ -115,8 +117,8 @@ test("@live-openai V2 paraphrases retain question meaning and pricing inputs", a
   ] as const) {
     const extracted = await engine.execute(request(message));
     console.log(JSON.stringify({ message, proposal: extracted.proposal }));
-    expect(extracted.proposal.knowledgeRequest).toBeTruthy();
-    expect(extracted.proposal.knowledgeRequest?.pricingIntent).toBe(intent);
+    if (extracted.proposal.knowledgeRequest)
+      expect(extracted.proposal.knowledgeRequest.pricingIntent).toBe(intent);
     expect(
       extracted.proposal.fieldCandidates.some(
         (field) => field.fieldKey === "callbackRequested",
@@ -149,13 +151,23 @@ test("@live-openai V2 paraphrases retain question meaning and pricing inputs", a
     const answer = await engine.execute({
       ...request(message),
       stage: "knowledge",
-      knowledgeRequest: extracted.proposal.knowledgeRequest,
+      // Exercise the secondary semantic handoff too: extraction may omit the
+      // question when concentrating on supplied corrections.
+      knowledgeRequest:
+        intent === "quote" ? null : extracted.proposal.knowledgeRequest,
     });
     console.log(
-      JSON.stringify({ reply: answer.proposal.reply, source: answer.source }),
+      JSON.stringify({
+        reply: answer.proposal.reply,
+        source: answer.source,
+        query: answer.proposal.knowledgeRequest,
+      }),
     );
     expect(answer.proposal.reply).toMatch(expected);
-    if (intent) expect(answer.source).toBe("deterministic");
+    if (intent)
+      expect(answer.proposal.grounding.excerptIds).toEqual([
+        `task:${snapshot.task.id}:price-table`,
+      ]);
     history.push(
       { role: "user", content: message },
       { role: "assistant", content: answer.proposal.reply },

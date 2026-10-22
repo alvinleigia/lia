@@ -114,6 +114,51 @@ test("semantic pricing intents use configured calculations without a model or ke
   }
 });
 
+test("knowledge-stage pricing interpretation cannot return model amounts or a promise to calculate", async () => {
+  const engine = new StructuredTurnEngine({
+    provider: {
+      async generateTurn(request) {
+        return {
+          modelId: request.modelId,
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+          output: {
+            schemaVersion: 1,
+            turnKind: "side_question",
+            reply: "Please allow me to calculate the revised estimate.",
+            knowledgeRequest: {
+              query: "What is the revised price?",
+              pricingIntent: "quote",
+            },
+            grounding: { status: "not_needed", excerptIds: [] },
+            fieldCandidates: [],
+            taskRecommendation: null,
+            toolRequest: null,
+            routeRecommendation: null,
+            outcomeRecommendation: null,
+            nextAction: "ask",
+            ambiguity: { requiresClarification: false, question: null },
+            safety: { decision: "allow", reasonCode: null },
+            decisionSummary: "Recognised a quote question.",
+          },
+        };
+      },
+    },
+  });
+  const result = await engine.execute({
+    ...input("What's the revised amount?"),
+    fieldState: fields({
+      ...selected.match,
+      adults: 2,
+      children: 2,
+      stayDates: "2026-10-26 to 2026-10-29",
+    }),
+  });
+  expect(result.proposal.reply).toContain(
+    "can't quote a price for these exact details",
+  );
+  expect(result.proposal.reply).not.toContain("calculate");
+});
+
 test("hotel price uses distinct saved tiers, tax and full-stay amounts", () => {
   const reply = answerTaskPricing({
     table,

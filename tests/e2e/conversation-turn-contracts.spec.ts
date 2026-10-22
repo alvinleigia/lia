@@ -166,6 +166,30 @@ test("FAQ selection validates IDs and cannot replace a partial, ambiguous or act
     validateStructuredTurnProposal(partial, compiled.validation).reply,
   ).toBe(partial.reply);
   const extraction = { ...compiled.validation, approvedAnswers: new Map() };
+  const rawSelection = {
+    ...validTurn(),
+    answerSelections: [
+      { question: "When are you open?", answerId: "document:12" },
+    ],
+  };
+  const rawResult = validateStructuredTurnProposal(
+    rawSelection,
+    compiled.validation,
+  );
+  expect(rawResult.reply).toBe(rawSelection.reply);
+  expect(rawResult.grounding.excerptIds).toEqual(["document:12"]);
+  expect(rawResult.answerSelections?.[0].answerId).toBeNull();
+  expect(() =>
+    validateStructuredTurnProposal(
+      {
+        ...rawSelection,
+        answerSelections: [
+          { question: "When are you open?", answerId: "document:999" },
+        ],
+      },
+      compiled.validation,
+    ),
+  ).toThrow();
   expect(() => validateStructuredTurnProposal(selected, extraction)).toThrow();
   expect(() =>
     validateStructuredTurnProposal(selected, {

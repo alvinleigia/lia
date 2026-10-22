@@ -214,55 +214,57 @@ test("semantic sender references resolve only to a permitted server channel iden
   );
 });
 
-test("rephrases a failed knowledge search once and validates the refreshed evidence", async () => {
-  const queries: string[] = [];
-  const missing = baseTurn({
-    turnKind: "ordinary_question",
-    fieldCandidates: [],
-    grounding: { status: "no_answer", excerptIds: [] },
-    knowledgeRequest: {
-      query: "Business location and address",
-      pricingIntent: null,
-    },
-  });
-  const provider = new QueueProvider([
-    missing,
-    {
-      ...missing,
-      reply: "We are at 12 Orchard Road.",
-      grounding: { status: "grounded", excerptIds: ["document:13"] },
-    },
-  ]);
-  const engine = new StructuredTurnEngine({
-    provider,
-    retriever: {
-      async retrieve(request) {
-        expect(request.projectId).toBe(194);
-        queries.push(request.query);
-        return queries.length === 1
-          ? []
-          : [
-              {
-                id: "document:13",
-                content: "Business address: 12 Orchard Road.",
-              },
-            ];
+for (const repairMissingQuery of [false, true])
+  test(`rephrases a failed knowledge search once after query repair=${repairMissingQuery}`, async () => {
+    const queries: string[] = [];
+    const missing = baseTurn({
+      turnKind: "ordinary_question",
+      fieldCandidates: [],
+      grounding: { status: "no_answer", excerptIds: [] },
+      knowledgeRequest: {
+        query: "Business location and address",
+        pricingIntent: null,
       },
-    },
+    });
+    const provider = new QueueProvider([
+      ...(repairMissingQuery ? [{ ...missing, knowledgeRequest: null }] : []),
+      missing,
+      {
+        ...missing,
+        reply: "We are at 12 Orchard Road.",
+        grounding: { status: "grounded", excerptIds: ["document:13"] },
+      },
+    ]);
+    const engine = new StructuredTurnEngine({
+      provider,
+      retriever: {
+        async retrieve(request) {
+          expect(request.projectId).toBe(194);
+          queries.push(request.query);
+          return queries.length === 1
+            ? []
+            : [
+                {
+                  id: "document:13",
+                  content: "Business address: 12 Orchard Road.",
+                },
+              ];
+        },
+      },
+    });
+    const result = await engine.execute({
+      ...engineInput(),
+      activeTask: null,
+      stage: "knowledge",
+      visitorMessage: "Hi! Where exactly are you based?",
+    });
+    expect(queries).toEqual([
+      "Hi! Where exactly are you based?",
+      "Business location and address",
+    ]);
+    expect(result.proposal.reply).toContain("12 Orchard Road");
+    expect(result.attempts).toBe(repairMissingQuery ? 3 : 2);
   });
-  const result = await engine.execute({
-    ...engineInput(),
-    activeTask: null,
-    stage: "knowledge",
-    visitorMessage: "Hi! Where exactly are you based?",
-  });
-  expect(queries).toEqual([
-    "Hi! Where exactly are you based?",
-    "Business location and address",
-  ]);
-  expect(result.proposal.reply).toContain("12 Orchard Road");
-  expect(result.attempts).toBe(2);
-});
 
 function engineInput() {
   return {

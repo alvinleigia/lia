@@ -301,16 +301,18 @@ test("declining restores normal collection; cancellation is not swallowed", () =
   ).toBe("cancel");
 });
 
-test("the team receives the actual question, bounded and without duplicate retries", () => {
+test("the team receives complete questions without duplicate retries", () => {
   const question = "Is the Wi-Fi fast enough for video calls?";
   expect(appendTaskFollowUpQuestion(null, question)).toBe(question);
   expect(appendTaskFollowUpQuestion(question, question)).toBe(question);
   expect(
     appendTaskFollowUpQuestion(question, "Can you check accessibility too?"),
   ).toContain("accessibility");
-  expect(
-    appendTaskFollowUpQuestion("x".repeat(500), "y".repeat(1000)).length,
-  ).toBeLessThanOrEqual(500);
+  const earlier = "Can you confirm accessibility? ".repeat(20).trim();
+  const latest = "Please also check the revised price for our changed dates.";
+  expect(appendTaskFollowUpQuestion(earlier, latest)).toBe(
+    `${earlier} | ${latest}`,
+  );
 });
 
 test("follow-up requires an actual published team handoff destination", () => {

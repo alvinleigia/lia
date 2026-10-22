@@ -179,11 +179,10 @@ export function appendTaskFollowUpQuestion(
   question: string,
 ) {
   const questions = typeof previous === "string" ? previous.split(" | ") : [];
-  const current = question.replace(/\s+/g, " ").trim().slice(0, 400);
-  return [...new Set([...questions, current])]
-    .filter(Boolean)
-    .join(" | ")
-    .slice(-500);
+  const current = question.replace(/\s+/g, " ").trim();
+  // Preserve complete questions. The configured field validator owns length
+  // restrictions; silently clipping here loses the reason for the callback.
+  return [...new Set([...questions, current])].filter(Boolean).join(" | ");
 }
 
 // The full saved reason remains available to the team and on visitor request.

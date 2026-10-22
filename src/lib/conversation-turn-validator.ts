@@ -259,6 +259,18 @@ export function validateStructuredTurnProposal(
   let selectedReply: string | null = null;
   let selectedIds: string[] = [];
   if (proposal.answerSelections) {
+    // A known retrieved excerpt is valid grounding, but is not an approved FAQ
+    // answer. Keep it in grounding and use the normal grounded reply path rather
+    // than treating a correctly cited raw fact as an unknown/approved answer.
+    proposal.answerSelections = proposal.answerSelections.map((part) =>
+      part.answerId &&
+      !allowed.approvedAnswers?.has(part.answerId) &&
+      allowed.rawExcerptIds?.has(part.answerId) &&
+      proposal.grounding.status === "grounded" &&
+      proposal.grounding.excerptIds.includes(part.answerId)
+        ? { ...part, answerId: null }
+        : part,
+    );
     const ids = [
       ...new Set(
         proposal.answerSelections.flatMap((part) =>

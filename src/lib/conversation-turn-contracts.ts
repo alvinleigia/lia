@@ -66,8 +66,20 @@ export const approvedAnswerSelectionSchema = z
 
 export const turnKnowledgeRequestSchema = z
   .object({
-    query: z.string().trim().min(1).max(500),
-    pricingIntent: z.enum(["quote", "offers", "discount"]).nullable(),
+    query: z
+      .string()
+      .trim()
+      .min(1)
+      .max(500)
+      .describe(
+        "Self-contained search terms for the specific requested fact. Resolve pronouns; use precise business terms (address, performance, eligibility, etc.), not greetings or internal project names.",
+      ),
+    pricingIntent: z
+      .enum(["quote", "offers", "discount"])
+      .nullable()
+      .describe(
+        "With configured pricing: quote for any requested amount or revised estimate; offers for cheaper plans/promotions; discount for bargaining. Null only for non-pricing questions. The server calculates, never the model.",
+      ),
   })
   .strict()
   .nullable();

@@ -1170,12 +1170,48 @@ export class StructuredTurnEngine {
                   }
                 : candidate,
           );
+          // A mixed turn can reach knowledge without a pricing interpretation
+          // from extraction. Honour the knowledge model's semantic decision as
+          // well, but always produce amounts through the configured calculator.
+          if (
+            priceTable &&
+            input.stage === "knowledge" &&
+            proposal.knowledgeRequest?.pricingIntent &&
+            proposal.safety.decision === "allow" &&
+            proposal.nextAction === "ask" &&
+            !proposal.ambiguity.requiresClarification
+          ) {
+            proposal = {
+              ...proposal,
+              answerSelections: null,
+              reply: answerTaskPricing({
+                table: priceTable,
+                fields: input.fieldState,
+                text: input.visitorMessage,
+                intent: proposal.knowledgeRequest.pricingIntent,
+              }),
+              grounding: {
+                status: "grounded",
+                excerptIds: [`task:${input.activeTask?.task.id}:price-table`],
+              },
+            };
+          }
+          if (
+            input.stage === "knowledge" &&
+            proposal.grounding.status === "no_answer" &&
+            proposal.knowledgeRequest === null &&
+            proposal.nextAction === "ask" &&
+            !proposal.taskRecommendation
+          ) {
+            throw new TurnProposalValidationError([
+              "missing_knowledge_query: interpret the actual factual question as a self-contained search query in knowledgeRequest; expand conversational wording into precise business terms before declaring the information unavailable",
+            ]);
+          }
           // A semantic query can recover a terse paraphrase whose first search
           // missed the relevant evidence. Retry once, in the same project and
-          // within the existing model time/repair budget; never invent facts.
+          // within the turn deadline and usage budget; never invent facts.
           if (
             !retrievalRephrased &&
-            repairAttempt < modelPolicy.maxRepairAttempts &&
             retriever &&
             input.stage === "knowledge" &&
             proposal.grounding.status === "no_answer" &&
@@ -1205,6 +1241,9 @@ export class StructuredTurnEngine {
             });
             repair =
               "\nThe first search did not establish the answer. Reassess using the refreshed references; use no_answer if still unsupported.";
+            // One evidence refresh is separate from repairing an invalid
+            // proposal. It still shares the turn deadline and usage accounting.
+            repairAttempt -= 1;
             continue;
           }
           if (
