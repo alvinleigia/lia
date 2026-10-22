@@ -232,6 +232,73 @@ test("selected source answers replace model embellishment across combined questi
   }
 });
 
+test("unverified knowledge uses the published fallback instead of unsupported model claims", async () => {
+  for (const reply of [
+    "The Standard Plan does not include breakfast. No meal inclusions are confirmed.",
+    "Your repair has no warranty. Coverage has not been confirmed.",
+    "Insurance will not cover the appointment. The team must confirm.",
+  ]) {
+    const provider = new QueueProvider([
+      baseTurn({
+        turnKind: "side_question",
+        fieldCandidates: [],
+        grounding: { status: "no_answer", excerptIds: [] },
+        reply,
+      }),
+    ]);
+    const result = await new StructuredTurnEngine({ provider }).execute({
+      ...engineInput(),
+      stage: "knowledge",
+      visitorMessage: "Is that included?",
+      assistantBehavior: {
+        ...DEFAULT_PROJECT_AI_SETTINGS,
+        fallbackMessage: "Our team needs to confirm that detail.",
+      },
+    });
+    expect(result.proposal.reply).toBe(
+      "Our team needs to confirm that detail.",
+    );
+    expect(result.proposal.grounding.status).toBe("no_answer");
+    expect(result.proposal.fieldCandidates).toEqual([]);
+    expect(provider.calls).toHaveLength(1);
+  }
+});
+
+test("partial unverified answers preserve approved facts and replace the unsupported remainder", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      turnKind: "side_question",
+      fieldCandidates: [],
+      grounding: { status: "no_answer", excerptIds: [] },
+      reply: "We collect bicycles, but parts are definitely not included.",
+      answerSelections: [
+        {
+          question: "Do you collect bicycles?",
+          answerId: "project_approved_answer:1",
+        },
+        { question: "Are parts included?", answerId: null },
+      ],
+    }),
+  ]);
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    stage: "knowledge",
+    visitorMessage: "Can you collect my bicycle, and are parts included?",
+    assistantBehavior: {
+      ...DEFAULT_PROJECT_AI_SETTINGS,
+      approvedKnowledgeAnswers: [
+        {
+          question: "Do you collect bicycles?",
+          answer: "We collect bicycles within 5 km.",
+        },
+      ],
+    },
+  });
+  expect(result.proposal.reply).toBe(
+    "We collect bicycles within 5 km.\nI can't confirm that detail.",
+  );
+});
+
 test("@live-openai approved answer selection handles paraphrases, combined requests and relevant conditions", async () => {
   test.skip(
     process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",
@@ -310,7 +377,7 @@ test("@live-openai approved answer selection handles paraphrases, combined reque
     expect(result.proposal.reply).not.toMatch(excluded);
     if (!selected)
       expect(result.proposal.reply).toMatch(
-        /(?:can.t confirm|cannot confirm|unconfirmed)[^.]*helipad/i,
+        /(?:can.t confirm|cannot confirm|unconfirmed)[^.]*(?:helipad|detail)/i,
       );
     expect(
       Boolean(
@@ -411,7 +478,7 @@ test("@live-openai uncertain inclusions stay uncertain across domains and plan s
   for (const scenario of [
     {
       previous: "The Standard Plan estimate is INR 29,960.78.",
-      question: "Does that price include breakfast?",
+      question: "Does the Standard Plan price include breakfast?",
       evidence:
         "Breakfast is available. Breakfast availability does not mean breakfast is included in your rate. We cannot confirm inclusion. Sliceinn Flexi does not include meals.",
       expected:
@@ -421,7 +488,7 @@ test("@live-openai uncertain inclusions stay uncertain across domains and plan s
     },
     {
       previous: "You selected the Standard repair service.",
-      question: "Is the warranty included in that?",
+      question: "Is the warranty included in the Standard repair service?",
       evidence:
         "Warranty inclusion for Standard is unconfirmed. The Basic repair service excludes warranty coverage.",
       expected:
@@ -431,7 +498,7 @@ test("@live-openai uncertain inclusions stay uncertain across domains and plan s
     },
     {
       previous: "You selected an in-person consultation.",
-      question: "Does insurance cover that appointment?",
+      question: "Does insurance cover my in-person consultation?",
       evidence:
         "Insurance coverage for in-person consultations has not been confirmed. Remote consultations are not covered.",
       expected:

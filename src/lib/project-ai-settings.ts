@@ -304,17 +304,24 @@ export function resolveApprovedKnowledgeAnswer(
     };
   }
 
+  return {
+    excerptId: null,
+    kind: "no_answer" as const,
+    reply: buildKnowledgeFallbackReply(settings),
+  };
+}
+
+export function buildKnowledgeFallbackReply(
+  value: ProjectAiSettings | Record<string, unknown> | null | undefined,
+) {
+  const settings = normalizeProjectAiSettings(value);
   const contacts = [settings.fallbackPhone, settings.fallbackEmail].filter(
     (contact): contact is string => Boolean(contact),
   );
   const fallback =
-    settings.fallbackMessage ?? "I don't have verified information for that.";
+    settings.fallbackMessage ?? "I can't confirm that detail.";
 
-  return {
-    excerptId: null,
-    kind: "no_answer" as const,
-    reply: contacts.length
-      ? `${fallback} For current details, contact ${contacts.join(" or ")}.`
-      : fallback,
-  };
+  return contacts.length
+    ? `${fallback} For current details, contact ${contacts.join(" or ")}.`
+    : fallback;
 }

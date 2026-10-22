@@ -249,6 +249,37 @@ export function validateStructuredTurnProposal(
     throw new TurnProposalValidationError([...new Set(issues)]);
   }
 
+  if (
+    selectedReply === null &&
+    allowed.noAnswerReply &&
+    proposal.grounding.status === "no_answer" &&
+    proposal.nextAction === "ask" &&
+    ["ordinary_question", "side_question"].includes(proposal.turnKind) &&
+    proposal.safety.decision === "allow" &&
+    !proposal.ambiguity.requiresClarification &&
+    !hasActionProposal
+  ) {
+    // A no-answer result cannot substantiate generated factual claims. Keep
+    // any selected approved facts, then use the published fallback for gaps.
+    const knownAnswers = [
+      ...new Set(
+        (proposal.answerSelections ?? []).flatMap((part) => {
+          const answer = part.answerId
+            ? allowed.approvedAnswers?.get(part.answerId)
+            : undefined;
+          return answer ? [answer] : [];
+        }),
+      ),
+    ];
+    return {
+      ...proposal,
+      reply: [
+        ...(knownAnswers.length ? [composeApprovedAnswers(knownAnswers)] : []),
+        allowed.noAnswerReply,
+      ].join("\n"),
+    };
+  }
+
   return selectedReply === null
     ? proposal
     : {

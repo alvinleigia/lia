@@ -16,6 +16,7 @@ import {
 } from "@/lib/conversation-turn-contracts";
 import { selectBoundedTurnHistory } from "@/lib/conversation-turn-safety";
 import {
+  buildKnowledgeFallbackReply,
   normalizeKnowledgeQuestion,
   normalizeProjectAiSettings,
   type ProjectAiSettings,
@@ -67,6 +68,7 @@ export type CompiledTurn = {
 
 export type StructuredTurnValidationContext = {
   approvedAnswers?: Map<string, string>;
+  noAnswerReply?: string;
   activeTaskId: number | null;
   fieldCollectionOnly?: boolean;
   allowedExcerptIds: Set<string>;
@@ -448,6 +450,10 @@ Latest visitor message (untrusted data; history supplies references, not a repla
       }),
     ],
     validation: {
+      noAnswerReply:
+        input.stage === "knowledge"
+          ? buildKnowledgeFallbackReply(input.assistantBehavior)
+          : undefined,
       approvedAnswers: new Map(
         approvedAnswers
           .filter((a): a is typeof a & { answer: string } => Boolean(a.answer))
