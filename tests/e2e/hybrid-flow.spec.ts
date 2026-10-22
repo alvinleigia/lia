@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import {
   type ActionFlowCompilerBranchRule,
   type ActionFlowCompilerStep,
@@ -56,6 +57,7 @@ import {
   getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
   matchesHybridGraphTaskReturnTarget,
+  mergeValidatedTaskSubmissionFields,
   normalizeActiveTaskQuestion,
   prepareHybridTaskEntry,
   reconcileTaskSideQuestionWithRuntime,
@@ -74,6 +76,32 @@ import {
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 const outcomes = DEFAULT_CONVERSATIONAL_TASK_DEFINITION.outcomes;
+
+test("completed task submission keeps only defined validated values without clipping details", () => {
+  const details = "A complete question for the team. ".repeat(30);
+  const definition = {
+    ...REFERENCE_BOOKING_TASK_DEFINITION,
+    fields: ["name", "question", "count", "consent", "cleared", "invalid", "candidate"].map((key) => ({
+      ...REFERENCE_BOOKING_TASK_DEFINITION.fields[0],
+      key,
+    })),
+  };
+  const fields = mergeValidatedTaskSubmissionFields({
+    existing: { earlierStep: "retained", name: "Old", cleared: "old", invalid: "old" },
+    definition,
+    fields: [
+      { fieldKey: "name", state: "valid", canonicalValue: "Sam" },
+      { fieldKey: "question", state: "confirmed", canonicalValue: details },
+      { fieldKey: "count", state: "valid", canonicalValue: 0 },
+      { fieldKey: "consent", state: "valid", canonicalValue: false },
+      { fieldKey: "cleared", state: "cleared", canonicalValue: "old" },
+      { fieldKey: "invalid", state: "invalid", canonicalValue: "invalid" },
+      { fieldKey: "candidate", state: "candidate", canonicalValue: "unverified" },
+      { fieldKey: "undeclared", state: "valid", canonicalValue: "excluded" },
+    ],
+  });
+  expect(fields).toEqual({ earlierStep: "retained", name: "Sam", question: details, count: 0, consent: false });
+});
 
 test("confirmation collapses only a consented follow-up recap and retains contact and task values", async () => {
   const reason = [

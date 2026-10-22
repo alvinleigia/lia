@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { recordActionFlowProgress } from "@/lib/action-flow-submissions";
 import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
 import {
@@ -106,6 +107,7 @@ import {
   getResumedTaskRuntimeInputRequest,
   getTaskRuntimeInputRequest,
   type HybridBoundaryExecution,
+  mergeValidatedTaskSubmissionFields,
   normalizeActiveTaskQuestion,
   reconcileTaskSideQuestionWithRuntime,
   reconcileTaskTurnWithAvailability,
@@ -2783,6 +2785,7 @@ async function runHybridChannelBoundaryInternal(
         session: taskSession,
       });
       replyProposal = entered.output;
+      session = taskSession;
       inputRequest = entered.inputRequest ?? null;
       continuation = resolveHybridDeterministicContinuation(
         await dispatchHybridFlowBoundary({
@@ -2795,6 +2798,50 @@ async function runHybridChannelBoundaryInternal(
     }
   }
 
+  let submission = input.submission;
+  if (
+    continuation &&
+    continuation.kind !== "cancel" &&
+    ["complete", "handoff"].includes(replyProposal.nextAction) &&
+    session.runtime &&
+    session.snapshot
+  ) {
+    const runtime = await getConversationalTaskRuntime({
+      includeAudit: false,
+      projectId: input.projectId,
+      taskRunId: session.runtime.run.id,
+    });
+    if (
+      !runtime ||
+      runtime.run.conversationId !== input.channelConversationId ||
+      !["completed", "handoff"].includes(runtime.run.status)
+    ) {
+      throw new Error("The completed task details are unavailable.");
+    }
+    const saved = await recordActionFlowProgress({
+      projectId: input.projectId,
+      submissionId: submission.id,
+      currentStepId: submission.currentStepId,
+      expectedRevision: submission.revision,
+      fields: mergeValidatedTaskSubmissionFields({
+        existing: submission.fields,
+        definition: session.snapshot.task.definition,
+        fields: runtime.fields,
+      }),
+      metadata: { ...submission.metadata, taskRunId: runtime.run.id },
+      event: {
+        eventType: "flow.task_fields_saved",
+        message: "Saved validated task details before continuing the flow.",
+        payload: {
+          taskRunId: runtime.run.id,
+          taskVersionId: runtime.run.taskVersionId,
+        },
+      },
+    });
+    if (!saved) throw new Error("The task details could not be saved.");
+    submission = saved;
+  }
+
   const replies: RuntimeReply[] = [
     createTaskRuntimeReply({
       inputRequest,
@@ -2805,7 +2852,7 @@ async function runHybridChannelBoundaryInternal(
   if (continuation?.kind === "cancel") {
     const cancelled = await cancelChannelFlowAfterHybridEnd({
       projectId: input.projectId,
-      submission: input.submission,
+      submission,
     });
     replies.push(...cancelled.replies);
   } else if (
@@ -2822,13 +2869,13 @@ async function runHybridChannelBoundaryInternal(
       action: input.action,
       projectId: input.projectId,
       step: handoffStep,
-      submission: input.submission,
+      submission,
     });
   } else if (continuation?.kind === "complete") {
     const completed = await completeChannelFlowAfterHybridEnd({
       contactId: null,
       projectId: input.projectId,
-      submission: input.submission,
+      submission,
     });
     replies.push(...completed.replies);
   } else if (continuation?.kind === "resume") {
@@ -2836,7 +2883,7 @@ async function runHybridChannelBoundaryInternal(
       action: input.action,
       contactId: null,
       projectId: input.projectId,
-      submission: input.submission,
+      submission,
       targetStepId: continuation.targetStepId,
     });
     replies.push(...resumed.replies);

@@ -35,6 +35,32 @@ const TRANSITION_PRECEDENCE = {
   default: 1,
 } satisfies Record<HybridFlowTransitionV1["kind"], number>;
 
+export function mergeValidatedTaskSubmissionFields(input: {
+  existing: Record<string, unknown>;
+  definition: ConversationalTaskSnapshotV1["task"]["definition"];
+  fields: Array<{
+    fieldKey: string;
+    state: string;
+    canonicalValue: unknown;
+  }>;
+}) {
+  const fields = { ...input.existing };
+  const allowedKeys = new Set(input.definition.fields.map((field) => field.key));
+  // A cleared or invalid task value must not leave an older submission value.
+  for (const key of allowedKeys) delete fields[key];
+  for (const field of input.fields) {
+    if (
+      allowedKeys.has(field.fieldKey) &&
+      ["valid", "confirmed"].includes(field.state) &&
+      field.canonicalValue !== null &&
+      field.canonicalValue !== undefined
+    ) {
+      fields[field.fieldKey] = field.canonicalValue;
+    }
+  }
+  return fields;
+}
+
 export type HybridTransitionSignal = {
   kind: HybridFlowTransitionV1["kind"];
   sourceRuleId?: number | null;
