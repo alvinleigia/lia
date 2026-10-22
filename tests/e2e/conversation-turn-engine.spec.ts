@@ -879,6 +879,58 @@ test("a related FAQ rejected by semantic review searches the actual question ins
   expect(result.usage.totalTokens).toBe(420);
 });
 
+test("semantic contact reference fallback requires current permission and a trusted channel", async () => {
+  for (const [channel, permission] of [
+    ["whatsapp", true],
+    ["whatsapp", false],
+    ["project_chat", true],
+  ] as const) {
+    let reviews = 0;
+    const queue = new QueueProvider([
+      baseTurn({
+        fieldCandidates: [
+          {
+            fieldKey: "guestName",
+            naturalValue: "Sam",
+            confidence: 1,
+            source: "visitor",
+          },
+        ],
+      }),
+    ]);
+    const result = await new StructuredTurnEngine({
+      provider: {
+        generateTurn: queue.generateTurn.bind(queue),
+        async reviewInterpretation(input) {
+          reviews += 1;
+          expect(input.kind).toBe("channel_phone_reference");
+          return {
+            matches: permission,
+            query: permission
+              ? "Use sender number"
+              : "Do not use sender number",
+            usage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },
+          };
+        },
+      },
+    }).execute({
+      ...engineInput(),
+      channel,
+      externalUserId: "12025550123",
+      requestedFieldKey: "guestName",
+      visitorMessage: permission
+        ? "I'm Sam. Reach me on the number I'm messaging from."
+        : "I'm Sam. Don't use the number I'm messaging from.",
+    });
+    expect(
+      result.proposal.fieldCandidates.find(
+        (field) => field.fieldKey === "guestPhone",
+      )?.naturalValue,
+    ).toBe(channel === "whatsapp" && permission ? "+12025550123" : undefined);
+    expect(reviews).toBe(channel === "whatsapp" ? 1 : 0);
+  }
+});
+
 test("cancelling an enquiry cannot become the requested name", async () => {
   const provider = new QueueProvider([]);
   const result = await new StructuredTurnEngine({ provider }).execute({

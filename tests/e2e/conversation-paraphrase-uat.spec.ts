@@ -102,6 +102,16 @@ test("@live-openai V2 paraphrases retain question meaning and pricing inputs", a
   );
   for (const [message, intent, expected] of [
     [
+      "Quick detour before we continue: we'll be driving. Do we pay extra to park?",
+      null,
+      /free parking/,
+    ],
+    [
+      "And is breakfast covered by the amount you just quoted?",
+      null,
+      /can't confirm.*included|cannot confirm.*included/,
+    ],
+    [
       "Is there a less expensive plan for those same dates, or any promo code we could use?",
       "offers",
       /21,262.50/,

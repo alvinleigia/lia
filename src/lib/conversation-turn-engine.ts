@@ -1189,6 +1189,21 @@ export class StructuredTurnEngine {
             selectedFaqs.length === 1 &&
             normalizeQuestion(selectedFaqs[0].question) ===
               normalizeQuestion(input.visitorMessage);
+          const missingChannelPhone =
+            input.stage === "extraction" &&
+            channelPhoneFieldKeys.length === 1 &&
+            proposal.nextAction === "ask" &&
+            !proposal.ambiguity.requiresClarification &&
+            (proposal.turnKind === "follow_up_request" ||
+              proposal.fieldCandidates.length > 0) &&
+            !proposal.fieldCandidates.some(
+              (field) => field.fieldKey === channelPhoneFieldKeys[0],
+            ) &&
+            !input.fieldState.some(
+              (field) =>
+                field.fieldKey === channelPhoneFieldKeys[0] &&
+                ["valid", "confirmed"].includes(field.state),
+            );
           // Exact commands/FAQ matches have deterministic paths. Model-selected
           // cancellations and paraphrased FAQ matches get an independent intent
           // check before an action or a potentially unrelated answer is used.
@@ -1197,7 +1212,9 @@ export class StructuredTurnEngine {
               ? "cancellation"
               : input.stage === "knowledge" && selectedFaqs.length && !exactFaq
                 ? "knowledge_selection"
-                : null;
+                : missingChannelPhone
+                  ? "channel_phone_reference"
+                  : null;
           if (reviewKind && this.provider.reviewInterpretation) {
             const remainingReviewMs = deadline - Date.now();
             if (remainingReviewMs <= 0)
@@ -1223,7 +1240,16 @@ export class StructuredTurnEngine {
               attemptUsages.push(failedModelUsage(error));
               throw error;
             }
-            if (!review.matches) {
+            if (reviewKind === "channel_phone_reference") {
+              if (review.matches)
+                proposal.fieldCandidates.push({
+                  fieldKey: channelPhoneFieldKeys[0],
+                  naturalValue: `+${input.externalUserId!.replace(/^\+/, "")}`,
+                  source: "visitor",
+                  confidence: 0.9,
+                  valueReference: null,
+                });
+            } else if (!review.matches) {
               if (reviewKind === "cancellation")
                 throw new TurnProposalValidationError([
                   `cancellation_not_authorized: the latest intent is ${review.query}; reconsider it without cancelling or reusing past cancellation requests`,
