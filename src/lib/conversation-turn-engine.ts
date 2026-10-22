@@ -1220,6 +1220,7 @@ export class StructuredTurnEngine {
             if (remainingReviewMs <= 0)
               throw new Error("Turn deadline exceeded.");
             attempts += 1;
+            const reviewModelId = modelIds.fallback ?? modelId;
             let review;
             try {
               review = await measureRuntimeModelCall(
@@ -1227,12 +1228,12 @@ export class StructuredTurnEngine {
                 () =>
                   this.provider.reviewInterpretation!({
                     kind: reviewKind,
-                    modelId,
+                    modelId: reviewModelId,
                     timeoutMs: remainingReviewMs,
                     messages: compiled.messages,
                     selected: selectedFaqs,
                   }),
-                modelId,
+                reviewModelId,
                 input.stage,
               );
               attemptUsages.push(review.usage);

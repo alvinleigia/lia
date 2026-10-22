@@ -47,6 +47,7 @@ export const turnFieldCandidateProposalV1Schema = z
     naturalValue: proposalValue,
     confidence,
     source: z.literal("visitor"),
+    evidenceText: z.string().trim().min(1).max(500).optional(),
     valueReference: z.literal("channel_sender_phone").nullable().optional(),
   })
   .strict();
@@ -164,6 +165,14 @@ export const turnResultV1ProviderSchema = turnResultV1BaseSchema.extend({
   fieldCandidates: z
     .array(
       turnFieldCandidateProposalV1Schema.extend({
+        evidenceText: z
+          .string()
+          .trim()
+          .min(1)
+          .max(500)
+          .describe(
+            "A short exact quote from the LATEST visitor message supplying this value or explicitly referring to the earlier value/question. Never quote an older message. Omit the candidate if the latest message does not supply or refer to it.",
+          ),
         valueReference: z.literal("channel_sender_phone").nullable(),
       }),
     )

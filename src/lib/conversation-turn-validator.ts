@@ -118,6 +118,26 @@ export function validateStructuredTurnProposal(
   }
   for (const candidate of proposal.fieldCandidates) {
     if (
+      candidate.evidenceText !== undefined &&
+      allowed.visitorMessage !== undefined
+    ) {
+      const normalizeEvidence = (text: string) =>
+        text
+          .normalize("NFKC")
+          .toLowerCase()
+          .replace(/[’‘]/g, "'")
+          .replace(/\s+/g, " ")
+          .trim();
+      if (
+        !normalizeEvidence(allowed.visitorMessage).includes(
+          normalizeEvidence(candidate.evidenceText),
+        )
+      )
+        issues.push(
+          `field_evidence_not_current: ${candidate.fieldKey} must be supported by an exact quote from the latest visitor message; omit values copied from history and preserve the actual current question`,
+        );
+    }
+    if (
       !candidate.valueReference &&
       typeof candidate.naturalValue === "string" &&
       !candidate.naturalValue.trim()

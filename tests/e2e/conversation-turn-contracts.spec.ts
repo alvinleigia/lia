@@ -199,6 +199,60 @@ test("FAQ selection validates IDs and cannot replace a partial, ambiguous or act
   ).toThrow("validation");
 });
 
+test("field evidence must come from the latest message rather than prior contact details", () => {
+  const compiled = compileStructuredTurn({
+    activeTask: snapshot,
+    assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
+    assistantIntroduced: true,
+    channel: "whatsapp",
+    companyName: "Test",
+    projectName: "Test",
+    projectPolicy: REFERENCE_BOOKING_PROJECT_POLICY,
+    context: [],
+    fieldState: [],
+    history: [
+      { role: "user", content: "I'm Alex. Use the number I'm messaging from." },
+    ],
+    publishedTasks: [],
+    retrieval: [],
+    stage: "extraction",
+    visitorMessage: "Actually, my name is Sam. Is delivery available?",
+  });
+  const proposal = {
+    ...validTurn(),
+    turnKind: "field_answer",
+    grounding: { status: "not_needed", excerptIds: [] },
+    fieldCandidates: [
+      {
+        fieldKey: "guestName",
+        naturalValue: "Sam",
+        source: "visitor",
+        confidence: 1,
+        evidenceText: "my name is Sam",
+      },
+    ],
+  };
+  expect(
+    validateStructuredTurnProposal(proposal, compiled.validation)
+      .fieldCandidates[0].naturalValue,
+  ).toBe("Sam");
+  expect(() =>
+    validateStructuredTurnProposal(
+      {
+        ...proposal,
+        fieldCandidates: [
+          {
+            ...proposal.fieldCandidates[0],
+            naturalValue: "Alex",
+            evidenceText: "I'm Alex",
+          },
+        ],
+      },
+      compiled.validation,
+    ),
+  ).toThrow(TurnProposalValidationError);
+});
+
 test("compact knowledge keeps grounding and cannot propose task mutations", () => {
   const compact = {
     knowledgeRequest: null,
@@ -264,6 +318,7 @@ test("compact knowledge routing preserves task choice and forbids operations", (
       {
         fieldKey: "patientName",
         naturalValue: "Alex",
+        evidenceText: "My name is Alex",
         confidence: 1,
         valueReference: null,
       },
@@ -314,6 +369,7 @@ test("compact extraction restores visitor provenance and preserves uncertainty",
       {
         fieldKey: "patientName",
         naturalValue: "Alex Test",
+        evidenceText: "I'm Alex Test",
         confidence: 1,
         valueReference: null,
       },

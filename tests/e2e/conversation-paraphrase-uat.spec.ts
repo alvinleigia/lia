@@ -206,4 +206,23 @@ test("@live-openai V2 paraphrases retain question meaning and pricing inputs", a
   expect(String(reason?.naturalValue)).toMatch(
     /Wi-Fi|connection|video|Google Meet/i,
   );
+  saved.guestName = "Hotel WhatsApp Test V2";
+  saved.callbackRequested = true;
+  saved.callbackWindow = "24 October 2026, 2 to 4pm India time";
+  history.push(
+    {
+      role: "user",
+      content:
+        "I'm Hotel WhatsApp Test V2. You can reach me on the number I'm messaging from. Could someone call on 24 October 2026, from 2 to 4pm India time?",
+    },
+    { role: "assistant", content: "Which phone number may our team use?" },
+  );
+  const interruption = await engine.execute({
+    ...request(
+      "Quick detour before we continue: we'll be driving. Do we pay extra to park?",
+    ),
+    requestedFieldKey: "contactNumber",
+  });
+  expect(interruption.proposal.knowledgeRequest?.query).toMatch(/park/i);
+  expect(interruption.proposal.fieldCandidates).toEqual([]);
 });
