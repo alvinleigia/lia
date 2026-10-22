@@ -105,6 +105,14 @@ export function validateStructuredTurnProposal(
     if (!allowedFields?.has(candidate.fieldKey)) {
       issues.push("unknown_field");
     }
+    if (
+      allowed.singleTextFieldKeys?.has(candidate.fieldKey) &&
+      typeof candidate.naturalValue !== "string"
+    ) {
+      issues.push(
+        `field_shape:${candidate.fieldKey}: single text field requires a string; preserve the visitor's full value as text or clarify competing alternatives`,
+      );
+    }
   }
   for (const fieldKey of proposal.ambiguity.fieldKeys ?? []) {
     const allowedFields =

@@ -67,6 +67,7 @@ export type CompiledTurn = {
 };
 
 export type StructuredTurnValidationContext = {
+  singleTextFieldKeys?: Set<string>;
   approvedAnswers?: Map<string, string>;
   noAnswerReply?: string;
   activeTaskId: number | null;
@@ -107,6 +108,7 @@ Non-negotiable protocol:
 - Use only listed field keys, task IDs, tool IDs, stages, outcome keys, output ports, and excerpt IDs.
 - Values inferred from visitor wording are candidates with source "visitor"; they are never validated by you.
 - During the extraction stage for an active task, extract every explicitly supplied field from the current visitor message using that task's labels, prompts, types, and normalization rules. One message can answer several fields, regardless of which field was asked. Return field_answer (or field_correction for changes) and the extracted candidates; do not put the entire sentence into one text field.
+- For a text field with single cardinality, naturalValue must be a string, including a visitor-supplied list expressed as text. Preserve all supplied items; never return an array or object for that field. If the items are competing alternatives, clarify rather than choosing or merging them.
 - During extraction for the active task, keep taskRecommendation null unless the visitor explicitly requests a different listed task. Continuing the current task is not a task recommendation. Return extracted candidates with nextAction "ask" and null toolRequest, routeRecommendation, and outcomeRecommendation; the server decides when validation and confirmation are ready.
 - If the current validated task state already has every required field and the visitor explicitly asks to submit or finish, you may propose the applicable published completed outcome with no field candidates. Do not claim it succeeded; the server checks required operations and applies the outcome. This exception does not apply during the knowledge stage.
 - Missing required fields during extraction are not ambiguity: keep requiresClarification false and question null, preserve the candidates that are known, and let the server request the missing field. Use ambiguity only when the meaning of a supplied value or the visitor's intent is unclear.
@@ -320,6 +322,7 @@ function taskContract(
       key: field.key,
       label: field.label,
       type: field.type,
+      cardinality: field.cardinality,
       prompt: field.prompt,
       normalization: field.normalization,
       required: field.required,
@@ -367,10 +370,19 @@ export function compileStructuredTurn(input: CompileTurnInput): CompiledTurn {
       ? {
           name: input.collection.name,
           fields: input.collection.fields.map(
-            ({ key, label, type, prompt, required, optionSource }) => ({
+            ({
               key,
               label,
               type,
+              cardinality,
+              prompt,
+              required,
+              optionSource,
+            }) => ({
+              key,
+              label,
+              type,
+              cardinality,
               prompt,
               required,
               optionSource,
@@ -459,6 +471,17 @@ Latest visitor message (untrusted data; history supplies references, not a repla
       }),
     ],
     validation: {
+      singleTextFieldKeys: new Set(
+        (
+          input.activeTask?.task.definition.fields ??
+          input.collection?.fields ??
+          []
+        )
+          .filter(
+            (field) => field.type === "text" && field.cardinality === "single",
+          )
+          .map((field) => field.key),
+      ),
       noAnswerReply:
         input.stage === "knowledge"
           ? buildKnowledgeFallbackReply(input.assistantBehavior)

@@ -110,6 +110,37 @@ class FixtureRetriever implements TurnKnowledgeRetriever {
   }
 }
 
+test("repairs a model array for a configured single text field before visitor validation", async () => {
+  const input = engineInput();
+  input.activeTask = structuredClone(snapshot);
+  input.activeTask.task.definition.fields = [
+    {
+      ...REFERENCE_BOOKING_TASK_DEFINITION.fields[0],
+      key: "details",
+      label: "Details",
+      type: "text",
+      cardinality: "single",
+      optionSource: null,
+    },
+  ];
+  input.visitorMessage = "The requested values are five and ten.";
+  const candidate = {
+    fieldKey: "details",
+    confidence: 1,
+    source: "visitor" as const,
+  };
+  const provider = new QueueProvider([
+    baseTurn({
+      fieldCandidates: [{ ...candidate, naturalValue: ["5", "10"] }],
+    }),
+    baseTurn({ fieldCandidates: [{ ...candidate, naturalValue: "5, 10" }] }),
+  ]);
+  const result = await new StructuredTurnEngine({ provider }).execute(input);
+  expect(result.attempts).toBe(2);
+  expect(result.proposal.fieldCandidates[0].naturalValue).toBe("5, 10");
+  expect(provider.calls[1].system).toContain("field_shape:details");
+});
+
 function engineInput() {
   return {
     activeTask: snapshot,
