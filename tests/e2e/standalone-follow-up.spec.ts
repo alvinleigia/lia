@@ -10,6 +10,7 @@ import { AiSdkStructuredTurnProvider } from "../../src/lib/model-provider";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 import { validateTaskFollowUp } from "../../src/lib/task-follow-up";
 import { createCollectionTaskConfirmationProposal } from "../../src/lib/hybrid-flow-runtime";
+import { shouldAnswerTaskSideQuestion } from "../../src/lib/hybrid-flow-runtime";
 
 const definition =
   createConversationalTaskDefinitionFromTemplate("team_follow_up");
@@ -133,6 +134,14 @@ for (const scenario of [
       requestedFieldKey: "contactName",
     });
     const fields = extraction.proposal.fieldCandidates;
+    expect(extraction.proposal.turnKind).toBe("follow_up_request");
+    expect(
+      shouldAnswerTaskSideQuestion({
+        proposal: extraction.proposal,
+        text: scenario.request,
+        availabilityHandled: false,
+      }),
+    ).toBe(false);
     expect(
       fields.find((f) => f.fieldKey === "followUpQuestion")?.naturalValue,
     ).toMatch(scenario.topic);
@@ -155,5 +164,17 @@ for (const scenario of [
         "No need to contact anyone. What information do you already have about that?",
     });
     expect(declined.proposal.taskRecommendation).toBeNull();
+    const factual = await engine.execute({
+      ...input,
+      history: [
+        ...input.history,
+        { role: "user", content: scenario.request },
+        { role: "assistant", content: "What is your name for the callback?" },
+        { role: "user", content: "Cancel this request." },
+        { role: "assistant", content: "The callback request was cancelled." },
+      ],
+      visitorMessage: scenario.question,
+    });
+    expect(factual.proposal.taskRecommendation).toBeNull();
   });
 }

@@ -20,6 +20,7 @@ export const TURN_KINDS = [
   "ordinary_question",
   "field_answer",
   "field_correction",
+  "follow_up_request",
   "side_question",
   "task_recommendation",
   "task_switch",

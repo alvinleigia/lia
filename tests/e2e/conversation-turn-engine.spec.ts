@@ -424,7 +424,8 @@ test("@live-openai detailed pricing requests can enter a published channel task 
     await listPublishedConversationalTaskOptions(1895),
     "whatsapp",
   );
-  expect(options).toHaveLength(1);
+  const hotelTask = options.find(({ task }) => task.id === 916);
+  expect(hotelTask).toBeDefined();
   const provider = new AiSdkStructuredTurnProvider();
   const result = await new StructuredTurnEngine({
     retriever: new ProjectDocumentTurnRetriever(),
@@ -464,7 +465,7 @@ test("@live-openai detailed pricing requests can enter a published channel task 
     nextAction: result.proposal.nextAction,
     taskId: result.proposal.taskRecommendation?.taskId,
   });
-  expect(result.proposal.taskRecommendation?.taskId).toBe(options[0].task.id);
+  expect(result.proposal.taskRecommendation?.taskId).toBe(hotelTask?.task.id);
   expect(result.proposal.ambiguity.requiresClarification).toBe(false);
   expect(result.attempts).toBe(1);
   // The channel hands the original message to the selected task and discards

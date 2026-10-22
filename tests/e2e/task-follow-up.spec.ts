@@ -14,6 +14,7 @@ import {
   getTaskRuntimeInputRequest,
   reconcileTaskSideQuestionWithRuntime,
   reconcileTaskTurnWithRuntime,
+  shouldAnswerTaskSideQuestion,
 } from "../../src/lib/hybrid-flow-runtime";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 import {
@@ -114,6 +115,48 @@ test("follow-up is configured by field roles and rejects broken bindings", () =>
   expect(validateTaskFollowUp(definition).join(" ")).toContain(
     "different fields",
   );
+});
+
+test("interpreted team requests collect contact details without repeating knowledge or submitting", () => {
+  const { snapshot, fields, proposal } = fixture();
+  const request = { ...proposal, turnKind: "follow_up_request" as const };
+  expect(
+    shouldAnswerTaskSideQuestion({
+      proposal: request,
+      text: "Can you check with them?",
+      availabilityHandled: false,
+    }),
+  ).toBe(false);
+  for (const field of fields) {
+    if (field.fieldKey === "question") {
+      field.state = "valid";
+      field.canonicalValue = "Can you check compatibility with my equipment?";
+    }
+    if (field.fieldKey === "helpWanted") {
+      field.state = "valid";
+      field.canonicalValue = true;
+    }
+  }
+  const response = reconcileTaskTurnWithRuntime({
+    snapshot,
+    fields,
+    proposal: request,
+  });
+  expect(response.reply).toMatch(/name.*follow up/i);
+  expect(response.nextAction).toBe("ask");
+  expect(response.outcomeRecommendation).toBeNull();
+  for (const field of fields) field.state = "valid";
+  expect(
+    reconcileTaskTurnWithRuntime({ snapshot, fields, proposal: request })
+      .nextAction,
+  ).toBe("confirm");
+  expect(
+    shouldAnswerTaskSideQuestion({
+      proposal: { ...proposal, turnKind: "side_question" },
+      text: "What are your opening hours?",
+      availabilityHandled: false,
+    }),
+  ).toBe(true);
 });
 
 test("unknown answers and generic referrals qualify across domains, ordinary facts and refusals do not", () => {

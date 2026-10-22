@@ -245,6 +245,9 @@ export function shouldAnswerTaskSideQuestion(input: {
     )
   )
     return false;
+  // The model distinguishes a request for the team to act from a factual FAQ.
+  // Its fields still pass normal validation and final submission confirmation.
+  if (proposal.turnKind === "follow_up_request") return false;
   // A review/confirmation question attached to supplied details belongs to the
   // task's validation and confirmation path, not factual knowledge retrieval.
   const asksOnlyToProceed =
@@ -520,7 +523,8 @@ export function reconcileTaskTurnWithRuntime(
     if (
       requiredOperation &&
       (input.proposal.turnKind === "field_answer" ||
-        input.proposal.turnKind === "field_correction") &&
+        input.proposal.turnKind === "field_correction" ||
+        input.proposal.turnKind === "follow_up_request") &&
       input.proposal.safety.decision === "allow"
     ) {
       return {
@@ -546,7 +550,9 @@ export function reconcileTaskTurnWithRuntime(
       input.snapshot.task.definition.outcomes.some(
         (outcome) => outcome.type === "completed",
       ) &&
-      ["field_answer", "field_correction"].includes(input.proposal.turnKind) &&
+      ["field_answer", "field_correction", "follow_up_request"].includes(
+        input.proposal.turnKind,
+      ) &&
       ["ask", "confirm"].includes(input.proposal.nextAction) &&
       input.proposal.safety.decision === "allow" &&
       !input.proposal.ambiguity.requiresClarification &&
