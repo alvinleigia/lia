@@ -75,6 +75,73 @@ import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 const outcomes = DEFAULT_CONVERSATIONAL_TASK_DEFINITION.outcomes;
 
+test("confirmation collapses only a consented follow-up recap and retains contact and task values", async () => {
+  const reason = [
+    "Does the price include breakfast and are dietary options available for both children?",
+    "Can the team confirm whether the service includes collection and delivery on the same day?",
+    "Is the quoted price applicable to the new dates and can the team confirm the cancellation terms?",
+  ].join(" | ");
+  const fields = [
+    ["question", "text"],
+    ["callback", "boolean"],
+    ["name", "text"],
+    ["email", "email"],
+  ].map(([key, type]) => ({
+    ...REFERENCE_BOOKING_TASK_DEFINITION.fields[0],
+    key,
+    label: key,
+    type,
+    optionSource: null,
+  }));
+  const snapshot = conversationalTaskSnapshotV1Schema.parse({
+    ...taskSnapshot,
+    toolDefinitions: [],
+    task: {
+      ...taskSnapshot.task,
+      definition: {
+        ...taskSnapshot.task.definition,
+        fields,
+        tools: [],
+        followUp: {
+          reasonField: "question",
+          consentField: "callback",
+          nameField: "name",
+          contactField: "email",
+        },
+      },
+    },
+  });
+  for (const consent of [true, false]) {
+    const runtime = {
+      run: { id: 1 },
+      fields: [
+        { fieldKey: "question", state: "valid", canonicalValue: reason },
+        { fieldKey: "callback", state: "valid", canonicalValue: consent },
+        { fieldKey: "name", state: "valid", canonicalValue: "Alex Test" },
+        {
+          fieldKey: "email",
+          state: "valid",
+          canonicalValue: "alex@example.com",
+        },
+      ],
+    } as Parameters<typeof buildTaskConfirmationText>[0]["runtime"];
+    const reply = await buildTaskConfirmationText({
+      runtime,
+      snapshot,
+      projectId: 194,
+      confirmationSummary: null,
+      operationName: null,
+    });
+    expect(reply).toContain("Alex Test");
+    expect(reply).toContain("alex@example.com");
+    if (consent) {
+      expect(reply).toContain("3 questions saved");
+      expect(reply).not.toContain(reason);
+    } else expect(reply).toContain(reason);
+    expect(runtime.fields[0].canonicalValue).toBe(reason);
+  }
+});
+
 test("enquiry confirmation renders validated fields without requiring a write operation", async () => {
   const fields = [
     {

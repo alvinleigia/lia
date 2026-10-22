@@ -15,6 +15,8 @@ import {
   type StructuredTurnValidationContext,
 } from "../../src/lib/conversation-turn-compiler";
 import {
+  compactKnowledgeRouterProviderSchema,
+  expandCompactKnowledgeRouterTurn,
   compactTaskExtractionProviderSchema,
   compactTaskKnowledgeProviderSchema,
   expandCompactTaskTurn,
@@ -216,6 +218,48 @@ test("compact knowledge keeps grounding and cannot propose task mutations", () =
       ),
     ),
   ).toThrow();
+});
+
+test("compact knowledge routing preserves task choice and forbids operations", () => {
+  const {
+    schemaVersion: _version,
+    decisionSummary: _summary,
+    toolRequest: _tool,
+    routeRecommendation: _route,
+    outcomeRecommendation: _outcome,
+    ...base
+  } = validTurn();
+  const compact = {
+    ...base,
+    turnKind: "task_recommendation",
+    ambiguity: { ...base.ambiguity, fieldKeys: null },
+    grounding: { status: "not_needed", excerptIds: [] },
+    fieldCandidates: [
+      { fieldKey: "patientName", naturalValue: "Alex", confidence: 1 },
+    ],
+    taskRecommendation: {
+      taskId: 95,
+      confidence: 1,
+      reason: "Requested appointment.",
+    },
+  };
+  const expanded = turnResultV1Schema.parse(
+    expandCompactKnowledgeRouterTurn(compact),
+  );
+  expect(expanded.taskRecommendation).toEqual(compact.taskRecommendation);
+  expect(expanded.fieldCandidates[0]).toMatchObject({
+    naturalValue: "Alex",
+    source: "visitor",
+  });
+  expect(expanded.toolRequest).toBeNull();
+  expect(expanded.routeRecommendation).toBeNull();
+  expect(expanded.outcomeRecommendation).toBeNull();
+  expect(
+    compactKnowledgeRouterProviderSchema.safeParse({
+      ...compact,
+      toolRequest: {},
+    }).success,
+  ).toBe(false);
 });
 
 test("compact extraction restores visitor provenance and preserves uncertainty", () => {

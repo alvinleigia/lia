@@ -177,6 +177,33 @@ export const compactTaskKnowledgeProviderSchema =
     outcomeRecommendation: true,
   });
 
+// Before task entry, knowledge routing cannot propose tools or outcomes either.
+// Keep task recommendations and candidate fields; restore only server constants.
+export const compactKnowledgeRouterProviderSchema =
+  compactTaskExtractionProviderSchema.omit({
+    toolRequest: true,
+    routeRecommendation: true,
+    outcomeRecommendation: true,
+  });
+
+export function expandCompactKnowledgeRouterTurn(output: unknown) {
+  const proposal = compactKnowledgeRouterProviderSchema
+    .partial({ answerSelections: true })
+    .parse(output);
+  return {
+    ...expandCompactTaskTurn(
+      {
+        ...proposal,
+        toolRequest: null,
+        routeRecommendation: null,
+        outcomeRecommendation: null,
+      },
+      "extraction",
+    ),
+    decisionSummary: "Knowledge routing proposal; see structured fields.",
+  };
+}
+
 export function expandCompactTaskTurn(
   output: unknown,
   stage: "extraction" | "knowledge",

@@ -19,6 +19,7 @@ import {
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 import {
   appendTaskFollowUpQuestion,
+  formatTaskFollowUpReview,
   hasTaskFollowUpDestination,
   isPendingTaskFollowUp,
   parseTaskFollowUpConsent,
@@ -29,6 +30,25 @@ import type {
   CompiledHybridFlowGraphV1,
   HybridFlowNodeV1,
 } from "../../src/lib/hybrid-flow-contracts";
+
+test("long multi-question reviews are expandable without losing the saved questions", () => {
+  const questions = [
+    "Does that price include breakfast and can the team confirm the dietary options for both children?",
+    "Can the team check whether the service includes collection from my address and return delivery on the same day?",
+    "Will the appointment include the assessment or should I book a separate visit for that?",
+  ];
+  const value = questions.join(" | ");
+  const review = formatTaskFollowUpReview(value);
+  expect(review?.summary).toContain("3 questions saved");
+  expect(review?.summary).toContain("Show questions");
+  questions.forEach((question) => expect(review?.details).toContain(question));
+  expect(review?.summary.length).toBeLessThan(value.length / 2);
+  expect(formatTaskFollowUpReview("Is breakfast included?")).toBeNull();
+  expect(
+    formatTaskFollowUpReview("One detailed question ".repeat(20)),
+  ).toBeNull();
+  expect(formatTaskFollowUpReview(null)).toBeNull();
+});
 
 function fixture() {
   const definition: ConversationalTaskDefinitionV1 = {

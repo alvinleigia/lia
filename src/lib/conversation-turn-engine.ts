@@ -1092,6 +1092,8 @@ export class StructuredTurnEngine {
               input.projectId,
               () =>
                 this.provider.generateTurn({
+                  knowledgeRoutingOnly:
+                    input.stage === "knowledge" && !input.activeTask,
                   selectApprovedAnswers: Boolean(
                     compiled.validation.approvedAnswers?.size,
                   ),

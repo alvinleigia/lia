@@ -296,10 +296,13 @@ function visibleFields(input: CompileTurnInput) {
   });
 }
 
-function taskContract(snapshot: ConversationalTaskSnapshotV1 | null) {
+function taskContract(
+  snapshot: ConversationalTaskSnapshotV1 | null,
+  knowledgeOnly: boolean,
+) {
   if (!snapshot) return null;
   const { task } = snapshot;
-  return {
+  const identity = {
     id: task.id,
     name: task.name,
     objective: task.objective,
@@ -307,6 +310,12 @@ function taskContract(snapshot: ConversationalTaskSnapshotV1 | null) {
     responseLength: task.definition.taskPolicy.responseLength,
     instructions: task.definition.taskPolicy.instructions,
     followUp: task.definition.followUp ?? null,
+  };
+  // Knowledge interruptions read validated state below; they cannot extract
+  // fields or execute operations. Do not resend the unused collection schema.
+  if (knowledgeOnly) return identity;
+  return {
+    ...identity,
     fields: task.definition.fields.map((field) => ({
       key: field.key,
       label: field.label,
@@ -353,7 +362,7 @@ export function compileStructuredTurn(input: CompileTurnInput): CompiledTurn {
   const retrieval = boundedRetrieval(input);
   const approvedAnswers = approvedKnowledgeReferences(input);
   const activeContract =
-    taskContract(input.activeTask) ??
+    taskContract(input.activeTask, input.stage === "knowledge") ??
     (input.stage === "extraction" && input.collection
       ? {
           name: input.collection.name,

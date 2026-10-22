@@ -1,9 +1,11 @@
 import { openai } from "@ai-sdk/openai";
 import { generateText, NoObjectGeneratedError, Output } from "ai";
 import {
+  compactKnowledgeRouterProviderSchema,
   compactTaskExtractionProviderSchema,
   compactTaskKnowledgeProviderSchema,
   expandCompactTaskTurn,
+  expandCompactKnowledgeRouterTurn,
   type TurnMessageV1,
   turnResultV1ProviderSchema,
 } from "@/lib/conversation-turn-contracts";
@@ -32,6 +34,7 @@ export function getPlatformEmbeddingModel() {
 }
 
 export type StructuredTurnProviderInput = {
+  knowledgeRoutingOnly?: boolean;
   taskKnowledgeOnly?: boolean;
   taskExtractionOnly?: boolean;
   selectApprovedAnswers?: boolean;
@@ -76,16 +79,20 @@ export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
           ? compactTaskKnowledgeProviderSchema
           : input.taskExtractionOnly
             ? compactTaskExtractionProviderSchema
-            : turnResultV1ProviderSchema
+            : input.knowledgeRoutingOnly
+              ? compactKnowledgeRouterProviderSchema
+              : turnResultV1ProviderSchema
         ).omit(input.selectApprovedAnswers ? {} : { answerSelections: true }),
       }),
       system:
         input.system +
         (input.taskExtractionOnly
           ? "\nFor ordinary field extraction, keep reply to a brief acknowledgement (at most eight words). Do not repeat supplied values or ask for remaining fields; the server renders the next prompt. Clarifications, safety refusals and handoffs still need clear wording. Server supplies schemaVersion, decisionSummary and candidate source; omit them from your output."
-          : input.taskKnowledgeOnly
-            ? "\nServer supplies the omitted constant fields and audit summary. Return only the requested compact answer object."
-            : ""),
+          : input.knowledgeRoutingOnly
+            ? "\nServer supplies the omitted constant fields and audit summary. Return only the requested compact object. For a task recommendation, keep reply to a brief acknowledgement (at most eight words); the server processes the request next. Factual answers, clarifications and safety refusals still need complete wording."
+            : input.taskKnowledgeOnly
+              ? "\nServer supplies the omitted constant fields and audit summary. Return only the requested compact answer object."
+              : ""),
       messages: input.messages,
       maxOutputTokens: input.maxOutputTokens,
       maxRetries: input.maxRetries,
@@ -121,7 +128,9 @@ export class AiSdkStructuredTurnProvider implements StructuredTurnProvider {
           ? expandCompactTaskTurn(result.output, "knowledge")
           : input.taskExtractionOnly
             ? expandCompactTaskTurn(result.output, "extraction")
-            : result.output,
+            : input.knowledgeRoutingOnly
+              ? expandCompactKnowledgeRouterTurn(result.output)
+              : result.output,
         usage,
       };
     } catch (error) {

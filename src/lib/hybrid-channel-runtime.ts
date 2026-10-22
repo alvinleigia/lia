@@ -133,6 +133,7 @@ import {
 } from "@/lib/runtime-stage-timing";
 import {
   appendTaskFollowUpQuestion,
+  formatTaskFollowUpReview,
   FOLLOW_UP_CONSENT_PROMPT,
   hasTaskFollowUpDestination,
   isPendingTaskFollowUp,
@@ -288,6 +289,14 @@ export async function buildTaskConfirmationText(input: {
   for (const definition of input.snapshot.task.definition.fields) {
     if (!fieldValues.has(definition.key)) continue;
     const value = fieldValues.get(definition.key);
+    const followUpReview =
+      definition.key === input.snapshot.task.definition.followUp?.reasonField &&
+      taskFollowUpConsent(
+        input.snapshot.task.definition,
+        input.runtime.fields,
+      ) === true
+        ? formatTaskFollowUpReview(value)
+        : null;
     let displayValue =
       definition.key === calendar?.startFieldKey
         ? (calendarOptions.find((option) => option.value === value)?.label ??
@@ -312,7 +321,9 @@ export async function buildTaskConfirmationText(input: {
       }
       displayValue = selected;
     }
-    lines.push(`- ${definition.label}: ${displayValue}`);
+    lines.push(
+      `- ${definition.label}: ${followUpReview?.summary ?? displayValue}`,
+    );
   }
 
   const availableSlot = calendarOptions.find(
@@ -1224,6 +1235,32 @@ async function executeTaskBoundary(input: {
   }
   const runtime = session.runtime;
   const snapshot = session.snapshot;
+  if (
+    /^show questions[.!?]?$/i.test(appointmentAnswer.trim()) &&
+    taskFollowUpConsent(snapshot.task.definition, runtime.fields) === true &&
+    !getResumedTaskRuntimeInputRequest({
+      fields: runtime.fields,
+      requestedFieldKey: runtime.run.lastRequestedFieldKey,
+      snapshot,
+    })
+  ) {
+    const reason = runtime.fields.find(
+      (field) =>
+        field.fieldKey === snapshot.task.definition.followUp?.reasonField &&
+        ["valid", "confirmed"].includes(field.state),
+    );
+    const review = formatTaskFollowUpReview(
+      reason?.canonicalValue ?? reason?.naturalValue,
+    );
+    if (review)
+      return {
+        output: operationTurn({
+          nextAction: "confirm",
+          reply: `Questions saved for our team:\n${review.details}\n\nReply Confirm to submit the reviewed details, or tell me what to change.`,
+        }),
+        signals: [],
+      };
+  }
   const pendingFollowUp = isPendingTaskFollowUp({
     definition: snapshot.task.definition,
     fields: runtime.fields,

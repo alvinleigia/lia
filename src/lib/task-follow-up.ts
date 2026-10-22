@@ -185,3 +185,20 @@ export function appendTaskFollowUpQuestion(
     .join(" | ")
     .slice(-500);
 }
+
+// The full saved reason remains available to the team and on visitor request.
+// Only a multi-question recap is collapsed; never shorten an individual fact.
+export function formatTaskFollowUpReview(value: unknown) {
+  if (typeof value !== "string" || value.length <= 240) return null;
+  const questions = value
+    .split(" | ")
+    .map((question) => question.trim())
+    .filter(Boolean);
+  if (questions.length < 2) return null;
+  return {
+    summary: `${questions.length} questions saved for our team. Reply "Show questions" to review them.`,
+    details: questions
+      .map((question, index) => `${index + 1}. ${question}`)
+      .join("\n"),
+  };
+}
