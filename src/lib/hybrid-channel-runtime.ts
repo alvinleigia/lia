@@ -1336,6 +1336,13 @@ async function executeTaskBoundary(input: {
   const requestedAnswerKind = classifyRequestedTaskAnswer({
     answer: requestedAnswer,
     hasSelection: Boolean(input.runtimeInput.selection),
+    hasPendingField: Boolean(
+      getResumedTaskRuntimeInputRequest({
+        fields: runtime.fields,
+        requestedFieldKey: runtime.run.lastRequestedFieldKey,
+        snapshot,
+      }),
+    ),
     requestedFieldIsProjectResource,
   });
   const rejectMismatchedSelection = async () => ({

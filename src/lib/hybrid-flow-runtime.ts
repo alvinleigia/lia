@@ -354,9 +354,13 @@ export function createMismatchedTaskSelectionProposal(input: {
 export function classifyRequestedTaskAnswer(input: {
   answer: string;
   hasSelection: boolean;
+  hasPendingField: boolean;
   requestedFieldIsProjectResource: boolean;
 }) {
-  if (isExplicitCancellationRequest(input.answer)) {
+  if (
+    isExplicitCancellationRequest(input.answer) ||
+    (!input.hasPendingField && isExplicitConfirmationRequest(input.answer))
+  ) {
     return "unstructured" as const;
   }
   if (input.requestedFieldIsProjectResource && input.answer.trim()) {

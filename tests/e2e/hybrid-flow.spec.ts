@@ -1956,6 +1956,7 @@ test("explicit cancellation bypasses requested resource validation", () => {
     classifyRequestedTaskAnswer({
       answer: "cancel",
       hasSelection: false,
+      hasPendingField: true,
       requestedFieldIsProjectResource: true,
     }),
   ).toBe("unstructured");
@@ -1963,9 +1964,43 @@ test("explicit cancellation bypasses requested resource validation", () => {
     classifyRequestedTaskAnswer({
       answer: "2026-08-26",
       hasSelection: false,
+      hasPendingField: true,
       requestedFieldIsProjectResource: true,
     }),
   ).toBe("project_resource");
+});
+
+test("confirmation buttons use the text confirmation path only when collection is complete", () => {
+  for (const hasSelection of [true, false]) {
+    expect(
+      classifyRequestedTaskAnswer({
+        answer: "confirm",
+        hasSelection,
+        hasPendingField: false,
+        requestedFieldIsProjectResource: false,
+      }),
+    ).toBe("unstructured");
+  }
+  // A button must not bypass an unanswered field or turn an unrelated stale
+  // choice into a confirmation. The normal completion gate still runs next.
+  for (const requestedFieldIsProjectResource of [true, false]) {
+    expect(
+      classifyRequestedTaskAnswer({
+        answer: "confirm",
+        hasSelection: true,
+        hasPendingField: true,
+        requestedFieldIsProjectResource,
+      }),
+    ).toBe(requestedFieldIsProjectResource ? "project_resource" : "static_selection");
+  }
+  expect(
+    classifyRequestedTaskAnswer({
+      answer: "premium",
+      hasSelection: true,
+      hasPendingField: false,
+      requestedFieldIsProjectResource: false,
+    }),
+  ).toBe("static_selection");
 });
 
 test("stale task selections re-prompt without proposing a field mutation", () => {
