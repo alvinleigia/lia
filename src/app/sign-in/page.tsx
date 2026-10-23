@@ -1,5 +1,7 @@
 import { KeyRound, LogIn, Mail, UserPlus } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import {
   ActionFormError,
   ActionStateForm,
@@ -8,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getUserByEmail } from "@/lib/users";
 import { signInWithCredentials, signInWithGoogle } from "./actions";
 
 type SignInPageProps = {
@@ -21,6 +24,11 @@ type SignInPageProps = {
 };
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
+  const session = await auth();
+  // A stale session for a removed user must still be able to sign in.
+  if (session?.user?.email && (await getUserByEmail(session.user.email))) {
+    redirect("/post-login");
+  }
   const params = await searchParams;
 
   return (

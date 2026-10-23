@@ -574,6 +574,9 @@ test("user can sign up, sign in, and create a project", async ({ page }) => {
   await signInWithEmail(page, email);
 
   await expect(page.getByText("Projects").first()).toBeVisible();
+  await page.goto("/sign-in");
+  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page.getByRole("button", { name: "Sign In with Email" })).toHaveCount(0);
   await createProjectFromProjectsPage(page, projectName);
   await expect(
     page.getByText(`Project: ${projectName}`, { exact: true }),
@@ -1319,6 +1322,9 @@ test("platform admin email lands on the platform dashboard", async ({
   });
   await expect(page.getByText("Tenants").first()).toBeVisible();
   await expect(page.getByText(platformAdminEmail)).toBeVisible();
+  await page.goto("/sign-in");
+  await expect(page).toHaveURL(/\/platform$/);
+  await expect(page.getByRole("button", { name: "Sign In with Email" })).toHaveCount(0);
 });
 
 test("non platform admin cannot open platform admin routes", async ({
