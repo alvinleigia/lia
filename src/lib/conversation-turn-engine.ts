@@ -457,6 +457,29 @@ function modelFailureProposal(input: ExecuteStructuredTurnInput) {
       reply: "I cannot process that request right now.",
     });
   }
+  const requestedField = (
+    input.activeTask?.task.definition.fields ??
+    input.collection?.fields ??
+    []
+  ).find((field) => field.key === input.requestedFieldKey);
+  if (requestedField) {
+    const question =
+      requestedField.prompt ?? `Please provide ${requestedField.label}.`;
+    return {
+      ...deterministicProposal({
+        nextAction: "clarify",
+        reasonCode: "model_unavailable",
+        reply: `I couldn't process that reliably. ${question}`,
+        groundingStatus: "not_needed",
+        turnKind: "field_answer",
+      }),
+      ambiguity: {
+        requiresClarification: true,
+        question: `I couldn't process that reliably. ${question}`,
+        fieldKeys: [requestedField.key],
+      },
+    };
+  }
   return deterministicProposal({
     nextAction: "ask",
     reasonCode: "model_unavailable",

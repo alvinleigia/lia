@@ -37,6 +37,10 @@ Confirmed gaps addressed in this change
 9. Booking-specific cancellation shortcuts bypassed context and could abandon
    collection when the visitor meant an existing record. Those shortcuts now
    defer to semantic interpretation; plain Cancel/Stop still control collection.
+10. A deployed smoke test exposed an extraction timeout being misclassified as
+    a factual interruption. That triggered another model call and contradictory
+    prose, although no name was saved. Model-unavailable fallbacks now stay in
+    collection and ask a safe clarification for the pending field.
 
 Economics
 Some bare text answers now consume an extraction call. Newly inferred follow-up
@@ -60,7 +64,7 @@ Scope limits and follow-up work
   database schema changes or actual booking/payment operations are introduced.
 
 Verification and rollout
-254 offline regressions passed. The full ordinary-flow database suite passed
+256 offline regressions passed. The full ordinary-flow database suite passed
 all 18 cases, including project chat, widget and WhatsApp adapters. Four more
 database cases passed: resource interruption/stale selection, exact appointment
 choice, semantic time correction and early time retention through record/date

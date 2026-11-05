@@ -236,6 +236,7 @@ export function bindRequestedTaskTextAnswer(input: {
 export function normalizeActiveTaskQuestion(
   proposal: TurnResultV1,
 ): TurnResultV1 {
+  if (proposal.safety.reasonCode === "model_unavailable") return proposal;
   if (
     (proposal.turnKind === "ordinary_question" ||
       proposal.turnKind === "task_recommendation" ||
@@ -262,6 +263,7 @@ export function shouldAnswerTaskSideQuestion(input: {
 }) {
   const { proposal } = input;
   if (
+    proposal.safety.reasonCode === "model_unavailable" ||
     proposal.safety.decision !== "allow" ||
     proposal.ambiguity.requiresClarification ||
     ["cancel", "handoff", "fail", "complete", "confirm"].includes(

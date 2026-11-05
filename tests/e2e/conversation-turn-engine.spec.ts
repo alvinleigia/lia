@@ -1923,6 +1923,22 @@ test("provider failures use bounded primary and fallback attempts", async () => 
   expect(new Set(provider.calls.map(({ modelId }) => modelId)).size).toBe(2);
 });
 
+test("extraction failure at a pending field clarifies without guessing a value", async () => {
+  const provider = new QueueProvider(
+    Array.from({ length: 4 }, () => new Error("Unavailable")),
+  );
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    requestedFieldKey: "guestName",
+    visitorMessage: "Alex or Sam",
+  });
+  expect(result.source).toBe("deterministic");
+  expect(result.proposal.nextAction).toBe("clarify");
+  expect(result.proposal.ambiguity.fieldKeys).toEqual(["guestName"]);
+  expect(result.proposal.fieldCandidates).toEqual([]);
+  expect(result.proposal.reply).not.toContain("Alex or Sam");
+});
+
 test("unambiguous typed field answers bypass the model", async () => {
   const provider = new QueueProvider([]);
   const engine = new StructuredTurnEngine({ provider });

@@ -1949,6 +1949,26 @@ test("task completion cannot be diverted into a knowledge interruption", () => {
   ).toBe(false);
 });
 
+test("model failure fallback stays in collection instead of starting a knowledge turn", () => {
+  const proposal = {
+    ...createRequestedTaskSelectionProposal({
+      requestedFieldKey: "guestName",
+      selectionValue: "unused",
+    })!,
+    fieldCandidates: [],
+    turnKind: "ordinary_question" as const,
+    safety: { decision: "allow" as const, reasonCode: "model_unavailable" },
+  };
+  expect(normalizeActiveTaskQuestion(proposal)).toEqual(proposal);
+  expect(
+    shouldAnswerTaskSideQuestion({
+      proposal,
+      text: "Alex or Sam",
+      availabilityHandled: false,
+    }),
+  ).toBe(false);
+});
+
 test("requested project-resource selections can skip the model", () => {
   expect(
     createRequestedTaskSelectionProposal({
