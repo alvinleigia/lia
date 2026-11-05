@@ -943,6 +943,29 @@ test("cancelling an enquiry cannot become the requested name", async () => {
   expect(provider.calls).toHaveLength(0);
 });
 
+test("business-record cancellation uses semantic context instead of stopping collection immediately", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      turnKind: "ordinary_question",
+      fieldCandidates: [],
+      nextAction: "clarify",
+      ambiguity: {
+        requiresClarification: true,
+        question:
+          "Do you mean your existing booking or this unfinished request?",
+      },
+    }),
+  ]);
+  const result = await new StructuredTurnEngine({ provider }).execute({
+    ...engineInput(),
+    visitorMessage: "Cancel my booking",
+    requestedFieldKey: "guestName",
+  });
+  expect(provider.calls).toHaveLength(1);
+  expect(result.proposal.nextAction).toBe("clarify");
+  expect(result.proposal.fieldCandidates).toEqual([]);
+});
+
 test("follow-up consent missing its referenced question requests model repair", async () => {
   const followUpSnapshot = conversationalTaskSnapshotV1Schema.parse({
     ...snapshot,
@@ -982,6 +1005,89 @@ test("follow-up consent missing its referenced question requests model repair", 
   expect(result.proposal.fieldCandidates).toEqual([consent, question]);
   expect(provider.calls).toHaveLength(2);
   expect(provider.calls[1].system).toContain("missing_follow_up_question");
+});
+
+test("independent consent review blocks a factual topic and permits an authorized contextual follow-up", async () => {
+  const activeTask = conversationalTaskSnapshotV1Schema.parse({
+    ...snapshot,
+    task: {
+      ...snapshot.task,
+      definition:
+        createConversationalTaskDefinitionFromTemplate("team_follow_up"),
+    },
+  });
+  const config = activeTask.task.definition.followUp!;
+  const earlierQuestion = "Can you check compatibility with my equipment?";
+  for (const authorized of [false, true]) {
+    const visitorMessage = authorized
+      ? "Have someone ring me tomorrow"
+      : "Compatibility, please";
+    const provider = new QueueProvider([
+      baseTurn({
+        turnKind: "follow_up_request",
+        fieldCandidates: [
+          {
+            fieldKey: config.consentField,
+            naturalValue: true,
+            confidence: 1,
+            source: "visitor",
+            evidenceText: visitorMessage,
+          },
+          {
+            fieldKey: config.reasonField,
+            naturalValue: earlierQuestion,
+            confidence: 1,
+            source: "visitor",
+            evidenceText: earlierQuestion,
+          },
+        ],
+      }),
+    ]);
+    let reviews = 0;
+    const result = await new StructuredTurnEngine({
+      provider: {
+        generateTurn: provider.generateTurn.bind(provider),
+        async reviewInterpretation(request) {
+          expect(request.kind).toBe("follow_up_consent");
+          reviews++;
+          return {
+            matches: authorized,
+            query: authorized
+              ? "Requests team contact"
+              : "Asks for compatibility information",
+            usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+          };
+        },
+      },
+    }).execute({
+      ...engineInput(),
+      activeTask,
+      requestedFieldKey: config.nameField,
+      visitorMessage,
+      history: [
+        { role: "user", content: earlierQuestion },
+        { role: "assistant", content: "Our team can check that." },
+      ],
+    });
+    expect(reviews).toBe(1);
+    expect(provider.calls).toHaveLength(1);
+    expect(result.attempts).toBe(2);
+    if (authorized) {
+      expect(
+        result.proposal.fieldCandidates.find(
+          (f) => f.fieldKey === config.reasonField,
+        ),
+      ).toMatchObject({
+        naturalValue: earlierQuestion,
+        evidenceText: visitorMessage,
+      });
+      expect(result.proposal.nextAction).toBe("ask");
+    } else {
+      expect(result.proposal.nextAction).toBe("clarify");
+      expect(result.proposal.fieldCandidates).toEqual([]);
+      expect(result.proposal.knowledgeRequest).toBeNull();
+    }
+  }
 });
 
 test("minimal enquiry continues the pinned task without repair or restart", async () => {
@@ -1889,8 +1995,20 @@ test("a requested date remains deterministic when the same text appeared earlier
   ]);
 });
 
-test("the specifically requested text field bypasses the model", async () => {
-  const provider = new QueueProvider([]);
+test("the requested free-text field uses semantic interpretation", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      fieldCandidates: [
+        {
+          fieldKey: "guestName",
+          naturalValue: "Phase 17A Tester",
+          evidenceText: "Phase 17A Tester",
+          confidence: 1,
+          source: "visitor",
+        },
+      ],
+    }),
+  ]);
   const engine = new StructuredTurnEngine({ provider });
 
   const result = await engine.execute({
@@ -1909,17 +2027,54 @@ test("the specifically requested text field bypasses the model", async () => {
     visitorMessage: "Phase 17A Tester",
   });
 
-  expect(result.source).toBe("deterministic");
-  expect(result.attempts).toBe(0);
-  expect(provider.calls).toHaveLength(0);
-  expect(result.proposal.fieldCandidates).toEqual([
-    {
-      fieldKey: "guestName",
-      naturalValue: "Phase 17A Tester",
-      confidence: 1,
-      source: "visitor",
-    },
-  ]);
+  expect(result.source).toBe("model");
+  expect(result.attempts).toBe(1);
+  expect(provider.calls).toHaveLength(1);
+  expect(result.proposal.fieldCandidates[0].naturalValue).toBe(
+    "Phase 17A Tester",
+  );
+});
+
+test("short contextual requests and uncertain values never become a pending name", async () => {
+  for (const [visitorMessage, turnKind] of [
+    ["Have someone ring me tomorrow", "follow_up_request"],
+    ["Need a cheaper option", "side_question"],
+    ["Alex or Sam", "field_answer"],
+  ] as const) {
+    const clarify = visitorMessage === "Alex or Sam";
+    const provider = new QueueProvider([
+      baseTurn({
+        turnKind,
+        fieldCandidates: [],
+        nextAction: clarify ? "clarify" : "ask",
+        ambiguity: {
+          requiresClarification: clarify,
+          question: clarify ? "Which name should I use?" : null,
+          fieldKeys: clarify ? ["guestName"] : null,
+        },
+      }),
+    ]);
+    const result = await new StructuredTurnEngine({ provider }).execute({
+      ...engineInput(),
+      requestedFieldKey: "guestName",
+      fieldState: [
+        {
+          fieldKey: "guestName",
+          label: "Guest Name",
+          required: true,
+          sensitivity: "personal",
+          state: "missing",
+          value: null,
+        },
+      ],
+      visitorMessage,
+    });
+    expect(result.source).toBe("model");
+    expect(provider.calls).toHaveLength(1);
+    expect(result.proposal.fieldCandidates).toEqual([]);
+    expect(result.proposal.turnKind).toBe(turnKind);
+    expect(result.proposal.ambiguity.requiresClarification).toBe(clarify);
+  }
 });
 
 test("a full booking answer at a text prompt goes through multi-field extraction", async () => {
@@ -1949,8 +2104,20 @@ test("a full booking answer at a text prompt goes through multi-field extraction
   expect(result.proposal.fieldCandidates).toEqual(fieldCandidates);
 });
 
-test("Telnyx booking collects the caller's exact required reason without a model", async () => {
-  const provider = new QueueProvider([]);
+test("booking interprets a free-form required reason before collecting it", async () => {
+  const provider = new QueueProvider([
+    baseTurn({
+      fieldCandidates: [
+        {
+          fieldKey: "reason",
+          naturalValue: "Persistent knee pain",
+          evidenceText: "Persistent knee pain",
+          confidence: 1,
+          source: "visitor",
+        },
+      ],
+    }),
+  ]);
   const engine = new StructuredTurnEngine({ provider });
   const voiceSnapshot = conversationalTaskSnapshotV1Schema.parse({
     ...snapshot,
@@ -1990,16 +2157,11 @@ test("Telnyx booking collects the caller's exact required reason without a model
     visitorMessage: "Persistent knee pain",
   });
 
-  expect(result.source).toBe("deterministic");
-  expect(provider.calls).toHaveLength(0);
-  expect(result.proposal.fieldCandidates).toEqual([
-    {
-      fieldKey: "reason",
-      naturalValue: "Persistent knee pain",
-      confidence: 1,
-      source: "visitor",
-    },
-  ]);
+  expect(result.source).toBe("model");
+  expect(provider.calls).toHaveLength(1);
+  expect(result.proposal.fieldCandidates[0].naturalValue).toBe(
+    "Persistent knee pain",
+  );
   expect(result.proposal.toolRequest).toBeNull();
 });
 

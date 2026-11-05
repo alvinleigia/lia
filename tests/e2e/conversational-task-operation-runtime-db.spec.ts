@@ -1546,7 +1546,13 @@ async function verifyCalendarRuntime(
   confirmationRefreshCase?: "available" | "busy" | "failed",
   selectionRefreshCase?: "available" | "busy" | "failed" | "fresh",
   resumeCase?: "available" | "busy" | "failed" | "reload" | "changed",
-  preferenceCase?: "available" | "busy" | "failed" | "window" | "conflict",
+  preferenceCase?:
+    | "available"
+    | "busy"
+    | "failed"
+    | "window"
+    | "conflict"
+    | "semantic",
   contextCase = false,
   writeRaceCase = false,
 ) {
@@ -2036,14 +2042,14 @@ async function verifyCalendarRuntime(
         };
         let calls = 0;
         StructuredTurnEngine.prototype.execute = async (input) => {
-          if (input.visitorMessage === "routine follow-up") {
+          if (input.visitorMessage === "Reason: routine follow-up") {
             expect(input.requestedFieldKey).toBe("reason");
             return originalExecute.call(
               new StructuredTurnEngine({
                 provider: {
                   async generateTurn() {
                     throw new Error(
-                      "A short clarification must not call the model",
+                      "A labelled clarification must not call the model",
                     );
                   },
                 },
@@ -2135,7 +2141,7 @@ async function verifyCalendarRuntime(
         expect(freeBusyCalls).toBe(callsBeforeClarification);
         const clarified = await runBrowserFlowText({
           ...browserInput,
-          text: "routine follow-up",
+          text: "Reason: routine follow-up",
         });
         const afterClarification = await getConversationalTaskRuntime({
           projectId,
@@ -2591,15 +2597,51 @@ async function verifyCalendarRuntime(
               ? preferenceCase
               : "available";
           StructuredTurnEngine.prototype.execute = async () => {
+            if (preferenceCase === "semantic")
+              return {
+                source: "model",
+                attempts: 1,
+                modelEscalationReason: "semantic_extraction",
+                usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+                proposal: {
+                  schemaVersion: 1,
+                  turnKind: "field_correction",
+                  reply: "I noted your preferred time.",
+                  grounding: { status: "not_needed", excerptIds: [] },
+                  fieldCandidates: [
+                    {
+                      fieldKey: "appointmentStart",
+                      naturalValue: "3:30 pm",
+                      source: "visitor",
+                      confidence: 1,
+                    },
+                  ],
+                  nextAction: "ask",
+                  taskRecommendation: null,
+                  toolRequest: null,
+                  routeRecommendation: null,
+                  outcomeRecommendation: null,
+                  ambiguity: { requiresClarification: false, question: null },
+                  safety: { decision: "allow", reasonCode: null },
+                  decisionSummary: "Interpreted a changed time preference.",
+                  validation: {
+                    accepted: true,
+                    modelAttemptCount: 1,
+                    providerModelId: "fixture",
+                  },
+                },
+              };
             throw new Error("Time preference queries must not call the model");
           };
           const callsBefore = freeBusyCalls;
           const reply = await runBrowserFlowText({
             ...browserInput,
             text:
-              preferenceCase === "window"
-                ? "Show me times after 2 pm"
-                : "Is 3:30 pm available?",
+              preferenceCase === "semantic"
+                ? "I cannot do 2 pm; please try half past three"
+                : preferenceCase === "window"
+                  ? "Show me times after 2 pm"
+                  : "Is 3:30 pm available?",
           });
           expect(freeBusyCalls).toBeGreaterThan(callsBefore);
           const after = await getConversationalTaskRuntime(preferenceScope);
@@ -2616,7 +2658,11 @@ async function verifyCalendarRuntime(
             ).toEqual(fields[key].canonicalValue);
           expect(insertedEvent).toBeNull();
           const responseText = reply.replies.map((item) => item.text).join(" ");
-          if (preferenceCase === "available" || preferenceCase === "conflict") {
+          if (
+            preferenceCase === "available" ||
+            preferenceCase === "semantic" ||
+            preferenceCase === "conflict"
+          ) {
             expect(after?.fields).toContainEqual(
               expect.objectContaining({
                 fieldKey: "appointmentStart",
@@ -2645,7 +2691,10 @@ async function verifyCalendarRuntime(
               ...browserInput,
               text: "Confirm",
             });
-            if (preferenceCase === "available") {
+            if (
+              preferenceCase === "available" ||
+              preferenceCase === "semantic"
+            ) {
               expect(insertedEvent).toMatchObject({
                 start: { dateTime: `${date}T15:30:00.000Z` },
               });
@@ -4068,6 +4117,7 @@ for (const preferenceCase of [
   "failed",
   "window",
   "conflict",
+  "semantic",
 ] as const) {
   test(`Preferred appointment time beyond initial choices: ${preferenceCase}`, async () => {
     await verifyCalendarRuntime(

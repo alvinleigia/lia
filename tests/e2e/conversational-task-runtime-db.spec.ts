@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
+import { startChannelFlow } from "../../src/lib/channel-flow-runtime";
+import type { RuntimeActionStep } from "../../src/lib/action-runtime";
+import { StructuredTurnEngine } from "../../src/lib/conversation-turn-engine";
+import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
+import { runHybridChannelBoundary } from "../../src/lib/hybrid-channel-runtime";
+import { getRuntimeProjectAction } from "../../src/lib/runtime-actions";
 import {
   getNormalizedChannelInboundRuntimeValue,
   normalizeChannelInboundV1,
@@ -36,6 +42,10 @@ import { resolveProjectTaskToolDefinition } from "../../src/lib/conversational-t
 import { db } from "../../src/lib/db-config";
 import {
   catalogProducts,
+  actionFlowVersions,
+  actionSubmissions,
+  actionSubmissionEvents,
+  projectActions,
   channelConversations,
   channelMessages,
   companies,
@@ -54,6 +64,203 @@ import { POST_CONVERSATION_JOB_KINDS } from "../../src/lib/post-conversation-job
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 
 test.describe.configure({ mode: "serial" });
+
+test("resource prompts interpret free-form questions but reject stale buttons without field changes", async () => {
+  if (!fixture) throw new Error("Missing runtime fixture");
+  const { projectId, taskId, taskVersionId } = fixture;
+  const [actionRow] = await db
+    .insert(projectActions)
+    .values({ projectId, name: "Resource interpretation", status: "active" })
+    .returning();
+  const steps: RuntimeActionStep[] = [
+    {
+      id: 1,
+      sortOrder: 1,
+      fieldKey: null,
+      inputType: null,
+      isEnabled: true,
+      isRequired: true,
+      label: "Service",
+      nextStepId: null,
+      operationId: null,
+      options: [],
+      prompt: null,
+      stepType: "conversational_task",
+      settings: {
+        conversationalTask: {
+          schemaVersion: 1,
+          transferContextKeys: [],
+          transferFieldKeys: [],
+          outcomeRoutes: Object.fromEntries(
+            runtimeTaskDefinition.outcomes.map((outcome) => [
+              outcome.outputPort,
+              "end",
+            ]),
+          ),
+          task: {
+            taskId,
+            taskVersionId,
+            versionNumber: 1,
+            schemaVersion: 1,
+            name: "Book a Service",
+            outcomes: runtimeTaskDefinition.outcomes,
+          },
+        },
+      },
+    },
+  ];
+  const [version] = await db
+    .insert(actionFlowVersions)
+    .values({
+      actionId: actionRow.id,
+      projectId,
+      status: "published",
+      versionNumber: 1,
+      snapshot: {
+        schemaVersion: 1,
+        action: actionRow,
+        branchRules: [],
+        steps,
+        hybridGraph: compileHybridFlowGraph({ branchRules: [], steps }).graph,
+      },
+    })
+    .returning();
+  await db
+    .update(projectActions)
+    .set({ publishedVersionId: version.id })
+    .where(eq(projectActions.id, actionRow.id));
+  const action = await getRuntimeProjectAction(projectId, actionRow.id);
+  if (!action) throw new Error("Missing resource action");
+  const externalConversationId = `resource-semantics-${suffix}`;
+  const [conversation] = await db
+    .insert(channelConversations)
+    .values({ projectId, channelType: "whatsapp", externalConversationId })
+    .returning();
+  certificationConversationIds.push(conversation.id);
+  const started = await startChannelFlow({
+    action,
+    projectId,
+    conversationId: externalConversationId,
+    source: "whatsapp_chat",
+  });
+  const [submission] = await db
+    .select()
+    .from(actionSubmissions)
+    .where(
+      and(
+        eq(actionSubmissions.projectId, projectId),
+        eq(actionSubmissions.conversationId, externalConversationId),
+      ),
+    );
+  const runtimeInput = {
+    action,
+    projectId,
+    submission,
+    channelConversationId: conversation.id,
+    externalConversationId,
+    channelType: "whatsapp" as const,
+    boundaryNodeId: started.boundaryNodeId!,
+  };
+  let messageId = 0;
+  const original = StructuredTurnEngine.prototype.execute;
+  const stages: string[] = [];
+  try {
+    await runHybridChannelBoundary({
+      ...runtimeInput,
+      text: "begin",
+      inboundMessageId: ++messageId,
+      consumeTriggerMessage: true,
+    });
+    StructuredTurnEngine.prototype.execute = async (input) => {
+      stages.push(input.stage);
+      return {
+        source: "model",
+        attempts: 1,
+        modelEscalationReason: "ambiguous_intent",
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        proposal: {
+          schemaVersion: 1,
+          turnKind: "side_question",
+          reply: "Our team can check accessibility.",
+          knowledgeRequest: {
+            query: "Service accessibility",
+            pricingIntent: null,
+          },
+          grounding: { status: "not_needed", excerptIds: [] },
+          fieldCandidates: [],
+          nextAction: "ask",
+          taskRecommendation: null,
+          toolRequest: null,
+          routeRecommendation: null,
+          outcomeRecommendation: null,
+          ambiguity: { requiresClarification: false, question: null },
+          safety: { decision: "allow", reasonCode: null },
+          decisionSummary: "Interpreted current question.",
+          validation: {
+            accepted: true,
+            modelAttemptCount: 1,
+            providerModelId: "fixture",
+          },
+        },
+      };
+    };
+    const result = await runHybridChannelBoundary({
+      ...runtimeInput,
+      text: "Accessibility, please",
+      inboundMessageId: ++messageId,
+    });
+    expect(stages).toEqual(["extraction", "knowledge"]);
+    expect(result.replies[0].text).toContain("accessibility");
+    expect(result.replies[0].payload).toMatchObject({
+      inputRequest: { fieldKey: "serviceCategoryId" },
+    });
+    const stale = await runHybridChannelBoundary({
+      ...runtimeInput,
+      text: "Foreign choice",
+      inboundMessageId: ++messageId,
+      selection: {
+        id: "catalog:999999999",
+        label: "Foreign choice",
+        value: "catalog:999999999",
+        resourceId: null,
+        resourceType: null,
+      },
+    });
+    expect(stale.replies[0].text).toContain("no longer active");
+    expect(stages).toHaveLength(2);
+    const session = await getConversationTaskRuntimeSession({
+      projectId,
+      channelType: "whatsapp",
+      externalConversationId,
+    });
+    expect(
+      session.runtime?.fields.find(
+        (field) => field.fieldKey === "serviceCategoryId",
+      )?.canonicalValue,
+    ).toBeNull();
+  } finally {
+    StructuredTurnEngine.prototype.execute = original;
+    await deleteConversationRuntimeData({
+      projectId,
+      conversationId: conversation.id,
+      includeMessages: true,
+    });
+    await db
+      .delete(actionSubmissionEvents)
+      .where(eq(actionSubmissionEvents.submissionId, submission.id));
+    await db
+      .delete(actionSubmissions)
+      .where(eq(actionSubmissions.id, submission.id));
+    await db
+      .update(projectActions)
+      .set({ publishedVersionId: null })
+      .where(eq(projectActions.id, actionRow.id));
+    await db
+      .delete(actionFlowVersions)
+      .where(eq(actionFlowVersions.id, version.id));
+    await db.delete(projectActions).where(eq(projectActions.id, actionRow.id));
+  }
+});
 
 const startedAt = new Date("2026-07-25T10:00:00.000Z");
 const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;

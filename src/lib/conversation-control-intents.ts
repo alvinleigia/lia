@@ -9,14 +9,10 @@ const EXPLICIT_CANCELLATION_PHRASES = new Set([
   "abort this",
   "abort this request",
   "cancel",
-  "cancel booking",
   "cancel it",
-  "cancel my booking",
   "cancel request",
-  "cancel the booking",
   "cancel the request",
   "cancel this",
-  "cancel this booking",
   "cancel this request",
   "do not continue",
   "don't continue",
@@ -37,7 +33,6 @@ const EXPLICIT_CANCELLATION_PHRASES = new Set([
   "quit",
   "stop",
   "stop this",
-  "stop this booking",
   "stop this request",
 ]);
 

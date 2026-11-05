@@ -543,6 +543,20 @@ export function parseCalendarTimePreference(
   return { kind: "window", minute: from, endMinute: to, timezone };
 }
 
+// Only complete, unambiguous time answers can bypass language interpretation.
+// The broader parser is also used on model-extracted preferences, not
+// arbitrary messages containing a clock time alongside another request.
+export function parseStandaloneCalendarTimePreference(
+  text: string,
+  timezone: string,
+) {
+  return /^(?:(?:(?:is|after|before|from|show me times after|show me times before)\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{2}:\d{2})(?:\s+(?:available|free))?|(?:in the\s+)?(?:morning|afternoon|evening))\s*\??$/i.test(
+    text.trim(),
+  )
+    ? parseCalendarTimePreference(text, timezone)
+    : null;
+}
+
 // Match and rank only provider-returned slots. This helper never fabricates an
 // instant from a requested clock time; date and timezone remain explicit.
 export function suggestCalendarSlots(input: {

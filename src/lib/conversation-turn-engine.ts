@@ -7,7 +7,6 @@ import {
   isExplicitCancellationRequest,
   isExplicitHumanHandoffRequest,
   isPotentialKnowledgeSideQuestion,
-  isSimpleTaskTextAnswer,
   isStandaloneKnowledgeQuestion,
   stripKnowledgeDiscoursePrefix,
 } from "@/lib/conversation-control-intents";
@@ -28,6 +27,7 @@ import {
   type TurnMessageV1,
   type TurnResultV1,
   type TurnRetrievalExcerptV1,
+  turnResultV1BaseSchema,
   turnResultV1Schema,
   type ValidatedTurnProposalV1,
 } from "@/lib/conversation-turn-contracts";
@@ -509,12 +509,9 @@ function directFieldProposal(
     requestedField.type !== "media" &&
     requestedField.type !== "project_resource" &&
     requestedField.optionSource?.kind !== "project_resource" &&
-    !(
-      ["address", "text"].includes(requestedField.type) &&
-      (!isSimpleTaskTextAnswer(value) ||
-        isPotentialKnowledgeSideQuestion(value) ||
-        hasDirectUnresolvedFieldEvidence(input))
-    )
+    // Free-form language needs semantic interpretation even when a permissive
+    // text validator would accept it. Exact labelled values were handled above.
+    !["address", "text"].includes(requestedField.type)
   ) {
     const contextValues = new Map(
       input.context.map((contextValue) => [
@@ -624,6 +621,60 @@ function preserveAmbiguousDateWording(
         );
       });
       return match ? { ...candidate, naturalValue: match[0] } : candidate;
+    }),
+  };
+}
+
+function normalizeTaskFollowUpEvidence(
+  input: ExecuteStructuredTurnInput,
+  value: unknown,
+): unknown {
+  const config = input.activeTask?.task.definition.followUp;
+  if (input.stage !== "extraction" || !config) return value;
+  const parsed = turnResultV1BaseSchema.safeParse(value);
+  if (!parsed.success) return value;
+  const proposal = parsed.data;
+  if (
+    proposal.turnKind !== "follow_up_request" ||
+    proposal.nextAction !== "ask" ||
+    proposal.safety.decision !== "allow" ||
+    proposal.ambiguity.requiresClarification
+  )
+    return value;
+  const normalize = (text: string) =>
+    text.toLowerCase().replace(/\s+/g, " ").trim();
+  const current = normalize(input.visitorMessage);
+  const consent = proposal.fieldCandidates.find(
+    (candidate) =>
+      candidate.fieldKey === config.consentField &&
+      /^(true|yes)$/i.test(String(candidate.naturalValue)) &&
+      candidate.evidenceText &&
+      current.includes(normalize(candidate.evidenceText)),
+  );
+  if (!consent?.evidenceText) return value;
+  return {
+    ...proposal,
+    fieldCandidates: proposal.fieldCandidates.map((candidate) => {
+      if (
+        candidate.fieldKey !== config.reasonField ||
+        typeof candidate.naturalValue !== "string" ||
+        !candidate.evidenceText ||
+        current.includes(normalize(candidate.evidenceText)) ||
+        !input.history.some(
+          (message) =>
+            message.role === "user" &&
+            normalize(message.content) ===
+              normalize(String(candidate.naturalValue)) &&
+            normalize(message.content).includes(
+              normalize(candidate.evidenceText!),
+            ),
+        )
+      )
+        return candidate;
+      // The model selected an actual prior visitor question and a current
+      // contact request. Bind that reference to its current authorization;
+      // personal fields and unsupported history values still fail validation.
+      return { ...candidate, evidenceText: consent.evidenceText };
     }),
   };
 }
@@ -1152,7 +1203,7 @@ export class StructuredTurnEngine {
             input,
             applyIntentRoutingPolicy(
               validateStructuredTurnProposal(
-                generated.output,
+                normalizeTaskFollowUpEvidence(input, generated.output),
                 compiled.validation,
               ),
               compiled.validation,
@@ -1207,15 +1258,41 @@ export class StructuredTurnEngine {
           // Exact commands/FAQ matches have deterministic paths. Model-selected
           // cancellations and paraphrased FAQ matches get an independent intent
           // check before an action or a potentially unrelated answer is used.
-          const reviewKind =
+          const followUpConfig = input.activeTask?.task.definition.followUp;
+          const newFollowUpConsent =
+            input.stage === "extraction" &&
+            followUpConfig &&
+            !proposal.ambiguity.requiresClarification &&
+            proposal.safety.decision === "allow" &&
+            proposal.nextAction === "ask" &&
+            (proposal.turnKind === "follow_up_request" ||
+              proposal.fieldCandidates.some(
+                (candidate) =>
+                  candidate.fieldKey === followUpConfig.consentField &&
+                  /^(true|yes)$/i.test(String(candidate.naturalValue)),
+              )) &&
+            !input.fieldState.some(
+              (field) =>
+                field.fieldKey === followUpConfig.consentField &&
+                ["valid", "confirmed"].includes(field.state) &&
+                /^(true|yes)$/i.test(String(field.value)),
+            );
+          const reviewKinds = [
             proposal.nextAction === "cancel"
               ? "cancellation"
               : input.stage === "knowledge" && selectedFaqs.length && !exactFaq
                 ? "knowledge_selection"
-                : missingChannelPhone
-                  ? "channel_phone_reference"
-                  : null;
-          if (reviewKind && this.provider.reviewInterpretation) {
+                : null,
+            newFollowUpConsent ? "follow_up_consent" : null,
+            missingChannelPhone ? "channel_phone_reference" : null,
+          ] as const;
+          for (const reviewKind of reviewKinds) {
+            if (
+              !reviewKind ||
+              !this.provider.reviewInterpretation ||
+              proposal.ambiguity.requiresClarification
+            )
+              continue;
             const remainingReviewMs = deadline - Date.now();
             if (remainingReviewMs <= 0)
               throw new Error("Turn deadline exceeded.");
@@ -1241,7 +1318,36 @@ export class StructuredTurnEngine {
               attemptUsages.push(failedModelUsage(error));
               throw error;
             }
-            if (reviewKind === "channel_phone_reference") {
+            if (
+              reviewKind === "follow_up_consent" &&
+              !review.matches &&
+              followUpConfig
+            ) {
+              const question =
+                "Would you like information about this, or would you like our team to follow up with you?";
+              proposal = {
+                ...proposal,
+                turnKind: "field_answer",
+                nextAction: "clarify",
+                reply: question,
+                knowledgeRequest: null,
+                fieldCandidates: proposal.fieldCandidates.filter(
+                  (candidate) =>
+                    ![
+                      followUpConfig.consentField,
+                      followUpConfig.reasonField,
+                    ].includes(candidate.fieldKey),
+                ),
+                ambiguity: {
+                  requiresClarification: true,
+                  question,
+                  fieldKeys: [followUpConfig.consentField],
+                },
+              };
+            } else if (reviewKind === "follow_up_consent") {
+              // Current consent was independently verified. Other checks, such
+              // as authorization to use the sender's phone, remain separate.
+            } else if (reviewKind === "channel_phone_reference") {
               if (review.matches)
                 proposal.fieldCandidates.push({
                   fieldKey: channelPhoneFieldKeys[0],
@@ -1406,7 +1512,7 @@ export class StructuredTurnEngine {
             )
           ) {
             throw new TurnProposalValidationError([
-              "missing_follow_up_question: resolve the referenced visitor question from history, or ask clarification if its meaning is ambiguous",
+              `missing_follow_up_question: emit a ${followUp.reasonField} candidate containing the most recent unresolved visitor question from history; evidenceText quotes the current contact request, which can refer to that subject implicitly. If multiple subjects are plausible, ask clarification instead of omitting the reason silently`,
             ]);
           }
           if (

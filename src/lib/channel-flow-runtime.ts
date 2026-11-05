@@ -72,7 +72,6 @@ import {
   isExplicitCancellationRequest,
   isExplicitHumanHandoffRequest,
   isPotentialKnowledgeSideQuestion,
-  isSimpleTaskTextAnswer,
   shouldUseKnowledgeSideQuestion,
 } from "@/lib/conversation-control-intents";
 import {
@@ -80,6 +79,7 @@ import {
   getClearCandidatesDuringClarification,
 } from "@/lib/conversation-field-extraction";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
+import type { TurnResultV1 } from "@/lib/conversation-turn-contracts";
 import { executeConfiguredStructuredTurn } from "@/lib/conversation-turn-service";
 import { validateTaskFieldValue } from "@/lib/conversational-task-field-validation";
 import {
@@ -299,6 +299,7 @@ function formatStepPrompt(
 }
 
 async function tryAnswerDeterministicFlowQuestion(input: {
+  knowledgeRequest?: TurnResultV1["knowledgeRequest"];
   answerIsValid: boolean;
   action: RuntimeAction;
   channelConversationId?: number | null;
@@ -310,7 +311,8 @@ async function tryAnswerDeterministicFlowQuestion(input: {
   text: string;
   source: string;
 }) {
-  if (!isPotentialKnowledgeSideQuestion(input.text)) return null;
+  if (!input.knowledgeRequest && !isPotentialKnowledgeSideQuestion(input.text))
+    return null;
 
   const project = await getProjectTurnContext(input.projectId);
   if (!project) return null;
@@ -341,6 +343,7 @@ async function tryAnswerDeterministicFlowQuestion(input: {
       projectPolicy,
       publishedTasks: [],
       stage: "knowledge",
+      knowledgeRequest: input.knowledgeRequest,
       visitorMessage: input.text,
     });
     const proposal = execution.proposal;
@@ -1681,6 +1684,8 @@ async function interpretFlowFieldAnswer(input: {
   inboundMessageId?: number | null;
 }): Promise<{
   answers?: Record<string, string>;
+  controlAction?: "cancel" | "handoff";
+  knowledgeRequest?: TurnResultV1["knowledgeRequest"];
   reply?: string;
   clarificationFieldKey?: string | null;
 } | null> {
@@ -1697,6 +1702,9 @@ async function interpretFlowFieldAnswer(input: {
       readFlowClarificationField(input.submission.metadata, input.action),
   );
   const requestedStep = clarificationField?.step ?? input.step;
+  const requestedField = collection.find(
+    ({ step }) => step.id === requestedStep.id,
+  )?.field;
   const fields = collection.map(({ field }) => field);
   const retained = readFlowFieldCandidates(
     input.submission.metadata,
@@ -1707,10 +1715,12 @@ async function interpretFlowFieldAnswer(input: {
     text: input.answer,
     timezone: "UTC",
   });
-  // Existing single-field answers and choice buttons keep their zero-model path.
+  // Exact choices and typed scalar answers keep their zero-model path. A text
+  // validator accepting a sentence does not establish the sentence's intent.
   if (
     !local &&
-    isSimpleTaskTextAnswer(input.answer) &&
+    requestedField &&
+    !["text", "address"].includes(requestedField.type) &&
     !isPotentialKnowledgeSideQuestion(input.answer) &&
     validateStepAnswer(requestedStep, input.answer, input.submission.fields)
       .isValid
@@ -1791,6 +1801,11 @@ async function interpretFlowFieldAnswer(input: {
         visitorMessage: input.answer,
       });
       if (
+        !proposal.ambiguity.requiresClarification &&
+        ["cancel", "handoff"].includes(proposal.nextAction)
+      )
+        return { controlAction: proposal.nextAction as "cancel" | "handoff" };
+      if (
         proposal.safety.decision !== "allow" ||
         ["fail", "handoff", "cancel"].includes(proposal.nextAction)
       )
@@ -1803,9 +1818,11 @@ async function interpretFlowFieldAnswer(input: {
         };
         candidates = getClearCandidatesDuringClarification(proposal, fields);
       } else if (!proposal.fieldCandidates.length)
-        return isPotentialKnowledgeSideQuestion(input.answer)
-          ? null
-          : { reply: formatStepPrompt(input.step, input.submission.fields) };
+        return proposal.knowledgeRequest
+          ? { knowledgeRequest: proposal.knowledgeRequest }
+          : isPotentialKnowledgeSideQuestion(input.answer)
+            ? null
+            : { reply: formatStepPrompt(input.step, input.submission.fields) };
       else candidates = proposal.fieldCandidates;
     } catch {
       return {
@@ -1849,6 +1866,36 @@ async function interpretFlowFieldAnswer(input: {
     : { reply: formatStepPrompt(input.step, input.submission.fields) };
 }
 
+async function handoffRequestedChannelFlow(input: {
+  action: RuntimeAction;
+  projectId: number;
+  step: RuntimeActionStep;
+  submission: SelectActionSubmission;
+}) {
+  await requestHumanHandoff({
+    ...input,
+    step: {
+      ...input.step,
+      label: "Human handoff",
+      operationId: null,
+      prompt: "Visitor requested human help.",
+      settings: {
+        ...input.step.settings,
+        handoffNotifyTeam: false,
+        handoffPriority: "normal",
+        handoffQueue: "",
+      },
+    },
+  });
+  return {
+    replies: [
+      createTextReply(
+        "I will connect you with the team. The details you already provided have been saved.",
+      ),
+    ],
+  };
+}
+
 async function continueChannelFlow(input: {
   skipEntityInterpretation?: boolean;
   action: RuntimeAction;
@@ -1871,31 +1918,12 @@ async function continueChannelFlow(input: {
     currentStep &&
     isExplicitHumanHandoffRequest(input.answer)
   ) {
-    await requestHumanHandoff({
+    return handoffRequestedChannelFlow({
       action: input.action,
       projectId: input.projectId,
-      step: {
-        ...currentStep,
-        label: "Human handoff",
-        operationId: null,
-        prompt: "Visitor explicitly requested human help.",
-        settings: {
-          ...currentStep.settings,
-          handoffNotifyTeam: false,
-          handoffPriority: "normal",
-          handoffQueue: "",
-        },
-      },
+      step: currentStep,
       submission: input.submission,
     });
-
-    return {
-      replies: [
-        createTextReply(
-          "I will connect you with the team. The details you already provided have been saved.",
-        ),
-      ],
-    };
   }
 
   if (
@@ -1995,6 +2023,34 @@ async function continueChannelFlow(input: {
   const interpretation = input.skipEntityInterpretation
     ? null
     : await interpretFlowFieldAnswer({ ...input, step });
+  if (interpretation?.controlAction === "cancel")
+    return routeResponsePolicyOutput({
+      ...input,
+      step,
+      output: "cancelled",
+      reply: "No problem. I cancelled this request.",
+    });
+  if (interpretation?.controlAction === "handoff")
+    return handoffRequestedChannelFlow({ ...input, step });
+  if (interpretation?.knowledgeRequest) {
+    const interruption = await tryAnswerDeterministicFlowQuestion({
+      ...input,
+      action: input.action,
+      answerIsValid: false,
+      knowledgeRequest: interpretation.knowledgeRequest,
+      resumePrompt: formatStepPrompt(step, input.submission.fields),
+      stepId: step.id,
+      submissionId: input.submission.id,
+      text: input.answer,
+    });
+    return (
+      interruption ?? {
+        replies: [
+          createTextReply(formatStepPrompt(step, input.submission.fields)),
+        ],
+      }
+    );
+  }
   if (interpretation?.reply && !interpretation.answers)
     return { replies: [createTextReply(interpretation.reply)] };
   if (interpretation || input.skipEntityInterpretation) {

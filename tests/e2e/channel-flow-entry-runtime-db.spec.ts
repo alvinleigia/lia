@@ -443,7 +443,7 @@ for (const source of [
           "5": "blue",
         },
       });
-      await send("Alex Test");
+      await send("Customer Name: Alex Test");
       saved = await read();
       expect(saved.currentStepId).toBe(3);
       expect(saved.fields).toMatchObject({
@@ -636,6 +636,149 @@ test("ordinary flow model interpretation clarifies ambiguity without losing cont
     StructuredTurnEngine.prototype.execute = original;
   }
 });
+
+for (const scenario of [
+  {
+    text: "Let's leave this for another day",
+    action: "cancel",
+    status: "cancelled",
+    source: "whatsapp_chat",
+  },
+  {
+    text: "Have somebody take over from here",
+    action: "handoff",
+    status: "under_review",
+    source: "widget_chat",
+  },
+  {
+    text: "Parking, please",
+    action: "knowledge",
+    status: "awaiting_input",
+    source: "project_chat",
+  },
+] as const) {
+  test(`ordinary flows persist semantic ${scenario.action} without recording it as a name`, async () => {
+    const action = await collectionAction();
+    const conversationId = `${suffix}-semantic-${scenario.action}`;
+    if (scenario.action === "knowledge")
+      await db
+        .update(projects)
+        .set({
+          aiSettings: {
+            ...DEFAULT_PROJECT_AI_SETTINGS,
+            approvedKnowledgeAnswers: [
+              { question: scenario.text, answer: "Parking is free." },
+            ],
+          },
+        })
+        .where(eq(projects.id, fixture.projectId));
+    await startChannelFlow({
+      action,
+      conversationId,
+      projectId: fixture.projectId,
+      source: scenario.source,
+    });
+    const read = async () =>
+      (
+        await db
+          .select()
+          .from(actionSubmissions)
+          .where(
+            and(
+              eq(actionSubmissions.projectId, fixture.projectId),
+              eq(actionSubmissions.conversationId, conversationId),
+            ),
+          )
+      )[0];
+    const original = StructuredTurnEngine.prototype.execute;
+    const stages: string[] = [];
+    StructuredTurnEngine.prototype.execute = async (input) => {
+      stages.push(input.stage);
+      if (input.stage === "knowledge")
+        expect(input.knowledgeRequest?.query).toBe(
+          "Visitor parking availability",
+        );
+      return original.call(
+        new StructuredTurnEngine({
+          provider: {
+            async generateTurn(request) {
+              const knowledge = scenario.action === "knowledge";
+              return {
+                modelId: request.modelId,
+                usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+                output: {
+                  schemaVersion: 1,
+                  turnKind: knowledge
+                    ? "side_question"
+                    : scenario.action === "cancel"
+                      ? "cancellation"
+                      : "follow_up_request",
+                  reply:
+                    input.stage === "knowledge"
+                      ? "Parking is free."
+                      : "I understood your request.",
+                  knowledgeRequest: knowledge
+                    ? {
+                        query: "Visitor parking availability",
+                        pricingIntent: null,
+                      }
+                    : null,
+                  grounding: {
+                    status:
+                      input.stage === "knowledge" ? "grounded" : "not_needed",
+                    excerptIds: [],
+                  },
+                  fieldCandidates: [],
+                  taskRecommendation: null,
+                  toolRequest: null,
+                  routeRecommendation: null,
+                  outcomeRecommendation: null,
+                  nextAction: knowledge ? "ask" : scenario.action,
+                  ambiguity: { requiresClarification: false, question: null },
+                  safety: { decision: "allow", reasonCode: null },
+                  decisionSummary: "Interpreted the current visitor request.",
+                },
+              };
+            },
+          },
+        }),
+        input,
+      );
+    };
+    try {
+      const before = await read();
+      const result = await processChannelFlowText({
+        activeSubmission: before,
+        conversationId,
+        projectId: fixture.projectId,
+        source: scenario.source,
+        text: scenario.text,
+      });
+      const saved = await read();
+      expect(saved.fields).toEqual(before.fields);
+      expect(saved.status).toBe(
+        scenario.action === "knowledge" ? before.status : scenario.status,
+      );
+      expect(stages).toEqual(
+        scenario.action === "knowledge"
+          ? ["extraction", "knowledge"]
+          : ["extraction"],
+      );
+      if (scenario.action === "knowledge") {
+        expect(saved.currentStepId).toBe(before.currentStepId);
+        expect(result.replies[0].text).toContain("Parking is free.");
+        expect(result.replies[0].text).toContain("Customer Name");
+      }
+    } finally {
+      StructuredTurnEngine.prototype.execute = original;
+      if (scenario.action === "knowledge")
+        await db
+          .update(projects)
+          .set({ aiSettings: DEFAULT_PROJECT_AI_SETTINGS })
+          .where(eq(projects.id, fixture.projectId));
+    }
+  });
+}
 
 test("staged fields cannot bypass published branches or cross into another action version", async () => {
   const action = await collectionAction(true);

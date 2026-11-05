@@ -320,6 +320,93 @@ function input(
     })),
   };
 }
+
+test("@live-openai shared controller distinguishes short follow-up, clarification and factual intent across domains", async () => {
+  test.skip(
+    process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",
+    "Opt-in metered verification only.",
+  );
+  test.setTimeout(180_000);
+  for (const [domain, question, topic] of [
+    [
+      "Hotel stay",
+      "Will the internet handle video calls?",
+      /internet|video|connection/i,
+    ],
+    ["Repair service", "Can you repair a cracked basin?", /basin|repair/i],
+    [
+      "Appointment",
+      "Can the specialist review my previous scans?",
+      /scan|specialist/i,
+    ],
+  ] as const) {
+    const snapshot = task(domain, [
+      ["name", "Customer Name", "text"],
+      ["phone", "Contact Number", "phone"],
+      ["consent", "Callback Requested", "boolean"],
+      ["question", "Question for Team", "text"],
+    ]);
+    snapshot.task.definition.followUp = {
+      nameField: "name",
+      contactField: "phone",
+      consentField: "consent",
+      reasonField: "question",
+    };
+    const engine = new StructuredTurnEngine();
+    const request = {
+      ...input(snapshot, "Have someone ring me tomorrow", "name"),
+      channel: "whatsapp" as const,
+      history: [
+        { role: "user" as const, content: question },
+        {
+          role: "assistant" as const,
+          content: "Our team can check that for you.",
+        },
+      ],
+    };
+    const followUp = await engine.execute(request);
+    expect(followUp.source).toBe("model");
+    expect(followUp.proposal.turnKind).toBe("follow_up_request");
+    expect(
+      followUp.proposal.fieldCandidates.some((f) => f.fieldKey === "name"),
+    ).toBe(false);
+    expect(
+      String(
+        followUp.proposal.fieldCandidates.find((f) => f.fieldKey === "consent")
+          ?.naturalValue,
+      ),
+    ).toMatch(/true|yes/i);
+    expect(
+      String(
+        followUp.proposal.fieldCandidates.find((f) => f.fieldKey === "question")
+          ?.naturalValue,
+      ),
+    ).toMatch(topic);
+    const ambiguous = await engine.execute({
+      ...request,
+      visitorMessage: "Alex or Sam",
+    });
+    expect(ambiguous.proposal.ambiguity.requiresClarification).toBe(true);
+    expect(
+      ambiguous.proposal.fieldCandidates.some((f) => f.fieldKey === "name"),
+    ).toBe(false);
+    const factual = await engine.execute({
+      ...request,
+      visitorMessage: "Accessibility, please",
+    });
+    if (!factual.proposal.ambiguity.requiresClarification)
+      expect(factual.proposal.knowledgeRequest?.query).toMatch(/accessib/i);
+    expect(factual.proposal.fieldCandidates).toEqual([]);
+    console.log(
+      JSON.stringify({
+        domain,
+        followUp: followUp.proposal.turnKind,
+        clarification: ambiguous.proposal.ambiguity.question,
+        factualQuery: factual.proposal.knowledgeRequest?.query,
+      }),
+    );
+  }
+});
 test("@live-openai mixed follow-up keeps name, authorized phone and callback window across domains", async () => {
   test.skip(
     process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",
@@ -488,6 +575,19 @@ test("@live-openai date range paraphrases retain complete endpoints and partial 
       rentalDates: "2026-10-26 to 2026-10-28",
     }),
   );
+  if (changed.proposal.ambiguity.requiresClarification) {
+    expect(changed.proposal.ambiguity.fieldKeys).toContain("rentalDates");
+    expect(changed.proposal.ambiguity.question).toMatch(/end|return/i);
+    expect(changed.proposal.ambiguity.question).toMatch(
+      /start|earlier|before/i,
+    );
+    expect(
+      changed.proposal.fieldCandidates.some(
+        (f) => f.fieldKey === "rentalDates",
+      ),
+    ).toBe(false);
+    return;
+  }
   const invalid = await reconcile(
     snapshot,
     changed.proposal,
@@ -619,13 +719,19 @@ test("simple answers keep caller wording even if the model proposes a default", 
   expect(result.values.reason).toBe("Persistent knee pain");
 });
 
-test("noun phrases containing change or update use the requested field without model calls", async () => {
+test("noun phrases containing change or update are interpreted as field answers", async () => {
   let calls = 0;
   const engine = new StructuredTurnEngine({
     provider: {
-      async generateTurn() {
+      async generateTurn(request) {
         calls += 1;
-        throw new Error("A simple requested value must not invoke the model.");
+        return {
+          modelId: request.modelId,
+          output: proposal({
+            serviceSubject: request.messages.at(-1)!.content,
+          }),
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        };
       },
     },
   });
@@ -633,14 +739,13 @@ test("noun phrases containing change or update use the requested field without m
     const result = await engine.execute(
       input(bike, message, "serviceSubject", { customerName: "Alex Test" }),
     );
-    expect(result.source).toBe("deterministic");
-    expect(result.attempts).toBe(0);
-    expect(result.usage.totalTokens).toBe(0);
+    expect(result.source).toBe("model");
+    expect(result.attempts).toBe(1);
     expect(result.proposal.fieldCandidates).toEqual(
       proposal({ serviceSubject: message }).fieldCandidates,
     );
   }
-  expect(calls).toBe(0);
+  expect(calls).toBe(3);
 });
 
 test("correction requests still use extraction rather than filling the requested text field", async () => {

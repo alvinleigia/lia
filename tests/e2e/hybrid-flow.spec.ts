@@ -1759,7 +1759,7 @@ test("explicit task selections override model-rewritten resource IDs", () => {
   ]);
 });
 
-test("direct answers bind the requested text field to the exact visitor message", () => {
+test("text reconciliation preserves extracted values and never fills an omitted answer", () => {
   const proposal = {
     ambiguity: { question: null, requiresClarification: false },
     decisionSummary: "The visitor answered the requested field.",
@@ -1782,14 +1782,7 @@ test("direct answers bind the requested text field to the exact visitor message"
       requestedFieldKey: "guestName",
       text: "  Phase 14 Release Guest  ",
     }).fieldCandidates,
-  ).toEqual([
-    {
-      confidence: 1,
-      fieldKey: "guestName",
-      naturalValue: "Phase 14 Release Guest",
-      source: "visitor",
-    },
-  ]);
+  ).toEqual([]);
   expect(
     bindRequestedTaskTextAnswer({
       proposal: {
@@ -1798,7 +1791,7 @@ test("direct answers bind the requested text field to the exact visitor message"
           {
             confidence: 0.99,
             fieldKey: "reason",
-            naturalValue: "General appointment",
+            naturalValue: "knee pain",
             source: "visitor" as const,
           },
         ],
@@ -1808,9 +1801,9 @@ test("direct answers bind the requested text field to the exact visitor message"
     }).fieldCandidates,
   ).toEqual([
     {
-      confidence: 1,
+      confidence: 0.99,
       fieldKey: "reason",
-      naturalValue: "I need to discuss knee pain",
+      naturalValue: "knee pain",
       source: "visitor",
     },
   ]);
@@ -1846,7 +1839,7 @@ test("misclassified questions cannot populate the requested text field", () => {
         text,
       });
       expect(result.fieldCandidates).toEqual([]);
-      expect(result.turnKind).toBe("side_question");
+      if (naturalValue) expect(result.turnKind).toBe("side_question");
     }
   }
   expect(
@@ -1877,6 +1870,38 @@ test("multi-field answers preserve extracted values while waiting for text", () 
       text: "My name is Alex Test and email alex@example.com",
     }).fieldCandidates,
   ).toEqual(proposal.fieldCandidates);
+});
+
+test("text reconciliation preserves semantic clarification without inventing an answer", () => {
+  const proposal = createRequestedTaskSelectionProposal({
+    requestedFieldKey: "guestName",
+    selectionValue: "Alex",
+  })!;
+  const ambiguous = {
+    ...proposal,
+    fieldCandidates: [],
+    nextAction: "clarify" as const,
+    ambiguity: {
+      requiresClarification: true,
+      question: "Which name should I use?",
+      fieldKeys: ["guestName"],
+    },
+  };
+  expect(
+    bindRequestedTaskTextAnswer({
+      proposal: ambiguous,
+      requestedFieldKey: "guestName",
+      text: "Alex or Sam",
+    }),
+  ).toEqual(ambiguous);
+  const unanswered = { ...proposal, fieldCandidates: [] };
+  expect(
+    bindRequestedTaskTextAnswer({
+      proposal: unanswered,
+      requestedFieldKey: "guestName",
+      text: "Have someone ring me tomorrow",
+    }),
+  ).toEqual(unanswered);
 });
 
 test("candidate-bearing task answers do not remain ordinary conversation", () => {

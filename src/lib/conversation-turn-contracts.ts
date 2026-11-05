@@ -110,7 +110,7 @@ export const turnToolRequestProposalV1Schema = z
   })
   .strict();
 
-const turnResultV1BaseSchema = z
+export const turnResultV1BaseSchema = z
   .object({
     schemaVersion: z.literal(STRUCTURED_TURN_SCHEMA_VERSION),
     turnKind: z.enum(TURN_KINDS),

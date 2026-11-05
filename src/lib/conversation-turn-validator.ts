@@ -1,6 +1,7 @@
 import type { StructuredTurnValidationContext } from "@/lib/conversation-turn-compiler";
 import {
   type TurnResultV1,
+  turnResultV1BaseSchema,
   turnResultV1Schema,
 } from "@/lib/conversation-turn-contracts";
 
@@ -40,6 +41,31 @@ export function validateStructuredTurnProposal(
   value: unknown,
   allowed: StructuredTurnValidationContext,
 ): TurnResultV1 {
+  const shape = turnResultV1BaseSchema.safeParse(value);
+  if (
+    shape.success &&
+    shape.data.safety.decision === "allow" &&
+    shape.data.ambiguity.requiresClarification &&
+    shape.data.ambiguity.question &&
+    shape.data.ambiguity.fieldKeys?.length &&
+    ["ask", "clarify"].includes(shape.data.nextAction) &&
+    !shape.data.taskRecommendation &&
+    !shape.data.toolRequest &&
+    !shape.data.routeRecommendation &&
+    !shape.data.outcomeRecommendation
+  ) {
+    // Honour the semantic uncertainty before strict consistency checks. An
+    // explicitly uncertain candidate is never a field update, even if the
+    // model also returned it with high confidence or forgot nextAction clarify.
+    value = {
+      ...shape.data,
+      nextAction: "clarify",
+      fieldCandidates: shape.data.fieldCandidates.filter(
+        (candidate) =>
+          !shape.data.ambiguity.fieldKeys!.includes(candidate.fieldKey),
+      ),
+    };
+  }
   const parsed = turnResultV1Schema.safeParse(value);
   if (!parsed.success) {
     throw new TurnProposalValidationError(

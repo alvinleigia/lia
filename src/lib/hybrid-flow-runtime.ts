@@ -175,6 +175,9 @@ export function bindRequestedTaskTextAnswer(input: {
     !input.requestedFieldKey ||
     !value ||
     input.proposal.safety.decision !== "allow" ||
+    input.proposal.ambiguity.requiresClarification ||
+    input.proposal.nextAction !== "ask" ||
+    input.proposal.fieldCandidates.length === 0 ||
     (input.proposal.turnKind !== "field_answer" &&
       input.proposal.turnKind !== "field_correction")
   ) {
@@ -219,20 +222,15 @@ export function bindRequestedTaskTextAnswer(input: {
     };
   }
 
-  // The current channel message is authoritative for a requested free-text
-  // field; a model candidate must never replace its caller provenance.
-
-  return {
-    ...input.proposal,
-    fieldCandidates: [
-      {
-        confidence: 1,
-        fieldKey: input.requestedFieldKey,
-        naturalValue: value,
-        source: "visitor",
-      },
-    ],
-  };
+  // A supplied short literal must not be replaced with a model's generic
+  // default. This requires an actual interpreted answer above; it never fills
+  // an omitted candidate, a follow-up request or an ambiguous answer.
+  if (candidate && isSimpleTaskTextAnswer(value))
+    return {
+      ...input.proposal,
+      fieldCandidates: [{ ...candidate, naturalValue: value }],
+    };
+  return input.proposal;
 }
 
 export function normalizeActiveTaskQuestion(

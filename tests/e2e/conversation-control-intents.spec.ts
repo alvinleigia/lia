@@ -40,6 +40,14 @@ test.describe("explicit conversation cancellation", () => {
   });
 
   test("does not cancel negated or incidental mentions", () => {
+    // Cancelling an existing business record needs context; it is not an
+    // unconditional instruction to abandon the current data collection.
+    for (const phrase of [
+      "Cancel my booking",
+      "Cancel the booking",
+      "Stop this booking",
+    ])
+      expect(isExplicitCancellationRequest(phrase)).toBe(false);
     expect(isExplicitCancellationRequest("Do not cancel my booking.")).toBe(
       false,
     );

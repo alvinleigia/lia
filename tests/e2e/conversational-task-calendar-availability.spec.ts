@@ -2,12 +2,32 @@ import { expect, test } from "@playwright/test";
 import {
   findRequestedCalendarSlots,
   matchRequestedCalendarSlot,
+  parseStandaloneCalendarTimePreference,
   suggestCalendarSlots,
   verifiedCalendarSlots,
 } from "../../src/lib/conversational-task-calendar-availability";
 import { getTaskOperationOutcome } from "../../src/lib/task-operation-outcome";
 
 const now = new Date("2026-09-12T00:00:00Z");
+
+test("only standalone time preferences bypass semantic interpretation", () => {
+  for (const text of [
+    "3:30 pm",
+    "Is 3:30 pm available?",
+    "Show me times after 2 pm",
+    "afternoon",
+  ])
+    expect(parseStandaloneCalendarTimePreference(text, "UTC")).not.toBeNull();
+  for (const text of [
+    "Have someone call me",
+    "I need to change my contact details",
+    "Not 3 pm; make it 4 pm instead",
+    "If 3 pm includes the service, choose it",
+    "I finish work at 3 pm; what are your cancellation terms?",
+    "Either 3 pm or 4 pm",
+  ])
+    expect(parseStandaloneCalendarTimePreference(text, "UTC")).toBeNull();
+});
 const date = "2026-09-21";
 const attempt = {
   status: "completed",

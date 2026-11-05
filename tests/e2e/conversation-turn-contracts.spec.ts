@@ -422,6 +422,58 @@ function validationCodes(value: unknown) {
   }
 }
 
+test("field clarification drops uncertain candidates before strict consistency validation", () => {
+  const context = {
+    ...validationContext(),
+    allowedFieldKeys: new Set(["name", "phone"]),
+    visitorMessage: "Alex or Sam; phone +12025550123",
+  };
+  const proposal = {
+    ...validTurn(),
+    turnKind: "field_answer",
+    grounding: { status: "not_needed", excerptIds: [] },
+    ambiguity: {
+      requiresClarification: true,
+      question: "Which name should I use?",
+      fieldKeys: ["name"],
+    },
+    fieldCandidates: [
+      {
+        fieldKey: "name",
+        naturalValue: "Alex or Sam",
+        confidence: 1,
+        source: "visitor",
+        evidenceText: "Alex or Sam",
+      },
+      {
+        fieldKey: "phone",
+        naturalValue: "+12025550123",
+        confidence: 1,
+        source: "visitor",
+        evidenceText: "+12025550123",
+      },
+    ],
+  };
+  const result = validateStructuredTurnProposal(proposal, context);
+  expect(result.nextAction).toBe("clarify");
+  expect(result.fieldCandidates.map((f) => f.fieldKey)).toEqual(["phone"]);
+  expect(result.ambiguity.question).toBe("Which name should I use?");
+  for (const extra of [
+    {
+      toolRequest: {
+        toolId: "operation:204",
+        stage: "operation",
+        arguments: [],
+      },
+    },
+    { outcomeRecommendation: { outcomeKey: "booked", confidence: 1 } },
+    { ambiguity: { ...proposal.ambiguity, fieldKeys: ["unknownField"] } },
+  ])
+    expect(() =>
+      validateStructuredTurnProposal({ ...proposal, ...extra }, context),
+    ).toThrow(TurnProposalValidationError);
+});
+
 test("legacy project policies receive the Phase 15 knowledge and routing defaults", () => {
   const legacyPolicy = {
     ...DEFAULT_CONVERSATION_PROJECT_POLICY,

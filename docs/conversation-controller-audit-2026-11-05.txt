@@ -1,0 +1,87 @@
+Lia conversation controller audit - 5 November 2026
+
+Decision
+Use the shared LLM engine to interpret free-form language and references. Keep
+field validation, prices, provider availability, permissions, confirmations,
+tenant scope and persisted workflow transitions under server control.
+
+Confirmed gaps addressed in this change
+1. Short requests could be accepted as a pending name/description because a text
+   validator accepts almost anything. Free-form text/address answers now use
+   semantic interpretation. Explicit labelled values and typed scalars retain
+   their deterministic path.
+2. A resource prompt rejected unmatched conversational text before reaching the
+   interpreter. Exact resource matches stay fast; unmatched text reaches the
+   LLM. Stale interactive selections remain blocked.
+3. Calendar parsing could consume a sentence merely containing a time. Only
+   standalone time answers/options bypass interpretation. Complex corrections
+   use the extracted preference and receive a fresh provider check.
+4. Text reconciliation could fabricate a value from an omitted answer or an
+   ambiguous message. It now respects clarification and omitted candidates.
+   Explicitly uncertain fields are discarded before strict consistency checks;
+   clear unrelated values still pass normal validation.
+5. Ordinary flows could acknowledge semantic cancellation/handoff without
+   applying the transition. Those decisions now use the existing persisted
+   cancellation/handoff paths. Interpreted terse factual requests preserve the
+   pending field and go to knowledge answering.
+6. Extraction received the full knowledge-answering protocol, with conflicting
+   responsibilities. It now has a focused interpretation contract. Knowledge
+   answering keeps its own grounding and business-fact requirements.
+7. Follow-up reason evidence could cite an earlier question instead of the
+   current authorization. The server can bind a model-selected, exact historical
+   visitor question to the model-selected current consent quote. This exception
+   applies only to the configured follow-up reason, never personal details.
+8. A model could infer callback consent from a factual topic. Newly inferred
+   follow-up requests receive an independent semantic consent check. Rejected
+   interpretations ask a clarification and cannot save callback consent/reason.
+9. Booking-specific cancellation shortcuts bypassed context and could abandon
+   collection when the visitor meant an existing record. Those shortcuts now
+   defer to semantic interpretation; plain Cancel/Stop still control collection.
+
+Economics
+Some bare text answers now consume an extraction call. Newly inferred follow-up
+intent may consume a second interpretation check. Exact commands, approved exact
+FAQs, explicit labelled fields, typed scalars, deterministic pricing and verified
+option selections retain their existing shortcuts. Models, hosting settings and
+dependencies were not changed. These changes prioritize reliable interpretation
+without routing calculations or writes through an LLM.
+
+Scope limits and follow-up work
+- This is a shared controller correction, not proof that every possible
+  conversation works. LLM outputs and external providers can still fail.
+- A callback destination/contact collection path must be configured and
+  published for the project. An LLM cannot supply a missing business workflow.
+- Active-task switching, a global start-over contract and the enquiry's
+  plan-selection-before-contact stage need separate end-to-end certification.
+  They are not added by this change.
+- Existing conversation-quality signals and review tools remain the mechanism
+  for finding new failures; add confirmed failures to the shared regressions.
+- No client-specific topic rules, project overrides, environment changes,
+  database schema changes or actual booking/payment operations are introduced.
+
+Verification and rollout
+254 offline regressions passed. The full ordinary-flow database suite passed
+all 18 cases, including project chat, widget and WhatsApp adapters. Four more
+database cases passed: resource interruption/stale selection, exact appointment
+choice, semantic time correction and early time retention through record/date
+selection. Calendar operations used a mocked provider, with real persistence.
+
+Four real-model tests passed: nine interpretation checks across hotel, service
+and appointment contexts; full appointment details; full service details; and
+date-range collection/partial correction (13 visitor messages in total).
+Ambiguous values and an end date before the start date either receive a focused
+clarification or fail server validation; they do not advance collection silently.
+TypeScript passed. No client WhatsApp messages were sent by these tests.
+
+Supabase initially rejected the local connection as tenant/user not found.
+After the user restored access, one
+calendar test encountered a temporary connection reset; its isolated rerun passed.
+Interrupted test fixtures were identified by exact synthetic ownership and cleaned.
+This connection instability remains an infrastructure observation, not a fixed
+conversation-controller behavior.
+
+Release gate: production deployment must report Ready for the new commit on
+lia.leigia.com. The final rollout result is reported separately in the chat.
+
+Prompt reference
+https://developers.openai.com/api/docs/guides/optimizing-llm-accuracy#optimization

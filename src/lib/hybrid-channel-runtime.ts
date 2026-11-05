@@ -51,6 +51,7 @@ import {
   findRequestedCalendarSlots,
   getTaskCalendarAvailability,
   parseCalendarTimePreference,
+  parseStandaloneCalendarTimePreference,
   readTaskCalendarAvailability,
   refreshExpiredTaskCalendarAvailability,
   suggestCalendarSlots,
@@ -1396,7 +1397,12 @@ async function executeTaskBoundary(input: {
       requestedAnswer,
     );
   const preference =
-    savedAvailability && !dateCorrection
+    savedAvailability &&
+    !dateCorrection &&
+    parseStandaloneCalendarTimePreference(
+      requestedAnswer,
+      calendar?.timezone ?? input.project.companyTimeZone ?? "UTC",
+    )
       ? suggestCalendarSlots({
           text: requestedAnswer,
           date: String(savedAvailability.date),
@@ -1411,7 +1417,9 @@ async function executeTaskBoundary(input: {
     !dateCorrection &&
     !isExplicitCancellationRequest(requestedAnswer) &&
     !isExplicitHumanHandoffRequest(requestedAnswer) &&
-    (!isPotentialKnowledgeSideQuestion(requestedAnswer) || Boolean(preference));
+    // Unrecognized language belongs to the shared extraction stage. A failed
+    // time parser is not evidence that the visitor chose an invalid option.
+    Boolean(savedOption || preference);
   let selectionValue: string | null = null;
   if (calendarAnswer && !appointmentSelected && requestedField) {
     if (!savedOption && !preference) return rejectMismatchedSelection();
@@ -1511,7 +1519,7 @@ async function executeTaskBoundary(input: {
     });
     if (resolvedSelection.status === "resolved") {
       selectionValue = resolvedSelection.id;
-    } else {
+    } else if (input.runtimeInput.selection) {
       return rejectMismatchedSelection();
     }
   } else if (
@@ -1546,10 +1554,7 @@ async function executeTaskBoundary(input: {
   const earlyTimeQuestion =
     calendar &&
     !input.runtimeInput.selection &&
-    /^(?:(?:(?:is|after|before|from|show me times after|show me times before)\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{2}:\d{2})(?:\s+(?:available|free))?|(?:in the\s+)?(?:morning|afternoon|evening))\s*\??$/i.test(
-      requestedAnswer.trim(),
-    ) &&
-    parseCalendarTimePreference(requestedAnswer, timezone);
+    parseStandaloneCalendarTimePreference(requestedAnswer, timezone);
   const localCandidates =
     earlyTimeQuestion && calendar
       ? [
@@ -1641,19 +1646,13 @@ async function executeTaskBoundary(input: {
           text: input.runtimeInput.text,
         })
       : normalizedProposal;
-  const hasRequestedCalendarTime =
+  const requestedCalendarTime =
     calendar &&
-    proposal.fieldCandidates.some(
+    proposal.fieldCandidates.find(
       ({ fieldKey, source }) =>
         fieldKey === calendar.startFieldKey && source === "visitor",
     );
-  if (calendar && !calendarAnswer && hasRequestedCalendarTime) {
-    proposal.fieldCandidates = proposal.fieldCandidates.map((candidate) =>
-      candidate.fieldKey === calendar.startFieldKey
-        ? { ...candidate, naturalValue: requestedAnswer }
-        : candidate,
-    );
-  }
+  const hasRequestedCalendarTime = Boolean(requestedCalendarTime);
   const clarifying =
     proposal.ambiguity.requiresClarification &&
     !["cancel", "handoff", "fail"].includes(proposal.nextAction);
@@ -2141,6 +2140,7 @@ async function executeTaskBoundary(input: {
         proposal.fieldCandidates.some(
           ({ fieldKey }) => fieldKey === calendar.dateFieldKey,
         ) ||
+        (!calendarAnswer && hasRequestedCalendarTime) ||
         !previous.attempt
       ) {
         await executeTaskReadOperation({
@@ -2161,8 +2161,8 @@ async function executeTaskBoundary(input: {
         ({ fieldKey }) => fieldKey === calendar.startFieldKey,
       );
       const preferenceText =
-        !calendarAnswer && hasRequestedCalendarTime
-          ? requestedAnswer
+        !calendarAnswer && requestedCalendarTime
+          ? String(requestedCalendarTime.naturalValue)
           : retainedTime?.state === "candidate" &&
               retainedTime.provenance.source === "visitor" &&
               typeof retainedTime.naturalValue === "string"
