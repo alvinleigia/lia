@@ -10,6 +10,7 @@ import {
   FileImage,
   FolderKanban,
   IdCard,
+  Inbox,
   LayoutTemplate,
   ListTodo,
   LogIn,
@@ -75,6 +76,7 @@ type NavigationItem = {
 const projectNavigationGroups: NavigationItem[][] = [
   [
     { href: "/projects", icon: FolderKanban, label: "All Projects" },
+    { href: "/projects/leads", icon: Inbox, label: "Leads Inbox" },
     { href: "/projects/new", icon: Plus, label: "New Project" },
   ],
   [

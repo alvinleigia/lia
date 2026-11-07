@@ -1,0 +1,38 @@
+LEADS INBOX
+
+Open Projects > Leads Inbox (/projects/leads).
+The inbox spans projects in the selected company. Filter by project, lead status,
+channel, or search collected details. Open a record to see all collected fields,
+the linked conversation, ownership, notes, and the next follow-up date.
+
+Saved submissions and requests sent for team review appear automatically.
+Incomplete sessions and requests cancelled before submission are excluded.
+There is one inbox record per submission; no copying or extra LLM call is needed.
+
+Fields come from the pinned published workflow and AI task versions, with stable
+keys and native values. Old, unversioned submissions retain their original keys.
+Changing the current workflow does not relabel historical records.
+
+Lead status (New, Assigned, Contacted, Converted, Closed) is separate from workflow
+execution status. Assignment requires an active company member. Updates use
+revision checks and save notes plus audit events atomically.
+Follow-up dates are tracking fields; saving one does not schedule a call or message.
+
+Authenticated, tenant-scoped JSON reads:
+GET /api/leads?projectId=123&status=new&page=1
+GET /api/leads/456
+Detail JSON includes fields and fieldDefinitions (key, label, type, required).
+Existing project export settings apply. These endpoints use the signed-in session;
+external CRM authentication and delivery must be configured separately.
+
+Existing contacts remain linked to their conversations. This release does not
+merge people automatically across projects or convert ordinary FAQ chats to leads.
+
+Verified locally on 7 November 2026: production build, TypeScript, tenant-scope
+checks, lint, and 12 focused tests passed. Browser checks cover sign-in, search,
+field display, validation with retained entries, note saving, export restrictions,
+and a 390px mobile layout.
+
+Production browser verification uses E2E_BASE_URL=https://lia.leigia.com and
+LIA_LEAD_UI_UAT=1. Tests create separate temporary tenants with random credentials
+and remove their records afterward. Staging remains deferred.
