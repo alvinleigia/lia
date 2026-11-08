@@ -421,9 +421,11 @@ test("live chat collects an enquiry, handles a FAQ interruption and saves it in 
         .getByRole("definition")
         .filter({ hasText: /^alex\.inbox@example\.test$/ }),
     ).toBeVisible();
-    await expect(
-      page.getByText("Do you have Wi-Fi?", { exact: true }),
-    ).toBeVisible();
+    const linkedFaqMessages = page.getByText("Do you have Wi-Fi?", {
+      exact: true,
+    });
+    await expect(linkedFaqMessages).toHaveCount(2);
+    await expect(linkedFaqMessages.first()).toBeVisible();
     await page.screenshot({
       path: `${artifacts}/inbox-enquiry.png`,
       fullPage: true,
@@ -533,7 +535,13 @@ test("live chat collects an enquiry, handles a FAQ interruption and saves it in 
     });
     await page.goto("/projects/handoffs");
     await expect(
-      page.getByText("Exception Review", { exact: true }).first(),
+      page.getByRole("link", { name: "Queue: Exception Review", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", {
+        name: `#${assistanceSubmission.id} Exception Assistance UAT`,
+        exact: true,
+      }),
     ).toBeVisible();
     await page.screenshot({
       path: `${artifacts}/exception-handoff.png`,
