@@ -8,6 +8,7 @@ export default defineConfig({
   testMatch: [
     "conversation-quality.spec.ts",
     "conversation-recovery.spec.ts",
+    "conversation-exceptions.spec.ts",
     "knowledge-import.spec.ts",
     "catalog-resource-dependencies.spec.ts",
     "channel-adapter-conformance.spec.ts",

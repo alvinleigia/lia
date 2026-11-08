@@ -493,10 +493,20 @@ export async function updateConversationKnowledgePolicyAction(
     .object({
       allowTaskRecommendation: z.boolean(),
       noAnswerBehavior: z.enum(["fallback", "handoff", "task_recommendation"]),
+      clarificationAttempts: z
+        .string()
+        .trim()
+        .min(1)
+        .transform(Number)
+        .pipe(z.number().int().min(0).max(3))
+        .optional(),
     })
     .safeParse({
       allowTaskRecommendation: formData.get("allowTaskRecommendation") === "on",
       noAnswerBehavior: formData.get("noAnswerBehavior"),
+      clarificationAttempts: formData.has("clarificationAttempts")
+        ? formData.get("clarificationAttempts")
+        : undefined,
     });
   if (!parsed.success) {
     return { error: "Please check the knowledge settings." };
@@ -512,6 +522,12 @@ export async function updateConversationKnowledgePolicyAction(
     knowledge: {
       ...policy.knowledge,
       noAnswerBehavior: parsed.data.noAnswerBehavior,
+      noAnswerPolicy: {
+        ...policy.knowledge.noAnswerPolicy,
+        clarificationAttempts:
+          parsed.data.clarificationAttempts ??
+          policy.knowledge.noAnswerPolicy.clarificationAttempts,
+      },
     },
   });
   await writeAuditLog({
@@ -522,6 +538,9 @@ export async function updateConversationKnowledgePolicyAction(
     metadata: {
       allowTaskRecommendation: parsed.data.allowTaskRecommendation,
       noAnswerBehavior: parsed.data.noAnswerBehavior,
+      clarificationAttempts:
+        parsed.data.clarificationAttempts ??
+        policy.knowledge.noAnswerPolicy.clarificationAttempts,
     },
   });
   revalidatePath(destination);

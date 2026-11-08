@@ -1,6 +1,10 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
+  exceptionStateSchema,
+  readConversationException,
+} from "@/lib/conversation-exceptions";
+import {
   detectConversationQuality,
   type QualityMessage,
 } from "@/lib/conversation-quality";
@@ -144,6 +148,9 @@ export async function getProjectQualityDashboard(projectId: number) {
         recoveryFailures.find((r) => r.conversationId === conversation.id)
           ?.total ?? 0,
       lastMessageAt: conversation.lastMessageAt,
+      exceptionNeedsReview: ["offer_assistance", "review", "handoff"].includes(
+        readConversationException(conversation.metadata)?.action ?? "",
+      ),
     });
     return {
       id: conversation.id,
@@ -234,6 +241,9 @@ export async function getConversationQualityEvidence(
       ...event,
       recovery: recoveryReportSchema.safeParse(summary.recovery).success
         ? recoveryReportSchema.parse(summary.recovery)
+        : null,
+      exception: exceptionStateSchema.safeParse(summary.exception).success
+        ? exceptionStateSchema.parse(summary.exception)
         : null,
       turn: turnEvidenceSchema.safeParse(summary).success
         ? turnEvidenceSchema.parse(summary)

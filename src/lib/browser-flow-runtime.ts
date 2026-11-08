@@ -336,7 +336,7 @@ async function executeBrowserFlowText(
       );
     }
 
-    if (!action) {
+    if (!action && (input.actionId || !text)) {
       return { action: null, activeFlow: null, handled: false, replies: [] };
     }
   }
@@ -386,7 +386,17 @@ async function executeBrowserFlowText(
           source: input.source,
           traceId: input.traceId,
         })
-      : { boundaryNodeId: null, replies: [] };
+      : await processChannelFlowText({
+          activeSubmission: null,
+          channelConversationId: inboundRecord.conversation.id,
+          contactId: inboundRecord.conversation.contactId,
+          conversationId: input.conversationId,
+          inboundMessageId:
+            "message" in inboundRecord ? inboundRecord.message.id : null,
+          projectId: input.projectId,
+          source: input.source,
+          text,
+        });
   recordRuntimeStage(
     activeSubmission ? "advance_flow" : "start_flow",
     stageStartedAt,

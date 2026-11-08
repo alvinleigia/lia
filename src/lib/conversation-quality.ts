@@ -12,7 +12,8 @@ export type QualityFlag = {
     | "slow_reply"
     | "inactive_enquiry"
     | "failed_action"
-    | "recovery_review";
+    | "recovery_review"
+    | "exception_review";
   messageId: number | null;
   detail: string;
 };
@@ -42,6 +43,8 @@ export function qualityNextStep(category: string) {
       return "Inspect the linked execution or tool failure before retrying an operation.";
     case "recovery_review":
       return "Inspect the recorded recovery decisions and saved workflow state. Reconcile uncertain writes before considering another attempt.";
+    case "exception_review":
+      return "Review the unresolved question and saved workflow state. Check the configured handoff, record the expected behavior, and add a synthetic regression case before changing shared logic.";
     default:
       return "Review the conversation, record the expected behaviour and add a synthetic regression case.";
   }
@@ -55,9 +58,17 @@ export function detectConversationQuality(input: {
   humanOwned?: boolean;
   failedActions?: number;
   recoveryFailures?: number;
+  exceptionNeedsReview?: boolean;
   now?: Date;
 }) {
   const flags: QualityFlag[] = [];
+  if (input.exceptionNeedsReview)
+    flags.push({
+      code: "exception_review",
+      messageId: null,
+      detail:
+        "Repeated ambiguity or an unresolved answer reached the clarification limit. Review the assistance decision and retained workflow context.",
+    });
   if (input.recoveryFailures)
     flags.push({
       code: "recovery_review",

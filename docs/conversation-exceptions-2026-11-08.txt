@@ -1,0 +1,42 @@
+Shared handling of unusual conversation cases
+
+Lia counts unresolved replies against the current workflow/session and field.
+The default is one clarification; the next unresolved reply offers assistance
+when there is an unambiguous, published handoff destination.
+With no suitable destination, the case is flagged for operator review instead.
+An uncertain external write continues to require reconciliation before retrying.
+
+Visitor replies to an assistance offer are interpreted before field collection:
+- Yes: request the configured handoff, retaining collected fields.
+- No: return to the pending question without requesting assistance.
+- Other wording: use the shared, metered semantic interpreter if necessary.
+  Factual questions, corrections and ordinary details are not consent.
+- Cancel: follows the normal cancellation path.
+
+Successful progress resets the limit. Declining assistance prevents repeated
+offers for the same unresolved step. Duplicate or older messages cannot inflate
+the counter or authorize a handoff against a newer decision.
+Offers expire for consent after 30 minutes; the review evidence remains.
+
+Browser chat and the widget now use the same persistent runtime for knowledge
+questions outside an active workflow. Stateless preview/compatibility endpoints
+remain available, but do not create persistent exception state.
+WhatsApp and the shared channel runtime use the same policy. No channel setup
+or provider-publication settings are changed.
+
+Controls:
+- Task configuration > Knowledge > Clarifications before assistance (0-3).
+  This saves the existing project policy. Republish tasks to update their pinned
+  policy; active sessions retain their published policy.
+- Conversation Quality > Needs review: look for exception_review.
+  Expand Recorded processing evidence to see reason, action and attempt count.
+- Use the existing feedback and regression-case tools to record the expected
+  behavior. Review and publish knowledge/flow changes through their normal paths.
+- Actual handoffs appear in the existing Handoffs/Inbox views. A review flag by
+  itself does not notify a team or promise a callback.
+
+No migration, client-specific overrides, dependencies or scheduler are added.
+Semantic assistance interpretation shares the turn deadline and usage controls.
+Exact yes/no and typed values retain deterministic paths where supported.
+Only structural exception metadata is stored: no raw messages, field values,
+credentials or private model reasoning are copied into exception reports.

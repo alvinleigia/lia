@@ -1,19 +1,28 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { expect, test } from "@playwright/test";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   createActionFlowStep,
   createPublishedActionFlowVersion,
+  getActionSubmission,
+  getProjectAction,
+  listActionFlowBranchRules,
+  listActionFlowSteps,
 } from "../../src/lib/action-flows";
 import { runBrowserFlowText } from "../../src/lib/browser-flow-runtime";
+import { processChannelFlowText } from "../../src/lib/channel-flow-runtime";
+import { REFERENCE_BOOKING_TASK_DEFINITION } from "../../src/lib/conversation-contract-fixtures";
 import { DEFAULT_CONVERSATION_PROJECT_POLICY } from "../../src/lib/conversation-contracts";
+import { advanceConversationException } from "../../src/lib/conversation-exception-store";
+import { EXCEPTION_METADATA_KEY } from "../../src/lib/conversation-exceptions";
 import {
   getConversationQualityEvidence,
   getProjectQualityDashboard,
 } from "../../src/lib/conversation-quality-store";
 import { recordConversationQualityTurn } from "../../src/lib/conversation-quality-telemetry";
 import { StructuredTurnEngine } from "../../src/lib/conversation-turn-engine";
+import { executeConfiguredStructuredTurn } from "../../src/lib/conversation-turn-service";
 import { db } from "../../src/lib/db-config";
 import {
   actionFlowSteps,
@@ -21,7 +30,11 @@ import {
   actionSubmissionEvents,
   actionSubmissions,
   channelConversations,
+  channelMessages,
   companies,
+  contactAttributes,
+  contacts,
+  contactTagAssignments,
   conversationalTaskAuditEvents,
   durableJobs,
   flowRuntimeCommands,
@@ -38,6 +51,8 @@ import {
   enqueueDurableJob,
   failDurableJob,
 } from "../../src/lib/durable-jobs";
+import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
+import type { StructuredTurnProvider } from "../../src/lib/model-provider";
 import {
   processProjectDurableOperationQueue,
   queueOperationForSubmission,
@@ -172,10 +187,25 @@ test.beforeAll(async () => {
     projectId: fixture.projectId,
     actionId: fixture.actionId,
     sortOrder: 2,
-    stepType: "confirmation",
-    label: "Review details",
-    isRequired: true,
+    stepType: "handoff",
+    label: "Exception Team Review",
+    prompt: "Your request has been sent for team review.",
+    settings: { handoffNotifyTeam: false, handoffQueue: "Exception UAT" },
   });
+  const action = await getProjectAction(fixture.projectId, fixture.actionId);
+  const compiled = compileHybridFlowGraph({
+    actionSettings: action?.settings ?? {},
+    branchRules: await listActionFlowBranchRules(
+      fixture.projectId,
+      fixture.actionId,
+    ),
+    steps: await listActionFlowSteps(fixture.projectId, fixture.actionId),
+  });
+  expect(
+    [...compiled.baseIssues, ...compiled.issues].filter(
+      (issue) => issue.severity === "error",
+    ),
+  ).toEqual([]);
   const version = await createPublishedActionFlowVersion({
     projectId: fixture.projectId,
     actionId: fixture.actionId,
@@ -201,7 +231,11 @@ test.afterAll(async () => {
         integrationProviders,
         conversationalTaskAuditEvents,
         flowRuntimeCommands,
+        channelMessages,
         channelConversations,
+        contactTagAssignments,
+        contactAttributes,
+        contacts,
         actionSubmissionEvents,
         actionSubmissions,
         actionFlowSteps,
@@ -452,4 +486,402 @@ test("recovery review is scoped, persisted and redacted in quality evidence", as
   expect(
     dashboard[0].flags.some((flag) => flag.code === "recovery_review"),
   ).toBe(true);
+});
+
+const ambiguousProvider: StructuredTurnProvider = {
+  async generateTurn() {
+    return {
+      modelId: "test",
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+      output: {
+        schemaVersion: 1,
+        turnKind: "field_answer",
+        reply: "Which date would you prefer?",
+        grounding: { status: "not_needed", excerptIds: [] },
+        fieldCandidates: [],
+        taskRecommendation: null,
+        toolRequest: null,
+        routeRecommendation: null,
+        outcomeRecommendation: null,
+        nextAction: "clarify",
+        ambiguity: {
+          requiresClarification: true,
+          question: "Which date would you prefer?",
+          fieldKeys: ["preferredDate"],
+        },
+        safety: { decision: "allow", reasonCode: null },
+        decisionSummary: "Clarify the date.",
+      },
+    };
+  },
+};
+
+async function exceptionMessage(text: string) {
+  const [message] = await db
+    .insert(channelMessages)
+    .values({
+      projectId: fixture.projectId,
+      conversationId: fixture.conversationId,
+      direction: "inbound",
+      messageType: "text",
+      text,
+    })
+    .returning();
+  return message.id;
+}
+
+async function resetException() {
+  await db
+    .update(channelConversations)
+    .set({
+      metadata: sql`${channelConversations.metadata} - ${EXCEPTION_METADATA_KEY}`,
+    })
+    .where(eq(channelConversations.id, fixture.conversationId));
+}
+
+function exceptionInput(
+  messageId: number,
+  visitorMessage = "Either 2 January 2027 or 3 January 2027",
+) {
+  const dateField = REFERENCE_BOOKING_TASK_DEFINITION.fields.find(
+    (field) => field.key === "preferredDate",
+  );
+  if (!dateField) throw new Error("Missing date fixture");
+  return {
+    activeTask: null,
+    collection: { name: "Recovery flow", fields: [dateField] },
+    assistantBehavior: DEFAULT_PROJECT_AI_SETTINGS,
+    assistantIntroduced: true,
+    channel: "project_chat" as const,
+    companyName: "Recovery",
+    context: [],
+    fieldState: [],
+    history: [],
+    projectId: fixture.projectId,
+    projectName: "Recovery",
+    publishedTasks: [],
+    projectPolicy: {
+      ...DEFAULT_CONVERSATION_PROJECT_POLICY,
+      knowledge: {
+        ...DEFAULT_CONVERSATION_PROJECT_POLICY.knowledge,
+        sourceSelection: {
+          ...DEFAULT_CONVERSATION_PROJECT_POLICY.knowledge.sourceSelection,
+          allowedSources: [],
+        },
+      },
+    },
+    stage: "extraction" as const,
+    requestedFieldKey: "preferredDate",
+    visitorMessage,
+    conversationId: fixture.conversationId,
+    inboundMessageId: messageId,
+    exceptionScope: `flow:${fixture.submissionId}:step:${fixture.dateStepId}`,
+    handoffAvailable: true,
+  };
+}
+
+async function offerAssistance() {
+  const first = await exceptionMessage("Either 2 January or 3 January");
+  const second = await exceptionMessage(
+    "I am still undecided between those dates",
+  );
+  const a = await executeConfiguredStructuredTurn(
+    exceptionInput(first),
+    undefined,
+    ambiguousProvider,
+  );
+  const b = await executeConfiguredStructuredTurn(
+    exceptionInput(second),
+    undefined,
+    ambiguousProvider,
+  );
+  expect(a.exception?.action).toBe("clarify");
+  expect(b.exception?.action).toBe("offer_assistance");
+  return b;
+}
+
+test("global exception state is scoped, deduplicated and visible in the review queue", async () => {
+  await resetException();
+  const offered = await offerAssistance();
+  if (!offered.exception) throw new Error("Missing exception decision");
+  const duplicate = await executeConfiguredStructuredTurn(
+    exceptionInput(offered.exception.messageId),
+    undefined,
+    ambiguousProvider,
+  );
+  expect(duplicate.exception?.failures).toBe(2);
+  const wrongScope = await advanceConversationException({
+    projectId: fixture.foreignProjectId,
+    conversationId: fixture.conversationId,
+    messageId: offered.exception.messageId,
+    scope: offered.exception.scope,
+    reason: "ambiguity",
+    limit: 1,
+    canHandoff: true,
+  });
+  expect(wrongScope).toBeNull();
+  const dashboard = await getProjectQualityDashboard(fixture.projectId);
+  expect(
+    dashboard[0].flags.some((flag) => flag.code === "exception_review"),
+  ).toBe(true);
+  const evidence = await getConversationQualityEvidence(
+    fixture.projectId,
+    fixture.conversationId,
+  );
+  expect(
+    evidence.events.some(
+      (event) => event.exception?.action === "offer_assistance",
+    ),
+  ).toBe(true);
+  expect(
+    JSON.stringify(
+      evidence.events
+        .filter((event) => event.exception)
+        .map((event) => event.exception),
+    ),
+  ).not.toContain("January");
+});
+
+test("declining assistance never fills the requested field and valid progress resets the exception", async () => {
+  await resetException();
+  await offerAssistance();
+  const declineId = await exceptionMessage("No thanks");
+  const noCalls: StructuredTurnProvider = {
+    async generateTurn() {
+      throw new Error("No model call expected");
+    },
+  };
+  const declined = await executeConfiguredStructuredTurn(
+    exceptionInput(declineId, "No thanks"),
+    undefined,
+    noCalls,
+  );
+  expect(declined.exception?.action).toBe("resume");
+  expect(declined.proposal.fieldCandidates).toEqual([]);
+  const validId = await exceptionMessage("2027-01-04");
+  const continued = await executeConfiguredStructuredTurn(
+    exceptionInput(validId, "2027-01-04"),
+    undefined,
+    noCalls,
+  );
+  expect(continued.exception?.action).toBe("resolved");
+  expect(
+    (await getProjectQualityDashboard(fixture.projectId))
+      .find((row) => row.id === fixture.conversationId)
+      ?.flags.some((flag) => flag.code === "exception_review"),
+  ).toBe(false);
+  expect(
+    (await getProjectQualityDashboard(fixture.projectId))[0].flags.some(
+      (flag) => flag.code === "exception_review",
+    ),
+  ).toBe(false);
+  expect(continued.proposal.fieldCandidates[0]?.naturalValue).toBe(
+    "2027-01-04",
+  );
+});
+
+test("contextual assistance requests use the shared semantic interpreter and remain metered", async () => {
+  await resetException();
+  await offerAssistance();
+  const id = await exceptionMessage(
+    "Could someone take over and sort this out for me?",
+  );
+  let reviewed = 0;
+  const result = await executeConfiguredStructuredTurn(
+    exceptionInput(id, "Could someone take over and sort this out for me?"),
+    undefined,
+    {
+      async generateTurn() {
+        throw new Error("Consent must not become a business field");
+      },
+      async reviewInterpretation(input) {
+        expect(input.kind).toBe("exception_assistance");
+        reviewed++;
+        return {
+          matches: true,
+          query: "Visitor requests team assistance",
+          usage: { inputTokens: 3, outputTokens: 2, totalTokens: 5 },
+        };
+      },
+    },
+  );
+  expect(reviewed).toBe(1);
+  expect(result.proposal.nextAction).toBe("handoff");
+  expect(result.proposal.fieldCandidates).toEqual([]);
+  expect(result.usage.totalTokens).toBe(5);
+});
+
+test("invalid generated values also reach the clarification limit without changing saved fields", async () => {
+  await resetException();
+  const invalid: StructuredTurnProvider = {
+    async generateTurn(input) {
+      const result = await ambiguousProvider.generateTurn(input);
+      return {
+        ...result,
+        output: {
+          ...(result.output as Record<string, unknown>),
+          nextAction: "ask",
+          reply: "Thanks",
+          fieldCandidates: [
+            {
+              fieldKey: "preferredDate",
+              naturalValue: "2027-99-50",
+              source: "visitor",
+              confidence: 0.9,
+            },
+          ],
+          ambiguity: {
+            requiresClarification: false,
+            question: null,
+            fieldKeys: null,
+          },
+        },
+      };
+    },
+  };
+  const first = await exceptionMessage("not a valid date");
+  const second = await exceptionMessage("still not a valid date");
+  expect(
+    (
+      await executeConfiguredStructuredTurn(
+        exceptionInput(first, "not a valid date"),
+        undefined,
+        invalid,
+      )
+    ).exception?.action,
+  ).toBe("clarify");
+  expect(
+    (
+      await executeConfiguredStructuredTurn(
+        exceptionInput(second, "still not a valid date"),
+        undefined,
+        invalid,
+      )
+    ).exception?.action,
+  ).toBe("offer_assistance");
+  expect(
+    (await getActionSubmission(fixture.projectId, fixture.submissionId))?.fields
+      .preferredDate,
+  ).toBe("2027-01-02");
+});
+
+test("a paraphrased refusal declines assistance without cancelling the enquiry", async () => {
+  await resetException();
+  await offerAssistance();
+  const text =
+    "Please don't get anyone else involved; I'd rather finish this here.";
+  const id = await exceptionMessage(text);
+  const result = await executeConfiguredStructuredTurn(
+    exceptionInput(id, text),
+    undefined,
+    {
+      async generateTurn() {
+        throw new Error(
+          "A refusal must not become a business field or cancellation",
+        );
+      },
+      async reviewInterpretation() {
+        return {
+          matches: false,
+          assistanceDecision: "decline",
+          query: "Visitor declines team assistance",
+          usage: { inputTokens: 3, outputTokens: 2, totalTokens: 5 },
+        };
+      },
+    },
+  );
+  expect(result.exception?.action).toBe("resume");
+  expect(result.proposal.nextAction).toBe("clarify");
+  expect(result.proposal.fieldCandidates).toEqual([]);
+  expect(
+    (await getActionSubmission(fixture.projectId, fixture.submissionId))
+      ?.status,
+  ).not.toBe("cancelled");
+});
+
+test("accepting an exception offer runs the published handoff with existing fields retained", async () => {
+  await resetException();
+  await offerAssistance();
+  const id = await exceptionMessage("Yes please");
+  const submission = await getActionSubmission(
+    fixture.projectId,
+    fixture.submissionId,
+  );
+  if (!submission) throw new Error("Missing submission");
+  const result = await processChannelFlowText({
+    activeSubmission: submission,
+    channelConversationId: fixture.conversationId,
+    conversationId: suffix,
+    inboundMessageId: id,
+    projectId: fixture.projectId,
+    source: "project_chat",
+    text: "Yes please",
+  });
+  expect(JSON.stringify(result.replies)).toMatch(/team|review/);
+  const saved = await getActionSubmission(
+    fixture.projectId,
+    fixture.submissionId,
+  );
+  expect(saved?.status).toBe("under_review");
+  expect(saved?.fields.preferredDate).toBe("2027-01-02");
+  expect(JSON.stringify(saved?.metadata)).toContain("Exception UAT");
+});
+
+test("browser knowledge outside a workflow shares persistent exception handling", async () => {
+  await db
+    .update(projects)
+    .set({
+      aiSettings: {
+        ...DEFAULT_PROJECT_AI_SETTINGS,
+        approvedKnowledgeAnswers: [
+          {
+            question: "Do you provide transport?",
+            answer: "Yes, we provide transport.",
+          },
+          {
+            question: "Can you guarantee transport for every date?",
+            answer: null,
+          },
+        ],
+      },
+    })
+    .where(eq(projects.id, fixture.projectId));
+  const conversationId = `knowledge-${suffix}`;
+  const send = (text: string) =>
+    runBrowserFlowText({
+      projectId: fixture.projectId,
+      conversationId,
+      channelType: "project_chat",
+      source: "project_chat",
+      commandId: randomUUID(),
+      text,
+    });
+  const answer = await send("Do you provide transport?");
+  expect(answer.handled).toBe(true);
+  expect(answer.activeFlow).toBeNull();
+  expect(JSON.stringify(answer.replies)).toContain(
+    "Yes, we provide transport.",
+  );
+  await send("Can you guarantee transport for every date?");
+  const repeated = await send("Can you guarantee transport for every date?");
+  expect(JSON.stringify(repeated.replies)).toContain("contact our team");
+  const [conversation] = await db
+    .select()
+    .from(channelConversations)
+    .where(
+      and(
+        eq(channelConversations.projectId, fixture.projectId),
+        eq(channelConversations.externalConversationId, conversationId),
+      ),
+    );
+  expect(
+    (await getProjectQualityDashboard(fixture.projectId))
+      .find((row) => row.id === conversation.id)
+      ?.flags.some((flag) => flag.code === "exception_review"),
+  ).toBe(true);
+  const submissions = await db
+    .select({ id: actionSubmissions.id })
+    .from(actionSubmissions)
+    .where(eq(actionSubmissions.projectId, fixture.projectId));
+  expect(submissions.map((row) => row.id)).toEqual([fixture.submissionId]);
 });

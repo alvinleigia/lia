@@ -74,6 +74,7 @@ import {
   isPotentialKnowledgeSideQuestion,
   shouldUseKnowledgeSideQuestion,
 } from "@/lib/conversation-control-intents";
+import { getConversationExceptionState } from "@/lib/conversation-exception-store";
 import {
   extractLocalTaskFieldCandidates,
   getClearCandidatesDuringClarification,
@@ -104,7 +105,11 @@ import {
   isFlowMediaUploadValue,
 } from "@/lib/flow-media-values";
 import { getFlowWaitDurationMs } from "@/lib/flow-wait";
-import { buildHandoffMetadata, runHandoffNotification } from "@/lib/handoff";
+import {
+  buildHandoffMetadata,
+  getConfiguredAssistanceStep,
+  runHandoffNotification,
+} from "@/lib/handoff";
 import { selectHybridFlowEntryNode } from "@/lib/hybrid-flow-runtime";
 import { runOperationForSubmission } from "@/lib/operations";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
@@ -330,6 +335,9 @@ async function tryAnswerDeterministicFlowQuestion(input: {
     ]);
     const execution = await executeConfiguredStructuredTurn({
       conversationId: input.channelConversationId,
+      inboundMessageId: input.inboundMessageId,
+      exceptionScope: `flow:${input.submissionId}:step:${input.stepId}`,
+      handoffAvailable: Boolean(getConfiguredAssistanceStep(input.action)),
       activeTask: null,
       assistantBehavior: normalizeProjectAiSettings(project.projectAiSettings),
       assistantIntroduced: true,
@@ -347,6 +355,31 @@ async function tryAnswerDeterministicFlowQuestion(input: {
       visitorMessage: input.text,
     });
     const proposal = execution.proposal;
+    if (
+      proposal.nextAction === "handoff" &&
+      proposal.safety.reasonCode === "exception_handoff"
+    ) {
+      const step = getConfiguredAssistanceStep(input.action);
+      const submission = await getActionSubmission(
+        input.projectId,
+        input.submissionId,
+      );
+      if (step && submission) {
+        await requestHumanHandoff({
+          action: input.action,
+          projectId: input.projectId,
+          step,
+          submission,
+        });
+        return {
+          replies: [
+            createTextReply("Your request has been sent for team review."),
+          ],
+        };
+      }
+    }
+    if (proposal.safety.reasonCode?.startsWith("exception_"))
+      return { replies: [createTextReply(proposal.reply)] };
     const shouldInterrupt = shouldUseKnowledgeSideQuestion({
       answerIsValid: input.answerIsValid,
       groundingStatus: proposal.grounding.status,
@@ -1710,14 +1743,43 @@ async function interpretFlowFieldAnswer(input: {
     input.submission.metadata,
     input.action,
   );
+  const exceptionState =
+    input.channelConversationId && input.inboundMessageId
+      ? (
+          await getConversationExceptionState({
+            projectId: input.projectId,
+            conversationId: input.channelConversationId,
+            messageId: input.inboundMessageId,
+          })
+        )?.state
+      : null;
+  const pendingAssistance = ["offer_assistance", "review", "resume"].includes(
+    exceptionState?.action ?? "",
+  );
   let local = extractLocalTaskFieldCandidates({
     fields,
     text: input.answer,
     timezone: "UTC",
   });
+  if (pendingAssistance) local = null;
+  if (
+    local?.some((candidate) => {
+      const field = fields.find((field) => field.key === candidate.fieldKey);
+      return (
+        field &&
+        !validateTaskFieldValue({
+          field,
+          value: candidate.naturalValue,
+          contextValues: new Map(),
+        }).ok
+      );
+    })
+  )
+    local = null;
   // Exact choices and typed scalar answers keep their zero-model path. A text
   // validator accepting a sentence does not establish the sentence's intent.
   if (
+    !pendingAssistance &&
     !local &&
     requestedField &&
     !["text", "address"].includes(requestedField.type) &&
@@ -1757,6 +1819,9 @@ async function interpretFlowFieldAnswer(input: {
       ]);
       const { proposal } = await executeConfiguredStructuredTurn({
         conversationId: input.channelConversationId,
+        inboundMessageId: input.inboundMessageId,
+        exceptionScope: `flow:${input.submission.id}:step:${input.step.id}`,
+        handoffAvailable: Boolean(getConfiguredAssistanceStep(input.action)),
         activeTask: null,
         collection: { name: input.action.name, fields },
         assistantBehavior: normalizeProjectAiSettings(
@@ -1874,7 +1939,7 @@ async function handoffRequestedChannelFlow(input: {
 }) {
   await requestHumanHandoff({
     ...input,
-    step: {
+    step: getConfiguredAssistanceStep(input.action) ?? {
       ...input.step,
       label: "Human handoff",
       operationId: null,
@@ -1890,7 +1955,7 @@ async function handoffRequestedChannelFlow(input: {
   return {
     replies: [
       createTextReply(
-        "I will connect you with the team. The details you already provided have been saved.",
+        "Your request has been sent for team review, including the details you already provided.",
       ),
     ],
   };
@@ -2618,6 +2683,8 @@ export async function processChannelFlowText(input: {
       );
       const { proposal } = await executeConfiguredStructuredTurn({
         conversationId: input.channelConversationId,
+        inboundMessageId: input.inboundMessageId,
+        exceptionScope: "knowledge",
         activeTask: null,
         assistantBehavior: normalizeProjectAiSettings(
           project.projectAiSettings,

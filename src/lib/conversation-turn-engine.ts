@@ -10,6 +10,7 @@ import {
   isStandaloneKnowledgeQuestion,
   stripKnowledgeDiscoursePrefix,
 } from "@/lib/conversation-control-intents";
+import type { ExceptionState } from "@/lib/conversation-exceptions";
 import {
   extractChannelPhoneReference,
   extractLocalTaskFieldCandidates,
@@ -119,6 +120,7 @@ export type OpenStructuredConversationInput = Omit<
 >;
 
 export type StructuredTurnExecution = {
+  exception?: ExceptionState;
   recovery?: RecoveryReport;
   attempts: number;
   modelEscalationReason: ModelEscalationReason | null;
@@ -355,6 +357,23 @@ function deterministicProposal(input: {
     },
     decisionSummary: `Deterministic response: ${input.reasonCode}.`,
   });
+}
+
+export function createAssistanceDecisionExecution(): StructuredTurnExecution {
+  return {
+    attempts: 0,
+    modelEscalationReason: null,
+    source: "deterministic",
+    proposal: asValidatedDeterministic(
+      deterministicProposal({
+        nextAction: "handoff",
+        reasonCode: "exception_consent",
+        reply: "I'll request help from our team.",
+        groundingStatus: "not_needed",
+      }),
+    ),
+    usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+  };
 }
 
 function approvedKnowledgeAnswerProposal(

@@ -33,6 +33,11 @@ import {
   isExplicitHumanHandoffRequest,
   isPotentialKnowledgeSideQuestion,
 } from "@/lib/conversation-control-intents";
+import { advanceConversationException } from "@/lib/conversation-exception-store";
+import {
+  hasUnresolvedConversationException,
+  readConversationException,
+} from "@/lib/conversation-exceptions";
 import { getClearCandidatesDuringClarification } from "@/lib/conversation-field-extraction";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { recordConversationRecovery } from "@/lib/conversation-quality-telemetry";
@@ -1256,6 +1261,20 @@ async function executeTaskBoundary(input: {
   }
   const runtime = session.runtime;
   const snapshot = session.snapshot;
+  const handoffOutcomes = snapshot.task.definition.outcomes.filter(
+    (outcome) => outcome.type === "handoff",
+  );
+  const exceptionHandoffAvailable =
+    handoffOutcomes.length === 1 &&
+    Boolean(
+      input.runtimeInput.action.hybridGraph?.nodes.some(
+        (node) =>
+          node.kind === "deterministic" &&
+          node.stepType === "handoff" &&
+          node.sourceStepId ===
+            input.node.settings.outcomeRoutes[handoffOutcomes[0].outputPort],
+      ),
+    );
   if (
     /^show questions[.!?]?$/i.test(appointmentAnswer.trim()) &&
     taskFollowUpConsent(snapshot.task.definition, runtime.fields) === true &&
@@ -1560,8 +1579,12 @@ async function executeTaskBoundary(input: {
     calendar &&
     !input.runtimeInput.selection &&
     parseStandaloneCalendarTimePreference(requestedAnswer, timezone);
-  const localCandidates =
-    earlyTimeQuestion && calendar
+  const pendingExceptionOffer =
+    hasUnresolvedConversationException(session.conversation?.metadata ?? {}) &&
+    !input.runtimeInput.selection;
+  const localCandidates = pendingExceptionOffer
+    ? null
+    : earlyTimeQuestion && calendar
       ? [
           {
             fieldKey: calendar.startFieldKey,
@@ -1587,9 +1610,9 @@ async function executeTaskBoundary(input: {
         nextAction: "ask",
         reply: "I found the appointment. Let us choose the new time.",
       })
-    : selectionProposal
+    : selectionProposal && !pendingExceptionOffer
       ? selectionProposal
-      : ((!pendingFollowUp
+      : ((!pendingFollowUp && !pendingExceptionOffer
           ? createCollectionTaskConfirmationProposal({
               fields: runtime.fields,
               snapshot,
@@ -1602,6 +1625,9 @@ async function executeTaskBoundary(input: {
             await executeConfiguredStructuredTurn(
               {
                 conversationId: input.runtimeInput.channelConversationId,
+                inboundMessageId: input.runtimeInput.inboundMessageId,
+                exceptionScope: `task:${runtime.run.id}:field:${runtime.run.lastRequestedFieldKey}`,
+                handoffAvailable: exceptionHandoffAvailable,
                 prefetchKnowledge:
                   !calendar &&
                   !pendingAppointment &&
@@ -1774,6 +1800,9 @@ async function executeTaskBoundary(input: {
       const knowledgeExecution = await executeConfiguredStructuredTurn(
         {
           conversationId: input.runtimeInput.channelConversationId,
+          inboundMessageId: input.runtimeInput.inboundMessageId,
+          exceptionScope: `task:${runtime.run.id}:field:${runtime.run.lastRequestedFieldKey}`,
+          handoffAvailable: exceptionHandoffAvailable,
           recordTiming: input.runtimeInput.recordTiming,
           activeTask: updatedSession.snapshot,
           assistantBehavior: normalizeProjectAiSettings(
@@ -1840,6 +1869,8 @@ async function executeTaskBoundary(input: {
     ) {
       return { output: knowledgeProposal, signals: [] };
     }
+    if (knowledgeProposal.safety.reasonCode?.startsWith("exception_"))
+      return { output: knowledgeProposal, inputRequest: null, signals: [] };
     const resumedAppointment = await readPendingTaskAppointmentChoice({
       runtime: resumedSession.runtime,
       projectId: input.runtimeInput.projectId,
@@ -2020,7 +2051,10 @@ async function executeTaskBoundary(input: {
       keys.length === 1
         ? snapshot.task.definition.fields.find(({ key }) => key === keys[0])
         : null;
-    const inputRequest = field ? createTaskRuntimeInputRequest(field) : null;
+    const inputRequest =
+      field && !proposal.safety.reasonCode?.startsWith("exception_")
+        ? createTaskRuntimeInputRequest(field)
+        : null;
     await recordTaskFieldRequest({
       conversationId: session.runtime.run.conversationId,
       inputRequest,
@@ -2114,6 +2148,32 @@ async function executeTaskBoundary(input: {
     externalConversationId: input.runtimeInput.externalConversationId,
     projectId: input.runtimeInput.projectId,
   });
+  const previousException = readConversationException(
+    session.conversation?.metadata ?? {},
+  );
+  if (
+    previousException &&
+    ["offer_assistance", "review", "resume"].includes(
+      previousException.action,
+    ) &&
+    canonicalSession.runtime?.fields.some(
+      (field) =>
+        ["valid", "confirmed"].includes(field.state) &&
+        proposal.fieldCandidates.some(
+          (candidate) => candidate.fieldKey === field.fieldKey,
+        ),
+    )
+  ) {
+    await advanceConversationException({
+      projectId: input.runtimeInput.projectId,
+      conversationId: input.runtimeInput.channelConversationId,
+      messageId: input.runtimeInput.inboundMessageId,
+      scope: previousException.scope,
+      reason: null,
+      limit: previousException.limit,
+      canHandoff: false,
+    });
+  }
   let reconciledProposal =
     canonicalSession.runtime && canonicalSession.snapshot
       ? reconcileTaskTurnWithRuntime({
@@ -2523,6 +2583,14 @@ async function executeKnowledgeBoundary(input: {
   ]);
   const execution = await executeConfiguredStructuredTurn({
     conversationId: input.runtimeInput.channelConversationId,
+    inboundMessageId: input.runtimeInput.inboundMessageId,
+    exceptionScope: `knowledge:${input.node.id}`,
+    handoffAvailable: input.graph.nodes.some(
+      (node) =>
+        node.kind === "deterministic" &&
+        node.stepType === "handoff" &&
+        node.sourceStepId === input.node.settings.handoffRoute,
+    ),
     activeTask: null,
     assistantBehavior: normalizeProjectAiSettings(
       input.project.projectAiSettings,

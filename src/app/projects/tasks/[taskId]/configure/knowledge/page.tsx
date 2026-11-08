@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormActionBar } from "@/components/ui/form-action-bar";
 import { FormSubmitButton } from "@/components/ui/form-submit-button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
@@ -130,6 +131,29 @@ export default async function TaskKnowledgePage({
                     Recommend a relevant task
                   </option>
                 </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="clarificationAttempts">
+                  Clarifications before assistance
+                </Label>
+                <Input
+                  id="clarificationAttempts"
+                  name="clarificationAttempts"
+                  type="number"
+                  min={0}
+                  max={3}
+                  step={1}
+                  required
+                  defaultValue={
+                    policy.knowledge.noAnswerPolicy.clarificationAttempts
+                  }
+                />
+                <p className="text-sm text-muted-foreground">
+                  Allow 0–3 unresolved replies before offering a configured
+                  handoff or flagging the case for review. This project policy
+                  also covers field collection. Republish tasks to update their
+                  pinned policy; active sessions keep their published version.
+                </p>
               </div>
               <label className="flex items-start gap-3 rounded-md border p-4">
                 <input

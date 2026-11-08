@@ -16,6 +16,13 @@ const HANDOFF_VALUE_DEPTH_LIMIT = 2;
 const SECRET_FIELD_PATTERN =
   /(?:authorization|password|secret|token|api[_-]?key)/i;
 
+export function getConfiguredAssistanceStep(action: RuntimeAction) {
+  const steps = action.steps.filter(
+    (step) => step.isEnabled && step.stepType === "handoff",
+  );
+  return steps.length === 1 ? steps[0] : null;
+}
+
 function boundHandoffValue(value: unknown, depth = 0): unknown {
   if (
     value === null ||
