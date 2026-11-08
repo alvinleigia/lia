@@ -614,7 +614,7 @@ export async function replayOperationAttemptAction(formData: FormData) {
 
   if (!replay) {
     redirectWithError(
-      "Operation attempt, operation, or provider is not active.",
+      "This operation cannot be replayed. Check that it is active and reconcile any unknown provider outcome first.",
     );
   }
 

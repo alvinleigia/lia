@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { and, asc, eq, inArray, lt, lte, or, sql } from "drizzle-orm";
+import { ConversationRecovery } from "@/lib/conversation-recovery";
 import { db } from "@/lib/db-config";
 import { durableJobs, type SelectDurableJob } from "@/lib/db-schema";
 import { resolveTraceId } from "@/lib/execution-trace";
@@ -286,7 +287,12 @@ export async function failDurableJob(input: {
     return null;
   }
 
-  const exhausted = input.permanent === true || job.attempts >= job.maxAttempts;
+  const recovery = new ConversationRecovery({ maxAutomaticSteps: 1 });
+  const decision = recovery.plan(
+    input.permanent ? "configuration" : "job_failure",
+    { canRetry: job.attempts < job.maxAttempts },
+  );
+  const exhausted = decision.action !== "retry_job";
   const availableAt = exhausted
     ? job.availableAt
     : new Date(
@@ -301,6 +307,12 @@ export async function failDurableJob(input: {
     .set({
       availableAt,
       lastError: input.errorMessage.slice(0, 4_000),
+      result: {
+        ...(job.result ?? {}),
+        recovery: recovery.report(
+          exhausted ? "review_required" : "clarification_required",
+        ),
+      },
       leaseExpiresAt: null,
       leaseOwner: null,
       status: exhausted ? "failed" : "queued",

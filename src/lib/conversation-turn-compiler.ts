@@ -63,6 +63,7 @@ export type OpeningTurnPlan =
   | { mode: "generated" };
 
 export type CompiledTurn = {
+  references: Array<{ id: string; content: string }>;
   messages: TurnMessageV1[];
   system: string;
   validation: StructuredTurnValidationContext;
@@ -530,6 +531,7 @@ ${input.stage === "extraction" ? "Decide only this latest message's intent. Do n
 
   return {
     system,
+    references: retrieval.map(({ id, content }) => ({ id, content })),
     messages: [
       ...history,
       turnMessageV1Schema.parse({

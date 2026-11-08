@@ -29,10 +29,13 @@ import {
 } from "@/lib/channel-inbound-contract";
 import {
   type ChannelType,
+  getChannelConversation,
   getOrCreateChannelConversation,
   recordChannelInboundMessage,
   recordChannelOutboundMessage,
 } from "@/lib/channels";
+import { recordConversationRecovery } from "@/lib/conversation-quality-telemetry";
+import { ConversationRecovery } from "@/lib/conversation-recovery";
 import { resolveTraceId } from "@/lib/execution-trace";
 import type { FlowMediaUploadValue } from "@/lib/flow-media-values";
 import {
@@ -507,6 +510,34 @@ export async function runBrowserFlowText(
       projectId: tracedInput.projectId,
     });
     if (error instanceof ActionSubmissionConflictError) {
+      const recovery = new ConversationRecovery({
+        maxAutomaticSteps: 1,
+        deadlineAt: Date.now() + 1500,
+      });
+      recovery.plan("state_conflict", { canRetry: true });
+      try {
+        const [state, conversation] = await recovery.read(() =>
+          Promise.all([
+            getBrowserFlowState(tracedInput),
+            getChannelConversation({
+              projectId: tracedInput.projectId,
+              channelType: tracedInput.channelType,
+              externalConversationId: tracedInput.conversationId,
+            }),
+          ]),
+        );
+        const report = recovery.report("recovered");
+        if (conversation && report)
+          await recordConversationRecovery({
+            projectId: tracedInput.projectId,
+            conversationId: conversation.id,
+            stage: "state",
+            report,
+            revision: state.activeFlow?.revision,
+          });
+      } catch {
+        // Preserve the conflict contract. The client can resume safely; never replay its stale write.
+      }
       throw new BrowserFlowCommandError(
         "This flow changed in another request. Refresh and try again.",
         "stale",

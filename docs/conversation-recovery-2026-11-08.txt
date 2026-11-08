@@ -1,0 +1,45 @@
+Lia shared conversation recovery
+
+This is shared runtime behavior, independent of a hotel's or other client's wording.
+
+Recovery now uses one bounded policy for approved actions:
+- Repair invalid model output or use the configured fallback model.
+- Check generated raw-passage claims against evidence; repair unsupported claims.
+- Retry a transient knowledge read once, retaining project scope and source rules.
+- Refresh missing evidence once when the validated model requests a better query.
+- Reload saved state after a conflict; never apply a stale visitor update again.
+- Keep durable retries within their configured attempt limits.
+- Hold uncertain external writes for reconciliation instead of blindly repeating them.
+
+Model/retrieval recovery shares a deadline and a maximum of three automatic actions.
+Every accepted model proposal still passes the existing schema, field, evidence,
+permission and workflow validation. Recovery never changes published flows or code.
+Raw-passage answers use a metered model evidence check within the same turn deadline;
+approved FAQ rendering and deterministic price calculations do not gain this call.
+Calendar reconciliation retains the actual provider key across repeated replays.
+Legacy replay records without that key are held rather than assumed safe.
+
+Review in the project's Conversation Quality screen:
+- Unresolved recovery gets a recovery_review flag.
+- Recorded processing evidence shows failure category, selected action and outcome.
+- Recovery reports exclude customer field values, prompts, credentials and raw errors.
+- Operation details retain uncertain-write and retry evidence.
+
+This covers known runtime failure classes; it is not a guarantee against all failures.
+The automatic background worker scheduler remains deferred. No migration is required.
+
+Verification uses fake model responses, a loopback HTTP provider and isolated,
+temporary records in the live database. No customer booking or external message
+is created by fault-injection tests. Healthy live chat-to-Inbox is checked separately.
+
+Verification results:
+- 197 policy, engine, workflow, provider-contract and database checks passed.
+- 3 real OpenAI suites passed: hotel FAQs/partial coverage, uncertainty across hotel,
+  repair and appointment domains, and pricing-task routing after cancellation.
+- TypeScript, scoped lint (existing warnings only), tenant scope and build passed.
+- Recovery test users remaining after cleanup: zero.
+
+Real-provider checks exposed two gaps corrected in shared behavior: retaining the
+known part of a partly unanswered FAQ, and not turning uncertainty into exclusion.
+The evidence reviewer judges whether the answer is supported, not whether the
+visitor's assumption is true. Tests account for separate semantic-review calls.

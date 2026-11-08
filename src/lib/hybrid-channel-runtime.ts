@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { recordActionFlowProgress } from "@/lib/action-flow-submissions";
+import {
+  ActionSubmissionConflictError,
+  recordActionFlowProgress,
+} from "@/lib/action-flow-submissions";
 import { getActiveActionSubmissionForConversation } from "@/lib/action-flows";
 import type { RuntimeAction } from "@/lib/action-runtime";
 import {
@@ -32,6 +35,8 @@ import {
 } from "@/lib/conversation-control-intents";
 import { getClearCandidatesDuringClarification } from "@/lib/conversation-field-extraction";
 import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
+import { recordConversationRecovery } from "@/lib/conversation-quality-telemetry";
+import { ConversationRecovery } from "@/lib/conversation-recovery";
 import type {
   TurnContextValueV1,
   TurnFieldStateV1,
@@ -136,8 +141,8 @@ import {
 } from "@/lib/runtime-stage-timing";
 import {
   appendTaskFollowUpQuestion,
-  formatTaskFollowUpReview,
   FOLLOW_UP_CONSENT_PROMPT,
+  formatTaskFollowUpReview,
   hasTaskFollowUpDestination,
   isPendingTaskFollowUp,
   parseTaskFollowUpConsent,
@@ -2332,8 +2337,7 @@ async function executeTaskBoundary(input: {
       return {
         output: operationTurn({
           nextAction: "ask",
-          reply:
-            "I couldn't confirm that action completed. Please try again.",
+          reply: "I couldn't confirm that action completed. Please try again.",
         }),
         signals: [],
       };
@@ -2551,6 +2555,57 @@ export async function runHybridChannelBoundary(
   try {
     return await runHybridChannelBoundaryInternal(input);
   } catch (error) {
+    if (
+      error instanceof ConversationalTaskRuntimeConflictError ||
+      error instanceof ActionSubmissionConflictError
+    ) {
+      const recovery = new ConversationRecovery({
+        maxAutomaticSteps: 1,
+        deadlineAt: Date.now() + 2000,
+      });
+      recovery.plan("state_conflict", { canRetry: true });
+      try {
+        const replies = await recovery.read(() =>
+          buildHybridChannelResumeRepliesInternal(input),
+        );
+        const report = recovery.report("recovered");
+        if (report)
+          await recordConversationRecovery({
+            projectId: input.projectId,
+            conversationId: input.channelConversationId,
+            stage: "state",
+            report,
+          });
+        return {
+          replies: replies.length
+            ? replies
+            : [
+                createTaskRuntimeReply({
+                  nextAction: "clarify",
+                  text: "The conversation changed while I was processing your reply. Please review the current request before continuing.",
+                }),
+              ],
+        };
+      } catch {
+        recovery.plan("retrieval_unavailable");
+        const report = recovery.report("review_required");
+        if (report)
+          await recordConversationRecovery({
+            projectId: input.projectId,
+            conversationId: input.channelConversationId,
+            stage: "state",
+            report,
+          });
+        return {
+          replies: [
+            createTaskRuntimeReply({
+              nextAction: "clarify",
+              text: "I couldn't reload the latest conversation state reliably. Please try again before continuing.",
+            }),
+          ],
+        };
+      }
+    }
     const recovered = await recoverCalendarSlot({
       error,
       projectId: input.projectId,

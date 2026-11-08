@@ -16,6 +16,7 @@ import {
   RequestTurnKnowledgeRetriever,
 } from "../../src/lib/conversation-turn-retrieval";
 import { buildSafeTurnDecisionSummary } from "../../src/lib/conversation-turn-safety";
+import { createConversationalTaskDefinitionFromTemplate } from "../../src/lib/conversational-task-templates";
 import {
   AiSdkStructuredTurnProvider,
   StructuredTurnOutputLimitError,
@@ -28,7 +29,6 @@ import {
   postConversationJobPayloadSchema,
 } from "../../src/lib/post-conversation-jobs";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
-import { createConversationalTaskDefinitionFromTemplate } from "../../src/lib/conversational-task-templates";
 import {
   measureRuntimeRequest,
   type RuntimeRequestLog,
@@ -473,6 +473,20 @@ test("@live-openai approved answer selection handles paraphrases, combined reque
     },
   };
   const provider = new AiSdkStructuredTurnProvider();
+  let semanticReviews = 0;
+  const reviewInterpretation = provider.reviewInterpretation.bind(provider);
+  provider.reviewInterpretation = async (input) => {
+    semanticReviews += 1;
+    const review = await reviewInterpretation(input);
+    console.log(
+      JSON.stringify({
+        reviewKind: input.kind,
+        matches: review.matches,
+        query: review.query,
+      }),
+    );
+    return review;
+  };
   const hotel = new StructuredTurnEngine({
     retriever: new ProjectDocumentTurnRetriever(),
     provider,
@@ -509,6 +523,7 @@ test("@live-openai approved answer selection handles paraphrases, combined reque
       false,
     ],
   ] as const) {
+    const reviewsBefore = semanticReviews;
     const result = await hotel.execute({
       ...engineInput(),
       activeTask: null,
@@ -527,6 +542,7 @@ test("@live-openai approved answer selection handles paraphrases, combined reque
         selected: result.proposal.answerSelections,
         attempts: result.attempts,
         tokens: result.usage.totalTokens,
+        recovery: result.recovery,
       }),
     );
     expect(result.proposal.reply).toMatch(expected);
@@ -543,7 +559,7 @@ test("@live-openai approved answer selection handles paraphrases, combined reque
           ),
       ),
     ).toBe(selected);
-    expect(result.attempts).toBe(1);
+    expect(result.attempts).toBe(1 + semanticReviews - reviewsBefore);
   }
   for (const [question, faqs] of [
     [
@@ -581,6 +597,7 @@ test("@live-openai approved answer selection handles paraphrases, combined reque
       ],
     ],
   ] as const) {
+    const reviewsBefore = semanticReviews;
     const engine = new StructuredTurnEngine({
       provider,
       retriever: {
@@ -620,7 +637,7 @@ test("@live-openai approved answer selection handles paraphrases, combined reque
         .map((f) => f.answer)
         .join("\n"),
     );
-    expect(result.attempts).toBe(1);
+    expect(result.attempts).toBe(1 + semanticReviews - reviewsBefore);
   }
 });
 
@@ -631,6 +648,18 @@ test("@live-openai uncertain inclusions stay uncertain across domains and plan s
   );
   test.setTimeout(180_000);
   const provider = new AiSdkStructuredTurnProvider();
+  const reviewInterpretation = provider.reviewInterpretation.bind(provider);
+  provider.reviewInterpretation = async (input) => {
+    const review = await reviewInterpretation(input);
+    console.log(
+      JSON.stringify({
+        reviewKind: input.kind,
+        matches: review.matches,
+        query: review.query,
+      }),
+    );
+    return review;
+  };
   for (const scenario of [
     {
       previous: "The Standard Plan estimate is INR 29,960.78.",
@@ -695,6 +724,8 @@ test("@live-openai uncertain inclusions stay uncertain across domains and plan s
       JSON.stringify({
         question: scenario.question,
         reply: result.proposal.reply,
+        attempts: result.attempts,
+        recovery: result.recovery,
       }),
     );
     expect(result.proposal.reply).toMatch(scenario.expected);
@@ -836,6 +867,12 @@ test("a related FAQ rejected by semantic review searches the actual question ins
     provider: {
       generateTurn: queue.generateTurn.bind(queue),
       async reviewInterpretation(input) {
+        if (input.kind === "knowledge_grounding")
+          return {
+            matches: true,
+            query: "Street address is directly supported",
+            usage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },
+          };
         expect(input.kind).toBe("knowledge_selection");
         return {
           matches: false,
@@ -875,8 +912,8 @@ test("a related FAQ rejected by semantic review searches the actual question ins
     "business street address",
   ]);
   expect(result.proposal.reply).toBe("We are at 12 Orchard Road.");
-  expect(result.attempts).toBe(3);
-  expect(result.usage.totalTokens).toBe(420);
+  expect(result.attempts).toBe(4);
+  expect(result.usage.totalTokens).toBe(440);
 });
 
 test("semantic contact reference fallback requires current permission and a trusted channel", async () => {
@@ -1477,7 +1514,8 @@ test("failed or disallowed prefetch cannot stop field collection or bypass sourc
   const answer = await engine.execute({ ...input, stage: "knowledge" });
   expect(answer.proposal.grounding.status).toBe("no_answer");
   expect(provider.calls).toHaveLength(1);
-  expect(calls).toBe(1);
+  // The failed prefetch is evicted; knowledge gets one fresh read and one retry.
+  expect(calls).toBe(3);
   await engine.execute({
     ...input,
     projectPolicy: {
@@ -1491,7 +1529,7 @@ test("failed or disallowed prefetch cannot stop field collection or bypass sourc
       },
     },
   });
-  expect(calls).toBe(1);
+  expect(calls).toBe(3);
 });
 
 test("standalone task FAQs skip extraction but still require grounded knowledge", async () => {
@@ -1921,6 +1959,221 @@ test("provider failures use bounded primary and fallback attempts", async () => 
   expect(result.attempts).toBe(4);
   expect(result.proposal.safety.reasonCode).toBe("model_unavailable");
   expect(new Set(provider.calls.map(({ modelId }) => modelId)).size).toBe(2);
+  expect(result.recovery).toMatchObject({
+    outcome: "review_required",
+    validated: false,
+    automaticSteps: 3,
+  });
+});
+
+test("self-healing repairs invalid output and validates before accepting it", async () => {
+  const provider = new QueueProvider([{ malformed: true }, baseTurn()]);
+  const result = await new StructuredTurnEngine({ provider }).execute(
+    engineInput(),
+  );
+  expect(result.source).toBe("model");
+  expect(result.proposal.validation.accepted).toBe(true);
+  expect(result.recovery).toMatchObject({
+    outcome: "recovered",
+    validated: true,
+    automaticSteps: 1,
+  });
+  expect(result.recovery?.decisions[0].action).toBe("repair_output");
+});
+
+test("shared evidence recovery rejects an unsupported claim and verifies its repair", async () => {
+  const queue = new QueueProvider([
+    baseTurn({
+      turnKind: "ordinary_question",
+      fieldCandidates: [],
+      reply: "The Standard service excludes warranty coverage.",
+      grounding: { status: "grounded", excerptIds: ["document:12"] },
+    }),
+    baseTurn({
+      turnKind: "ordinary_question",
+      fieldCandidates: [],
+      reply: "Warranty coverage for the Standard service is unconfirmed.",
+      grounding: { status: "grounded", excerptIds: ["document:12"] },
+    }),
+  ]);
+  let reviews = 0;
+  const result = await new StructuredTurnEngine({
+    provider: {
+      generateTurn: queue.generateTurn.bind(queue),
+      async reviewInterpretation(input) {
+        expect(input.kind).toBe("knowledge_grounding");
+        expect(
+          input.references?.some((reference) =>
+            reference.content.includes("Basic"),
+          ),
+        ).toBe(true);
+        reviews += 1;
+        return {
+          matches: reviews > 1,
+          query: "Standard is unconfirmed; only Basic excludes coverage",
+          usage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },
+        };
+      },
+    },
+    retriever: {
+      async retrieve() {
+        return [
+          {
+            id: "document:12",
+            content:
+              "Warranty for Standard is unconfirmed. Basic excludes coverage.",
+          },
+        ];
+      },
+    },
+  }).execute({
+    ...engineInput(),
+    activeTask: null,
+    publishedTasks: [],
+    stage: "knowledge",
+    visitorMessage: "Is warranty included in the Standard service?",
+  });
+  expect(result.proposal.reply).toBe(
+    "Warranty coverage for the Standard service is unconfirmed.",
+  );
+  expect(queue.calls).toHaveLength(2);
+  expect(reviews).toBe(2);
+  expect(result.attempts).toBe(4);
+  expect(result.usage.totalTokens).toBe(440);
+  expect(result.recovery).toMatchObject({
+    outcome: "recovered",
+    validated: true,
+    automaticSteps: 1,
+  });
+  expect(queue.calls[1].system).toContain("unsupported_knowledge_claim");
+});
+
+test("unsupported raw claims exhaust recovery without reaching the visitor", async () => {
+  const queue = new QueueProvider(
+    Array.from({ length: 4 }, () =>
+      baseTurn({
+        turnKind: "ordinary_question",
+        fieldCandidates: [],
+        reply: "Warranty is excluded.",
+        grounding: { status: "grounded", excerptIds: ["document:12"] },
+      }),
+    ),
+  );
+  const result = await new StructuredTurnEngine({
+    provider: {
+      generateTurn: queue.generateTurn.bind(queue),
+      async reviewInterpretation() {
+        return {
+          matches: false,
+          query: "Exclusion is unsupported",
+          usage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },
+        };
+      },
+    },
+    retriever: {
+      async retrieve() {
+        return [
+          { id: "document:12", content: "Warranty inclusion is unconfirmed." },
+        ];
+      },
+    },
+  }).execute({
+    ...engineInput(),
+    activeTask: null,
+    publishedTasks: [],
+    stage: "knowledge",
+    visitorMessage: "Does the service include a warranty?",
+  });
+  expect(queue.calls).toHaveLength(4);
+  expect(result.source).toBe("deterministic");
+  expect(result.proposal.reply).not.toContain("Warranty is excluded");
+  expect(result.recovery).toMatchObject({
+    outcome: "review_required",
+    validated: false,
+    automaticSteps: 3,
+  });
+});
+
+test("self-healing never retries a permanent provider configuration failure or changes pending values", async () => {
+  const error = Object.assign(new Error("private provider detail"), {
+    statusCode: 401,
+  });
+  const provider = new QueueProvider([error]);
+  const input = { ...engineInput(), requestedFieldKey: "guestName" };
+  const previous = structuredClone(input.fieldState);
+  const result = await new StructuredTurnEngine({ provider }).execute(input);
+  expect(provider.calls).toHaveLength(1);
+  expect(result.proposal.nextAction).toBe("clarify");
+  expect(result.proposal.fieldCandidates).toEqual([]);
+  expect(input.fieldState).toEqual(previous);
+  expect(result.recovery?.decisions[0]).toMatchObject({
+    failure: "configuration",
+    action: "review",
+    automatic: false,
+  });
+  expect(JSON.stringify(result.recovery)).not.toContain("private provider");
+});
+
+test("self-healing evicts a rejected retrieval and retries the same scoped read once", async () => {
+  let reads = 0;
+  const retriever = new RequestTurnKnowledgeRetriever({
+    async retrieve(input) {
+      expect(input.projectId).toBe(194);
+      reads += 1;
+      if (reads === 1) throw new Error("temporary disconnect");
+      return [
+        { id: "document:12", content: "The spa is open from 9 am to 6 pm." },
+      ];
+    },
+  });
+  const provider = new QueueProvider([
+    baseTurn({
+      turnKind: "ordinary_question",
+      fieldCandidates: [],
+      reply: "The spa is open from 9 am to 6 pm.",
+      grounding: { status: "grounded", excerptIds: ["document:12"] },
+    }),
+  ]);
+  const result = await new StructuredTurnEngine({
+    provider,
+    retriever,
+  }).execute({
+    ...engineInput(),
+    activeTask: null,
+    stage: "knowledge",
+    visitorMessage: "What time does the spa open?",
+  });
+  expect(reads).toBe(2);
+  expect(result.recovery).toMatchObject({
+    outcome: "recovered",
+    validated: true,
+  });
+  expect(result.recovery?.decisions[0].action).toBe("retry_read");
+});
+
+test("a stalled knowledge prefetch cannot outlive the extraction turn deadline", async () => {
+  const input = engineInput();
+  const provider = new QueueProvider([baseTurn()]);
+  const result = await new StructuredTurnEngine({
+    provider,
+    retriever: { retrieve: () => new Promise<never>(() => {}) },
+  }).execute({
+    ...input,
+    prefetchKnowledge: true,
+    visitorMessage: "I would like a facial. When do you open?",
+    projectPolicy: {
+      ...input.projectPolicy,
+      assistant: {
+        ...input.projectPolicy.assistant,
+        modelPolicy: {
+          ...input.projectPolicy.assistant.modelPolicy,
+          timeoutMs: 30,
+        },
+      },
+    },
+  });
+  expect(result.proposal.fieldCandidates).toHaveLength(1);
+  expect(provider.calls).toHaveLength(1);
 });
 
 test("extraction failure at a pending field clarifies without guessing a value", async () => {

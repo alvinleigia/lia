@@ -11,6 +11,7 @@ export default defineConfig({
     "channel-flow-entry-runtime-db.spec.ts",
     "conversational-task-runtime-db.spec.ts",
     "conversational-task-operation-runtime-db.spec.ts",
+    "conversation-recovery-db.spec.ts",
     "whatsapp-onboarding-db.spec.ts",
   ],
   timeout: 90_000,

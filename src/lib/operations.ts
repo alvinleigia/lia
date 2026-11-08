@@ -1,6 +1,10 @@
 import { createHash, createHmac } from "node:crypto";
 import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 import { isReadOnlyCalendarOperation } from "@/lib/appointment-lookup";
+import {
+  ConversationRecovery,
+  recoveryReportSchema,
+} from "@/lib/conversation-recovery";
 import { db } from "@/lib/db-config";
 import {
   actionFlowSteps,
@@ -276,6 +280,17 @@ export function getOperationAttemptReplaySourceId(
 
   const sourceAttemptId = (replay as Record<string, unknown>).sourceAttemptId;
   return typeof sourceAttemptId === "number" ? sourceAttemptId : null;
+}
+
+export function getOperationAttemptProviderIdempotencyKey(
+  attempt: Pick<SelectOperationAttempt, "idempotencyKey" | "requestPayload">,
+) {
+  const replay = getRecordValue(attempt.requestPayload, "replay");
+  // Older replay records did not retain the key sent to the provider. Do not
+  // assume their new local attempt key protects an already uncertain write.
+  return replay
+    ? readStringConfig(replay, "providerIdempotencyKey")
+    : attempt.idempotencyKey;
 }
 
 export function getOperationAttemptMappedOutput(input: {
@@ -1333,6 +1348,8 @@ async function executeWebhookProvider(
   }
 
   const request = buildWebhookRequest({ config, idempotencyKey, payload });
+  const recovery = new ConversationRecovery({ maxAutomaticSteps: 5 });
+  const readOnly = request.method === "GET";
   const timeoutMs = readNumberConfig(config, "timeoutMs") ?? 15_000;
   const retryCount = clampInteger(
     readIntegerConfig(config, "retryCount") ?? 0,
@@ -1367,7 +1384,13 @@ async function executeWebhookProvider(
     });
     lastErrorMessage = result.errorMessage ?? lastErrorMessage;
     lastAttemptPayload = result.attemptPayload;
-    outcomeUnknown ||= !result.outcomeKnown;
+    const httpStatus =
+      "status" in result.attemptPayload
+        ? Number(result.attemptPayload.status)
+        : null;
+    outcomeUnknown ||=
+      !readOnly &&
+      (!result.outcomeKnown || (httpStatus !== null && httpStatus >= 500));
 
     if (result.ok) {
       return {
@@ -1377,10 +1400,25 @@ async function executeWebhookProvider(
           finalAttempt: attemptIndex + 1,
           response: result.attemptPayload,
           retryCount,
+          recovery: recovery.report("recovered"),
         },
         errorMessage: undefined,
       };
     }
+    const decision = recovery.plan(
+      outcomeUnknown
+        ? "unknown_operation"
+        : httpStatus !== null &&
+            httpStatus >= 400 &&
+            httpStatus < 500 &&
+            httpStatus !== 429
+          ? "configuration"
+          : "retrieval_unavailable",
+      {
+        canRetry: readOnly && attemptIndex < retryCount,
+      },
+    );
+    if (decision.action !== "retry_read") break;
   }
 
   return {
@@ -1393,6 +1431,7 @@ async function executeWebhookProvider(
         : {}),
       response: lastAttemptPayload,
       retryCount,
+      recovery: recovery.report("review_required"),
     },
     errorMessage: lastErrorMessage,
   };
@@ -2270,6 +2309,20 @@ async function finalizeDurableOperationResult(input: {
   return finalizedAttempt;
 }
 
+function canSafelyReplayProvider(
+  provider: { providerType: string; config: Record<string, unknown> },
+  idempotencyKey: string | null,
+) {
+  if (["internal_save", "manual_review"].includes(provider.providerType))
+    return true;
+  if (provider.providerType === "google_calendar")
+    return Boolean(idempotencyKey);
+  return (
+    ["webhook", "n8n_webhook"].includes(provider.providerType) &&
+    String(provider.config.method ?? "POST").toUpperCase() === "GET"
+  );
+}
+
 export async function processProjectDurableOperationQueue(input: {
   maxJobs?: number;
   projectId: number;
@@ -2325,6 +2378,35 @@ export async function processProjectDurableOperationQueue(input: {
         throw new Error("The operation or provider is no longer active.");
       }
 
+      // A reclaimed delivery may have reached the provider before the old worker
+      // disappeared. A request header alone is not a provider replay guarantee.
+      if (
+        attempt.startedAt &&
+        job.attempts > 1 &&
+        !canSafelyReplayProvider(
+          provider,
+          getOperationAttemptProviderIdempotencyKey(attempt),
+        )
+      ) {
+        const recovery = new ConversationRecovery({ maxAutomaticSteps: 0 });
+        recovery.plan("unknown_operation");
+        const held = await finalizeDurableOperationResult({
+          attempt,
+          errorMessage:
+            "The interrupted write needs provider reconciliation before retrying.",
+          jobId: job.id,
+          operation,
+          projectId: input.projectId,
+          providerType: provider.providerType,
+          responsePayload: { recovery: recovery.report("review_required") },
+          status: "outcome_unknown",
+          traceId: job.traceId,
+          workerId: input.workerId,
+        });
+        if (held) failed += 1;
+        continue;
+      }
+
       if (!attempt.startedAt) {
         await db
           .update(operationAttempts)
@@ -2340,7 +2422,8 @@ export async function processProjectDurableOperationQueue(input: {
 
       const result = await executeConfiguredProvider({
         config: provider.config,
-        idempotencyKey: attempt.idempotencyKey ?? job.dedupeKey,
+        idempotencyKey:
+          getOperationAttemptProviderIdempotencyKey(attempt) ?? job.dedupeKey,
         operationType: operation.operationType,
         payload: attempt.requestPayload,
         projectId: input.projectId,
@@ -2386,8 +2469,16 @@ export async function processProjectDurableOperationQueue(input: {
         continue;
       }
 
+      const recoveryReport = recoveryReportSchema.safeParse(
+        (result.responsePayload as Record<string, unknown>).recovery,
+      );
       const failedJob = await failDurableJob({
         errorMessage: result.errorMessage ?? "Operation delivery failed.",
+        permanent:
+          recoveryReport.success &&
+          recoveryReport.data.decisions.some(
+            (decision) => decision.failure === "configuration",
+          ),
         jobId: job.id,
         projectId: input.projectId,
         workerId: input.workerId,
@@ -2570,22 +2661,49 @@ export async function replayOperationAttempt(input: {
     return null;
   }
 
+  const sourceProviderKey =
+    getOperationAttemptProviderIdempotencyKey(sourceAttempt);
+  if (sourceAttempt.status === "outcome_unknown") {
+    const recovery = new ConversationRecovery({ maxAutomaticSteps: 1 });
+    const decision = recovery.plan("unknown_operation", {
+      protectedWrite: canSafelyReplayProvider(provider, sourceProviderKey),
+      canRetry: true,
+    });
+    if (decision.action !== "retry_operation") {
+      if (sourceAttempt.submissionId)
+        await addOperationSubmissionEvent({
+          projectId: input.projectId,
+          submissionId: sourceAttempt.submissionId,
+          eventType: "operation.reconciliation_required",
+          message:
+            "The provider outcome must be reconciled before another write.",
+          payload: {
+            attemptId: sourceAttempt.id,
+            recovery: recovery.report("review_required"),
+          },
+          traceId: sourceAttempt.traceId,
+        });
+      return null;
+    }
+  }
+
+  const startedAt = new Date();
+  const idempotencyKey = `replay:${sourceAttempt.id}:${startedAt.getTime()}`;
+  const providerIdempotencyKey =
+    provider.providerType === "google_calendar" &&
+    sourceAttempt.status === "outcome_unknown" &&
+    sourceProviderKey
+      ? sourceProviderKey
+      : idempotencyKey;
   const requestPayload = {
     ...sourceAttempt.requestPayload,
     replay: {
       requestedAt: new Date().toISOString(),
       requestedBy: input.mode ?? "manual",
       sourceAttemptId: sourceAttempt.id,
+      providerIdempotencyKey,
     },
   };
-  const startedAt = new Date();
-  const idempotencyKey = `replay:${sourceAttempt.id}:${startedAt.getTime()}`;
-  const providerIdempotencyKey =
-    provider.providerType === "google_calendar" &&
-    sourceAttempt.status === "outcome_unknown" &&
-    sourceAttempt.idempotencyKey
-      ? sourceAttempt.idempotencyKey
-      : idempotencyKey;
   const [attempt] = await db
     .insert(operationAttempts)
     .values({

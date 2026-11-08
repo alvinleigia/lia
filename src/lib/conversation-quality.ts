@@ -11,7 +11,8 @@ export type QualityFlag = {
     | "repeated_prompt"
     | "slow_reply"
     | "inactive_enquiry"
-    | "failed_action";
+    | "failed_action"
+    | "recovery_review";
   messageId: number | null;
   detail: string;
 };
@@ -39,6 +40,8 @@ export function qualityNextStep(category: string) {
       return "Compare request timing and model usage. Check repeated retrieval or model calls before changing providers.";
     case "failed_action":
       return "Inspect the linked execution or tool failure before retrying an operation.";
+    case "recovery_review":
+      return "Inspect the recorded recovery decisions and saved workflow state. Reconcile uncertain writes before considering another attempt.";
     default:
       return "Review the conversation, record the expected behaviour and add a synthetic regression case.";
   }
@@ -51,9 +54,16 @@ export function detectConversationQuality(input: {
   activeTask: boolean;
   humanOwned?: boolean;
   failedActions?: number;
+  recoveryFailures?: number;
   now?: Date;
 }) {
   const flags: QualityFlag[] = [];
+  if (input.recoveryFailures)
+    flags.push({
+      code: "recovery_review",
+      messageId: null,
+      detail: `${input.recoveryFailures} recovery attempt(s) need review. Saved state is retained; check the recorded failure and approved next action.`,
+    });
   let waitingSince: Date | null = null;
   let previousReply = "";
   let visitorQuestion = false;

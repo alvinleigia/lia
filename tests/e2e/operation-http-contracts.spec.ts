@@ -6,6 +6,7 @@ import {
 } from "../../src/lib/operation-contracts";
 import {
   buildWebhookRequest,
+  getOperationAttemptProviderIdempotencyKey,
   getOperationConfigurationIssues,
   getOperationResultOutcome,
   getSanitizedOperationAttemptPreview,
@@ -32,6 +33,36 @@ function getOutcome(input: {
 }
 
 test.describe("HTTP operation contracts", () => {
+  test("keeps the original provider key across uncertain replays and rejects legacy unknown keys", () => {
+    const original = { idempotencyKey: "booking-original", requestPayload: {} };
+    const providerKey = getOperationAttemptProviderIdempotencyKey(original);
+    const firstReplay = {
+      idempotencyKey: "local-replay-1",
+      requestPayload: {
+        replay: { sourceAttemptId: 1, providerIdempotencyKey: providerKey },
+      },
+    };
+    const secondReplay = {
+      idempotencyKey: "local-replay-2",
+      requestPayload: {
+        replay: {
+          sourceAttemptId: 2,
+          providerIdempotencyKey:
+            getOperationAttemptProviderIdempotencyKey(firstReplay),
+        },
+      },
+    };
+    expect(getOperationAttemptProviderIdempotencyKey(secondReplay)).toBe(
+      "booking-original",
+    );
+    expect(
+      getOperationAttemptProviderIdempotencyKey({
+        idempotencyKey: "old-local-replay",
+        requestPayload: { replay: { sourceAttemptId: 1 } },
+      }),
+    ).toBeNull();
+  });
+
   test("blocks invalid API configuration while preserving legacy POST defaults", () => {
     const validLegacy = getOperationConfigurationIssues({
       operation: {

@@ -19,7 +19,10 @@ export class RequestTurnKnowledgeRetriever implements TurnKnowledgeRetriever {
     const key = JSON.stringify([input.projectId, input.limit, input.query]);
     let result = this.pending.get(key);
     if (!result) {
-      result = this.source.retrieve(input);
+      result = this.source.retrieve(input).catch((error) => {
+        this.pending.delete(key);
+        throw error;
+      });
       this.pending.set(key, result);
     }
     return result;

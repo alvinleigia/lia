@@ -11,9 +11,14 @@ import {
   stripKnowledgeDiscoursePrefix,
 } from "@/lib/conversation-control-intents";
 import {
-  extractLocalTaskFieldCandidates,
   extractChannelPhoneReference,
+  extractLocalTaskFieldCandidates,
 } from "@/lib/conversation-field-extraction";
+import {
+  ConversationRecovery,
+  getRecoveryFailure,
+  type RecoveryReport,
+} from "@/lib/conversation-recovery";
 import {
   compileStructuredTurn,
   type FieldCollectionContext,
@@ -114,6 +119,7 @@ export type OpenStructuredConversationInput = Omit<
 >;
 
 export type StructuredTurnExecution = {
+  recovery?: RecoveryReport;
   attempts: number;
   modelEscalationReason: ModelEscalationReason | null;
   proposal: ValidatedTurnProposalV1;
@@ -1083,6 +1089,12 @@ export class StructuredTurnEngine {
       };
     }
 
+    const deadline =
+      Date.now() + input.projectPolicy.assistant.modelPolicy.timeoutMs;
+    const recovery = new ConversationRecovery({
+      maxAutomaticSteps: 3,
+      deadlineAt: deadline,
+    });
     let retrieval: TurnRetrievalExcerptV1[] = [];
     const retriever = this.retriever;
     if (
@@ -1093,30 +1105,38 @@ export class StructuredTurnEngine {
         "project_documents",
       )
     ) {
-      try {
-        retrieval = await measureRuntimeStage(
-          "knowledge_retrieval",
-          input.recordTiming,
-          () =>
-            retriever.retrieve({
-              limit: Math.min(
-                input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
-                MAX_MODEL_RETRIEVAL_EXCERPTS,
-              ),
-              projectId: input.projectId,
-              query:
-                input.knowledgeRequest?.query ??
-                buildKnowledgeRetrievalQuery(input),
-            }),
-        );
-      } catch {
-        return {
-          attempts: 0,
-          modelEscalationReason,
-          proposal: asValidatedDeterministic(retrievalFailureProposal(input)),
-          source: "deterministic",
-          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-        };
+      for (let readAttempt = 0; readAttempt < 2; readAttempt += 1) {
+        try {
+          retrieval = await recovery.read(() =>
+            measureRuntimeStage("knowledge_retrieval", input.recordTiming, () =>
+              retriever.retrieve({
+                limit: Math.min(
+                  input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
+                  MAX_MODEL_RETRIEVAL_EXCERPTS,
+                ),
+                projectId: input.projectId,
+                query:
+                  input.knowledgeRequest?.query ??
+                  buildKnowledgeRetrievalQuery(input),
+              }),
+            ),
+          );
+          break;
+        } catch (error) {
+          const decision = recovery.plan(
+            getRecoveryFailure(error, "retrieval"),
+            { canRetry: readAttempt === 0 },
+          );
+          if (decision.action === "retry_read") continue;
+          return {
+            recovery: recovery.report("review_required"),
+            attempts: 0,
+            modelEscalationReason,
+            proposal: asValidatedDeterministic(retrievalFailureProposal(input)),
+            source: "deterministic",
+            usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
       }
     }
 
@@ -1156,16 +1176,23 @@ export class StructuredTurnEngine {
       input.projectPolicy.knowledge.sourceSelection.allowedSources.includes(
         "project_documents",
       )
-        ? measureRuntimeStage("knowledge_prefetch", input.recordTiming, () =>
-            retriever.retrieve({
-              projectId: input.projectId,
-              limit: Math.min(
-                input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
-                MAX_MODEL_RETRIEVAL_EXCERPTS,
+        ? recovery
+            .read(() =>
+              measureRuntimeStage(
+                "knowledge_prefetch",
+                input.recordTiming,
+                () =>
+                  retriever.retrieve({
+                    projectId: input.projectId,
+                    limit: Math.min(
+                      input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
+                      MAX_MODEL_RETRIEVAL_EXCERPTS,
+                    ),
+                    query: buildKnowledgeRetrievalQuery(input),
+                  }),
               ),
-              query: buildKnowledgeRetrievalQuery(input),
-            }),
-          ).catch(() => undefined)
+            )
+            .catch(() => undefined)
         : null;
     const modelPolicy = input.projectPolicy.assistant.modelPolicy;
     const models = [...new Set([modelIds.primary, modelIds.fallback])].filter(
@@ -1175,7 +1202,6 @@ export class StructuredTurnEngine {
     let retrievalRephrased = false;
     const attemptUsages: ModelUsage[] = [];
 
-    const deadline = Date.now() + modelPolicy.timeoutMs;
     modelAttempts: for (const modelId of models) {
       let repair = "";
       for (
@@ -1184,7 +1210,10 @@ export class StructuredTurnEngine {
         repairAttempt += 1
       ) {
         const remainingMs = deadline - Date.now();
-        if (remainingMs <= 0) break modelAttempts;
+        if (remainingMs <= 0) {
+          recovery.plan("deadline");
+          break modelAttempts;
+        }
         attempts += 1;
         let receivedUsage = false;
         try {
@@ -1308,6 +1337,15 @@ export class StructuredTurnEngine {
                 : null,
             newFollowUpConsent ? "follow_up_consent" : null,
             missingChannelPhone ? "channel_phone_reference" : null,
+            input.stage === "knowledge" &&
+            !selectedFaqs.length &&
+            proposal.grounding.status === "grounded" &&
+            proposal.grounding.excerptIds.some((id) =>
+              retrieval.some((excerpt) => excerpt.id === id),
+            ) &&
+            !(priceTable && proposal.knowledgeRequest?.pricingIntent)
+              ? "knowledge_grounding"
+              : null,
           ] as const;
           for (const reviewKind of reviewKinds) {
             if (
@@ -1320,8 +1358,15 @@ export class StructuredTurnEngine {
             if (remainingReviewMs <= 0)
               throw new Error("Turn deadline exceeded.");
             attempts += 1;
-            const reviewModelId = modelIds.fallback ?? modelId;
-            let review;
+            const reviewModelId =
+              reviewKind === "knowledge_grounding"
+                ? modelId
+                : (modelIds.fallback ?? modelId);
+            let review: Awaited<
+              ReturnType<
+                NonNullable<StructuredTurnProvider["reviewInterpretation"]>
+              >
+            >;
             try {
               review = await measureRuntimeModelCall(
                 input.projectId,
@@ -1331,7 +1376,19 @@ export class StructuredTurnEngine {
                     modelId: reviewModelId,
                     timeoutMs: remainingReviewMs,
                     messages: compiled.messages,
-                    selected: selectedFaqs,
+                    references:
+                      reviewKind === "knowledge_grounding"
+                        ? compiled.references
+                        : undefined,
+                    selected:
+                      reviewKind === "knowledge_grounding"
+                        ? [
+                            {
+                              question: input.visitorMessage,
+                              answer: proposal.reply,
+                            },
+                          ]
+                        : selectedFaqs,
                   }),
                 reviewModelId,
                 input.stage,
@@ -1380,6 +1437,10 @@ export class StructuredTurnEngine {
                   valueReference: null,
                 });
             } else if (!review.matches) {
+              if (reviewKind === "knowledge_grounding")
+                throw new TurnProposalValidationError([
+                  `unsupported_knowledge_claim: ${review.query}; preserve uncertainty and option scope, and do not assert an unsupported positive or negative fact`,
+                ]);
               if (reviewKind === "cancellation")
                 throw new TurnProposalValidationError([
                   `cancellation_not_authorized: the latest intent is ${review.query}; reconsider it without cancelling or reusing past cancellation requests`,
@@ -1453,27 +1514,49 @@ export class StructuredTurnEngine {
             proposal.knowledgeRequest.query !==
               (input.knowledgeRequest?.query ?? input.visitorMessage)
           ) {
-            retrievalRephrased = true;
-            retrieval = await retriever.retrieve({
-              projectId: input.projectId,
-              limit: Math.min(
-                input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
-                MAX_MODEL_RETRIEVAL_EXCERPTS,
-              ),
-              query: proposal.knowledgeRequest.query,
+            const decision = recovery.plan("missing_evidence", {
+              canRetry: true,
             });
-            compiled = compileStructuredTurn({
-              ...input,
-              knowledgeRequest: proposal.knowledgeRequest,
-              retrieval,
-              channelPhoneFieldKeys,
-            });
-            repair =
-              "\nThe first search did not establish the answer. Reassess using the refreshed references; use no_answer if still unsupported.";
-            // One evidence refresh is separate from repairing an invalid
-            // proposal. It still shares the turn deadline and usage accounting.
-            repairAttempt -= 1;
-            continue;
+            if (decision.action === "refresh_evidence") {
+              retrievalRephrased = true;
+              const rewrittenQuery = proposal.knowledgeRequest.query;
+              try {
+                retrieval = await recovery.read(() =>
+                  retriever.retrieve({
+                    projectId: input.projectId,
+                    limit: Math.min(
+                      input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
+                      MAX_MODEL_RETRIEVAL_EXCERPTS,
+                    ),
+                    query: rewrittenQuery,
+                  }),
+                );
+              } catch (error) {
+                recovery.plan(getRecoveryFailure(error, "retrieval"));
+                return {
+                  attempts,
+                  modelEscalationReason,
+                  proposal: asValidatedDeterministic(
+                    retrievalFailureProposal(input),
+                  ),
+                  source: "deterministic",
+                  usage: sumModelUsage(attemptUsages),
+                  recovery: recovery.report("review_required"),
+                };
+              }
+              compiled = compileStructuredTurn({
+                ...input,
+                knowledgeRequest: proposal.knowledgeRequest,
+                retrieval,
+                channelPhoneFieldKeys,
+              });
+              repair =
+                "\nThe first search did not establish the answer. Reassess using the refreshed references; use no_answer if still unsupported.";
+              // One evidence refresh is separate from repairing an invalid
+              // proposal. It still shares the turn deadline and usage accounting.
+              repairAttempt -= 1;
+              continue;
+            }
           }
           if (
             channelPhoneCandidate &&
@@ -1551,6 +1634,11 @@ export class StructuredTurnEngine {
 
           await prefetched;
           return {
+            recovery: recovery.report(
+              proposal.grounding.status === "no_answer"
+                ? "clarification_required"
+                : "recovered",
+            ),
             attempts,
             modelEscalationReason,
             proposal: {
@@ -1566,13 +1654,24 @@ export class StructuredTurnEngine {
           };
         } catch (error) {
           if (!receivedUsage) attemptUsages.push(failedModelUsage(error));
-          // Repairing with the same output cap cannot reliably fix truncation.
-          // Keep the configured budget and move to the next allowed model.
-          if (error instanceof StructuredTurnOutputLimitError) break;
           const codes =
             error instanceof TurnProposalValidationError
               ? error.codes
               : ["provider_or_structured_output_failure"];
+          const failure =
+            error instanceof TurnProposalValidationError
+              ? "invalid_output"
+              : error instanceof StructuredTurnOutputLimitError
+                ? "output_limit"
+                : getRecoveryFailure(error, "model");
+          const decision = recovery.plan(failure, {
+            canRepair: repairAttempt < modelPolicy.maxRepairAttempts,
+            canRetry: repairAttempt < modelPolicy.maxRepairAttempts,
+            hasFallback: models.indexOf(modelId) < models.length - 1,
+          });
+          if (decision.action === "fallback_model") break;
+          if (!["repair_output", "retry_model"].includes(decision.action))
+            break modelAttempts;
           repair = repairInstruction(repairAttempt + 1, codes);
         }
       }
@@ -1583,6 +1682,7 @@ export class StructuredTurnEngine {
       directFieldProposal(input, "model_unavailable") ??
       modelFailureProposal(input);
     return {
+      recovery: recovery.report("review_required"),
       attempts,
       modelEscalationReason,
       proposal: {

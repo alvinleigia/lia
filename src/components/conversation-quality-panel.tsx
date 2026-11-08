@@ -263,6 +263,8 @@ export function ConversationQualityReview({
               {e.eventType} · run {e.taskRunId ?? "none"}
               {e.status ? ` · ${e.status}` : ""}
               {e.grounding ? ` · ${e.grounding}` : ""}
+              {e.recovery &&
+                ` · recovery: ${e.recovery.outcome.replaceAll("_", " ")} · ${e.recovery.decisions.map((decision) => `${decision.failure} → ${decision.action}`).join("; ")}`}
               {e.turn &&
                 ` · ${e.turn.stage} · ${e.turn.source} · ${e.turn.latencyMs} ms · ${e.turn.totalTokens ?? "unknown"} tokens · references: ${e.turn.referenceIds.join(", ") || "none"}`}
             </p>

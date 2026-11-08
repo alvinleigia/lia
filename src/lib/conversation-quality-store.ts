@@ -4,6 +4,7 @@ import {
   detectConversationQuality,
   type QualityMessage,
 } from "@/lib/conversation-quality";
+import { recoveryReportSchema } from "@/lib/conversation-recovery";
 import { db } from "@/lib/db-config";
 import {
   channelConversations,
@@ -28,9 +29,10 @@ export async function getProjectQualityDashboard(projectId: number) {
     .limit(50);
   const ids = conversations.map((c) => c.id);
   if (!ids.length) return [];
-  const [messages, runs, reviews, failed, owners] = await Promise.all([
-    // Bound each conversation independently so busy chats do not hide others.
-    db.execute<QualityMessage & { conversationId: number }>(sql`
+  const [messages, runs, reviews, failed, owners, recoveryFailures] =
+    await Promise.all([
+      // Bound each conversation independently so busy chats do not hide others.
+      db.execute<QualityMessage & { conversationId: number }>(sql`
       select m.id, m.conversation_id as "conversationId", m.direction, m.text,
         m.created_at as "createdAt"
       from ${channelConversations} c cross join lateral (
@@ -42,68 +44,87 @@ export async function getProjectQualityDashboard(projectId: number) {
         sql`, `,
       )})
     `),
-    db
-      .select({ conversationId: conversationalTaskRuns.conversationId })
-      .from(conversationalTaskRuns)
-      .where(
-        and(
-          eq(conversationalTaskRuns.projectId, projectId),
-          inArray(conversationalTaskRuns.conversationId, ids),
-          eq(conversationalTaskRuns.status, "active"),
-        ),
-      ),
-    db
-      .select()
-      .from(conversationDiagnosticFindings)
-      .where(
-        and(
-          eq(conversationDiagnosticFindings.projectId, projectId),
-          inArray(conversationDiagnosticFindings.conversationId, ids),
-        ),
-      )
-      .orderBy(desc(conversationDiagnosticFindings.createdAt))
-      .limit(1000),
-    db
-      .select({
-        conversationId: conversationalTaskRuns.conversationId,
-        total: sql<number>`count(*)::int`,
-      })
-      .from(conversationalTaskToolRequests)
-      .innerJoin(
-        conversationalTaskRuns,
-        and(
-          eq(
-            conversationalTaskRuns.id,
-            conversationalTaskToolRequests.taskRunId,
+      db
+        .select({ conversationId: conversationalTaskRuns.conversationId })
+        .from(conversationalTaskRuns)
+        .where(
+          and(
+            eq(conversationalTaskRuns.projectId, projectId),
+            inArray(conversationalTaskRuns.conversationId, ids),
+            eq(conversationalTaskRuns.status, "active"),
           ),
-          eq(conversationalTaskRuns.projectId, projectId),
         ),
-      )
-      .where(
-        and(
-          eq(conversationalTaskToolRequests.projectId, projectId),
-          inArray(conversationalTaskRuns.conversationId, ids),
-          inArray(conversationalTaskToolRequests.status, [
-            "failed",
-            "error",
-            "timeout",
-          ]),
+      db
+        .select()
+        .from(conversationDiagnosticFindings)
+        .where(
+          and(
+            eq(conversationDiagnosticFindings.projectId, projectId),
+            inArray(conversationDiagnosticFindings.conversationId, ids),
+          ),
+        )
+        .orderBy(desc(conversationDiagnosticFindings.createdAt))
+        .limit(1000),
+      db
+        .select({
+          conversationId: conversationalTaskRuns.conversationId,
+          total: sql<number>`count(*)::int`,
+        })
+        .from(conversationalTaskToolRequests)
+        .innerJoin(
+          conversationalTaskRuns,
+          and(
+            eq(
+              conversationalTaskRuns.id,
+              conversationalTaskToolRequests.taskRunId,
+            ),
+            eq(conversationalTaskRuns.projectId, projectId),
+          ),
+        )
+        .where(
+          and(
+            eq(conversationalTaskToolRequests.projectId, projectId),
+            inArray(conversationalTaskRuns.conversationId, ids),
+            inArray(conversationalTaskToolRequests.status, [
+              "failed",
+              "error",
+              "timeout",
+              "outcome_unknown",
+            ]),
+          ),
+        )
+        .groupBy(conversationalTaskRuns.conversationId),
+      db
+        .select({
+          conversationId: conversationExecutionStates.conversationId,
+          owner: conversationExecutionStates.responseOwner,
+        })
+        .from(conversationExecutionStates)
+        .where(
+          and(
+            eq(conversationExecutionStates.projectId, projectId),
+            inArray(conversationExecutionStates.conversationId, ids),
+          ),
         ),
-      )
-      .groupBy(conversationalTaskRuns.conversationId),
-    db
-      .select({
-        conversationId: conversationExecutionStates.conversationId,
-        owner: conversationExecutionStates.responseOwner,
-      })
-      .from(conversationExecutionStates)
-      .where(
-        and(
-          eq(conversationExecutionStates.projectId, projectId),
-          inArray(conversationExecutionStates.conversationId, ids),
-        ),
-      ),
-  ]);
+      db
+        .select({
+          conversationId: conversationalTaskAuditEvents.conversationId,
+          total: sql<number>`count(*)::int`,
+        })
+        .from(conversationalTaskAuditEvents)
+        .where(
+          and(
+            eq(conversationalTaskAuditEvents.projectId, projectId),
+            inArray(conversationalTaskAuditEvents.conversationId, ids),
+            inArray(conversationalTaskAuditEvents.eventType, [
+              "quality.turn",
+              "recovery.decision",
+            ]),
+            sql`${conversationalTaskAuditEvents.summary}->'recovery'->>'outcome' = 'review_required'`,
+          ),
+        )
+        .groupBy(conversationalTaskAuditEvents.conversationId),
+    ]);
   return conversations.map((conversation) => {
     const humanReviews = reviews.filter(
       (r) => r.conversationId === conversation.id && r.category !== "ai_review",
@@ -119,6 +140,9 @@ export async function getProjectQualityDashboard(projectId: number) {
       ),
       failedActions:
         failed.find((r) => r.conversationId === conversation.id)?.total ?? 0,
+      recoveryFailures:
+        recoveryFailures.find((r) => r.conversationId === conversation.id)
+          ?.total ?? 0,
       lastMessageAt: conversation.lastMessageAt,
     });
     return {
@@ -208,6 +232,9 @@ export async function getConversationQualityEvidence(
   return {
     events: events.map(({ summary, ...event }) => ({
       ...event,
+      recovery: recoveryReportSchema.safeParse(summary.recovery).success
+        ? recoveryReportSchema.parse(summary.recovery)
+        : null,
       turn: turnEvidenceSchema.safeParse(summary).success
         ? turnEvidenceSchema.parse(summary)
         : null,
