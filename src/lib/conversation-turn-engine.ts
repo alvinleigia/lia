@@ -1264,7 +1264,7 @@ export class StructuredTurnEngine {
                   system:
                     compiled.system +
                     (selectiveGrounding
-                      ? "\nAnswer a settled fact directly, even when the same passage leaves another option unresolved. When a fact needs checking, mention prerequisites only if the source explicitly requires them; a referral to staff alone does not require additional customer details."
+                      ? "\nAnswer a settled fact directly, even when the same passage leaves another option unresolved. Say exactly what remains unknown in plain language. If something is available but its inclusion in a price is unknown, say you can confirm availability and cannot confirm whether the price includes it. When a fact needs checking, mention prerequisites only if the source explicitly requires them; a referral to staff alone does not require additional customer details."
                       : "") +
                     repair,
                   timeoutMs: remainingMs,
