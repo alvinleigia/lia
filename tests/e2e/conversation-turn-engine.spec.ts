@@ -3059,3 +3059,57 @@ test("informational appointment questions and negations never route deterministi
     expect(result.proposal.taskRecommendation).toBeNull();
   }
 });
+test("project opt-in routes uncertain cited evidence to the stronger reviewer", async () => {
+  for (const [enabled, uncertain, expected] of [
+    [false, true, "gpt-4.1-mini"],
+    [true, false, "gpt-4.1-mini"],
+    [true, true, "gpt-5-mini"],
+  ] as const) {
+    const text = uncertain
+      ? "Standard coverage is unconfirmed."
+      : "Standard includes coverage.";
+    const projectPolicy = structuredClone(REFERENCE_BOOKING_PROJECT_POLICY);
+    projectPolicy.assistant.modelPolicy.mode = "platform_default";
+    if (enabled)
+      projectPolicy.assistant.modelPolicy.selectiveGroundingReview = true;
+    const queue = new QueueProvider([
+      baseTurn({
+        turnKind: "ordinary_question",
+        fieldCandidates: [],
+        reply: text,
+        grounding: { status: "grounded", excerptIds: ["document:12"] },
+      }),
+    ]);
+    const reviews: string[] = [];
+    await new StructuredTurnEngine({
+      provider: {
+        generateTurn: queue.generateTurn.bind(queue),
+        async reviewInterpretation(input) {
+          reviews.push(input.modelId);
+          expect(input.selectiveGrounding).toBe(enabled);
+          return {
+            matches: true,
+            query: "supported",
+            usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+          };
+        },
+      },
+      retriever: {
+        async retrieve() {
+          return [
+            { id: "document:12", content: text },
+            { id: "document:13", content: "Premium coverage is unconfirmed." },
+          ];
+        },
+      },
+    }).execute({
+      ...engineInput(),
+      projectPolicy,
+      activeTask: null,
+      publishedTasks: [],
+      stage: "knowledge",
+      visitorMessage: "Is Standard coverage included?",
+    });
+    expect(reviews).toEqual([expected]);
+  }
+});

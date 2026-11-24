@@ -1,3 +1,4 @@
+import { needsStrongerGroundingReview } from "@/lib/knowledge-grounding";
 import type {
   ConversationalTaskSnapshotV1,
   ConversationProjectPolicyV1,
@@ -1083,6 +1084,11 @@ export class StructuredTurnEngine {
 
     const modelEscalationReason = resolveModelEscalationReason(input);
     const modelIds = resolveModelIds(input.projectPolicy, input.stage);
+    const selectiveGrounding =
+      input.stage === "knowledge" &&
+      input.projectPolicy.assistant.modelPolicy.mode === "platform_default" &&
+      input.projectPolicy.assistant.modelPolicy.selectiveGroundingReview ===
+        true;
     const budget = await this.budgetGate.admit({
       estimatedCostUnits: admission.estimatedCostUnits ?? 0,
       estimatedInputTokens: admission.estimatedInputTokens ?? 0,
@@ -1255,7 +1261,12 @@ export class StructuredTurnEngine {
                   maxRetries: modelPolicy.maxRetries,
                   messages: compiled.messages,
                   modelId,
-                  system: compiled.system + repair,
+                  system:
+                    compiled.system +
+                    (selectiveGrounding
+                      ? "\nAnswer a settled fact directly, even when the same passage leaves another option unresolved. When a fact needs checking, mention prerequisites only if the source explicitly requires them; a referral to staff alone does not require additional customer details."
+                      : "") +
+                    repair,
                   timeoutMs: remainingMs,
                 }),
               modelId,
@@ -1377,10 +1388,24 @@ export class StructuredTurnEngine {
             if (remainingReviewMs <= 0)
               throw new Error("Turn deadline exceeded.");
             attempts += 1;
-            const reviewModelId =
-              reviewKind === "knowledge_grounding"
-                ? modelId
-                : (modelIds.fallback ?? modelId);
+            const reviewReferences =
+              reviewKind === "knowledge_grounding" && selectiveGrounding
+                ? compiled.references.map((reference) => ({
+                    ...reference,
+                    cited: proposal.grounding.excerptIds.includes(reference.id),
+                  }))
+                : undefined;
+            const useCurrentModel =
+              reviewKind === "knowledge_grounding" &&
+              (!reviewReferences ||
+                !needsStrongerGroundingReview(
+                  input.projectPolicy.assistant.language,
+                  reviewReferences.filter((reference) => reference.cited),
+                  proposal.reply,
+                ));
+            const reviewModelId = useCurrentModel
+              ? modelId
+              : (modelIds.fallback ?? modelId);
             let review: Awaited<
               ReturnType<
                 NonNullable<StructuredTurnProvider["reviewInterpretation"]>
@@ -1392,12 +1417,13 @@ export class StructuredTurnEngine {
                 () =>
                   this.provider.reviewInterpretation!({
                     kind: reviewKind,
+                    selectiveGrounding: Boolean(reviewReferences),
                     modelId: reviewModelId,
                     timeoutMs: remainingReviewMs,
                     messages: compiled.messages,
                     references:
                       reviewKind === "knowledge_grounding"
-                        ? compiled.references
+                        ? (reviewReferences ?? compiled.references)
                         : undefined,
                     selected:
                       reviewKind === "knowledge_grounding"
@@ -1456,6 +1482,28 @@ export class StructuredTurnEngine {
                   valueReference: null,
                 });
             } else if (!review.matches) {
+              if (reviewReferences) {
+                const sentence = review.completeSupportedSentence
+                  ?.trim()
+                  .replace(/[.;]$/, "");
+                const supportedPart =
+                  sentence &&
+                  proposal.reply
+                    .split(/(?<=[.!?])\s+|;\s*/u)
+                    .find((part) => part.replace(/\.$/, "") === sentence);
+                if (supportedPart && supportedPart !== proposal.reply) {
+                  proposal = {
+                    ...proposal,
+                    reply: /[.!?]$/.test(supportedPart)
+                      ? supportedPart
+                      : `${supportedPart}.`,
+                  };
+                  continue;
+                }
+                throw new TurnProposalValidationError([
+                  `unsupported_knowledge_claim: ${review.query}; answer only for the requested options. State each established fact directly and express uncertainty only about unresolved facts`,
+                ]);
+              }
               if (reviewKind === "knowledge_grounding")
                 throw new TurnProposalValidationError([
                   `unsupported_knowledge_claim: ${review.query}; preserve uncertainty and option scope, and do not assert an unsupported positive or negative fact`,

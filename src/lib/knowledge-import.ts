@@ -81,6 +81,12 @@ export function extractKnowledgeAnswers(text: string) {
   return answers;
 }
 
+export function hasExplicitKnowledgeUncertainty(text: string) {
+  return /\b(?:unknown|unconfirmed|unresolved|not confirmed|not supplied|not provided|conflict|inconsistent|needs? confirmation)\b/i.test(
+    text,
+  );
+}
+
 export function inspectKnowledgeImport(text: string): KnowledgeIssue[] {
   const issues: KnowledgeIssue[] = [];
   for (const [index, line] of text.split(/\r?\n/).entries()) {
@@ -105,17 +111,15 @@ export function inspectKnowledgeImport(text: string): KnowledgeIssue[] {
         "internal",
         "Separate internal notes from customer answers. Do not present test prices as live prices.",
       );
-    if (
-      /\b(?:unknown|unconfirmed|unresolved|not confirmed|not supplied|not provided|conflict|inconsistent|need[s]? confirmation)\b/i.test(
-        line,
-      )
-    )
+    if (hasExplicitKnowledgeUncertainty(line))
       add(
         "uncertain",
         "Confirm this detail or keep an explicit limitation. Do not turn missing information into a promise.",
       );
     if (
-      /\b(?:guaranteed|guarantee|always|never|lowest price)\b|\b100%/i.test(line)
+      /\b(?:guaranteed|guarantee|always|never|lowest price)\b|\b100%/i.test(
+        line,
+      )
     )
       add(
         "claim",

@@ -97,6 +97,7 @@ export const assistantPolicyV1Schema = z.object({
   language: z.string().trim().min(2).max(40),
   modelPolicy: z.object({
     mode: z.enum(["platform_default", "project_override"]),
+    selectiveGroundingReview: z.boolean().optional(),
     primaryModelId: z.string().trim().min(1).max(120).default("gpt-5-mini"),
     fallbackModelId: z
       .string()
