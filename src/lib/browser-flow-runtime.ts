@@ -388,6 +388,7 @@ async function executeBrowserFlowText(
         })
       : await processChannelFlowText({
           activeSubmission: null,
+          recordTiming: input.recordTiming,
           channelConversationId: inboundRecord.conversation.id,
           contactId: inboundRecord.conversation.contactId,
           conversationId: input.conversationId,

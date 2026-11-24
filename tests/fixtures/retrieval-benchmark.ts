@@ -1,0 +1,125 @@
+// Synthetic source passages and visitor paraphrases. Each question asks for a
+// fact that its passage can support, including explicit limits on an answer.
+export const retrievalCases = [
+  [
+    "hotel",
+    "Guest Wi-Fi is included in every bedroom and in the lobby.",
+    "Can I get online in my bedroom?",
+    "Does the hotel charge for wireless internet?",
+    "Is internet access available at the property?",
+  ],
+  [
+    "hotel",
+    "Internet performance: Wi-Fi upload speed has not been measured. We cannot guarantee video-call quality.",
+    "Is the Wi-Fi fast enough for Google Meet?",
+    "Can you guarantee enough upload bandwidth for video calls?",
+  ],
+  [
+    "hotel",
+    "Standard Plan guests may cancel without a fee until 48 hours before arrival.",
+    "How late can I cancel the Standard Plan for free?",
+    "Would cancelling my Standard stay three days ahead cost anything?",
+  ],
+  [
+    "hotel",
+    "Saver Plan reservations are non-refundable from the moment of booking.",
+    "Can I get my money back on the Saver rate?",
+    "What happens if I cancel a Saver reservation?",
+  ],
+  [
+    "hotel",
+    "Breakfast is available at the property. The Standard Plan has no verified breakfast inclusion. Reservations can confirm the meal terms before booking.",
+    "Does the Standard Plan price you quoted cover breakfast?",
+    "We're choosing Standard. Does that amount cover the morning meal?",
+  ],
+  [
+    "hotel",
+    "The Flexi rate is room only. Guests on Flexi pay separately for breakfast.",
+    "Does the Flexi rate include the morning meal?",
+    "Would breakfast be extra if I choose Flexi?",
+  ],
+  [
+    "hotel",
+    "The outdoor swimming pool is open daily from 7 am until 8 pm.",
+    "Can we swim before breakfast at eight?",
+    "When does the outdoor pool close?",
+  ],
+  [
+    "service",
+    "Bicycle collection is available within five kilometres of the workshop.",
+    "Will you pick up my bike four kilometres away?",
+    "How far do you travel to collect a bicycle?",
+  ],
+  [
+    "service",
+    "A basic bicycle service covers brake inspection and gear adjustment. Replacement parts are billed separately.",
+    "Are new brake pads included in the basic service?",
+    "Does a basic tune-up cover gear adjustment?",
+  ],
+  [
+    "service",
+    "Electric bicycle batteries require a separate electrical diagnostic appointment.",
+    "Can you test my e-bike battery during a regular tune-up?",
+    "Do I need a separate booking for a battery diagnosis?",
+  ],
+  [
+    "service",
+    "Workshop repairs require customer approval before any extra paid work begins.",
+    "Will you ask me before doing work that costs extra?",
+    "Can the mechanic add repairs without my permission?",
+  ],
+  [
+    "service",
+    "After a repair, the workshop sends a text message when the bicycle is ready for collection.",
+    "How will I know my repaired bike is ready?",
+    "Will the workshop text me when I can collect it?",
+  ],
+  [
+    "appointment",
+    "Clinic parking is free for appointment holders, subject to space availability.",
+    "Do patients have to pay to park?",
+    "Is a parking space guaranteed when I see the doctor?",
+  ],
+  [
+    "appointment",
+    "For a first consultation, bring photo identification and your current medication list.",
+    "What paperwork should I take to my first consultation?",
+    "Should I bring a list of my medicines on my first visit?",
+  ],
+  [
+    "appointment",
+    "Follow-up consultations can take place by video when the clinician approves.",
+    "Can I see the clinician remotely for my follow-up?",
+    "Who decides if my next consultation can happen by video?",
+  ],
+  [
+    "appointment",
+    "To move an existing clinic appointment, provide the original booking reference.",
+    "What do I need to reschedule my clinic visit?",
+    "Which reference do you need to move my appointment?",
+  ],
+  [
+    "appointment",
+    "Blood sample collection appointments are offered in the morning, from 8 am to 11 am.",
+    "Can I give a blood sample after lunch?",
+    "What time does the clinic finish taking blood samples?",
+  ],
+  [
+    "property",
+    "Cedar Court residents can rent a covered parking bay for INR 900 a month.",
+    "Does covered parking at Cedar Court cost extra?",
+    "What would I pay monthly to park under cover at Cedar Court?",
+  ],
+  [
+    "property",
+    "At Maple Court, one covered parking bay is included in the apartment rent.",
+    "Is a parking space included in my rent at Maple Court?",
+    "Will I pay separately for covered parking if I rent at Maple Court?",
+  ],
+  [
+    "property",
+    "Visitors to Cedar Court must reserve a viewing with the sales office before arriving.",
+    "Can I walk in to see a Cedar Court apartment?",
+    "Who arranges a viewing at Cedar Court?",
+  ],
+] as const;

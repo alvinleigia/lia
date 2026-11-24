@@ -22,10 +22,10 @@ import {
   approveKnowledgeImport,
   getImportedKnowledgeAnswers,
   getKnowledgeImport,
-  getPublishedKnowledgeAnswersForChunks,
   saveKnowledgeDraft,
 } from "../../src/lib/knowledge-import-store";
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
+import { searchProjectDocumentEvidenceWithEmbedding } from "../../src/lib/search";
 import { processUploadQueue } from "../../src/lib/upload-queue";
 
 let scope: {
@@ -124,30 +124,29 @@ test("retrieved FAQ references use full published answers and remain project sco
     .update(documents)
     .set({ content: "Q: Is collection available? A: Yes, within 5 km." })
     .where(eq(documents.id, chunk.id));
-  const published = await getPublishedKnowledgeAnswersForChunks(
-    scope.projectId,
-    [chunk.id],
-  );
+  const query = "Is collection available?";
+  async function publishedAnswers(projectId: number) {
+    const hits = await searchProjectDocumentEvidenceWithEmbedding(
+      projectId,
+      query,
+      chunk.embedding!,
+      5,
+    );
+    return hits.flatMap((hit) => hit.approvedAnswers);
+  }
+  const published = await publishedAnswers(scope.projectId);
   expect(published).toHaveLength(1);
   expect(published[0].answer).toContain("INR 200");
-  expect(
-    await getPublishedKnowledgeAnswersForChunks(scope.otherProjectId, [
-      chunk.id,
-    ]),
-  ).toEqual([]);
+  expect(await publishedAnswers(scope.otherProjectId)).toEqual([]);
   await saveKnowledgeDraft({
     projectId: scope.projectId,
     documentId: doc.id,
     revision: 1,
     text: "Q: Is collection available? A: Free everywhere.",
   });
-  expect(
-    await getPublishedKnowledgeAnswersForChunks(scope.projectId, [chunk.id]),
-  ).toEqual(published);
+  expect(await publishedAnswers(scope.projectId)).toEqual(published);
   await deleteSourceDocumentFromProject(scope.projectId, doc.id);
-  expect(
-    await getPublishedKnowledgeAnswersForChunks(scope.projectId, [chunk.id]),
-  ).toEqual([]);
+  expect(await publishedAnswers(scope.projectId)).toEqual([]);
 });
 
 test("drafts stay private, tenant scope is enforced, approval blocks wording and stale revisions", async () => {

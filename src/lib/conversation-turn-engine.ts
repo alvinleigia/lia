@@ -74,6 +74,7 @@ import {
 import { measureRuntimeModelCall } from "@/lib/runtime-request-metrics";
 import {
   measureRuntimeStage,
+  recordRuntimeStage,
   type RuntimeTimingRecorder,
 } from "@/lib/runtime-stage-timing";
 import {
@@ -1242,6 +1243,7 @@ export class StructuredTurnEngine {
         attempts += 1;
         let receivedUsage = false;
         try {
+          const generationStartedAt = performance.now();
           let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
           const generated = await Promise.race([
             measureRuntimeModelCall(
@@ -1278,7 +1280,14 @@ export class StructuredTurnEngine {
                 remainingMs,
               );
             }),
-          ]).finally(() => clearTimeout(deadlineTimer));
+          ]).finally(() => {
+            clearTimeout(deadlineTimer);
+            recordRuntimeStage(
+              "model_generation",
+              generationStartedAt,
+              input.recordTiming,
+            );
+          });
           attemptUsages.push(generated.usage);
           receivedUsage = true;
           let proposal = preserveAmbiguousDateWording(
@@ -1411,6 +1420,7 @@ export class StructuredTurnEngine {
                 NonNullable<StructuredTurnProvider["reviewInterpretation"]>
               >
             >;
+            const reviewStartedAt = performance.now();
             try {
               review = await measureRuntimeModelCall(
                 input.projectId,
@@ -1442,6 +1452,12 @@ export class StructuredTurnEngine {
             } catch (error) {
               attemptUsages.push(failedModelUsage(error));
               throw error;
+            } finally {
+              recordRuntimeStage(
+                `review_${reviewKind}`,
+                reviewStartedAt,
+                input.recordTiming,
+              );
             }
             if (
               reviewKind === "follow_up_consent" &&
@@ -1589,14 +1605,20 @@ export class StructuredTurnEngine {
               const rewrittenQuery = proposal.knowledgeRequest.query;
               try {
                 retrieval = await recovery.read(() =>
-                  retriever.retrieve({
-                    projectId: input.projectId,
-                    limit: Math.min(
-                      input.projectPolicy.knowledge.sourceSelection.maxExcerpts,
-                      MAX_MODEL_RETRIEVAL_EXCERPTS,
-                    ),
-                    query: rewrittenQuery,
-                  }),
+                  measureRuntimeStage(
+                    "knowledge_retrieval",
+                    input.recordTiming,
+                    () =>
+                      retriever.retrieve({
+                        projectId: input.projectId,
+                        limit: Math.min(
+                          input.projectPolicy.knowledge.sourceSelection
+                            .maxExcerpts,
+                          MAX_MODEL_RETRIEVAL_EXCERPTS,
+                        ),
+                        query: rewrittenQuery,
+                      }),
+                  ),
                 );
               } catch (error) {
                 recovery.plan(getRecoveryFailure(error, "retrieval"));

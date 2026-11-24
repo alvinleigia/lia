@@ -1,8 +1,10 @@
 // src/lib/search.ts
 import { and, cosineDistance, desc, eq, gt, or, sql } from "drizzle-orm";
 import { db } from "./db-config";
-import { documents } from "./db-schema";
+import { documents, sourceDocuments } from "./db-schema";
+import { projectHasIndexedDocuments } from "./documents";
 import { generateEmbedding } from "./embeddings";
+import { publishedAnswersInChunk } from "./knowledge-import";
 
 const DEFAULT_SEARCH_LIMIT = 5;
 const DEFAULT_SIMILARITY_THRESHOLD = 0.35;
@@ -25,19 +27,20 @@ export function createProjectEmbeddingCacheKey(
   return `${projectId}:${normalizeQueryForCache(query)}`;
 }
 
+function readCachedEmbedding(projectId: number, query: string) {
+  const cached = embeddingCache.get(
+    createProjectEmbeddingCacheKey(projectId, query),
+  );
+  return cached && cached.expiresAt > Date.now() ? cached.embedding : undefined;
+}
+
 async function getCachedQueryEmbedding(projectId: number, query: string) {
-  const cacheKey = createProjectEmbeddingCacheKey(projectId, query);
-  const now = Date.now();
-  const cached = embeddingCache.get(cacheKey);
-
-  if (cached && cached.expiresAt > now) {
-    return cached.embedding;
-  }
-
+  const cached = readCachedEmbedding(projectId, query);
+  if (cached) return cached;
   const embedding = await generateEmbedding(projectId, query);
-  embeddingCache.set(cacheKey, {
+  embeddingCache.set(createProjectEmbeddingCacheKey(projectId, query), {
     embedding,
-    expiresAt: now + EMBEDDING_CACHE_TTL_MS,
+    expiresAt: Date.now() + EMBEDDING_CACHE_TTL_MS,
   });
 
   // Keep memory bounded.
@@ -78,6 +81,71 @@ export async function searchDocumentsWithEmbedding(
   limit: number = DEFAULT_SEARCH_LIMIT,
   threshold: number = DEFAULT_SIMILARITY_THRESHOLD,
 ) {
+  const rows = await rankedChunks(
+    projectId,
+    query,
+    embedding,
+    limit,
+    threshold,
+    false,
+  );
+  return rows.map(({ id, content, similarity }) => ({
+    id,
+    content,
+    similarity,
+  }));
+}
+
+export async function searchProjectDocumentEvidence(
+  projectId: number,
+  query: string,
+  limit: number,
+) {
+  const cached = readCachedEmbedding(projectId, query);
+  // Avoid paying for an embedding in an empty project. A cached vector needs
+  // no preflight: the scoped search itself sees current edits and deletions.
+  if (!cached && !(await projectHasIndexedDocuments(projectId))) return [];
+  const embedding = cached ?? (await getCachedQueryEmbedding(projectId, query));
+  return searchProjectDocumentEvidenceWithEmbedding(
+    projectId,
+    query,
+    embedding,
+    limit,
+  );
+}
+
+export async function searchProjectDocumentEvidenceWithEmbedding(
+  projectId: number,
+  query: string,
+  embedding: number[],
+  limit: number,
+) {
+  const rows = await rankedChunks(
+    projectId,
+    query,
+    embedding,
+    limit,
+    DEFAULT_SIMILARITY_THRESHOLD,
+    true,
+  );
+  return rows.map((row, index) => ({
+    id: `document:${row.id}`,
+    content: row.content,
+    approvedAnswers:
+      index < 12 && row.answers != null
+        ? publishedAnswersInChunk(row.id, row.content, row.answers)
+        : [],
+  }));
+}
+
+function rankedChunks(
+  projectId: number,
+  query: string,
+  embedding: number[],
+  limit: number,
+  threshold: number,
+  includePublishedAnswers: boolean,
+) {
   // Calculate similarity using Drizzle's cosineDistance function
   // This creates a SQL expression for similarity calculation
   const similarity = sql<number>`1 - (${cosineDistance(
@@ -91,14 +159,21 @@ export async function searchDocumentsWithEmbedding(
   const lexicalQuery = sql`replace(plainto_tsquery('english', ${query})::text, ' & ', ' | ')::tsquery`;
   const lexicalDocument = sql`to_tsvector('english', ${documents.content})`;
   const lexicalMatch = sql<boolean>`${lexicalDocument} @@ ${lexicalQuery}`;
-  const rank = sql<number>`${similarity} + least(ts_rank_cd(${lexicalDocument}, ${lexicalQuery}), 0.1)`;
+  // Keep keyword matches eligible while limiting the boost from incidental overlap.
+  const keywordWeight = includePublishedAnswers ? 0.25 : 1;
+  const rank = sql<number>`${similarity} + least(ts_rank_cd(${lexicalDocument}, ${lexicalQuery}), 0.1) * ${keywordWeight}::float8`;
 
   // Use Drizzle's query builder for the search
-  const similarDocuments = await db
+  return db
     .select({
       id: documents.id,
       content: documents.content,
       similarity,
+      answers: includePublishedAnswers
+        ? sql<unknown>`(select ${sourceDocuments.importReview}->'publishedAnswers'
+        from ${sourceDocuments} where ${sourceDocuments.id} = ${documents.sourceDocumentId}
+        and ${sourceDocuments.projectId} = ${projectId})`
+        : sql<null>`null`,
     })
     .from(documents)
     .where(
@@ -109,6 +184,4 @@ export async function searchDocumentsWithEmbedding(
     )
     .orderBy(desc(rank), desc(similarity), documents.id)
     .limit(limit);
-
-  return similarDocuments;
 }

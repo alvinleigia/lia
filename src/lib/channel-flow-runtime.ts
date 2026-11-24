@@ -112,6 +112,7 @@ import {
 } from "@/lib/handoff";
 import { selectHybridFlowEntryNode } from "@/lib/hybrid-flow-runtime";
 import { runOperationForSubmission } from "@/lib/operations";
+import type { RuntimeTimingRecorder } from "@/lib/runtime-stage-timing";
 import { normalizeProjectAiSettings } from "@/lib/project-ai-settings";
 import {
   getRuntimeProjectAction,
@@ -2575,6 +2576,7 @@ export function getChannelTaskRecommendations(
 }
 
 export async function processChannelFlowText(input: {
+  recordTiming?: RuntimeTimingRecorder;
   activeSubmission: SelectActionSubmission | null;
   channelConversationId?: number | null;
   contactId?: number | null;
@@ -2699,6 +2701,7 @@ export async function processChannelFlowText(input: {
         projectName: project.projectName,
         projectPolicy,
         publishedTasks: recommendations.map(({ task }) => task),
+        recordTiming: input.recordTiming,
         stage: "knowledge",
         visitorMessage: input.text,
       });

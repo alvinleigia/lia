@@ -179,3 +179,27 @@ export function applyKnowledgeSuggestions(
   }
   return knowledgeTextSchema.parse(draft);
 }
+
+export function publishedAnswersInChunk(
+  chunkId: number,
+  content: string,
+  answers: unknown,
+) {
+  const parsed =
+    knowledgeImportReviewSchema.shape.publishedAnswers.safeParse(answers);
+  if (!parsed.success) return [];
+  const chunk = normalizeKnowledgeQuestion(content);
+  return parsed.data.flatMap((answer, index) =>
+    answer.answer.length <= 1_000 &&
+    answer.question.length <= 240 &&
+    chunk.includes(normalizeKnowledgeQuestion(answer.question))
+      ? [
+          {
+            id: `document:${chunkId}:answer:${index + 1}`,
+            question: answer.question,
+            answer: answer.answer,
+          },
+        ]
+      : [],
+  );
+}
