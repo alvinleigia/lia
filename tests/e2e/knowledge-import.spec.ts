@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import {
   applyKnowledgeSuggestions,
@@ -5,6 +6,16 @@ import {
   extractKnowledgeAnswers,
   inspectKnowledgeImport,
 } from "../../src/lib/knowledge-import";
+import { extractPdfImportText } from "../../src/lib/pdf-import";
+
+test("PDF import preserves separate amounts and labels in a rate table", async () => {
+  const text = await extractPdfImportText(
+    await readFile("output/pdf/dune-house-rate-card.pdf"),
+  );
+  expect(text).toContain("Rate plan\tNightly rate\tBreakfast");
+  expect(text).toContain("Dune Saver\t6,200\t380 per adult each morning");
+  expect(text).toContain("Dune Flex\t7,100\tIncluded for both adults");
+});
 
 test("import flags source-report wording across business domains without rewriting facts", () => {
   for (const text of [

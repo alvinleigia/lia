@@ -4,7 +4,6 @@
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import pdf from "pdf-parse";
 import { z } from "zod";
 import { assertPermission } from "@/lib/access-control";
 import { writeAuditLog } from "@/lib/audit";
@@ -23,6 +22,7 @@ import {
   createKnowledgeImportReview,
   MAX_KNOWLEDGE_TEXT_LENGTH,
 } from "@/lib/knowledge-import";
+import { extractPdfImportText } from "@/lib/pdf-import";
 import { processUploadQueue } from "@/lib/upload-queue";
 
 const MAX_DOCUMENT_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -109,7 +109,7 @@ export async function processDocumentFile(formData: FormData) {
     }
 
     const textContent = isPdf
-      ? (await pdf(buffer)).text
+      ? await extractPdfImportText(buffer)
       : buffer.toString("utf8");
 
     if (!textContent || textContent.trim().length === 0) {
