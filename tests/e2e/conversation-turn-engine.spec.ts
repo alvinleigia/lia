@@ -3212,6 +3212,10 @@ test("pilot reviews the complete visitor reply and repairs a separate unrequeste
       baseTurn({
         turnKind: "ordinary_question",
         fieldCandidates: [],
+        knowledgeRequest: {
+          query: "Breakfast price for Sample Plan",
+          pricingIntent: null,
+        },
         reply,
         grounding: { status: "grounded", excerptIds: ["document:1"] },
       }),
@@ -3223,6 +3227,9 @@ test("pilot reviews the complete visitor reply and repairs a separate unrequeste
       generateTurn: queue.generateTurn.bind(queue),
       async reviewInterpretation(input) {
         expect(input.focusDocumentReply).toBe(true);
+        expect(input.selected[0].question).toBe(
+          "Breakfast price for Sample Plan",
+        );
         const answer = input.selected[0].answer;
         reviewed.push(answer);
         return {
@@ -3247,5 +3254,9 @@ test("pilot reviews the complete visitor reply and repairs a separate unrequeste
     visitorMessage: "What does breakfast cost?",
   });
   expect(result.proposal.reply).toBe(direct);
+  expect(queue.calls[0].focusDocumentReply).toBe(true);
+  expect(queue.calls[0].system).not.toContain(
+    "Say exactly what remains unknown",
+  );
   expect(reviewed).toEqual([draft, direct]);
 });

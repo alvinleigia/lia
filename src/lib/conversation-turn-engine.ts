@@ -1090,6 +1090,9 @@ export class StructuredTurnEngine {
       input.projectPolicy.assistant.modelPolicy.mode === "platform_default" &&
       input.projectPolicy.assistant.modelPolicy.selectiveGroundingReview ===
         true;
+    const focusDocumentReply =
+      input.stage === "knowledge" &&
+      input.projectPolicy.knowledge.preserveImportHeadings === true;
     const budget = await this.budgetGate.admit({
       estimatedCostUnits: admission.estimatedCostUnits ?? 0,
       estimatedInputTokens: admission.estimatedInputTokens ?? 0,
@@ -1250,6 +1253,7 @@ export class StructuredTurnEngine {
               input.projectId,
               () =>
                 this.provider.generateTurn({
+                  focusDocumentReply,
                   knowledgeRoutingOnly:
                     input.stage === "knowledge" && !input.activeTask,
                   selectApprovedAnswers: Boolean(
@@ -1265,9 +1269,11 @@ export class StructuredTurnEngine {
                   modelId,
                   system:
                     compiled.system +
-                    (selectiveGrounding
-                      ? "\nAnswer a settled fact directly, even when the same passage leaves another option unresolved. Say exactly what remains unknown in plain language. If something is available but its inclusion in a price is unknown, say you can confirm availability and cannot confirm whether the price includes it. When a fact needs checking, mention prerequisites only if the source explicitly requires them; a referral to staff alone does not require additional customer details."
-                      : "") +
+                    (focusDocumentReply
+                      ? "\nAnswer only the visitor's resolved question. Give the shortest natural complete answer that preserves any required unit, exception, uncertainty or eligibility limit for that question. A separate detail in the passage is outside scope, even when its value is unknown. On a change of option alone, carry over the fact the visitor last asked about and ignore asides volunteered by the assistant."
+                      : selectiveGrounding
+                        ? "\nAnswer a settled fact directly, even when the same passage leaves another option unresolved. Say exactly what remains unknown in plain language. If something is available but its inclusion in a price is unknown, say you can confirm availability and cannot confirm whether the price includes it. When a fact needs checking, mention prerequisites only if the source explicitly requires them; a referral to staff alone does not require additional customer details."
+                        : "") +
                     repair,
                   timeoutMs: remainingMs,
                 }),
@@ -1452,8 +1458,7 @@ export class StructuredTurnEngine {
                     timeoutMs: remainingReviewMs,
                     messages: compiled.messages,
                     focusDocumentReply: Boolean(
-                      reviewReferences &&
-                        input.projectPolicy.knowledge.preserveImportHeadings,
+                      reviewReferences && focusDocumentReply,
                     ),
                     requestedSections:
                       reviewKind === "knowledge_grounding" &&
@@ -1468,7 +1473,10 @@ export class StructuredTurnEngine {
                       reviewKind === "knowledge_grounding"
                         ? [
                             {
-                              question: input.visitorMessage,
+                              question: focusDocumentReply
+                                ? (proposal.knowledgeRequest?.query ??
+                                  input.visitorMessage)
+                                : input.visitorMessage,
                               answer: proposal.reply,
                             },
                           ]
