@@ -17,6 +17,7 @@ import {
 } from "../../src/lib/conversation-turn-retrieval";
 import { buildSafeTurnDecisionSummary } from "../../src/lib/conversation-turn-safety";
 import { createConversationalTaskDefinitionFromTemplate } from "../../src/lib/conversational-task-templates";
+import { requestedDocumentSections } from "../../src/lib/document-section-headings";
 import {
   AiSdkStructuredTurnProvider,
   StructuredTurnOutputLimitError,
@@ -3112,4 +3113,89 @@ test("project opt-in routes uncertain cited evidence to the stronger reviewer", 
     });
     expect(reviews).toEqual([expected]);
   }
+});
+
+test("named section matching distinguishes partial names, punctuation and explicit comparisons", () => {
+  const excerpts = [
+    { id: "one", sectionHeadings: ["Standard"] },
+    { id: "two", sectionHeadings: ["Standard Plus"] },
+    { id: "three", sectionHeadings: ["C++ Service"] },
+    { id: "four", sectionHeadings: ["Standard Plus"] },
+  ];
+  for (const [q, expected] of [
+    ["Is Standard Plus available?", ["two", "four"]],
+    ["Compare Standard with STANDARD PLUS.", ["one", "two", "four"]],
+    ["What is covered by C++ Service?", ["three"]],
+    ["What about standardisation or C Service?", []],
+  ] as const) {
+    expect(
+      requestedDocumentSections(q, excerpts).flatMap((s) => s.excerptIds),
+    ).toEqual(expected);
+  }
+});
+
+test("repairs an answer citing another service before a permissive reviewer can approve it", async () => {
+  const policy = structuredClone(REFERENCE_BOOKING_PROJECT_POLICY);
+  policy.assistant.modelPolicy.mode = "platform_default";
+  policy.knowledge.preserveImportHeadings = true;
+  policy.assistant.modelPolicy.selectiveGroundingReview = true;
+  const wrong = "The Copper Service collects within 6 kilometres.";
+  const right = "The Copper Service collects within 3 kilometres.";
+  const queue = new QueueProvider(
+    [
+      [wrong, "document:6"],
+      [right, "document:3"],
+    ].map(([reply, id]) =>
+      baseTurn({
+        turnKind: "ordinary_question",
+        fieldCandidates: [],
+        reply,
+        grounding: { status: "grounded", excerptIds: [id] },
+      }),
+    ),
+  );
+  const reviewed: string[] = [];
+  const result = await new StructuredTurnEngine({
+    provider: {
+      generateTurn: queue.generateTurn.bind(queue),
+      async reviewInterpretation(input) {
+        reviewed.push(input.selected[0].answer);
+        expect(input.requestedSections).toEqual([
+          { name: "Copper Service", excerptIds: ["document:3"] },
+        ]);
+        return {
+          matches: true,
+          query: "supported",
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        };
+      },
+    },
+    retriever: {
+      async retrieve() {
+        return [
+          {
+            id: "document:3",
+            sectionHeadings: ["Workshop", "Copper Service"],
+            content: "## Copper Service\nPickup within 3 kilometres.",
+          },
+          {
+            id: "document:6",
+            content: "Copper Wheel workshop collects within 6 kilometres.",
+          },
+        ];
+      },
+    },
+  }).execute({
+    ...engineInput(),
+    projectPolicy: policy,
+    activeTask: null,
+    publishedTasks: [],
+    stage: "knowledge",
+    visitorMessage: "How far will you collect a bike for the Copper Service?",
+  });
+  expect(result.proposal.reply).toBe(right);
+  expect(reviewed).toEqual([right]);
+  expect(queue.calls[0].system).toContain(
+    '"name":"Copper Service","excerptIds":["document:3"]',
+  );
 });

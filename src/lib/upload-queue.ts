@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import { chunkContent, textSplitter } from "@/lib/chunking";
+import { splitKnowledgeDocument, textSplitter } from "@/lib/chunking";
 import { db } from "@/lib/db-config";
 import { documents, sourceDocuments, uploadJobs } from "@/lib/db-schema";
 import { generateEmbeddings } from "@/lib/embeddings";
@@ -119,9 +119,12 @@ export async function processUploadQueue(
           review.draftText !== job.textContent)
       )
         throw new Error("This document needs approval before indexing.");
-      const chunks = review?.preserveHeadings
-        ? await chunkContent(job.textContent)
-        : await textSplitter.splitText(job.textContent.trim());
+      const { chunks, headingsByContent } = review?.preserveHeadings
+        ? await splitKnowledgeDocument(job.textContent)
+        : {
+            chunks: await textSplitter.splitText(job.textContent.trim()),
+            headingsByContent: undefined,
+          };
       if (chunks.length === 0) {
         await markJobFailed(
           job.id,
@@ -175,7 +178,20 @@ export async function processUploadQueue(
               eq(documents.sourceDocumentId, job.sourceDocumentId),
             ),
           );
-        await tx.insert(documents).values(records);
+        const insertion = tx.insert(documents).values(records);
+        const publishedSectionHeadings: Record<string, string[]> = {};
+        if (headingsByContent?.size) {
+          const inserted = await insertion.returning({
+            id: documents.id,
+            content: documents.content,
+          });
+          for (const { id, content } of inserted) {
+            const labels = headingsByContent.get(content);
+            if (labels) publishedSectionHeadings[id] = labels;
+          }
+        } else {
+          await insertion;
+        }
 
         await tx
           .update(sourceDocuments)
@@ -187,6 +203,9 @@ export async function processUploadQueue(
               ? {
                   importReview: {
                     ...review,
+                    ...(review.preserveHeadings
+                      ? { publishedSectionHeadings }
+                      : {}),
                     publishedText: job.textContent,
                     publishedAnswers: extractKnowledgeAnswers(
                       job.textContent,

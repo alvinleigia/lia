@@ -1,4 +1,3 @@
-import { needsStrongerGroundingReview } from "@/lib/knowledge-grounding";
 import type {
   ConversationalTaskSnapshotV1,
   ConversationProjectPolicyV1,
@@ -50,6 +49,7 @@ import {
   validateStructuredTurnProposal,
 } from "@/lib/conversation-turn-validator";
 import { validateTaskFieldValue } from "@/lib/conversational-task-field-validation";
+import { needsStrongerGroundingReview } from "@/lib/knowledge-grounding";
 import {
   AiSdkStructuredTurnProvider,
   PLATFORM_DEFAULT_MODEL_ID,
@@ -74,8 +74,8 @@ import {
 import { measureRuntimeModelCall } from "@/lib/runtime-request-metrics";
 import {
   measureRuntimeStage,
-  recordRuntimeStage,
   type RuntimeTimingRecorder,
+  recordRuntimeStage,
 } from "@/lib/runtime-stage-timing";
 import {
   answerTaskPricing,
@@ -1322,6 +1322,26 @@ export class StructuredTurnEngine {
               return question && answer ? [{ question, answer }] : [];
             },
           );
+          if (
+            compiled.requestedSections.length &&
+            proposal.grounding.status === "grounded" &&
+            !selectedFaqs.length &&
+            proposal.grounding.excerptIds.some((id) =>
+              compiled.validation.rawExcerptIds?.has(id),
+            )
+          ) {
+            const missing = compiled.requestedSections.filter(
+              (section) =>
+                !section.excerptIds.some((id) =>
+                  proposal.grounding.excerptIds.includes(id),
+                ),
+            );
+            if (missing.length) {
+              throw new TurnProposalValidationError([
+                `unsupported_knowledge_claim: cite evidence for each explicitly named section from ${JSON.stringify(missing)}. Use only its own terms or state that its term is unknown.`,
+              ]);
+            }
+          }
           const normalizeQuestion = (text: string) =>
             text
               .toLowerCase()
@@ -1431,6 +1451,11 @@ export class StructuredTurnEngine {
                     modelId: reviewModelId,
                     timeoutMs: remainingReviewMs,
                     messages: compiled.messages,
+                    requestedSections:
+                      reviewKind === "knowledge_grounding" &&
+                      compiled.requestedSections.length
+                        ? compiled.requestedSections
+                        : undefined,
                     references:
                       reviewKind === "knowledge_grounding"
                         ? (reviewReferences ?? compiled.references)
@@ -1507,7 +1532,11 @@ export class StructuredTurnEngine {
                   proposal.reply
                     .split(/(?<=[.!?])\s+|;\s*/u)
                     .find((part) => part.replace(/\.$/, "") === sentence);
-                if (supportedPart && supportedPart !== proposal.reply) {
+                if (
+                  !compiled.requestedSections.length &&
+                  supportedPart &&
+                  supportedPart !== proposal.reply
+                ) {
                   proposal = {
                     ...proposal,
                     reply: /[.!?]$/.test(supportedPart)

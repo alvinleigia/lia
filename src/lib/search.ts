@@ -131,6 +131,7 @@ export async function searchProjectDocumentEvidenceWithEmbedding(
   return rows.map((row, index) => ({
     id: `document:${row.id}`,
     content: row.content,
+    ...(row.headings ? { sectionHeadings: row.headings } : {}),
     approvedAnswers:
       index < 12 && row.answers != null
         ? publishedAnswersInChunk(row.id, row.content, row.answers)
@@ -170,12 +171,22 @@ function rankedChunks(
       content: documents.content,
       similarity,
       answers: includePublishedAnswers
-        ? sql<unknown>`(select ${sourceDocuments.importReview}->'publishedAnswers'
-        from ${sourceDocuments} where ${sourceDocuments.id} = ${documents.sourceDocumentId}
-        and ${sourceDocuments.projectId} = ${projectId})`
+        ? sql<unknown>`${sourceDocuments.importReview}->'publishedAnswers'`
+        : sql<null>`null`,
+      headings: includePublishedAnswers
+        ? sql<
+            string[] | null
+          >`${sourceDocuments.importReview}->'publishedSectionHeadings'->(${documents.id}::text)`
         : sql<null>`null`,
     })
     .from(documents)
+    .leftJoin(
+      sourceDocuments,
+      and(
+        eq(sourceDocuments.id, documents.sourceDocumentId),
+        eq(sourceDocuments.projectId, documents.projectId),
+      ),
+    )
     .where(
       and(
         eq(documents.projectId, projectId),

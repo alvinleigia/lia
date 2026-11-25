@@ -59,14 +59,15 @@ function documentSections(text: string): Section[] {
   return sections;
 }
 
-export async function chunkContent(content: string) {
+export async function splitKnowledgeDocument(content: string) {
+  const headingsByContent = new Map<string, string[]>();
   const text = content.trim();
   const sections = documentSections(text.replace(/\r\n/g, "\n"));
   if (
     !sections.length ||
     sections.some(({ heading }) => heading.length > chunkSize / 2)
   ) {
-    return textSplitter.splitText(text);
+    return { chunks: await textSplitter.splitText(text), headingsByContent };
   }
   const chunks: string[] = [];
   for (const { heading, body } of sections) {
@@ -79,7 +80,18 @@ export async function chunkContent(content: string) {
       ? splitter(chunkSize - prefix.length)
       : textSplitter;
     const parts = await sectionSplitter.splitText(body);
-    for (const part of parts) chunks.push(prefix + part);
+    const labels = heading
+      .split("\n")
+      .map((line) => line.replace(/^#{1,6}\s+/, "").replace(/\s+#+$/, ""));
+    for (const part of parts) {
+      const chunk = prefix + part;
+      chunks.push(chunk);
+      if (heading) headingsByContent.set(chunk, labels);
+    }
   }
-  return chunks;
+  return { chunks, headingsByContent };
+}
+
+export async function chunkContent(content: string) {
+  return (await splitKnowledgeDocument(content)).chunks;
 }

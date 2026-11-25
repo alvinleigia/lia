@@ -140,6 +140,17 @@ test("approved sections keep their labels through indexing and FAQ publication",
     "## Copper Service\nQ: How far is pickup available? A: Up to 3 kilometres.\nOnly on weekdays.",
     "## Silver Service\nPickup is available within 12 kilometres.",
   ]);
+  const hits = await searchProjectDocumentEvidenceWithEmbedding(
+    scope.projectId,
+    "Copper Service pickup",
+    (await embed(scope.projectId, ["query"]))[0],
+    8,
+  );
+  for (const { content } of chunks) {
+    expect(
+      hits.find((hit) => hit.content === content)?.sectionHeadings,
+    ).toEqual([content.split("\n")[0].slice(3)]);
+  }
   const answers = await getImportedKnowledgeAnswers(
     scope.projectId,
     "How far is pickup available?",

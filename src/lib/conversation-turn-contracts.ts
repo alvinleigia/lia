@@ -396,6 +396,7 @@ export const turnRetrievalExcerptV1Schema = z
   .object({
     id: z.string().trim().min(1).max(120),
     content: z.string().trim().min(1).max(4_000),
+    sectionHeadings: z.array(z.string().min(1).max(450)).max(6).optional(),
     approvedAnswers: z
       .array(
         z

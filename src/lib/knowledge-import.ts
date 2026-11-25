@@ -11,6 +11,9 @@ export const knowledgeImportReviewSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.number().int().positive(),
   preserveHeadings: z.literal(true).optional(),
+  publishedSectionHeadings: z
+    .record(z.string(), z.array(z.string().max(450)).max(6))
+    .optional(),
   originalText: knowledgeTextSchema,
   draftText: knowledgeTextSchema,
   publishedText: knowledgeTextSchema.nullable(),
