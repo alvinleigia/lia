@@ -154,6 +154,19 @@ test("cross-upload prose review compares published and approved rates within the
   await deleteSourceDocumentFromProject(scope.projectId, revision.id);
 });
 
+test("rate cards share the approval gate across uploads without mixing terms or projects", async () => {
+  const original = await upload("Service | Plan | Fee\n--- | --- | ---\nDelivery | Standard | INR 650", scope.projectId, true);
+  await approve(original.id);
+  const header = "Plan | Fee | Service\n--- | --- | ---\n";
+  const revised = await upload(header + "Standard | ₹950 | Delivery", scope.projectId, true);
+  await expect(approve(revised.id)).rejects.toThrow(original.title);
+  expect(await findKnowledgeAnswerConflicts(scope.otherProjectId, revised.id, revised.importReview!.draftText, true)).toEqual([]);
+  await saveKnowledgeDraft({projectId: scope.projectId, documentId: revised.id, revision: 1, text: header + "Premium | ₹950 | Delivery"});
+  await approve(revised.id, 2);
+  await deleteSourceDocumentFromProject(scope.projectId, original.id);
+  await deleteSourceDocumentFromProject(scope.projectId, revised.id);
+});
+
 test("concurrent single-paragraph prices cannot both queue", async () => {
   const first = await upload("Frame repair costs GBP 25 per visit.", scope.projectId, true);
   const second = await upload("Frame repair is priced at £40 per visit.", scope.projectId, true);

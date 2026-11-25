@@ -130,6 +130,35 @@ test("pilot price review respects terms in headings, prose and adjacent paragrap
   ]) expect(inspectKnowledgeImport("## Price guide\n" + price + "\n## Price guide\n" + variant, true)).toEqual([]);
 });
 
+test("pilot review flags duplicate rate-card rows and shows their column headings", () => {
+  const table = "| Service | Plan | Per visit |\n| --- | --- | ---: |\n| Frame fitting | Standard | INR 650 |\n| Frame fitting | Standard | ₹950 |";
+  for (const text of [table, "## Current price guide\n" + table]) {
+    const conflicts = inspectKnowledgeImport(text, true).filter(issue => issue.code === "conflict");
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].excerpt).toMatch(/Service.*Plan.*Per visit[\s\S]*650[\s\S]*950/);
+    expect(inspectKnowledgeImport(text)).toEqual([]);
+    expect(inspectKnowledgeImport(text.replace("₹950", "₹650.00"), true)).toEqual([]);
+  }
+});
+
+test("rate-card comparisons retain plan, date, customer group, currency, units and footnotes", () => {
+  const table = "Service | Plan | Date | Group | Price\n--- | --- | --- | --- | ---\nFrame fitting | Standard | May | Adult | INR 650 per visit [1]";
+  const row = "Frame fitting | Standard | May | Adult | INR 950 per visit [1]";
+  for (const [from, to] of [["Standard","Premium"], ["May","June"], ["Adult","Child"], ["INR","USD"], ["per visit","per hour"], ["[1]","[2]"]]) {
+    expect(inspectKnowledgeImport(table + "\n" + row.replace(from, to), true)).toEqual([]);
+  }
+  expect(inspectKnowledgeImport("~~~\n" + table + "\n" + row + "\n~~~", true)).toEqual([]);
+  expect(inspectKnowledgeImport(table + "\n" + row, true)).toHaveLength(1);
+  const tiers = "Service | Minimum order total | Fee\n--- | --- | ---\nDelivery | INR 100 | INR 20\nDelivery | INR 200 | INR 15";
+  expect(inspectKnowledgeImport(tiers, true)).toEqual([]);
+});
+
+test("table rates with currency in the header compare each price column independently", () => {
+  const text = "| Service | Base price (INR) | Total (INR) |\n| --- | --- | --- |\n| Admission | 1,000 | 1,100 |\n| Admission | 1,200 | 1,320 |";
+  expect(inspectKnowledgeImport(text, true).filter(i => i.code === "conflict")).toHaveLength(2);
+  expect(inspectKnowledgeImport(text.replaceAll(" (INR)", ""), true)).toHaveLength(2);
+});
+
 test("test prices, guarantees and unresolved facts are visible at import", () => {
   const issues = inspectKnowledgeImport(
     "Mock estimate for UAT: INR 400. Final price is unconfirmed.\nWe guarantee the lowest price.",

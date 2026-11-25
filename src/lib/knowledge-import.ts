@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { normalizeKnowledgeQuestion } from "@/lib/project-ai-settings";
-import { inspectProsePrices } from "./knowledge-import-prices";
+import { inspectImportPrices } from "./knowledge-import-prices";
 
 export const MAX_KNOWLEDGE_TEXT_LENGTH = 200_000;
 export const knowledgeTextSchema = z
@@ -102,7 +102,7 @@ export function inspectKnowledgeImport(
   text: string,
   preserveHeadings = false,
 ): KnowledgeIssue[] {
-  const issues: KnowledgeIssue[] = preserveHeadings ? inspectProsePrices(text) : [];
+  const issues: KnowledgeIssue[] = preserveHeadings ? inspectImportPrices(text) : [];
   for (const [index, line] of text.split(/\r?\n/).entries()) {
     const add = (code: KnowledgeIssue["code"], message: string) =>
       issues.push({

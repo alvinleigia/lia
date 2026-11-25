@@ -10,7 +10,7 @@ import {
   knowledgeTextSchema,
 } from "@/lib/knowledge-import";
 import { normalizeKnowledgeQuestion } from "@/lib/project-ai-settings";
-import { conflictingProsePrices, indexProsePrices } from "@/lib/knowledge-import-prices";
+import { conflictingImportPrices, indexImportPrices } from "@/lib/knowledge-import-prices";
 
 export async function getKnowledgeImport(
   projectId: number,
@@ -154,7 +154,7 @@ function conflictingAnswers(
   preserveHeadings = false,
 ) {
   const candidates = extractKnowledgeAnswers(text, preserveHeadings);
-  const prices = preserveHeadings ? indexProsePrices(text) : undefined;
+  const prices = preserveHeadings ? indexImportPrices(text) : undefined;
   const conflicts: string[] = [];
   for (const other of others) {
     const review = knowledgeImportReviewSchema.safeParse(other.review);
@@ -165,7 +165,7 @@ function conflictingAnswers(
       // edit cannot displace or reserve a price.
       for (const version of new Set([publishedText, approvedAt ? draftText : null])) {
         if (!version) continue;
-        for (const match of conflictingProsePrices(version, prices)) {
+        for (const match of conflictingImportPrices(version, prices)) {
           conflicts.push(
             'Price differs from "' + other.title + '". Update the existing rate or clarify when each rate applies.' +
             "\n\nThis draft\n" + match.previous + "\n\n" + other.title + "\n" + match.current,
