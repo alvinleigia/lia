@@ -1451,6 +1451,10 @@ export class StructuredTurnEngine {
                     modelId: reviewModelId,
                     timeoutMs: remainingReviewMs,
                     messages: compiled.messages,
+                    focusDocumentReply: Boolean(
+                      reviewReferences &&
+                        input.projectPolicy.knowledge.preserveImportHeadings,
+                    ),
                     requestedSections:
                       reviewKind === "knowledge_grounding" &&
                       compiled.requestedSections.length
@@ -1533,7 +1537,7 @@ export class StructuredTurnEngine {
                     .split(/(?<=[.!?])\s+|;\s*/u)
                     .find((part) => part.replace(/\.$/, "") === sentence);
                 if (
-                  !compiled.requestedSections.length &&
+                  !input.projectPolicy.knowledge.preserveImportHeadings &&
                   supportedPart &&
                   supportedPart !== proposal.reply
                 ) {
@@ -1546,7 +1550,9 @@ export class StructuredTurnEngine {
                   continue;
                 }
                 throw new TurnProposalValidationError([
-                  `unsupported_knowledge_claim: ${review.query}; answer only for the requested options. State each established fact directly and express uncertainty only about unresolved facts`,
+                  input.projectPolicy.knowledge.preserveImportHeadings
+                    ? `unsupported_knowledge_claim: ${review.query}; answer every requested aspect with its necessary conditions and omit unrelated terms`
+                    : `unsupported_knowledge_claim: ${review.query}; answer only for the requested options. State each established fact directly and express uncertainty only about unresolved facts`,
                 ]);
               }
               if (reviewKind === "knowledge_grounding")

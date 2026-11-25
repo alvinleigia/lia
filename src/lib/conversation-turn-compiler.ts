@@ -515,7 +515,13 @@ ${renderJson(approvedAnswers)}
     : ""
 }
 
-Current-turn decision:
+Current-turn decision:${
+    input.stage === "knowledge" &&
+    input.projectPolicy.knowledge.preserveImportHeadings
+      ? `
+- For a document answer, respond to the specific question in natural language and stop once it is answered. Include every requested aspect and any unit, eligibility limit, exception or uncertainty that changes that answer. Omit other terms in the same passage, even accurate ones. For a short follow-up naming a different option, carry over the visitor's last requested aspect. Extra facts previously volunteered by the assistant do not become visitor questions. If the visitor explicitly changes the aspect, use the new one.`
+      : ""
+  }
 - First distinguish a general factual FAQ, a personalized business request, and a request for human follow-up. A personalized estimate with supplied dates/quantities/preferences belongs to the matching published enquiry task, not FAQ selection or the callback task: recommend that enquiry task with answerSelections null so the server validates and calculates it. A general informational question alone does not start any task.
 - Classify the latest visitor message's INTENT; resolve its referenced SUBJECT from history. "Will it be suitable for my work?" is a factual question, not permission to arrange contact, even if an earlier turn requested contact. "Please ask them about that" requests follow-up about the earlier subject. Never treat an assistant's suggestion as visitor consent. Answer only the latest requested aspect.
 - For a request for human follow-up specifically: "Can you confirm with them?" after "our team can check" requests team action; repeating the FAQ does not answer it. With no active task, recommend a listed callback/follow-up task (nextAction "ask", answerSelections null). Do not start an unrelated enquiry. If none is available, explain that a callback cannot be arranged here without claiming anyone was contacted. A factual question alone or a refusal of contact must not start follow-up.

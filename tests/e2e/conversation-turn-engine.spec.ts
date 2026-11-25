@@ -3199,3 +3199,53 @@ test("repairs an answer citing another service before a permissive reviewer can 
     '"name":"Copper Service","excerptIds":["document:3"]',
   );
 });
+
+test("pilot reviews the complete visitor reply and repairs a separate unrequested fact", async () => {
+  const policy = structuredClone(REFERENCE_BOOKING_PROJECT_POLICY);
+  policy.assistant.modelPolicy.mode = "platform_default";
+  policy.knowledge.preserveImportHeadings = true;
+  policy.assistant.modelPolicy.selectiveGroundingReview = true;
+  const direct = "Breakfast costs INR 450 per guest.";
+  const draft = direct + " Late checkout costs INR 600.";
+  const queue = new QueueProvider(
+    [draft, direct].map((reply) =>
+      baseTurn({
+        turnKind: "ordinary_question",
+        fieldCandidates: [],
+        reply,
+        grounding: { status: "grounded", excerptIds: ["document:1"] },
+      }),
+    ),
+  );
+  const reviewed: string[] = [];
+  const result = await new StructuredTurnEngine({
+    provider: {
+      generateTurn: queue.generateTurn.bind(queue),
+      async reviewInterpretation(input) {
+        expect(input.focusDocumentReply).toBe(true);
+        const answer = input.selected[0].answer;
+        reviewed.push(answer);
+        return {
+          matches: answer === direct,
+          query: "Omit the unrequested checkout charge.",
+          completeSupportedSentence: direct,
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        };
+      },
+    },
+    retriever: {
+      async retrieve() {
+        return [{ id: "document:1", content: draft }];
+      },
+    },
+  }).execute({
+    ...engineInput(),
+    projectPolicy: policy,
+    activeTask: null,
+    publishedTasks: [],
+    stage: "knowledge",
+    visitorMessage: "What does breakfast cost?",
+  });
+  expect(result.proposal.reply).toBe(direct);
+  expect(reviewed).toEqual([draft, direct]);
+});
