@@ -103,6 +103,33 @@ test("extracts explicit FAQ formats and detects contradictory duplicates", () =>
   ).toBe("Yes, we offer pickup. Only within five kilometres.");
 });
 
+test("pilot review blocks conflicting prose prices and shows both sources", () => {
+  const text = "## Current visitor guide\nBicycle fitting costs INR 650 per visit.\n\n## Current reception guide\nBicycle fitting costs ₹950 per visit.";
+  const conflicts = (draft: string) => inspectKnowledgeImport(draft, true).filter(i => i.code === "conflict");
+  expect(conflicts(text)).toHaveLength(1);
+  expect(conflicts(text)[0].excerpt).toMatch(/visitor guide[\s\S]*650[\s\S]*reception guide[\s\S]*950/i);
+  expect(conflicts(text.replace("₹950", "₹650.00"))).toEqual([]);
+  expect(conflicts(text.replace("costs ₹950", "is priced at ₹950"))).toHaveLength(1);
+  expect(inspectKnowledgeImport(text)).toEqual([]);
+  expect(conflicts(text.replaceAll("per visit.", "per visit.\nQ: What does it cost here?\nA: Ask reception."))).toHaveLength(1);
+});
+
+test("pilot price review respects terms in headings, prose and adjacent paragraphs", () => {
+  const price = "A desk pass costs USD 100 per day.";
+  for (const [a, b] of [
+    ["## Gold plan", "## Silver plan"],
+    ["## Adults", "## Children"],
+    ["## June 2026", "## July 2026"],
+    ["# North branch\n## Current guide", "# South branch\n## Current guide"],
+    ["## Summer guide", "## Winter guide"],
+  ]) expect(inspectKnowledgeImport(a + "\n" + price + "\n" + b + "\n" + price.replace("100", "80"), true)).toEqual([]);
+  for (const variant of [
+    "A desk pass costs USD 80 per week.", "A desk pass costs EUR 80 per day.",
+    "A desk pass costs USD 80 per day for members.", "Printer hire costs USD 80 per day.",
+    "A desk pass costs USD 80 per day.\n\nApplies to members only.",
+  ]) expect(inspectKnowledgeImport("## Price guide\n" + price + "\n## Price guide\n" + variant, true)).toEqual([]);
+});
+
 test("test prices, guarantees and unresolved facts are visible at import", () => {
   const issues = inspectKnowledgeImport(
     "Mock estimate for UAT: INR 400. Final price is unconfirmed.\nWe guarantee the lowest price.",

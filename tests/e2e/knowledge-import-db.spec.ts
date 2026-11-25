@@ -113,6 +113,19 @@ async function approve(documentId: number, revision = 1) {
   });
 }
 
+test("approval rejects conflicting prose prices and queues a corrected draft", async () => {
+  const text = "## Price guide\nWheel hire costs GBP 25 per day.\n\n## Staff handbook\nWheel hire costs £40 per day.";
+  const document = await upload(text, scope.projectId, true);
+  await expect(approve(document.id)).rejects.toThrow("Resolve conflicting answers");
+  const jobs = () => db.select({ id: uploadJobs.id }).from(uploadJobs)
+    .where(and(eq(uploadJobs.projectId, scope.projectId), eq(uploadJobs.sourceDocumentId, document.id)));
+  expect(await jobs()).toHaveLength(0);
+  await saveKnowledgeDraft({ projectId: scope.projectId, documentId: document.id, revision: 1, text: text.replace("£40", "£25") });
+  await approve(document.id, 2);
+  expect(await jobs()).toHaveLength(1);
+  await deleteSourceDocumentFromProject(scope.projectId, document.id);
+});
+
 test("approved sections keep their labels through indexing and FAQ publication", async () => {
   const doc = await upload(
     [
