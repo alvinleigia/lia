@@ -7,7 +7,7 @@ import {
   inspectKnowledgeImport,
 } from "../../src/lib/knowledge-import";
 import { extractPdfImportText } from "../../src/lib/pdf-import";
-import { prosePriceLines } from "../../src/lib/knowledge-import-prices";
+import { priceComparisonContext, prosePriceLines } from "../../src/lib/knowledge-import-prices";
 import { appendSuggestedFaqs, faqSourceBlocks } from "../../src/lib/knowledge-import-faqs";
 
 test("suggested FAQs preserve source conditions and leave independent topics separate", () => {
@@ -122,6 +122,10 @@ test("pilot review blocks conflicting prose prices and shows both sources", () =
 test("differently worded findings point to original prose and exclude table lines", () => {
   const text = "## Visitor guide\nAn inspection costs INR 650 per visit.\n## Reception\nVisitors pay 950 rupees each time we check their equipment.\nService\tPrice\nInspection\tINR 800";
   expect([...prosePriceLines(text).keys()]).toEqual([2, 4]);
+  const scoped = "A 2-hour repair costs INR 650.\nThe 1-hour express repair costs 950 rupees.";
+  expect(priceComparisonContext(scoped, prosePriceLines(scoped)).map(row => row.text)).toEqual([
+    "A 2-hour repair costs INR [amount].", "The 1-hour express repair costs [amount] rupees.",
+  ]);
   const issues = inspectKnowledgeImport(text, true, [{ first: 2, second: 4 }]);
   expect(issues.filter(i => i.code === "conflict")).toHaveLength(1);
   expect(issues[0].excerpt).toContain("Visitors pay 950 rupees");

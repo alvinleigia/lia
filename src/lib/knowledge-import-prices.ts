@@ -34,6 +34,18 @@ export function prosePriceLines(text: string) {
   return amounts;
 }
 
+export function priceComparisonContext(text: string, eligible: ReadonlyMap<number, string>) {
+  return text.split(/\r?\n/).map((line, index) => {
+    // Keep the currency and every condition, including other numbers such as
+    // turnaround and occupancy. Different amounts alone cannot distinguish tiers.
+    const scope = eligible.has(index + 1)
+      ? line.replace(money, (match, _code, _symbol, amount) => match.replace(amount, "[amount]"))
+        .replace(trailingMoney, (match, amount) => match.replace(amount, "[amount]"))
+      : line;
+    return { line: index + 1, text: scope };
+  });
+}
+
 function singlePrice(text: string) {
   const matches = [...text.matchAll(money)];
   if (matches.length !== 1) return null;

@@ -67,7 +67,7 @@ export async function updateKnowledgeReviewAction(
       addedFaqs = input.intent === "faqs" && draftText !== text.data;
       const previous = document.importReview;
       const sameLines = previous?.draftText.replaceAll("\r\n", "\n") === draftText.replaceAll("\r\n", "\n");
-      const priceReview = sameLines && Array.isArray(previous?.priceReview)
+      const priceReview = sameLines && previous?.priceReviewVersion === 2 && Array.isArray(previous.priceReview)
         ? previous.priceReview
         : await reviewImportPrices(context.project.id, draftText, previous?.preserveHeadings);
       await saveKnowledgeDraft({ ...input, text: draftText, priceReview });

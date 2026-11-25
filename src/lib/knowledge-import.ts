@@ -12,6 +12,7 @@ export const knowledgeImportReviewSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.number().int().positive(),
   preserveHeadings: z.literal(true).optional(),
+  priceReviewVersion: z.literal(2).optional(),
   priceReview: z.union([z.literal("manual"), z.array(z.object({
     first: z.number().int().positive(), second: z.number().int().positive(),
   })).max(16)]).optional(),

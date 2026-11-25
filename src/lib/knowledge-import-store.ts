@@ -116,6 +116,7 @@ export async function saveKnowledgeDraft(input: {
           ...review.data,
           draftText,
           priceReview: input.priceReview,
+          priceReviewVersion: input.priceReview !== undefined ? 2 : undefined,
           revision: input.revision + 1,
           approvedAt: null,
           approvedByUserId: null,

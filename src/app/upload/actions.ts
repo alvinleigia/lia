@@ -131,6 +131,7 @@ export async function processDocumentFile(formData: FormData) {
     const policy = await getConversationProjectPolicy(context.project.id);
     const review = createKnowledgeImportReview(textContent, policy.knowledge.preserveImportHeadings);
     review.priceReview = await reviewImportPrices(context.project.id, review.draftText, review.preserveHeadings);
+    if (review.priceReview !== undefined) review.priceReviewVersion = 2;
     const sourceDocumentId = await db.transaction(async (tx) => {
       const [uploadedDocument] = await tx
         .insert(sourceDocuments)
