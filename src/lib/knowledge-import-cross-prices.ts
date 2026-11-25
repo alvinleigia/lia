@@ -1,11 +1,12 @@
-﻿import { createHash } from "node:crypto";
+import { createHash } from "node:crypto";
 import { knowledgeImportReviewSchema, type KnowledgeImportReview } from "./knowledge-import";
 import { priceComparisonContext, prosePriceLines } from "./knowledge-import-prices";
 
 type Source = { id: number; title: string; review: unknown };
 type PricePair = { draftLine: number; source: number; sourceLine: number };
 
-export function crossPricePlan(draft: string, others: Source[]) {
+export function crossPricePlan(text: string, others: Source[]) {
+  const draft = text.replaceAll("\r\n", "\n");
   const amounts = prosePriceLines(draft);
   if (!amounts.size) return null;
   const texts: { title: string; text: string; amounts: Map<number, string> }[] = [];
@@ -18,7 +19,7 @@ export function crossPricePlan(draft: string, others: Source[]) {
     const parsed = knowledgeImportReviewSchema.safeParse(other.review);
     if (!parsed.success) continue;
     const { publishedText, approvedAt, draftText } = parsed.data;
-    for (const text of new Set([publishedText, approvedAt ? draftText : null])) {
+    for (const text of new Set([publishedText, approvedAt ? draftText : null].map(version => version?.replaceAll("\r\n", "\n")))) {
       if (!text) continue;
       const prices = prosePriceLines(text);
       if (![...prices.values()].some(amount => distinct.size > 1 || !distinct.has(amount))) continue;

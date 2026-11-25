@@ -218,6 +218,9 @@ test("separate price sources retain scope and version when comparing differently
   expect(crossPricePlan(draft, [other])).toBeNull();
   review.publishedText = source;
   const plan = crossPricePlan(draft, [other])!;
+  const multiLine = "## Staff handbook\n" + draft;
+  expect(crossPricePlan(multiLine.replaceAll("\n", "\r\n"), [other])?.fingerprint)
+    .toBe(crossPricePlan(multiLine, [other])?.fingerprint);
   expect(crossPricePrompt(plan).sources[0][1].text).toContain("INR [amount]");
   const finding = { fingerprint: plan.fingerprint, manual: false, conflicts: [0] };
   expect(crossPriceFindings(plan, finding)[0]).toContain(source.split("\n")[1]);
