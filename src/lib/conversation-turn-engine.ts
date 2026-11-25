@@ -1093,22 +1093,12 @@ export class StructuredTurnEngine {
     const focusDocumentReply =
       input.stage === "knowledge" &&
       input.projectPolicy.knowledge.preserveImportHeadings === true;
-    const shortFollowUp =
-      focusDocumentReply &&
-      selectiveGrounding &&
-      !input.activeTask &&
-      !input.knowledgeRequest &&
-      input.history.some((message) => message.role === "user") &&
-      /^(?:and\b|(?:how|what) about\b)/iu.test(input.visitorMessage.trim()) &&
-      input.visitorMessage.trim().split(/\s+/u).length <= 5;
     const budget = await this.budgetGate.admit({
       estimatedCostUnits: admission.estimatedCostUnits ?? 0,
       estimatedInputTokens: admission.estimatedInputTokens ?? 0,
       maxTurnsPerMinute:
         input.projectPolicy.assistant.modelPolicy.maxTurnsPerMinute,
-      modelId: shortFollowUp
-        ? (modelIds.fallback ?? modelIds.primary)
-        : modelIds.primary,
+      modelId: modelIds.primary,
       projectId: input.projectId,
     });
     if (!budget.allowed) {
@@ -1237,19 +1227,6 @@ export class StructuredTurnEngine {
     const models = [...new Set([modelIds.primary, modelIds.fallback])].filter(
       (modelId): modelId is string => Boolean(modelId),
     );
-    // On terse option changes a single passage can mix a known fact with an
-    // unrelated unknown. Use the stronger writer up front only for that case.
-    if (
-      shortFollowUp &&
-      compiled.references.length === 1 &&
-      needsStrongerGroundingReview(
-        input.projectPolicy.assistant.language,
-        compiled.references,
-        "",
-      )
-    ) {
-      models.reverse();
-    }
     let attempts = 0;
     let retrievalRephrased = false;
     const attemptUsages: ModelUsage[] = [];

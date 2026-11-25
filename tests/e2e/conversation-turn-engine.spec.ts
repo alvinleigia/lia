@@ -3115,38 +3115,6 @@ test("project opt-in routes uncertain cited evidence to the stronger reviewer", 
   }
 });
 
-test("the pilot uses the stronger writer only for a short follow-up on uncertain evidence", async () => {
-  for (const [pilot, question, evidence, expected] of [
-    [true, "And with Blue?", "Blue includes delivery. Setup is unconfirmed.", "gpt-5-mini"],
-    [true, "And with Blue?", "Blue includes delivery.", "gpt-4.1-mini"],
-    [true, "Does Blue include delivery?", "Setup is unconfirmed.", "gpt-4.1-mini"],
-    [false, "And with Blue?", "Setup is unconfirmed.", "gpt-4.1-mini"],
-  ] as const) {
-    const policy = structuredClone(REFERENCE_BOOKING_PROJECT_POLICY);
-    policy.assistant.modelPolicy.mode = "platform_default";
-    policy.assistant.modelPolicy.selectiveGroundingReview = true;
-    policy.knowledge.preserveImportHeadings = pilot;
-    const queue = new QueueProvider([baseTurn({
-      turnKind: "ordinary_question",
-      fieldCandidates: [],
-      reply: evidence,
-      grounding: { status: "grounded", excerptIds: ["document:1"] },
-    })]);
-    await new StructuredTurnEngine({
-      provider: queue,
-      retriever: { retrieve: async () => [{ id: "document:1", content: evidence }] },
-    }).execute({
-      ...engineInput(),
-      projectPolicy: policy,
-      stage: "knowledge",
-      activeTask: null,
-      history: [{ role: "user", content: "Does Red include delivery?" }],
-      visitorMessage: question,
-    });
-    expect(queue.calls[0].modelId).toBe(expected);
-  }
-});
-
 test("named section matching distinguishes partial names, punctuation and explicit comparisons", () => {
   const excerpts = [
     { id: "one", sectionHeadings: ["Standard"] },
