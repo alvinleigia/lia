@@ -3,28 +3,30 @@ import { writeFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { embedMany } from "ai";
 import { eq, inArray } from "drizzle-orm";
-import { db } from "../../src/lib/db-config";
+import { chunkContent, textSplitter } from "../../src/lib/chunking";
 import { ProjectDocumentTurnRetriever } from "../../src/lib/conversation-turn-retrieval";
+import { db } from "../../src/lib/db-config";
 import {
-  companies,
   chatRequestLogs,
+  companies,
   documents,
   projects,
   sourceDocuments,
   users,
   workspaces,
 } from "../../src/lib/db-schema";
-import { createKnowledgeImportReview } from "../../src/lib/knowledge-import";
 import { deleteSourceDocumentFromProject } from "../../src/lib/documents";
+import { createKnowledgeImportReview } from "../../src/lib/knowledge-import";
 import {
   getPlatformEmbeddingModel,
   PLATFORM_EMBEDDING_MODEL_ID,
 } from "../../src/lib/model-provider";
 import {
-  searchProjectDocumentEvidenceWithEmbedding,
   searchDocumentsWithEmbedding,
+  searchProjectDocumentEvidenceWithEmbedding,
 } from "../../src/lib/search";
 import { retrievalCases } from "../fixtures/retrieval-benchmark";
+import { sectionGuides, sectionQuestions } from "../fixtures/section-terms";
 
 const queryVector = Array.from({ length: 1536 }, (_, i) => (i === 0 ? 1 : 0));
 // Below the general cutoff, above the grounded candidate cutoff.
@@ -331,5 +333,84 @@ test("ranks supporting passages for cross-domain paraphrases @live-openai", asyn
       .filter((row) => row.rank !== 1)
       .map(({ query, rank }) => ({ query, rank })),
     "Each labelled question in this fixture has one preferred passage",
+  ).toEqual([]);
+});
+
+test("compares retrieval of terms under neighbouring headings @live-openai", async () => {
+  const info = test.info();
+  test.skip(
+    info.project.name !== "rag-benchmark",
+    "Explicit benchmark command only.",
+  );
+  const baseline = (
+    await Promise.all(sectionGuides.map((doc) => textSplitter.splitText(doc)))
+  ).flat();
+  const candidate = (await Promise.all(sectionGuides.map(chunkContent))).flat();
+  const inputs = [
+    ...new Set([
+      ...baseline,
+      ...candidate,
+      ...sectionQuestions.map((q) => q.query),
+    ]),
+  ];
+  const batch = await embedMany({
+    model: getPlatformEmbeddingModel(),
+    values: inputs.map((text) => text.replaceAll("\n", " ")),
+    maxRetries: 0,
+  });
+  const vector = (text: string) => batch.embeddings[inputs.indexOf(text)];
+  const rows = [];
+  const { projectId } = scopes[0];
+  for (const [index, chunks] of [baseline, candidate].entries()) {
+    const inserted = await db
+      .insert(documents)
+      .values(
+        chunks.map((content) => ({
+          projectId,
+          content,
+          embedding: vector(content),
+        })),
+      )
+      .returning({ id: documents.id });
+    for (const { query, title, term, sibling } of sectionQuestions) {
+      const hits = await searchProjectDocumentEvidenceWithEmbedding(
+        projectId,
+        query,
+        vector(query),
+        5,
+      );
+      const rank = hits.findIndex(
+        (hit) => hit.content.includes(title) && hit.content.includes(term),
+      );
+      rows.push({
+        variant: index === 0 ? "baseline" : "candidate",
+        query,
+        rank: rank < 0 ? null : rank + 1,
+        mixed: hits[0]?.content.includes(sibling) ?? false,
+      });
+    }
+    await db.delete(documents).where(
+      inArray(
+        documents.id,
+        inserted.map((row) => row.id),
+      ),
+    );
+  }
+  await writeFile(
+    info.outputPath("section-ranks.json"),
+    JSON.stringify(
+      {
+        baselineChunks: baseline.length,
+        candidateChunks: candidate.length,
+        rows,
+      },
+      null,
+      2,
+    ),
+  );
+  expect(
+    rows.filter(
+      (row) => row.variant === "candidate" && (row.rank !== 1 || row.mixed),
+    ),
   ).toEqual([]);
 });

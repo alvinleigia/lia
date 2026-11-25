@@ -109,6 +109,41 @@ async function approve(documentId: number, revision = 1) {
   });
 }
 
+test("approved sections keep their labels through indexing and FAQ publication", async () => {
+  const doc = await upload(
+    [
+      "## Copper Service",
+      "Q: How far is pickup available? A: Up to 3 kilometres.",
+      "Only on weekdays.",
+      "## Silver Service",
+      "Pickup is available within 12 kilometres.",
+    ].join("\n"),
+  );
+  await approve(doc.id);
+  await processUploadQueue(1, scope.projectId, embed);
+  const chunks = await db
+    .select({ content: documents.content })
+    .from(documents)
+    .where(
+      and(
+        eq(documents.projectId, scope.projectId),
+        eq(documents.sourceDocumentId, doc.id),
+      ),
+    );
+  expect(chunks.map((row) => row.content).sort()).toEqual([
+    "## Copper Service\nQ: How far is pickup available? A: Up to 3 kilometres.\nOnly on weekdays.",
+    "## Silver Service\nPickup is available within 12 kilometres.",
+  ]);
+  const answers = await getImportedKnowledgeAnswers(
+    scope.projectId,
+    "How far is pickup available?",
+  );
+  expect(answers.map((entry) => entry.answer)).toEqual([
+    "Up to 3 kilometres. Only on weekdays.",
+  ]);
+  await deleteSourceDocumentFromProject(scope.projectId, doc.id);
+});
+
 test("retrieved FAQ references use full published answers and remain project scoped", async () => {
   const doc = await upload(
     "Q: Is collection available? A: Yes, within 5 km.\nOutside this area, collection costs INR 200.",

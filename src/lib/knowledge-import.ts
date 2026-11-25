@@ -70,6 +70,7 @@ export function extractKnowledgeAnswers(text: string) {
     while (
       i + 1 < lines.length &&
       lines[i + 1].trim() &&
+      !/^ {0,3}#{1,6}[ \t]+\S/.test(lines[i + 1]) &&
       !/^Q:|=>/i.test(lines[i + 1].trim())
     ) {
       answer += ` ${lines[++i].trim()}`;
