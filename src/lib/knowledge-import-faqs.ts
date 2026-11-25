@@ -4,11 +4,12 @@ import { documentSections } from "./chunking";
 
 export const FAQ_SUGGESTION_TEXT_LIMIT = 24_000;
 
-// Keep paragraph boundaries so a proposed answer cannot borrow a price from
-// another section. The model sees the full draft to check wider conditions.
+// Conditions may appear in a later paragraph of the same section.
 export function faqSourceBlocks(text: string) {
   const lines = text.split(/\r?\n/);
-  const plainSections = new Set(documentSections(lines.join("\n")).map(
+  const plainSections = new Set(documentSections(lines.join("\n")).filter(
+    ({ heading }) => heading && !heading.startsWith("#"),
+  ).map(
     ({ heading, body }) => heading + "\n" + body,
   ));
   const blocks: { endLine: number; sentences: string[] }[] = [];
@@ -19,15 +20,20 @@ export function faqSourceBlocks(text: string) {
       continue;
     }
     const start = i++;
-    while (i < lines.length && lines[i].trim() && !/^ {0,3}#{1,6}\s/.test(lines[i])) i++;
-    const paragraph = lines.slice(start, i);
-    if (paragraph.some((line) => /^\s*[QA]:|=>|\t|\|/i.test(line))) continue;
+    while (i < lines.length && !/^ {0,3}#{1,6}\s/.test(lines[i]) &&
+      (!plainSections.size || lines[i].trim())) i++;
+    let endLine = i - 1;
+    while (!lines[endLine].trim()) endLine--;
+    const section = lines.slice(start, endLine + 1);
+    if (section.some((line) => /^\s*[QA]:|=>|\t|\|/i.test(line))) continue;
     // A plain-text section title supplies context for the question.
-    if (paragraph.length > 1 && plainSections.has(paragraph.join("\n").trim())) {
-      paragraph.shift();
+    if (section.length > 1 && plainSections.has(section.join("\n").trim())) {
+      section.shift();
     }
-    const sentences = Array.from(segmenter.segment(paragraph.join(" ").trim()), (s) => s.segment.trim());
-    if (sentences.length) blocks.push({ endLine: i - 1, sentences });
+    const sentences = section.join("\n").split(/\n\s*\n/).flatMap((paragraph) =>
+      Array.from(segmenter.segment(paragraph.replaceAll("\n", " ").trim()), (s) => s.segment.trim()),
+    );
+    if (sentences.length) blocks.push({ endLine, sentences });
   }
   return blocks;
 }
@@ -53,7 +59,7 @@ export function appendSuggestedFaqs(
   for (const [index, block] of blocks.entries()) {
     const rows = facts.filter((fact) => fact.block === index).sort((a,b) => a.sentence - b.sentence);
     // Every source sentence must have exactly one role. Qualifiers must
-    // point to primary facts in this paragraph, never to another qualifier.
+    // point to primary facts in this section, never to another qualifier.
     if (rows.length !== block.sentences.length || rows.some((row, id) =>
       row.sentence !== id || (row.question === null) !== (row.qualifies.length > 0) ||
       row.qualifies.some((target) => !rows[target]?.question)

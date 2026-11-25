@@ -42,6 +42,22 @@ test("FAQ suggestions stay within each source paragraph and preserve existing FA
   expect(draft.replaceAll("\r\n", "")).not.toContain("\n");
 });
 
+test("a fee in a later paragraph can qualify its own section's price", () => {
+  const text = "## Harbor Studio\nHire costs INR 1,200 per day.\n\nA refundable deposit of INR 500 is required.\n\n## Moss Studio\nHire costs INR 950 per day. No deposit is required.";
+  const blocks = faqSourceBlocks(text);
+  expect(blocks.map(({ sentences }) => sentences.length)).toEqual([2, 2]);
+  const draft = appendSuggestedFaqs(text, blocks, [
+    { block: 0, sentence: 0, question: "What does Harbor cost?", qualifies: [] },
+    { block: 0, sentence: 1, question: null, qualifies: [0] },
+    { block: 1, sentence: 0, question: "What does Moss cost?", qualifies: [] },
+    { block: 1, sentence: 1, question: null, qualifies: [0] },
+  ]);
+  expect(extractKnowledgeAnswers(draft, true).map((faq) => faq.answer)).toEqual([
+    "Hire costs INR 1,200 per day. A refundable deposit of INR 500 is required.",
+    "Hire costs INR 950 per day. No deposit is required.",
+  ]);
+});
+
 test("PDF import preserves separate amounts and labels in a rate table", async () => {
   const text = await extractPdfImportText(
     await readFile("output/pdf/dune-house-rate-card.pdf"),

@@ -226,7 +226,7 @@ export default async function KnowledgeReviewPage({
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Wording suggestions cover up to 12 flagged lines per request.
-                  {review.preserveHeadings && " FAQ suggestions add up to 12 questions to your draft. Check each answer against its source paragraph, including fees and exceptions, before approving."}
+                  {review.preserveHeadings && " FAQ suggestions add up to 12 questions to your draft. Check each answer against its source section, including fees and exceptions, before approving."}
                   {" "}Each AI request uses one metered call.
                 </p>
               </ActionStateForm>
