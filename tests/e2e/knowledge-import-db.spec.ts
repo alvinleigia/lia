@@ -20,6 +20,7 @@ import {
 import { createKnowledgeImportReview } from "../../src/lib/knowledge-import";
 import {
   approveKnowledgeImport,
+  findKnowledgeAnswerConflicts,
   getImportedKnowledgeAnswers,
   getKnowledgeImport,
   saveKnowledgeDraft,
@@ -124,6 +125,44 @@ test("approval rejects conflicting prose prices and queues a corrected draft", a
   await approve(document.id, 2);
   expect(await jobs()).toHaveLength(1);
   await deleteSourceDocumentFromProject(scope.projectId, document.id);
+});
+
+test("cross-upload prose review compares published and approved rates within the project", async () => {
+  const rate = (amount: number, heading = "Visitor guide") =>
+    "## " + heading + "\nSpindle repair costs INR " + amount + " per visit.";
+  const original = await upload(rate(650), scope.projectId, true);
+  const revision = await upload(rate(950), scope.projectId, true);
+  const conflicts = (text: string) =>
+    findKnowledgeAnswerConflicts(scope.projectId, revision.id, text, true);
+  expect(await conflicts(rate(950))).toEqual([]); // another unapproved draft
+  await approve(original.id);
+  const queued = await conflicts(rate(950));
+  expect(queued.join(" ")).toContain(original.title);
+  await expect(approve(revision.id)).rejects.toThrow("Resolve conflicting answers");
+  await processUploadQueue(1, scope.projectId, embed);
+  await saveKnowledgeDraft({ projectId: scope.projectId, documentId: original.id, revision: 1, text: rate(950) });
+  expect((await conflicts(rate(950))).join(" ")).toContain("650");
+  expect(await conflicts(rate(950, "Weekend plan"))).toEqual([]);
+  expect(await findKnowledgeAnswerConflicts(scope.otherProjectId, revision.id, rate(950), true)).toEqual([]);
+  await approve(original.id, 2);
+  expect(await conflicts(rate(650))).not.toEqual([]); // approved replacement
+  expect(await conflicts(rate(950))).not.toEqual([]); // still-published predecessor
+  await processUploadQueue(1, scope.projectId, embed);
+  expect(await conflicts(rate(950))).toEqual([]);
+  await approve(revision.id);
+  await deleteSourceDocumentFromProject(scope.projectId, original.id);
+  await deleteSourceDocumentFromProject(scope.projectId, revision.id);
+});
+
+test("concurrent single-paragraph prices cannot both queue", async () => {
+  const first = await upload("Frame repair costs GBP 25 per visit.", scope.projectId, true);
+  const second = await upload("Frame repair is priced at £40 per visit.", scope.projectId, true);
+  const results = await Promise.allSettled([approve(first.id), approve(second.id)]);
+  expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+  const rejected = results.find(result => result.status === "rejected");
+  expect(String(rejected?.reason)).toContain("Price differs from");
+  await deleteSourceDocumentFromProject(scope.projectId, first.id);
+  await deleteSourceDocumentFromProject(scope.projectId, second.id);
 });
 
 test("approved sections keep their labels through indexing and FAQ publication", async () => {

@@ -8,11 +8,15 @@ const currencies: Record<string, string> = { "₹": "INR", "€": "EUR", "£": "
 // the document. Retain named plans, seasons, dates and parent headings.
 const publicationLabel = /^(?:current )?(?:(?:visitor|staff|customer|reception|price|pricing|service) )?(?:guide|handbook|manual|brochure|price list|rate card)$/i;
 
-export function inspectProsePrices(text: string): KnowledgeIssue[] {
-  const issues: KnowledgeIssue[] = [];
-  type Quote = { amount: string; source: string };
-  const scopes = new Map<string, Map<string, Quote>>();
-  for (const { heading, body } of documentSections(text.replaceAll("\r\n", "\n"))) {
+type Quote = { key: string; amount: string; source: string };
+type PriceIndex = Map<string, Map<string, Quote>>;
+
+function* priceSections(text: string) {
+  const normalizedText = text.trim().replaceAll("\r\n", "\n");
+  const sections = normalizedText.includes("\n")
+    ? documentSections(normalizedText)
+    : [{ heading: "", body: normalizedText }];
+  for (const { heading, body } of sections) {
     const labels = heading.split("\n").map(s => s.replace(/^#+\s*/, "").trim());
     // Generated FAQs follow the original prose. They have a separate
     // duplicate-question check and must not obscure the source conflict.
@@ -42,18 +46,38 @@ export function inspectProsePrices(text: string): KnowledgeIssue[] {
     if (!prices.length) continue;
     const scopeLabels = labels.filter(label => label && !publicationLabel.test(label));
     const scope = JSON.stringify([scopeLabels.map(label => label.toLowerCase()), qualifications]);
+    yield { scope, prices };
+  }
+}
+
+export function indexProsePrices(text: string): PriceIndex {
+  const index: PriceIndex = new Map();
+  for (const { scope, prices } of priceSections(text)) {
+    const seen = index.get(scope) ?? new Map<string, Quote>();
+    index.set(scope, seen);
+    for (const price of prices) seen.set(price.key, price);
+  }
+  return index;
+}
+
+export function* conflictingProsePrices(text: string, draftIndex?: PriceIndex) {
+  const scopes = draftIndex ?? new Map<string, Map<string, Quote>>();
+  for (const { scope, prices } of priceSections(text)) {
     const seen = scopes.get(scope) ?? new Map<string, Quote>();
-    scopes.set(scope, seen);
+    if (!draftIndex) scopes.set(scope, seen);
     for (const price of prices) {
       const previous = seen.get(price.key);
       if (previous && previous.amount !== price.amount) {
-        issues.push({
-          code: "conflict", line: 0,
-          message: "These passages give different prices for the same terms. Correct the price or specify when each rate applies.",
-          excerpt: previous.source + "\n\n" + price.source,
-        });
-      } else if (!previous) seen.set(price.key, price);
+        yield { previous: previous.source, current: price.source };
+      } else if (!previous && !draftIndex) seen.set(price.key, price);
     }
   }
-  return issues;
+}
+
+export function inspectProsePrices(text: string): KnowledgeIssue[] {
+  return Array.from(conflictingProsePrices(text), ({ previous, current }) => ({
+    code: "conflict", line: 0,
+    message: "These passages give different prices for the same terms. Correct the price or specify when each rate applies.",
+    excerpt: previous + "\n\n" + current,
+  }));
 }

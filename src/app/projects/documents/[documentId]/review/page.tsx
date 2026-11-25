@@ -141,7 +141,7 @@ export default async function KnowledgeReviewPage({
                 </p>
               )}
               {conflicts.map((message) => (
-                <p key={message} className="text-red-700">
+                <p key={message} className="whitespace-pre-wrap text-red-700">
                   {message}
                 </p>
               ))}
