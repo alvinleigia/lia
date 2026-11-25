@@ -167,6 +167,16 @@ test("rate cards share the approval gate across uploads without mixing terms or 
   await deleteSourceDocumentFromProject(scope.projectId, revised.id);
 });
 
+test("a saved semantic finding blocks approval and clears on a corrected revision", async () => {
+  const text = "Checking a frame costs INR 650.\nEach frame inspection is 950 rupees.";
+  const doc = await upload(text, scope.projectId, true);
+  await saveKnowledgeDraft({ projectId: scope.projectId, documentId: doc.id, revision: 1, text, priceReview: [{ first: 1, second: 2 }] });
+  await expect(approve(doc.id, 2)).rejects.toThrow("Resolve conflicting answers");
+  await saveKnowledgeDraft({ projectId: scope.projectId, documentId: doc.id, revision: 2, text: text.replace("650", "950") });
+  await approve(doc.id, 3);
+  await deleteSourceDocumentFromProject(scope.projectId, doc.id);
+});
+
 test("concurrent single-paragraph prices cannot both queue", async () => {
   const first = await upload("Frame repair costs GBP 25 per visit.", scope.projectId, true);
   const second = await upload("Frame repair is priced at £40 per visit.", scope.projectId, true);

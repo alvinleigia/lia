@@ -7,6 +7,7 @@ import {
   inspectKnowledgeImport,
 } from "../../src/lib/knowledge-import";
 import { extractPdfImportText } from "../../src/lib/pdf-import";
+import { prosePriceLines } from "../../src/lib/knowledge-import-prices";
 import { appendSuggestedFaqs, faqSourceBlocks } from "../../src/lib/knowledge-import-faqs";
 
 test("suggested FAQs preserve source conditions and leave independent topics separate", () => {
@@ -65,6 +66,10 @@ test("PDF import preserves separate amounts and labels in a rate table", async (
   expect(text).toContain("Rate plan\tNightly rate\tBreakfast");
   expect(text).toContain("Dune Saver\t6,200\t380 per adult each morning");
   expect(text).toContain("Dune Flex\t7,100\tIncluded for both adults");
+  const duplicate = text.replace("Dune Saver\t6,200\t380 per adult each morning",
+    "Dune Saver\t6,200\t380 per adult each morning\nDune Saver\t7,100\t380 per adult each morning");
+  expect(inspectKnowledgeImport(text, true).filter(i => i.code === "conflict")).toEqual([]);
+  expect(inspectKnowledgeImport(duplicate, true).filter(i => i.code === "conflict")).toHaveLength(1);
 });
 
 test("import flags source-report wording across business domains without rewriting facts", () => {
@@ -112,6 +117,15 @@ test("pilot review blocks conflicting prose prices and shows both sources", () =
   expect(conflicts(text.replace("costs ₹950", "is priced at ₹950"))).toHaveLength(1);
   expect(inspectKnowledgeImport(text)).toEqual([]);
   expect(conflicts(text.replaceAll("per visit.", "per visit.\nQ: What does it cost here?\nA: Ask reception."))).toHaveLength(1);
+});
+
+test("differently worded findings point to original prose and exclude table lines", () => {
+  const text = "## Visitor guide\nAn inspection costs INR 650 per visit.\n## Reception\nVisitors pay 950 rupees each time we check their equipment.\nService\tPrice\nInspection\tINR 800";
+  expect([...prosePriceLines(text).keys()]).toEqual([2, 4]);
+  const issues = inspectKnowledgeImport(text, true, [{ first: 2, second: 4 }]);
+  expect(issues.filter(i => i.code === "conflict")).toHaveLength(1);
+  expect(issues[0].excerpt).toContain("Visitors pay 950 rupees");
+  expect(inspectKnowledgeImport(text, true, "manual").some(i => i.code === "uncertain")).toBe(true);
 });
 
 test("pilot price review respects terms in headings, prose and adjacent paragraphs", () => {

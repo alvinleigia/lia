@@ -7,6 +7,7 @@ import {
   extractKnowledgeAnswers,
   inspectKnowledgeImport,
   knowledgeImportReviewSchema,
+  type KnowledgeImportReview,
   knowledgeTextSchema,
 } from "@/lib/knowledge-import";
 import { normalizeKnowledgeQuestion } from "@/lib/project-ai-settings";
@@ -83,6 +84,7 @@ export async function saveKnowledgeDraft(input: {
   documentId: number;
   revision: number;
   text: string;
+  priceReview?: KnowledgeImportReview["priceReview"];
 }) {
   const draftText = knowledgeTextSchema.parse(input.text);
   return db.transaction(async (tx) => {
@@ -113,6 +115,7 @@ export async function saveKnowledgeDraft(input: {
         importReview: {
           ...review.data,
           draftText,
+          priceReview: input.priceReview,
           revision: input.revision + 1,
           approvedAt: null,
           approvedByUserId: null,
@@ -228,6 +231,7 @@ export async function approveKnowledgeImport(input: {
     const issues = inspectKnowledgeImport(
       review.data.draftText,
       review.data.preserveHeadings,
+      review.data.priceReview,
     );
     if (
       issues.some(

@@ -13,7 +13,7 @@ import {
   saveKnowledgeDraft,
   startKnowledgeReview,
 } from "@/lib/knowledge-import-store";
-import { suggestKnowledgeImport } from "@/lib/knowledge-import-suggestions";
+import { reviewImportPrices, suggestKnowledgeImport } from "@/lib/knowledge-import-suggestions";
 
 const reviewActionSchema = z.object({
   projectId: z.coerce.number().int().positive(),
@@ -65,7 +65,12 @@ export async function updateKnowledgeReviewAction(
           ? await suggestKnowledgeImport(context.project.id, text.data, input.intent)
           : text.data;
       addedFaqs = input.intent === "faqs" && draftText !== text.data;
-      await saveKnowledgeDraft({ ...input, text: draftText });
+      const previous = document.importReview;
+      const sameLines = previous?.draftText.replaceAll("\r\n", "\n") === draftText.replaceAll("\r\n", "\n");
+      const priceReview = sameLines && Array.isArray(previous?.priceReview)
+        ? previous.priceReview
+        : await reviewImportPrices(context.project.id, draftText, previous?.preserveHeadings);
+      await saveKnowledgeDraft({ ...input, text: draftText, priceReview });
     }
     await writeAuditLog({
       ...context,

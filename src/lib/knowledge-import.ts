@@ -12,6 +12,9 @@ export const knowledgeImportReviewSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.number().int().positive(),
   preserveHeadings: z.literal(true).optional(),
+  priceReview: z.union([z.literal("manual"), z.array(z.object({
+    first: z.number().int().positive(), second: z.number().int().positive(),
+  })).max(16)]).optional(),
   publishedSectionHeadings: z
     .record(z.string(), z.array(z.string().max(450)).max(6))
     .optional(),
@@ -101,8 +104,23 @@ export function hasExplicitKnowledgeUncertainty(text: string) {
 export function inspectKnowledgeImport(
   text: string,
   preserveHeadings = false,
+  priceReview?: KnowledgeImportReview["priceReview"],
 ): KnowledgeIssue[] {
   const issues: KnowledgeIssue[] = preserveHeadings ? inspectImportPrices(text) : [];
+  if (preserveHeadings && priceReview) {
+    const lines = text.split(/\r?\n/);
+    if (priceReview === "manual") issues.push({
+      code: "uncertain", line: 0, excerpt: "",
+      message: "The wording comparison is incomplete. Compare the prose prices and their conditions before approving, or save again to retry.",
+    });
+    else for (const { first, second } of priceReview) {
+      if (lines[first - 1] && lines[second - 1]) issues.push({
+        code: "conflict", line: first,
+        message: "These passages may quote different prices for the same charge. Correct the price or clarify when each applies.",
+        excerpt: [first, second].map(n => "Line " + n + ": " + lines[n - 1]).join("\n"),
+      });
+    }
+  }
   for (const [index, line] of text.split(/\r?\n/).entries()) {
     const add = (code: KnowledgeIssue["code"], message: string) =>
       issues.push({

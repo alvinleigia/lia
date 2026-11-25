@@ -4,6 +4,7 @@ import type { KnowledgeIssue } from "./knowledge-import";
 const currencyMarker = /(?:\b(INR|USD|EUR|GBP|CAD|AUD|NZD|SGD|AED|JPY|CHF)(?![a-z])|([₹$€£]))/i;
 const amountPattern = /\d+(?:(?:,\d{2})*,\d{3}|(?:,\d{3})+)?(?:\.\d+)?/;
 const money = new RegExp(currencyMarker.source + "\\s*(" + amountPattern.source + ")(?!\\d|[.,]\\d)", "gi");
+const trailingMoney = new RegExp("(?<![\\d.,])(" + amountPattern.source + ")\\s*(?:" + currencyMarker.source + "|rupees?|dollars?|pounds?|euros?|yen)\\b", "gi");
 const bareAmount = new RegExp("^" + amountPattern.source + "$");
 const currencies: Record<string, string> = { "₹": "INR", "€": "EUR", "£": "GBP" };
 const priceHeader = /^per\s|\b(?:prices?|rates?|fees?|charges?|costs?|total|tax)(?:$|\s*[(\[]|\s+(?:per|including|excluding)\b)/;
@@ -20,6 +21,19 @@ function normalizeAmount(numeric: string) {
   return whole.replace(/^0+(?=\d)/, "") + "." + fraction.replace(/0+$/, "");
 }
 
+// One explicit amount per prose line keeps model findings attributable to a
+// concrete quote. Mixed-price comparisons and table rows use other checks.
+export function prosePriceLines(text: string) {
+  const amounts = new Map<number, string>();
+  for (const [index, line] of text.split(/\r?\n/).entries()) {
+    if (/[|\t]/.test(line) || /^\s*(?:#|Q:)/i.test(line)) continue;
+    const values = [...line.matchAll(money)].map(m => m[3])
+      .concat([...line.matchAll(trailingMoney)].map(m => m[1]));
+    if (values.length === 1) amounts.set(index + 1, normalizeAmount(values[0]));
+  }
+  return amounts;
+}
+
 function singlePrice(text: string) {
   const matches = [...text.matchAll(money)];
   if (matches.length !== 1) return null;
@@ -31,27 +45,32 @@ function singlePrice(text: string) {
   };
 }
 
-function cells(line: string) {
-  return line.trim().replace(/^\||\|$/g, "").split(/(?<!\\)\|/).map(cell =>
+function cells(line: string, tabular: boolean) {
+  const values = tabular ? line.split("\t") : line.trim().replace(/^\||\|$/g, "").split(/(?<!\\)\|/);
+  return values.map(cell =>
     cell.trim().toLowerCase().replace(/\s+/g, " "),
   );
 }
 
 function* tablePrices(body: string, heading: string, scopeLabels: string[], sectionIndex: number) {
-  if (!body.includes("|")) return;
+  if (!/[|\t]/.test(body)) return;
   // Text before and after each table can specify a date, a caption or a footnote.
   const blocks: string[][] = [];
   for (const line of body.split("\n")) {
     const previous = blocks.at(-1);
-    if (previous && previous[0].includes("|") === line.includes("|")) previous.push(line);
+    if (previous && previous[0].includes("|") === line.includes("|") &&
+      previous[0].includes("\t") === line.includes("\t")) previous.push(line);
     else blocks.push([line]);
   }
   for (const [index, lines] of blocks.entries()) {
-    if (lines.length < 3 || !lines[0].includes("|")) continue;
-    const headers = cells(lines[0]);
-    const separator = cells(lines[1]);
-    if (headers.length < 2 || new Set(headers).size !== headers.length || headers.includes("") ||
-      separator.length !== headers.length || !separator.every(cell => /^:?-{3,}:?$/.test(cell))) continue;
+    const tabular = lines[0].includes("\t") && !lines[0].includes("|");
+    if (lines.length < (tabular ? 2 : 3) || !(tabular || lines[0].includes("|"))) continue;
+    const headers = cells(lines[0], tabular);
+    if (headers.length < 2 || new Set(headers).size !== headers.length || headers.includes("")) continue;
+    if (!tabular) {
+      const separator = cells(lines[1], false);
+      if (separator.length !== headers.length || !separator.every(cell => /^:?-{3,}:?$/.test(cell))) continue;
+    } else if (headers.some(header => bareAmount.test(header) || singlePrice(header))) continue;
     const columns = headers.map((header, i) => ({
       header, i,
       price: priceHeader.test(header.replace(currencyMarker, "").trim()) &&
@@ -61,8 +80,8 @@ function* tablePrices(body: string, heading: string, scopeLabels: string[], sect
     const scope = JSON.stringify(["table", scopeLabels, columns.map(c => c.header),
       blocks[index - 1]?.join("\n").trim() ?? "", blocks[index + 1]?.join("\n").trim() ?? ""]);
     const prices: Quote[] = [];
-    for (const line of lines.slice(2)) {
-      const values = cells(line);
+    for (const line of lines.slice(tabular ? 1 : 2)) {
+      const values = cells(line, tabular);
       if (values.length !== headers.length) continue;
       const identity: string[] = [];
       const rates = [];

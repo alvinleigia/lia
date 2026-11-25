@@ -24,6 +24,7 @@ import {
   MAX_KNOWLEDGE_TEXT_LENGTH,
 } from "@/lib/knowledge-import";
 import { extractPdfImportText } from "@/lib/pdf-import";
+import { reviewImportPrices } from "@/lib/knowledge-import-suggestions";
 import { processUploadQueue } from "@/lib/upload-queue";
 
 const MAX_DOCUMENT_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -128,6 +129,8 @@ export async function processDocumentFile(formData: FormData) {
       };
     }
     const policy = await getConversationProjectPolicy(context.project.id);
+    const review = createKnowledgeImportReview(textContent, policy.knowledge.preserveImportHeadings);
+    review.priceReview = await reviewImportPrices(context.project.id, review.draftText, review.preserveHeadings);
     const sourceDocumentId = await db.transaction(async (tx) => {
       const [uploadedDocument] = await tx
         .insert(sourceDocuments)
@@ -136,10 +139,7 @@ export async function processDocumentFile(formData: FormData) {
           title: file.name || "Uploaded Document",
           fileHash,
           processingStatus: "review",
-          importReview: createKnowledgeImportReview(
-            textContent,
-            policy.knowledge.preserveImportHeadings,
-          ),
+          importReview: review,
           processingError: null,
           processedAt: null,
           mimeType: file.type || null,

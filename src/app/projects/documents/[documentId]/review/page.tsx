@@ -48,7 +48,7 @@ export default async function KnowledgeReviewPage({
   const result = knowledgeImportReviewSchema.safeParse(document.importReview);
   const review = result.success ? result.data : null;
   const issues = review
-    ? inspectKnowledgeImport(review.draftText, review.preserveHeadings)
+    ? inspectKnowledgeImport(review.draftText, review.preserveHeadings, review.priceReview)
     : [];
   const conflicts = review
     ? await findKnowledgeAnswerConflicts(
@@ -87,6 +87,7 @@ export default async function KnowledgeReviewPage({
           <p className="text-sm text-muted-foreground">
             Automatic checks help find issues; they cannot verify business facts
             or catch every contradiction.
+            {review?.preserveHeadings && " Saving a draft with differently worded prose prices can use one metered AI comparison."}
           </p>
           <p>Status: {document.processingStatus}</p>
           {document.processingError && (
@@ -267,6 +268,7 @@ export default async function KnowledgeReviewPage({
                   />
                   I reviewed this saved draft, checked the facts and flagged
                   limitations, and approve it for customer answers.
+                  {review.priceReview === "manual" && " I manually compared the prose prices and their conditions."}
                 </Label>
                 {blocked && (
                   <p className="text-sm text-red-700">
