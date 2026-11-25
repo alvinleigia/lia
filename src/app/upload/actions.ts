@@ -11,6 +11,7 @@ import {
   resolveStrictUserAndProject,
   resolveUserAndProject,
 } from "@/lib/auth-project";
+import { getConversationProjectPolicy } from "@/lib/conversation-project-policies";
 import { db } from "@/lib/db-config";
 import { sourceDocuments } from "@/lib/db-schema";
 import {
@@ -126,6 +127,7 @@ export async function processDocumentFile(formData: FormData) {
           "Split this document into files of at most 200,000 text characters for review.",
       };
     }
+    const policy = await getConversationProjectPolicy(context.project.id);
     const sourceDocumentId = await db.transaction(async (tx) => {
       const [uploadedDocument] = await tx
         .insert(sourceDocuments)
@@ -134,7 +136,10 @@ export async function processDocumentFile(formData: FormData) {
           title: file.name || "Uploaded Document",
           fileHash,
           processingStatus: "review",
-          importReview: createKnowledgeImportReview(textContent),
+          importReview: createKnowledgeImportReview(
+            textContent,
+            policy.knowledge.preserveImportHeadings,
+          ),
           processingError: null,
           processedAt: null,
           mimeType: file.type || null,

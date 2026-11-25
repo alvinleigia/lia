@@ -130,6 +130,7 @@ export async function findKnowledgeAnswerConflicts(
   projectId: number,
   documentId: number,
   text: string,
+  preserveHeadings = false,
 ) {
   const others = await db
     .select({
@@ -143,14 +144,15 @@ export async function findKnowledgeAnswerConflicts(
         ne(sourceDocuments.id, documentId),
       ),
     );
-  return conflictingAnswers(text, others);
+  return conflictingAnswers(text, others, preserveHeadings);
 }
 
 function conflictingAnswers(
   text: string,
   others: Array<{ title: string; review: unknown }>,
+  preserveHeadings = false,
 ) {
-  const candidates = extractKnowledgeAnswers(text);
+  const candidates = extractKnowledgeAnswers(text, preserveHeadings);
   const conflicts: string[] = [];
   for (const other of others) {
     const review = knowledgeImportReviewSchema.safeParse(other.review);
@@ -158,7 +160,10 @@ function conflictingAnswers(
     const answers = [
       ...review.data.publishedAnswers,
       ...(review.data.approvedAt
-        ? extractKnowledgeAnswers(review.data.draftText)
+        ? extractKnowledgeAnswers(
+            review.data.draftText,
+            review.data.preserveHeadings,
+          )
         : []),
     ];
     for (const answer of candidates) {
@@ -204,7 +209,10 @@ export async function approveKnowledgeImport(input: {
     if (review.data.revision !== input.revision)
       throw new Error("This review changed. Reload and review it again.");
     if (["queued", "processing"].includes(document.processingStatus)) return;
-    const issues = inspectKnowledgeImport(review.data.draftText);
+    const issues = inspectKnowledgeImport(
+      review.data.draftText,
+      review.data.preserveHeadings,
+    );
     if (
       issues.some(
         (issue) => issue.code === "conflict" || issue.code === "wording",
@@ -225,7 +233,11 @@ export async function approveKnowledgeImport(input: {
           ne(sourceDocuments.id, input.documentId),
         ),
       );
-    const conflicts = conflictingAnswers(review.data.draftText, others);
+    const conflicts = conflictingAnswers(
+      review.data.draftText,
+      others,
+      review.data.preserveHeadings,
+    );
     if (conflicts.length)
       throw new Error(
         `Resolve conflicting answers before publishing: ${conflicts[0]}`,

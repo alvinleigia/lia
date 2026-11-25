@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import { chunkContent } from "@/lib/chunking";
+import { chunkContent, textSplitter } from "@/lib/chunking";
 import { db } from "@/lib/db-config";
 import { documents, sourceDocuments, uploadJobs } from "@/lib/db-schema";
 import { generateEmbeddings } from "@/lib/embeddings";
@@ -119,7 +119,9 @@ export async function processUploadQueue(
           review.draftText !== job.textContent)
       )
         throw new Error("This document needs approval before indexing.");
-      const chunks = await chunkContent(job.textContent);
+      const chunks = review?.preserveHeadings
+        ? await chunkContent(job.textContent)
+        : await textSplitter.splitText(job.textContent.trim());
       if (chunks.length === 0) {
         await markJobFailed(
           job.id,
@@ -186,7 +188,10 @@ export async function processUploadQueue(
                   importReview: {
                     ...review,
                     publishedText: job.textContent,
-                    publishedAnswers: extractKnowledgeAnswers(job.textContent),
+                    publishedAnswers: extractKnowledgeAnswers(
+                      job.textContent,
+                      review.preserveHeadings,
+                    ),
                   },
                 }
               : {}),

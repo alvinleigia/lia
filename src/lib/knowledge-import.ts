@@ -10,6 +10,7 @@ export const knowledgeTextSchema = z
 export const knowledgeImportReviewSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.number().int().positive(),
+  preserveHeadings: z.literal(true).optional(),
   originalText: knowledgeTextSchema,
   draftText: knowledgeTextSchema,
   publishedText: knowledgeTextSchema.nullable(),
@@ -33,11 +34,13 @@ export type KnowledgeIssue = {
 
 export function createKnowledgeImportReview(
   text: string,
+  preserveHeadings = false,
 ): KnowledgeImportReview {
   const originalText = knowledgeTextSchema.parse(text);
   return {
     schemaVersion: 1,
     revision: 1,
+    ...(preserveHeadings ? { preserveHeadings: true } : {}),
     originalText,
     draftText: originalText,
     publishedText: null,
@@ -48,7 +51,10 @@ export function createKnowledgeImportReview(
 }
 
 // Explicit Q&A only. Never manufacture facts or infer questions from prose.
-export function extractKnowledgeAnswers(text: string) {
+export function extractKnowledgeAnswers(
+  text: string,
+  preserveHeadings = false,
+) {
   const answers: Array<{ question: string; answer: string; key: string }> = [];
   const pattern = /^Q:\s*(.+?)\s+A:\s*(.+)$|^(.+?)\s*=>\s*(.+)$/i;
   const lines = text.split(/\r?\n/);
@@ -70,7 +76,7 @@ export function extractKnowledgeAnswers(text: string) {
     while (
       i + 1 < lines.length &&
       lines[i + 1].trim() &&
-      !/^ {0,3}#{1,6}[ \t]+\S/.test(lines[i + 1]) &&
+      !(preserveHeadings && /^ {0,3}#{1,6}[ \t]+\S/.test(lines[i + 1])) &&
       !/^Q:|=>/i.test(lines[i + 1].trim())
     ) {
       answer += ` ${lines[++i].trim()}`;
@@ -88,7 +94,10 @@ export function hasExplicitKnowledgeUncertainty(text: string) {
   );
 }
 
-export function inspectKnowledgeImport(text: string): KnowledgeIssue[] {
+export function inspectKnowledgeImport(
+  text: string,
+  preserveHeadings = false,
+): KnowledgeIssue[] {
   const issues: KnowledgeIssue[] = [];
   for (const [index, line] of text.split(/\r?\n/).entries()) {
     const add = (code: KnowledgeIssue["code"], message: string) =>
@@ -128,7 +137,7 @@ export function inspectKnowledgeImport(text: string): KnowledgeIssue[] {
       );
   }
   const seen = new Map<string, string>();
-  for (const answer of extractKnowledgeAnswers(text)) {
+  for (const answer of extractKnowledgeAnswers(text, preserveHeadings)) {
     if (seen.has(answer.key) && seen.get(answer.key) !== answer.answer)
       issues.push({
         line: 0,

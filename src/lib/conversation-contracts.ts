@@ -134,6 +134,7 @@ export const assistantPolicyV1Schema = z.object({
 });
 
 export const knowledgeConversationV1Schema = z.object({
+  preserveImportHeadings: z.boolean().optional(),
   schemaVersion,
   noAnswerBehavior: z.enum(["fallback", "handoff", "task_recommendation"]),
   sourceSelection: z

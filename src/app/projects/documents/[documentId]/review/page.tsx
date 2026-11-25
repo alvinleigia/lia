@@ -47,12 +47,15 @@ export default async function KnowledgeReviewPage({
   if (!document) notFound();
   const result = knowledgeImportReviewSchema.safeParse(document.importReview);
   const review = result.success ? result.data : null;
-  const issues = review ? inspectKnowledgeImport(review.draftText) : [];
+  const issues = review
+    ? inspectKnowledgeImport(review.draftText, review.preserveHeadings)
+    : [];
   const conflicts = review
     ? await findKnowledgeAnswerConflicts(
         context.project.id,
         document.id,
         review.draftText,
+        review.preserveHeadings,
       )
     : [];
   const busy = ["queued", "processing"].includes(document.processingStatus);
@@ -230,9 +233,14 @@ export default async function KnowledgeReviewPage({
             </CardHeader>
             <CardContent>
               <p className="mb-4">
-                {extractKnowledgeAnswers(review.draftText).length} explicit FAQ
-                answers found. Published answers stay linked to this document
-                and are removed when it is deleted.
+                {
+                  extractKnowledgeAnswers(
+                    review.draftText,
+                    review.preserveHeadings,
+                  ).length
+                }{" "}
+                explicit FAQ answers found. Published answers stay linked to
+                this document and are removed when it is deleted.
               </p>
               <ActionStateForm
                 action={updateKnowledgeReviewAction}

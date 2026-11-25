@@ -88,14 +88,18 @@ test.afterAll(async () => {
   await db.delete(companies).where(eq(companies.id, scope.companyId));
   await db.delete(users).where(eq(users.id, scope.userId));
 });
-async function upload(text: string, projectId = scope.projectId) {
+async function upload(
+  text: string,
+  projectId = scope.projectId,
+  preserveHeadings = false,
+) {
   const [doc] = await db
     .insert(sourceDocuments)
     .values({
       projectId,
       title: `Review ${randomUUID()}`,
       processingStatus: "review",
-      importReview: createKnowledgeImportReview(text),
+      importReview: createKnowledgeImportReview(text, preserveHeadings),
     })
     .returning();
   return doc;
@@ -118,6 +122,8 @@ test("approved sections keep their labels through indexing and FAQ publication",
       "## Silver Service",
       "Pickup is available within 12 kilometres.",
     ].join("\n"),
+    scope.projectId,
+    true,
   );
   await approve(doc.id);
   await processUploadQueue(1, scope.projectId, embed);
@@ -140,6 +146,32 @@ test("approved sections keep their labels through indexing and FAQ publication",
   );
   expect(answers.map((entry) => entry.answer)).toEqual([
     "Up to 3 kilometres. Only on weekdays.",
+  ]);
+  await deleteSourceDocumentFromProject(scope.projectId, doc.id);
+});
+
+test("a review without the pilot setting keeps its original indexing rules", async () => {
+  const text =
+    "## Copper Service\nQ: How far is pickup available? A: Up to 3 kilometres.\n## Silver Service\nPickup is available within 12 kilometres.";
+  const doc = await upload(text);
+  await approve(doc.id);
+  await processUploadQueue(1, scope.projectId, embed);
+  const chunks = await db
+    .select({ content: documents.content })
+    .from(documents)
+    .where(
+      and(
+        eq(documents.projectId, scope.projectId),
+        eq(documents.sourceDocumentId, doc.id),
+      ),
+    );
+  expect(chunks).toEqual([{ content: text }]);
+  const answers = await getImportedKnowledgeAnswers(
+    scope.projectId,
+    "How far is pickup available?",
+  );
+  expect(answers.map((entry) => entry.answer)).toEqual([
+    "Up to 3 kilometres. ## Silver Service Pickup is available within 12 kilometres.",
   ]);
   await deleteSourceDocumentFromProject(scope.projectId, doc.id);
 });
