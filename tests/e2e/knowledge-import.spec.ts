@@ -7,6 +7,40 @@ import {
   inspectKnowledgeImport,
 } from "../../src/lib/knowledge-import";
 import { extractPdfImportText } from "../../src/lib/pdf-import";
+import { appendSuggestedFaqs, faqSourceBlocks } from "../../src/lib/knowledge-import-faqs";
+
+test("suggested FAQs preserve source conditions and leave independent topics separate", () => {
+  const text = "## Birch Plan\nBreakfast costs INR 450 per guest. Children under five eat free. The late checkout charge is unconfirmed.";
+  const blocks = faqSourceBlocks(text);
+  const price = { block: 0, sentence: 0, question: "What does breakfast cost on Birch?", qualifies: [] };
+  const exemption = { block: 0, sentence: 1, question: null, qualifies: [0] };
+  const checkout = { block: 0, sentence: 2, question: "What does late checkout cost on Birch?", qualifies: [] };
+  const draft = appendSuggestedFaqs(text, blocks, [price, exemption, checkout]);
+  expect(draft.startsWith(text + "\nQ:")).toBe(true);
+  expect(extractKnowledgeAnswers(draft, true).map((faq) => faq.answer)).toEqual([
+    "Breakfast costs INR 450 per guest. Children under five eat free.",
+    "The late checkout charge is unconfirmed.",
+  ]);
+  expect(faqSourceBlocks(draft)).toEqual([]);
+  for (const invalid of [
+    [price, checkout],
+    [price, { ...exemption, qualifies: [3] }, checkout],
+    [price, exemption, { ...checkout, question: price.question }],
+  ]) expect(appendSuggestedFaqs(text, blocks, invalid)).toBe(text);
+});
+
+test("FAQ suggestions stay within each source paragraph and preserve existing FAQs", () => {
+  const text = "Green Service\r\nCollection costs INR 200. Available within 5 km only.\r\n\r\nGold Service\r\nQ: How does Gold work?\r\nA: Call for details.";
+  const blocks = faqSourceBlocks(text);
+  expect(blocks).toHaveLength(1);
+  const draft = appendSuggestedFaqs(text, blocks, [{
+    block: 0, sentence: 1, question: null, qualifies: [0],
+  }, { block: 0, sentence: 0, question: "How does Green collection work?", qualifies: [] }]);
+  expect(extractKnowledgeAnswers(draft, true).map((faq) => faq.answer)).toEqual([
+    "Collection costs INR 200. Available within 5 km only.", "Call for details.",
+  ]);
+  expect(draft.replaceAll("\r\n", "")).not.toContain("\n");
+});
 
 test("PDF import preserves separate amounts and labels in a rate table", async () => {
   const text = await extractPdfImportText(

@@ -218,11 +218,16 @@ export default async function KnowledgeReviewPage({
                   >
                     Suggest wording with AI
                   </Button>
+                  {review.preserveHeadings && (
+                    <Button type="submit" name="intent" value="faqs" disabled={busy}>
+                      Suggest FAQs
+                    </Button>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  AI assistance is optional and processes up to 12 flagged lines
-                  per request. It uses one metered call during preparation,
-                  never a rewrite call for each customer message.
+                  Wording suggestions cover up to 12 flagged lines per request.
+                  {review.preserveHeadings && " FAQ suggestions add up to 12 questions to your draft. Check each answer against its source paragraph, including fees and exceptions, before approving."}
+                  {" "}Each AI request uses one metered call.
                 </p>
               </ActionStateForm>
             </CardContent>

@@ -15,7 +15,7 @@ export const textSplitter = splitter(chunkSize);
 
 type Section = { heading: string; body: string };
 
-function documentSections(text: string): Section[] {
+export function documentSections(text: string): Section[] {
   // A heading inside a code example must never become a policy label.
   if (/^[ \t]*(?:`{3,}|~{3,})/m.test(text)) return [];
   const headings = [...text.matchAll(/^ {0,3}(#{1,6})[ \t]+\S[^\n]*$/gm)];

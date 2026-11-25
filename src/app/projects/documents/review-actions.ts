@@ -13,13 +13,13 @@ import {
   saveKnowledgeDraft,
   startKnowledgeReview,
 } from "@/lib/knowledge-import-store";
-import { suggestKnowledgeWording } from "@/lib/knowledge-import-suggestions";
+import { suggestKnowledgeImport } from "@/lib/knowledge-import-suggestions";
 
 const reviewActionSchema = z.object({
   projectId: z.coerce.number().int().positive(),
   documentId: z.coerce.number().int().positive(),
   revision: z.coerce.number().int().nonnegative(),
-  intent: z.enum(["start", "save", "suggest", "publish"]),
+  intent: z.enum(["start", "save", "suggest", "faqs", "publish"]),
 });
 
 export async function updateKnowledgeReviewAction(
@@ -37,6 +37,7 @@ export async function updateKnowledgeReviewAction(
       input.documentId,
     );
     if (!document) return { error: "Document not found." };
+    let addedFaqs = false;
     if (input.intent === "start") {
       await startKnowledgeReview(context.project.id, document.id);
     } else if (input.intent === "publish") {
@@ -57,10 +58,13 @@ export async function updateKnowledgeReviewAction(
         };
       if (input.revision !== document.importReview?.revision)
         return { error: "This review changed. Reload before saving." };
+      if (input.intent === "faqs" && !document.importReview?.preserveHeadings)
+        return { error: "FAQ suggestions are available for pilot imports only." };
       const draftText =
-        input.intent === "suggest"
-          ? await suggestKnowledgeWording(context.project.id, text.data)
+        input.intent === "suggest" || input.intent === "faqs"
+          ? await suggestKnowledgeImport(context.project.id, text.data, input.intent)
           : text.data;
+      addedFaqs = input.intent === "faqs" && draftText !== text.data;
       await saveKnowledgeDraft({ ...input, text: draftText });
     }
     await writeAuditLog({
@@ -76,6 +80,8 @@ export async function updateKnowledgeReviewAction(
       success:
         input.intent === "publish"
           ? "Approved and queued. Process queued documents to make this version available to chat."
+          : input.intent === "faqs"
+            ? addedFaqs ? "FAQ suggestions added to your draft for review." : "Draft saved. No new FAQs were suggested."
           : input.intent === "suggest"
             ? "Suggestions saved as a draft. Review every change before publishing."
             : "Review saved. Nothing new has been published.",
