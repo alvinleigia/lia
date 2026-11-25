@@ -415,13 +415,27 @@ export function compileStructuredTurn(input: CompileTurnInput): CompiledTurn {
     input.history,
     input.projectPolicy.assistant.modelPolicy.maxHistoryMessages,
   ).map((message) => turnMessageV1Schema.parse(message));
-  const retrieval = boundedRetrieval(input);
+  const candidates = boundedRetrieval(input);
   const requestedSections =
     input.stage === "knowledge" &&
     input.projectPolicy.knowledge.preserveImportHeadings
-      ? requestedDocumentSections(input.visitorMessage, retrieval)
+      ? requestedDocumentSections(input.visitorMessage, candidates)
       : [];
-  const approvedAnswers = approvedKnowledgeReferences(input);
+  // Apply the same named-section boundary to generation, citations and review.
+  const sectionIds = new Set(
+    requestedSections.flatMap((section) => section.excerptIds),
+  );
+  const retrieval = sectionIds.size
+    ? candidates.filter((excerpt) => sectionIds.has(excerpt.id))
+    : candidates;
+  const approvedAnswers = approvedKnowledgeReferences(
+    sectionIds.size
+      ? {
+          ...input,
+          retrieval: input.retrieval.filter((excerpt) => sectionIds.has(excerpt.id)),
+        }
+      : input,
+  );
   const activeContract =
     taskContract(input.activeTask, input.stage === "knowledge") ??
     (input.stage === "extraction" && input.collection

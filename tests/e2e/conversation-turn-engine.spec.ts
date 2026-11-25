@@ -3160,6 +3160,9 @@ test("repairs an answer citing another service before a permissive reviewer can 
       generateTurn: queue.generateTurn.bind(queue),
       async reviewInterpretation(input) {
         reviewed.push(input.selected[0].answer);
+        expect(input.references?.map((reference) => reference.id)).toEqual([
+          "document:3",
+        ]);
         expect(input.requestedSections).toEqual([
           { name: "Copper Service", excerptIds: ["document:3"] },
         ]);
@@ -3195,6 +3198,7 @@ test("repairs an answer citing another service before a permissive reviewer can 
   });
   expect(result.proposal.reply).toBe(right);
   expect(reviewed).toEqual([right]);
+  expect(queue.calls[0].system).not.toContain("Copper Wheel workshop");
   expect(queue.calls[0].system).toContain(
     '"name":"Copper Service","excerptIds":["document:3"]',
   );
