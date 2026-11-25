@@ -20,7 +20,7 @@ import {
 import { createKnowledgeImportReview } from "../../src/lib/knowledge-import";
 import {
   approveKnowledgeImport,
-  findKnowledgeAnswerConflicts,
+  inspectProjectPriceAndAnswerConflicts,
   getImportedKnowledgeAnswers,
   getKnowledgeImport,
   saveKnowledgeDraft,
@@ -105,6 +105,9 @@ async function upload(
     .returning();
   return doc;
 }
+async function findKnowledgeAnswerConflicts(...args: Parameters<typeof inspectProjectPriceAndAnswerConflicts>) {
+  return (await inspectProjectPriceAndAnswerConflicts(...args)).conflicts;
+}
 async function approve(documentId: number, revision = 1) {
   await approveKnowledgeImport({
     projectId: scope.projectId,
@@ -142,7 +145,7 @@ test("cross-upload prose review compares published and approved rates within the
   await processUploadQueue(1, scope.projectId, embed);
   await saveKnowledgeDraft({ projectId: scope.projectId, documentId: original.id, revision: 1, text: rate(950) });
   expect((await conflicts(rate(950))).join(" ")).toContain("650");
-  expect(await conflicts(rate(950, "Weekend plan"))).toEqual([]);
+  expect((await conflicts(rate(950, "Weekend plan"))).join(" ")).toContain("Save and check draft");
   expect(await findKnowledgeAnswerConflicts(scope.otherProjectId, revision.id, rate(950), true)).toEqual([]);
   await approve(original.id, 2);
   expect(await conflicts(rate(650))).not.toEqual([]); // approved replacement
@@ -532,4 +535,17 @@ test("deleting a source during indexing cannot recreate its answers", async () =
   expect(
     await getImportedKnowledgeAnswers(scope.projectId, "Is delivery tracked?"),
   ).toEqual([]);
+});
+test("a newly approved paraphrased price requires a fresh cross-document check", async () => {
+  const first = await upload("Wheel inspection costs INR 650 per visit.", scope.projectId, true);
+  const other = await upload("Each time we check a wheel the visitor pays 950 rupees.", scope.projectId, true);
+  try {
+    await approve(first.id);
+    await expect(approve(other.id)).rejects.toThrow("Save and check draft");
+    await deleteSourceDocumentFromProject(scope.projectId, first.id);
+    await approve(other.id);
+  } finally {
+    await deleteSourceDocumentFromProject(scope.projectId, first.id);
+    await deleteSourceDocumentFromProject(scope.projectId, other.id);
+  }
 });

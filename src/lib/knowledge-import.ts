@@ -16,6 +16,11 @@ export const knowledgeImportReviewSchema = z.object({
   priceReview: z.union([z.literal("manual"), z.array(z.object({
     first: z.number().int().positive(), second: z.number().int().positive(),
   })).max(16)]).optional(),
+  crossPriceReview: z.object({
+    fingerprint: z.string().length(64),
+    conflicts: z.array(z.number().int().nonnegative()).max(16),
+    manual: z.boolean(),
+  }).optional(),
   publishedSectionHeadings: z
     .record(z.string(), z.array(z.string().max(450)).max(6))
     .optional(),

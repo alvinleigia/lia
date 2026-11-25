@@ -1,3 +1,4 @@
+import { crossPriceFindings, crossPricePlan, crossPricePrompt } from "../../src/lib/knowledge-import-cross-prices";
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import {
@@ -207,4 +208,27 @@ test("AI suggestions cannot change numbers, erase uncertainty, or edit invented 
       { source: "invented line", replacement: safe },
     ]),
   ).toBe(text);
+});
+
+test("separate price sources retain scope and version when comparing differently worded charges", () => {
+  const draft = "We charge 950 rupees each time we check a wheel.";
+  const source = "## Inspection\nA wheel check costs INR 650 per visit.";
+  const review = createKnowledgeImportReview(source, true);
+  const other = { id: 8, title: "Inspection guide", review };
+  expect(crossPricePlan(draft, [other])).toBeNull();
+  review.publishedText = source;
+  const plan = crossPricePlan(draft, [other])!;
+  expect(crossPricePrompt(plan).sources[0][1].text).toContain("INR [amount]");
+  const finding = { fingerprint: plan.fingerprint, manual: false, conflicts: [0] };
+  expect(crossPriceFindings(plan, finding)[0]).toContain(source.split("\n")[1]);
+  expect(crossPriceFindings(plan, finding)[0]).toContain(draft);
+  review.draftText = "## Express only\n" + source;
+  expect(crossPricePlan(draft, [other])?.fingerprint).toBe(plan.fingerprint);
+  review.approvedAt = new Date().toISOString();
+  expect(crossPriceFindings(crossPricePlan(draft, [other]), finding)[0]).toContain("Save and check draft");
+  review.publishedText = review.draftText.replace("650", "950");
+  review.approvedAt = null;
+  expect(crossPricePlan(draft, [other])).toBeNull();
+  review.publishedText = source + "\n" + "Terms ".repeat(4200);
+  expect(crossPricePlan(draft, [other])?.oversized).toBe(true);
 });

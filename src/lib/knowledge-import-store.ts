@@ -1,3 +1,5 @@
+import { crossPriceFindings, crossPricePlan } from "./knowledge-import-cross-prices";
+import { reviewCrossPrices } from "./knowledge-import-suggestions";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { stripKnowledgeDiscoursePrefix } from "@/lib/conversation-control-intents";
 import { db } from "@/lib/db-config";
@@ -11,7 +13,7 @@ import {
   knowledgeTextSchema,
 } from "@/lib/knowledge-import";
 import { normalizeKnowledgeQuestion } from "@/lib/project-ai-settings";
-import { conflictingImportPrices, indexImportPrices } from "@/lib/knowledge-import-prices";
+import { conflictingImportPrices, indexImportPrices, prosePriceLines } from "@/lib/knowledge-import-prices";
 
 export async function getKnowledgeImport(
   projectId: number,
@@ -85,6 +87,7 @@ export async function saveKnowledgeDraft(input: {
   revision: number;
   text: string;
   priceReview?: KnowledgeImportReview["priceReview"];
+  crossPriceReview?: KnowledgeImportReview["crossPriceReview"];
 }) {
   const draftText = knowledgeTextSchema.parse(input.text);
   return db.transaction(async (tx) => {
@@ -116,6 +119,7 @@ export async function saveKnowledgeDraft(input: {
           ...review.data,
           draftText,
           priceReview: input.priceReview,
+          crossPriceReview: input.crossPriceReview,
           priceReviewVersion: input.priceReview !== undefined ? 2 : undefined,
           revision: input.revision + 1,
           approvedAt: null,
@@ -131,25 +135,41 @@ export async function saveKnowledgeDraft(input: {
   });
 }
 
-export async function findKnowledgeAnswerConflicts(
-  projectId: number,
-  documentId: number,
-  text: string,
-  preserveHeadings = false,
-) {
-  const others = await db
-    .select({
-      title: sourceDocuments.title,
-      review: sourceDocuments.importReview,
-    })
+function otherReviewSources(projectId: number, documentId: number | null, client: Pick<typeof db, "select"> = db) {
+  return client.select({ id: sourceDocuments.id, title: sourceDocuments.title, review: sourceDocuments.importReview })
     .from(sourceDocuments)
-    .where(
-      and(
-        eq(sourceDocuments.projectId, projectId),
-        ne(sourceDocuments.id, documentId),
-      ),
-    );
-  return conflictingAnswers(text, others, preserveHeadings);
+    .where(and(eq(sourceDocuments.projectId, projectId), documentId === null ? undefined : ne(sourceDocuments.id, documentId)));
+}
+
+export async function checkCrossDocumentPrices(
+  projectId: number, documentId: number | null, text: string, pilot?: boolean,
+  previous?: KnowledgeImportReview["crossPriceReview"],
+) {
+  if (!pilot || !prosePriceLines(text).size) return undefined;
+  const others = await otherReviewSources(projectId, documentId);
+  if (conflictingAnswers(text, others, true).length) return undefined;
+  const plan = crossPricePlan(text, others);
+  return plan ? reviewCrossPrices(projectId, plan, previous) : undefined;
+}
+
+export async function inspectProjectPriceAndAnswerConflicts(
+  projectId: number, documentId: number, text: string, preserveHeadings = false,
+  crossReview?: KnowledgeImportReview["crossPriceReview"],
+) {
+  const others = await otherReviewSources(projectId, documentId);
+  return reviewConflicts(text, others, preserveHeadings, crossReview);
+}
+
+function reviewConflicts(
+  text: string, others: Awaited<ReturnType<typeof otherReviewSources>>,
+  pilot?: boolean, crossReview?: KnowledgeImportReview["crossPriceReview"],
+) {
+  const conflicts = conflictingAnswers(text, others, pilot);
+  if (conflicts.length || !pilot) return { conflicts, manualSources: [] };
+  const plan = crossPricePlan(text, others);
+  const manualSources = plan && crossReview?.fingerprint === plan.fingerprint && crossReview.manual
+    ? [...new Set(plan.texts.map(source => source.title))] : [];
+  return { conflicts: crossPriceFindings(plan, crossReview), manualSources };
 }
 
 function conflictingAnswers(
@@ -242,23 +262,8 @@ export async function approveKnowledgeImport(input: {
       throw new Error(
         "Resolve conflicting answers and source-report wording before publishing.",
       );
-    const others = await tx
-      .select({
-        title: sourceDocuments.title,
-        review: sourceDocuments.importReview,
-      })
-      .from(sourceDocuments)
-      .where(
-        and(
-          eq(sourceDocuments.projectId, input.projectId),
-          ne(sourceDocuments.id, input.documentId),
-        ),
-      );
-    const conflicts = conflictingAnswers(
-      review.data.draftText,
-      others,
-      review.data.preserveHeadings,
-    );
+    const others = await otherReviewSources(input.projectId, input.documentId, tx);
+    const { conflicts } = reviewConflicts(review.data.draftText, others, review.data.preserveHeadings, review.data.crossPriceReview);
     if (conflicts.length)
       throw new Error(
         `Resolve conflicting answers before publishing: ${conflicts[0]}`,

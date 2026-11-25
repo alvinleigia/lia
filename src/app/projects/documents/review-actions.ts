@@ -9,6 +9,7 @@ import { resolveStrictUserAndProject } from "@/lib/auth-project";
 import { knowledgeTextSchema } from "@/lib/knowledge-import";
 import {
   approveKnowledgeImport,
+  checkCrossDocumentPrices,
   getKnowledgeImport,
   saveKnowledgeDraft,
   startKnowledgeReview,
@@ -70,7 +71,8 @@ export async function updateKnowledgeReviewAction(
       const priceReview = sameLines && previous?.priceReviewVersion === 2 && Array.isArray(previous.priceReview)
         ? previous.priceReview
         : await reviewImportPrices(context.project.id, draftText, previous?.preserveHeadings);
-      await saveKnowledgeDraft({ ...input, text: draftText, priceReview });
+      const crossPriceReview = await checkCrossDocumentPrices(context.project.id, document.id, draftText, previous?.preserveHeadings, previous?.crossPriceReview);
+      await saveKnowledgeDraft({ ...input, text: draftText, priceReview, crossPriceReview });
     }
     await writeAuditLog({
       ...context,

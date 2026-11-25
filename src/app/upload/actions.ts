@@ -24,6 +24,7 @@ import {
   MAX_KNOWLEDGE_TEXT_LENGTH,
 } from "@/lib/knowledge-import";
 import { extractPdfImportText } from "@/lib/pdf-import";
+import { checkCrossDocumentPrices } from "@/lib/knowledge-import-store";
 import { reviewImportPrices } from "@/lib/knowledge-import-suggestions";
 import { processUploadQueue } from "@/lib/upload-queue";
 
@@ -131,6 +132,7 @@ export async function processDocumentFile(formData: FormData) {
     const policy = await getConversationProjectPolicy(context.project.id);
     const review = createKnowledgeImportReview(textContent, policy.knowledge.preserveImportHeadings);
     review.priceReview = await reviewImportPrices(context.project.id, review.draftText, review.preserveHeadings);
+    review.crossPriceReview = await checkCrossDocumentPrices(context.project.id, null, review.draftText, review.preserveHeadings);
     if (review.priceReview !== undefined) review.priceReviewVersion = 2;
     const sourceDocumentId = await db.transaction(async (tx) => {
       const [uploadedDocument] = await tx

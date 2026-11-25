@@ -21,7 +21,7 @@ import {
   knowledgeImportReviewSchema,
 } from "@/lib/knowledge-import";
 import {
-  findKnowledgeAnswerConflicts,
+  inspectProjectPriceAndAnswerConflicts,
   getKnowledgeImport,
 } from "@/lib/knowledge-import-store";
 
@@ -50,14 +50,19 @@ export default async function KnowledgeReviewPage({
   const issues = review
     ? inspectKnowledgeImport(review.draftText, review.preserveHeadings, review.priceReview)
     : [];
-  const conflicts = review
-    ? await findKnowledgeAnswerConflicts(
+  const { conflicts, manualSources } = review
+    ? await inspectProjectPriceAndAnswerConflicts(
         context.project.id,
         document.id,
         review.draftText,
         review.preserveHeadings,
+        review.crossPriceReview,
       )
-    : [];
+    : { conflicts: [], manualSources: [] };
+  if (manualSources.length) issues.push({
+    code: "uncertain", line: 0, excerpt: manualSources.join("\n"),
+    message: "Compare the prices and conditions in these documents before approving, or save this draft again to retry.",
+  });
   const busy = ["queued", "processing"].includes(document.processingStatus);
   const blocked =
     issues.some((issue) => ["wording", "conflict"].includes(issue.code)) ||
@@ -268,7 +273,7 @@ export default async function KnowledgeReviewPage({
                   />
                   I reviewed this saved draft, checked the facts and flagged
                   limitations, and approve it for customer answers.
-                  {review.priceReview === "manual" && " I manually compared the prose prices and their conditions."}
+                  {(review.priceReview === "manual" || manualSources.length > 0) && " I manually compared the prose prices and their conditions."}
                 </Label>
                 {blocked && (
                   <p className="text-sm text-red-700">
