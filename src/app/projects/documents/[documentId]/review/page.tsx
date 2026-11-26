@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { updateKnowledgeReviewAction } from "@/app/projects/documents/review-actions";
+import { recurringFaqAction, updateKnowledgeReviewAction } from "@/app/projects/documents/review-actions";
 import { processQueuedDocumentsAction } from "@/app/upload/actions";
 import {
   ActionFormError,
@@ -13,7 +13,7 @@ import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { assertPermission } from "@/lib/access-control";
+import { assertPermission, canAccess } from "@/lib/access-control";
 import { resolveStrictUserAndProject } from "@/lib/auth-project";
 import {
   extractKnowledgeAnswers,
@@ -133,6 +133,41 @@ export default async function KnowledgeReviewPage({
       </Card>
       {review && (
         <>
+          {review.preserveHeadings && review.publishedAnswers.length > 0 && canAccess(context.membership, "company.operations.manage") && (
+            <Card>
+              <CardHeader><CardTitle>Recurring visitor questions</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <p>Compare questions asked in at least two conversations in this project over the last 30 days with this document’s published FAQs. Approve a match only if the answer covers the entire question.</p>
+                <ActionStateForm action={recurringFaqAction}>
+                  {identifiers}
+                  <input type="hidden" name="variantRevision" value={review.faqVariantRevision ?? 0} />
+                  <input type="hidden" name="intent" value="find" />
+                  <ActionFormError /><ActionFormSuccessToast />
+                  <FormSubmitButton label="Find recurring questions" pendingLabel="Comparing..."
+                    disabled={busy || review.faqVariants?.some(v => v.status === "suggested")} />
+                  <p className="mt-2 text-sm text-muted-foreground">Uses up to one AI call to suggest up to five matches. Approved wording uses the published answer directly.</p>
+                </ActionStateForm>
+                {review.faqVariants?.filter(v => v.status !== "dismissed").map(v => (
+                  <article key={v.question} className="space-y-2 rounded-md border p-3">
+                    <p className="font-medium">{v.question}</p>
+                    <p className="text-sm text-muted-foreground">{v.frequency} conversations at review time · {v.status === "approved" ? "Approved" : "Suggested"}</p>
+                    <p><strong>Published question</strong> {v.sourceQuestion}</p>
+                    <p className="whitespace-pre-wrap"><strong>Answer</strong> {v.sourceAnswer}</p>
+                    <ActionStateForm action={recurringFaqAction} className="space-x-2">
+                      {identifiers}
+                      <input type="hidden" name="variantRevision" value={review.faqVariantRevision ?? 0} />
+                      <input type="hidden" name="question" value={v.question} />
+                      <ActionFormError /><ActionFormSuccessToast />
+                      {v.status === "suggested" && <Button type="submit" name="intent" value="approve" disabled={busy}>Approve match</Button>}
+                      <Button type="submit" name="intent" value="dismiss" variant="outline" disabled={busy}>
+                        {v.status === "approved" ? "Withdraw approval" : "Dismiss"}
+                      </Button>
+                    </ActionStateForm>
+                  </article>
+                ))}
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle>

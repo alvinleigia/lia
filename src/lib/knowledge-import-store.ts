@@ -315,14 +315,20 @@ export async function getImportedKnowledgeAnswers(
     ),
   ];
   const rows = await db.execute<{ question: string; answer: string }>(sql`
-    select a->>'question' as question, a->>'answer' as answer
-    from ${sourceDocuments},
-    jsonb_array_elements(coalesce(${sourceDocuments.importReview}->'publishedAnswers', '[]'::jsonb)) a
-    where ${sourceDocuments.projectId} = ${projectId}
-      and a->>'key' in (${sql.join(
-        keys.map((key) => sql`${key}`),
-        sql`, `,
-      )})
+    select matched.question, matched.answer from ${sourceDocuments} d
+    cross join lateral (
+      select a->>'question' as question, a->>'answer' as answer
+      from jsonb_array_elements(d.import_review->'publishedAnswers') a
+      where a->>'key' in (${sql.join(keys.map(key => sql`${key}`), sql`, `)})
+      union all
+      select v->>'question', a->>'answer'
+      from jsonb_array_elements(d.import_review->'faqVariants') v
+      join jsonb_array_elements(d.import_review->'publishedAnswers') a
+        on a->>'question' = v->>'sourceQuestion' and a->>'answer' = v->>'sourceAnswer'
+      where d.import_review->>'preserveHeadings' = 'true' and v->>'status' = 'approved'
+        and v->>'question' = ${question.trim()}
+    ) matched
+    where d.project_id = ${projectId}
   `);
   // Fail closed if old/manual data somehow contains a contradiction.
   if (new Set(rows.map((row) => row.answer)).size > 1) return [];

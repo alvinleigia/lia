@@ -29,6 +29,14 @@ export const knowledgeImportReviewSchema = z.object({
   publishedText: knowledgeTextSchema.nullable(),
   approvedByUserId: z.number().int().positive().nullable(),
   approvedAt: z.string().nullable(),
+  faqVariantRevision: z.number().int().nonnegative().optional(),
+  faqVariants: z.array(z.object({
+    question: z.string().min(1).max(240),
+    frequency: z.number().int().min(2),
+    sourceQuestion: z.string(),
+    sourceAnswer: z.string(),
+    status: z.enum(["suggested", "approved", "dismissed"]),
+  })).max(100).optional(),
   publishedAnswers: z.array(
     z.object({
       question: z.string(),

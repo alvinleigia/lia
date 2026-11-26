@@ -15,6 +15,35 @@ import {
   startKnowledgeReview,
 } from "@/lib/knowledge-import-store";
 import { reviewImportPrices, suggestKnowledgeImport } from "@/lib/knowledge-import-suggestions";
+import { reviewRecurringFaqs } from "@/lib/knowledge-recurring-faqs";
+
+const recurringFaqActionSchema = z.object({
+  projectId: z.coerce.number().int().positive(),
+  documentId: z.coerce.number().int().positive(),
+  revision: z.coerce.number().int().positive(),
+  variantRevision: z.coerce.number().int().nonnegative(),
+}).and(z.discriminatedUnion("intent", [
+  z.object({ intent: z.literal("find") }),
+  z.object({ intent: z.enum(["approve", "dismiss"]), question: z.string().min(1).max(240) }),
+]));
+
+export async function recurringFaqAction(_state: ActionFormState, formData: FormData): Promise<ActionFormState> {
+  const parsed = recurringFaqActionSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Invalid recurring question review." };
+  try {
+    const input = parsed.data;
+    const context = await resolveStrictUserAndProject(input.projectId);
+    assertPermission(context.membership, "company.documents.manage");
+    assertPermission(context.membership, "company.operations.manage");
+    const success = await reviewRecurringFaqs({ ...input, projectId: context.project.id }, input);
+    await writeAuditLog({ ...context, action: `document.recurring_faq_${input.intent}`, targetType: "source_document",
+      targetId: input.documentId, metadata: { revision: input.revision, variantRevision: input.variantRevision } });
+    revalidatePath(`/projects/documents/${input.documentId}/review`);
+    return { success };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not review recurring questions." };
+  }
+}
 
 const reviewActionSchema = z.object({
   projectId: z.coerce.number().int().positive(),

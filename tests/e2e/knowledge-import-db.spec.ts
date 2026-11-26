@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { REFERENCE_BOOKING_PROJECT_POLICY } from "../../src/lib/conversation-contract-fixtures";
 import { executeConfiguredStructuredTurn } from "../../src/lib/conversation-turn-service";
 import { db } from "../../src/lib/db-config";
 import {
   companies,
+  channelMessages,
+  channelConversations,
   documents,
   projects,
   sourceDocuments,
@@ -18,6 +20,7 @@ import {
   deleteSourceDocumentFromProject,
 } from "../../src/lib/documents";
 import { createKnowledgeImportReview } from "../../src/lib/knowledge-import";
+import { recentFaqQuestions, reviewRecurringFaqs } from "../../src/lib/knowledge-recurring-faqs";
 import {
   approveKnowledgeImport,
   inspectProjectPriceAndAnswerConflicts,
@@ -116,6 +119,65 @@ async function approve(documentId: number, revision = 1) {
     userId: scope.userId,
   });
 }
+
+test("recurring FAQ candidates require separate recent conversations in the same project", async () => {
+  const conversations = await db.insert(channelConversations).values([scope.projectId, scope.projectId, scope.otherProjectId].map(
+    projectId => ({ projectId, channelType: "project_chat", externalConversationId: randomUUID() }),
+  )).returning();
+  const ids = conversations.map(c => c.id);
+  const eligible = "How far is the pickup radius?";
+  const messages = (index: number, questions: string[]) => questions.map(text => ({
+    projectId: conversations[index].projectId, conversationId: ids[index], text, direction: "inbound",
+  }));
+  const privateText = "Can you send the price to user@example.com?";
+  try {
+    await db.insert(channelMessages).values([
+      ...messages(0, [eligible, privateText, "When is checkout?", "When is checkout?", "Can I leave early?", "Was pickup free?", "Do you provide maps?"]),
+      ...messages(1, [eligible, privateText]), ...messages(2, ["Can I leave early?"]),
+      { ...messages(1, ["Was pickup free?"])[0], createdAt: new Date(Date.now() - 32 * 86400000) },
+      { ...messages(1, ["Do you provide maps?"])[0], direction: "outbound" },
+    ]);
+    expect(await recentFaqQuestions(scope.projectId, [])).toEqual([{ question: eligible, frequency: 2 }]);
+    expect(await recentFaqQuestions(scope.projectId, [eligible])).toEqual([]);
+    expect(await recentFaqQuestions(scope.otherProjectId, [])).toEqual([]);
+  } finally {
+    await db.delete(channelMessages).where(inArray(channelMessages.conversationId, ids));
+    await db.delete(channelConversations).where(inArray(channelConversations.id, ids));
+  }
+});
+
+test("only reviewed recurring questions use the current source answer", async () => {
+  const sourceQuestion = "What is the repair fee?";
+  const sourceAnswer = "Repairs cost 15 dollars.";
+  const question = "How much do you charge for repairs?";
+  const other = "What do repairs cost?";
+  const text = `Q: ${sourceQuestion}\nA: ${sourceAnswer}`;
+  const document = await upload(text, scope.projectId, true);
+  const input = { projectId: scope.projectId, documentId: document.id, revision: 1, variantRevision: 0 };
+  await approve(document.id);
+  await processUploadQueue(1, scope.projectId, embed);
+  const review = (await getKnowledgeImport(scope.projectId, document.id))!.importReview!;
+  await db.update(sourceDocuments).set({ importReview: { ...review, faqVariants: [question, other].map(q => ({
+    question: q, sourceQuestion, sourceAnswer, frequency: 3, status: "suggested",
+  })) } }).where(and(eq(sourceDocuments.id, document.id), eq(sourceDocuments.projectId, scope.projectId)));
+  const lookup = () => getImportedKnowledgeAnswers(scope.projectId, question);
+  expect(await lookup()).toEqual([]);
+  await expect(reviewRecurringFaqs({ ...input, projectId: scope.otherProjectId }, { intent: "approve", question })).rejects.toThrow();
+  await reviewRecurringFaqs(input, { intent: "approve", question });
+  await expect(reviewRecurringFaqs(input, { intent: "dismiss", question })).rejects.toThrow("changed");
+  await reviewRecurringFaqs({ ...input, variantRevision: 1 }, { intent: "dismiss", question: other });
+  expect(await lookup()).toEqual([{ question, answer: sourceAnswer }]);
+  expect(await getImportedKnowledgeAnswers(scope.projectId, other)).toEqual([]);
+  expect(await getImportedKnowledgeAnswers(scope.otherProjectId, question)).toEqual([]);
+  await saveKnowledgeDraft({ ...input, text: text.replace("15", "20") });
+  expect(await lookup()).toEqual([{ question, answer: sourceAnswer }]);
+  await approve(document.id, 2);
+  await processUploadQueue(1, scope.projectId, embed);
+  expect(await lookup()).toEqual([]);
+  expect((await getKnowledgeImport(scope.projectId, document.id))!.importReview!.faqVariants).toEqual([]);
+  expect(await getImportedKnowledgeAnswers(scope.projectId, sourceQuestion)).toEqual([{ question: sourceQuestion, answer: "Repairs cost 20 dollars." }]);
+  await deleteSourceDocumentFromProject(scope.projectId, document.id);
+});
 
 test("approval rejects conflicting prose prices and queues a corrected draft", async () => {
   const text = "## Price guide\nWheel hire costs GBP 25 per day.\n\n## Staff handbook\nWheel hire costs £40 per day.";

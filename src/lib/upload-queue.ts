@@ -193,6 +193,7 @@ export async function processUploadQueue(
           await insertion;
         }
 
+        const publishedAnswers = review ? extractKnowledgeAnswers(job.textContent, review.preserveHeadings) : [];
         await tx
           .update(sourceDocuments)
           .set({
@@ -207,10 +208,10 @@ export async function processUploadQueue(
                       ? { publishedSectionHeadings }
                       : {}),
                     publishedText: job.textContent,
-                    publishedAnswers: extractKnowledgeAnswers(
-                      job.textContent,
-                      review.preserveHeadings,
-                    ),
+                    publishedAnswers,
+                    faqVariants: review.faqVariants?.filter(variant => publishedAnswers.some(
+                      faq => faq.question === variant.sourceQuestion && faq.answer === variant.sourceAnswer,
+                    )),
                   },
                 }
               : {}),
