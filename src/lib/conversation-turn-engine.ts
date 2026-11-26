@@ -69,6 +69,7 @@ import {
 } from "@/lib/model-usage";
 import {
   type ProjectAiSettings,
+  normalizeKnowledgeQuestion,
   resolveApprovedKnowledgeAnswer,
 } from "@/lib/project-ai-settings";
 import { measureRuntimeModelCall } from "@/lib/runtime-request-metrics";
@@ -1083,6 +1084,23 @@ export class StructuredTurnEngine {
       };
     }
 
+    if (
+      input.stage === "knowledge" && input.projectPolicy.knowledge.preserveImportHeadings &&
+      !input.openingTurn && !input.activeTask && !input.knowledgeRequest &&
+      !input.history.length && !input.context.length && !input.fieldState.length &&
+      /^(?:english|en(?:-[a-z]{2})?)$/i.test(input.projectPolicy.assistant.language) &&
+      /^(?:(?:and|but) )?(?:(?:what|how) about |(?:tell me (?:more )?about ))?(?:this|that|these|those|it|them)(?: ones?)?$/.test(
+        normalizeKnowledgeQuestion(input.visitorMessage),
+      )
+    ) {
+      return {
+        attempts: 0, modelEscalationReason: null, source: "deterministic",
+        proposal: asValidatedDeterministic(deterministicProposal({
+          nextAction: "clarify", reasonCode: "missing_subject", reply: "Which item or service do you mean?",
+        })),
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      };
+    }
     const modelEscalationReason = resolveModelEscalationReason(input);
     const modelIds = resolveModelIds(input.projectPolicy, input.stage);
     const selectiveGrounding =
@@ -1394,6 +1412,8 @@ export class StructuredTurnEngine {
                 ["valid", "confirmed"].includes(field.state) &&
                 /^(true|yes)$/i.test(String(field.value)),
             );
+          const reviewCompleteFaq = focusDocumentReply && selectedFaqs.length > 0 &&
+            proposal.answerSelections?.every(part => part.answerId !== null) === true;
           const reviewKinds = [
             proposal.nextAction === "cancel"
               ? "cancellation"
@@ -1457,9 +1477,9 @@ export class StructuredTurnEngine {
                     modelId: reviewModelId,
                     timeoutMs: remainingReviewMs,
                     messages: compiled.messages,
-                    focusDocumentReply: Boolean(
-                      reviewReferences && focusDocumentReply,
-                    ),
+                    focusDocumentReply: reviewKind === "knowledge_selection"
+                      ? reviewCompleteFaq
+                      : Boolean(reviewReferences && focusDocumentReply),
                     requestedSections:
                       reviewKind === "knowledge_grounding" &&
                       compiled.requestedSections.length
@@ -1570,6 +1590,10 @@ export class StructuredTurnEngine {
               if (reviewKind === "cancellation")
                 throw new TurnProposalValidationError([
                   `cancellation_not_authorized: the latest intent is ${review.query}; reconsider it without cancelling or reusing past cancellation requests`,
+                ]);
+              if (reviewKind === "knowledge_selection" && reviewCompleteFaq && compiled.references.length)
+                throw new TurnProposalValidationError([
+                  `incomplete_faq_selection: ${review.query}. Answer every part. Use answerSelections null and cite passages when the selected FAQs cannot supply the entire answer.`,
                 ]);
               proposal = {
                 ...proposal,

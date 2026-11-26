@@ -293,6 +293,63 @@ function engineInput() {
   };
 }
 
+test("a pilot passage can answer a different fact alongside its published FAQs", () => {
+  const input = engineInput();
+  const faq = { id: "document:3:answer:1", question: "How long is a class?", answer: "One hour." };
+  const compile = (body: string, enabled: boolean, answer = faq) => compileStructuredTurn({
+    ...input, activeTask: null, stage: "knowledge", visitorMessage: "Is registration free at Cedar School?",
+    projectPolicy: { ...input.projectPolicy, knowledge: { ...input.projectPolicy.knowledge, preserveImportHeadings: enabled } },
+    retrieval: [{ id: "document:3", sectionHeadings: ["Cedar School"],
+      content: "## Cedar School\n" + body, approvedAnswers: [answer] }],
+  });
+  const qa = "Q: How long is a class?\nA: One hour.";
+  const mixed = "Registration is free.\n\n" + qa;
+  const r = compile(mixed, true);
+  expect(r.references[0].content).toContain("Registration is free.");
+  expect(r.validation.approvedAnswers?.has(faq.id)).toBe(false);
+  expect(compile(qa, true).validation.approvedAnswers?.has(faq.id)).toBe(true);
+  expect(compile(mixed, false).validation.approvedAnswers?.has(faq.id)).toBe(true);
+  expect(compile(mixed, true, {...faq, answer:"One hour. Advance registration is required."}).validation.approvedAnswers?.has(faq.id)).toBe(true);
+});
+
+test("a new knowledge chat clarifies a bare reference before retrieving unrelated sources", async () => {
+  const input = engineInput();
+  const provider = new QueueProvider([]);
+  let searches = 0;
+  const engine = new StructuredTurnEngine({provider, retriever:{async retrieve(){searches++; return [];}}});
+  const r = await engine.execute({...input, activeTask:null, stage:"knowledge", visitorMessage:"What about that one?",
+    projectPolicy:{...input.projectPolicy, knowledge:{...input.projectPolicy.knowledge,preserveImportHeadings:true}}});
+  expect(r.proposal.nextAction).toBe("clarify");
+  expect(searches).toBe(0);
+  expect(provider.calls).toHaveLength(0);
+});
+
+test("pilot verifies that a composed FAQ covers the whole visitor question", async () => {
+  const input = engineInput();
+  const text = "Pickup is free within 4 km.";
+  const faqId = "project_approved_answer:1";
+  const proposal = { turnKind: "ordinary_question" as const, fieldCandidates: [], reply: text };
+  const queued = new QueueProvider([
+    baseTurn({...proposal, grounding:{status:"grounded",excerptIds:[faqId]},
+      answerSelections:[{question:"Is pickup free?",answerId:faqId}]}),
+    baseTurn({...proposal, grounding:{status:"grounded",excerptIds:["document:3"]}, answerSelections:null}),
+  ]);
+  const provider: StructuredTurnProvider = {
+    generateTurn: args => queued.generateTurn(args),
+    async reviewInterpretation(args) {
+      if (args.kind === "knowledge_selection") expect(args.focusDocumentReply).toBe(true);
+      return {matches:args.kind !== "knowledge_selection", query:"Also answer the distance.",usage:{inputTokens:1,outputTokens:1,totalTokens:2}};
+    },
+  };
+  const result = await new StructuredTurnEngine({provider,retriever:{async retrieve(){return [{id:"document:3",content:text}];}}}).execute({
+    ...input, activeTask:null, stage:"knowledge", visitorMessage:"Is pickup free, and how far can you travel?",
+    assistantBehavior:{...DEFAULT_PROJECT_AI_SETTINGS,approvedKnowledgeAnswers:[{question:"Is pickup free?",answer:"Pickup is free."}]},
+    projectPolicy:{...input.projectPolicy, knowledge:{...input.projectPolicy.knowledge,preserveImportHeadings:true}},
+  });
+  expect(queued.calls).toHaveLength(2);
+  expect(result.proposal.reply).toBe(text);
+});
+
 test("selected source answers replace model embellishment across combined questions", async () => {
   for (const [question, answers, expected] of [
     [

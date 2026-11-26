@@ -1,3 +1,4 @@
+import { extractKnowledgeAnswers } from "./knowledge-import";
 import { buildKnowledgeChatSystemPrompt } from "@/lib/ai-guardrails";
 import type {
   ConversationalTaskSnapshotV1,
@@ -259,7 +260,7 @@ function boundedRetrieval(input: CompileTurnInput) {
   return selected;
 }
 
-function approvedKnowledgeReferences(input: CompileTurnInput) {
+function approvedKnowledgeReferences(input: CompileTurnInput, visiblePassages: TurnRetrievalExcerptV1[]) {
   if (input.stage !== "knowledge" || input.openingTurn) return [];
   const terms = new Set(
     normalizeKnowledgeQuestion(
@@ -282,6 +283,25 @@ function approvedKnowledgeReferences(input: CompileTurnInput) {
         turnRetrievalExcerptV1Schema.parse(excerpt).approvedAnswers ?? [],
     ),
   ];
+  // When a section mixes prose with FAQs, selecting only an FAQ can discard
+  // facts in the same passage. Keep complete, visible pairs as passage evidence
+  // for synthesis. Truncated pairs still need their full approved reference.
+  const inMixedPassage = new Set<string>();
+  if (input.projectPolicy.knowledge.preserveImportHeadings) {
+    for (const passage of visiblePassages) {
+      const source = input.retrieval.find(excerpt => excerpt.id === passage.id);
+      if (!source?.approvedAnswers?.length) continue;
+      const body = passage.content.split(/\r?\n/).filter(line =>
+        !/^\s*#/.test(line) && !passage.sectionHeadings?.includes(line.trim())
+      ).join("\n").trim();
+      if (!body.split(/\n\s*\n/).some(block => !/^(?:Q:|A:)|^[^\n]*=>/i.test(block.trim()))) continue;
+      const visible = extractKnowledgeAnswers(body, true);
+      for (const faq of source.approvedAnswers) {
+        if (visible.some(pair => pair.question === faq.question && pair.answer === faq.answer))
+          inMixedPassage.add(faq.id);
+      }
+    }
+  }
   const answersByQuestion = new Map<string, Set<string | null>>();
   for (const candidate of candidates) {
     const key = normalizeKnowledgeQuestion(candidate.question);
@@ -294,7 +314,7 @@ function approvedKnowledgeReferences(input: CompileTurnInput) {
   return candidates
     .filter((candidate) => {
       const key = normalizeKnowledgeQuestion(candidate.question);
-      if (seen.has(key) || answersByQuestion.get(key)?.size !== 1) return false;
+      if (inMixedPassage.has(candidate.id) || seen.has(key) || answersByQuestion.get(key)?.size !== 1) return false;
       seen.add(key);
       return true;
     })
@@ -435,6 +455,7 @@ export function compileStructuredTurn(input: CompileTurnInput): CompiledTurn {
           retrieval: input.retrieval.filter((excerpt) => sectionIds.has(excerpt.id)),
         }
       : input,
+    retrieval,
   );
   const activeContract =
     taskContract(input.activeTask, input.stage === "knowledge") ??
@@ -530,6 +551,7 @@ ${renderJson(approvedAnswers)}
 }
 
 Current-turn decision:
+${input.stage === "knowledge" && input.projectPolicy.knowledge.preserveImportHeadings ? "- Resolve the subject and the requested facts from the visitor message and conversation before reading business evidence. If a reference has no identifiable subject, ask what the visitor means without proposing options from search results. A passage may contain both prose and FAQs. If prose answers any part, answer every requested part using the passage, cite its excerpt ID and leave answerSelections null. An absent FAQ alone does not mean the fact is unknown." : ""}
 - First distinguish a general factual FAQ, a personalized business request, and a request for human follow-up. A personalized estimate with supplied dates/quantities/preferences belongs to the matching published enquiry task, not FAQ selection or the callback task: recommend that enquiry task with answerSelections null so the server validates and calculates it. A general informational question alone does not start any task.
 - Classify the latest visitor message's INTENT; resolve its referenced SUBJECT from history. "Will it be suitable for my work?" is a factual question, not permission to arrange contact, even if an earlier turn requested contact. "Please ask them about that" requests follow-up about the earlier subject. Never treat an assistant's suggestion as visitor consent. Answer only the latest requested aspect.
 - For a request for human follow-up specifically: "Can you confirm with them?" after "our team can check" requests team action; repeating the FAQ does not answer it. With no active task, recommend a listed callback/follow-up task (nextAction "ask", answerSelections null). Do not start an unrelated enquiry. If none is available, explain that a callback cannot be arranged here without claiming anyone was contacted. A factual question alone or a refusal of contact must not start follow-up.
