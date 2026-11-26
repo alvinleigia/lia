@@ -130,10 +130,11 @@ test("recurring FAQ candidates require separate recent conversations in the same
     projectId: conversations[index].projectId, conversationId: ids[index], text, direction: "inbound",
   }));
   const privateText = "Can you send the price to user@example.com?";
+  const compound = "How far is the pickup radius, and is pickup free?";
   try {
     await db.insert(channelMessages).values([
-      ...messages(0, [eligible, privateText, "When is checkout?", "When is checkout?", "Can I leave early?", "Was pickup free?", "Do you provide maps?"]),
-      ...messages(1, [eligible, privateText]), ...messages(2, ["Can I leave early?"]),
+      ...messages(0, [eligible, privateText, compound, "When is checkout?", "When is checkout?", "Can I leave early?", "Was pickup free?", "Do you provide maps?"]),
+      ...messages(1, [eligible, privateText, compound]), ...messages(2, ["Can I leave early?"]),
       { ...messages(1, ["Was pickup free?"])[0], createdAt: new Date(Date.now() - 32 * 86400000) },
       { ...messages(1, ["Do you provide maps?"])[0], direction: "outbound" },
     ]);

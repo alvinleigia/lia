@@ -23,7 +23,8 @@ export async function recentFaqQuestions(projectId: number, excluded: string[]) 
   return rows.filter(({ question }) => {
     const key = normalizeKnowledgeQuestion(question);
     const isQuestion = /[?？]\s*$|^(?:how|what|when|where|why|which|can|could|is|are|do|does)\b/i.test(question);
-    if (!key || seen.has(key) || !isQuestion || redactDiagnosticText(question) !== question ||
+    const secondQuestion = /[?？]\s*\S|\b(?:and|or|also|plus)\s+(?:how|what|when|where|why|which|who|can|could|is|are|do|does|will|would)\b/i.test(question);
+    if (!key || seen.has(key) || !isQuestion || secondQuestion || redactDiagnosticText(question) !== question ||
       /[\r\n@]|https?:|www\.|\b(?:my name is|my address|booking ref(?:erence)?|order (?:id|number)|account number)\b/i.test(question)) return false;
     seen.add(key);
     return true;
