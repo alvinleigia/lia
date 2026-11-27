@@ -156,6 +156,9 @@ import {
   taskFollowUpConsent,
 } from "@/lib/task-follow-up";
 import { getTaskOperationOutcome } from "@/lib/task-operation-outcome";
+import { missingTaskPriceFields } from "@/lib/task-price-table";
+
+const CONTINUE_AFTER_ESTIMATE = "Would you like to continue with this option?";
 
 export type HybridChannelBoundaryResult = {
   replies: RuntimeReply[];
@@ -1312,6 +1315,55 @@ async function executeTaskBoundary(input: {
   const followUpAnswer = pendingFollowUp
     ? parseTaskFollowUpConsent(appointmentAnswer)
     : null;
+  const previous = input.history.at(-1);
+  if (
+    !pendingFollowUp &&
+    snapshot.task.definition.priceTable &&
+    previous?.role === "assistant" &&
+    previous.content.endsWith(CONTINUE_AFTER_ESTIMATE) &&
+    !input.runtimeInput.selection
+  ) {
+    const answer = parseTaskFollowUpConsent(appointmentAnswer);
+    const resume = {
+      fields: runtime.fields,
+      requestedFieldKey: null,
+      snapshot,
+    };
+    const next = getResumedTaskRuntimeInputRequest(resume);
+    if (
+      answer !== null &&
+      next &&
+      !getResumedTaskRuntimeInputRequest({ ...resume, afterSideQuestion: true })
+    ) {
+      if (!answer)
+        return {
+          inputRequest: null,
+          output: operationTurn({
+            nextAction: "ask",
+            reply: "Of course. What else would you like to know?",
+          }),
+          signals: [],
+        };
+      const field = snapshot.task.definition.fields.find(
+        ({ key }) => key === next.fieldKey,
+      )!;
+      await recordTaskFieldRequest({
+        conversationId: runtime.run.conversationId,
+        inputRequest: next,
+        revision: session.execution.revision,
+        runtimeInput: input.runtimeInput,
+        taskRunId: runtime.run.id,
+      });
+      return {
+        inputRequest: next,
+        output: operationTurn({
+          nextAction: "ask",
+          reply: field.prompt ?? `Please provide ${field.label}.`,
+        }),
+        signals: [],
+      };
+    }
+  }
 
   // Consent to follow up is not authorization to submit the enquiry or run a write.
   const confirmationExecution = pendingFollowUp
@@ -1760,29 +1812,93 @@ async function executeTaskBoundary(input: {
 
   const pendingChoice = readPendingChoice(runtime.context.find(value => value.key === PENDING_CHOICE_QUESTION)?.value);
   const pendingQuestion = pendingChoice?.question;
-  const answeringPendingChoice = typeof pendingQuestion === "string" &&
-    proposal.safety.decision === "allow" && proposal.nextAction === "ask" &&
-    !proposal.knowledgeRequest && proposal.turnKind !== "follow_up_request" &&
-    proposal.fieldCandidates.some(candidate => snapshot.task.definition.fields.some(field =>
-      field.key === candidate.fieldKey && field.knowledgeQuestions?.includes(pendingQuestion)));
-  if (
-    answeringPendingChoice || shouldAnswerTaskSideQuestion({
+  const answeringPendingChoice =
+    typeof pendingQuestion === "string" &&
+    proposal.safety.decision === "allow" &&
+    proposal.nextAction === "ask" &&
+    !proposal.knowledgeRequest &&
+    proposal.turnKind !== "follow_up_request" &&
+    proposal.fieldCandidates.some((candidate) =>
+      snapshot.task.definition.fields.some(
+        (field) =>
+          field.key === candidate.fieldKey &&
+          field.knowledgeQuestions?.includes(pendingQuestion),
+      ),
+    );
+  const sideQuestion =
+    answeringPendingChoice ||
+    shouldAnswerTaskSideQuestion({
       proposal,
       text: input.runtimeInput.text,
       availabilityHandled: Boolean(calendarAnswer || earlyTimeQuestion),
-    })
-  ) {
-    // Mixed turns must answer against the newly validated fields, not the
-    // session loaded before applying the visitor's corrections.
-    const updatedSession = proposal.fieldCandidates.length
+    });
+  const table = snapshot.task.definition.priceTable;
+  const priceSelection =
+    table &&
+    !sideQuestion &&
+    !pendingChoice &&
+    !calendar &&
+    proposal.safety.decision === "allow" &&
+    !clarifying &&
+    proposal.nextAction === "ask" &&
+    (proposal.turnKind === "field_answer" ||
+      proposal.turnKind === "field_correction") &&
+    taskFollowUpConsent(snapshot.task.definition, runtime.fields) !== true &&
+    proposal.fieldCandidates.length > 0 &&
+    proposal.fieldCandidates.every(({ fieldKey }) =>
+      table.fields.includes(fieldKey),
+    ) &&
+    runtime.fields.every(
+      (field) =>
+        !field.isRequired ||
+        !table.fields.includes(field.fieldKey) ||
+        ["valid", "confirmed"].includes(field.state) ||
+        proposal.fieldCandidates.some(
+          ({ fieldKey }) => fieldKey === field.fieldKey,
+        ),
+    );
+  // Mixed turns must answer against the newly validated fields, not the
+  // session loaded before applying the visitor's corrections.
+  const updatedSession =
+    (sideQuestion || priceSelection) && proposal.fieldCandidates.length
       ? await getConversationTaskRuntimeSession(input.runtimeInput)
       : session;
+  const quoteSelection =
+    priceSelection &&
+    updatedSession.runtime &&
+    updatedSession.snapshot &&
+    proposal.fieldCandidates.every(({ fieldKey }) =>
+      updatedSession.runtime?.fields.some(
+        (field) =>
+          field.fieldKey === fieldKey &&
+          ["valid", "confirmed"].includes(field.state),
+      ),
+    ) &&
+    !getResumedTaskRuntimeInputRequest({
+      fields: updatedSession.runtime.fields,
+      requestedFieldKey: null,
+      snapshot: updatedSession.snapshot,
+      afterSideQuestion: true,
+    });
+  if (sideQuestion || quoteSelection) {
     if (!updatedSession.runtime || !updatedSession.snapshot) {
       return { output: proposal, signals: [] };
     }
-    const knowledgeText = answeringPendingChoice ? pendingQuestion : input.runtimeInput.text;
-    const knowledgeFields = toRuntimeFieldState({ runtime: updatedSession.runtime, snapshot: updatedSession.snapshot });
-    const boundChoice = resolveTaskKnowledgeChoice(updatedSession.snapshot.task.definition, knowledgeText, knowledgeFields);
+    const knowledgeText = answeringPendingChoice
+      ? pendingQuestion
+      : input.runtimeInput.text;
+    const knowledgeRequest = quoteSelection
+      ? { query: knowledgeText, pricingIntent: "quote" as const }
+      : proposal.knowledgeRequest;
+    const knowledgeFields = toRuntimeFieldState({
+      runtime: updatedSession.runtime,
+      snapshot: updatedSession.snapshot,
+    });
+    const boundChoice = resolveTaskKnowledgeChoice(
+      updatedSession.snapshot.task.definition,
+      knowledgeText,
+      knowledgeFields,
+    );
     const now = new Date().toISOString();
     const suspended = await applyConversationalTaskEvent({
       authentication: null,
@@ -1835,7 +1951,7 @@ async function executeTaskBoundary(input: {
           projectPolicy: updatedSession.snapshot.conversationPolicy,
           publishedTasks: [],
           stage: "knowledge",
-          knowledgeRequest: proposal.knowledgeRequest,
+          knowledgeRequest,
           visitorMessage: knowledgeText,
         },
         turnRetriever,
@@ -1887,8 +2003,70 @@ async function executeTaskBoundary(input: {
     }
     if (knowledgeProposal.safety.reasonCode?.startsWith("exception_"))
       return { output: knowledgeProposal, inputRequest: null, signals: [] };
-    if (boundChoice && knowledgeProposal.safety.reasonCode === "knowledge_choice_required")
-      return { output: knowledgeProposal, inputRequest: createTaskRuntimeInputRequest(boundChoice.field), signals: [] };
+    if (
+      boundChoice &&
+      knowledgeProposal.safety.reasonCode === "knowledge_choice_required"
+    )
+      return {
+        output: knowledgeProposal,
+        inputRequest: createTaskRuntimeInputRequest(boundChoice.field),
+        signals: [],
+      };
+    if (
+      table &&
+      knowledgeRequest?.pricingIntent === "quote" &&
+      knowledgeProposal.safety.reasonCode === "configured_mock_pricing"
+    ) {
+      const [missing] = missingTaskPriceFields(table, knowledgeFields);
+      const plan = knowledgeFields.find(
+        (field) =>
+          field.fieldKey === table.alternativeField &&
+          field.sensitivity === "standard" &&
+          ["valid", "confirmed"].includes(field.state),
+      );
+      const acknowledgement =
+        quoteSelection && typeof plan?.value === "string"
+          ? `I’ve noted your choice of ${plan.value}. `
+          : "";
+      const next = snapshot.task.definition.fields.find(
+        (field) =>
+          field.key === missing &&
+          field.sourcePriority.includes("visitor") &&
+          field.sensitivity === "standard",
+      );
+      if (next) {
+        const inputRequest = await hydrateProjectResourceInputRequest({
+          fields: resumedSession.runtime.fields,
+          taskRunId: resumedSession.runtime.run.id,
+          inputRequest: createTaskRuntimeInputRequest(next),
+          projectId: input.runtimeInput.projectId,
+          snapshot,
+        });
+        await recordTaskFieldRequest({
+          conversationId: resumedSession.runtime.run.conversationId,
+          inputRequest,
+          revision: resumedSession.execution.revision,
+          runtimeInput: input.runtimeInput,
+          taskRunId: resumedSession.runtime.run.id,
+        });
+        return {
+          inputRequest,
+          output: {
+            ...knowledgeProposal,
+            reply:
+              acknowledgement +
+              (next.prompt ??
+                `Which ${next.label} should I use for the estimate?`),
+          },
+          signals: [],
+        };
+      }
+      if (acknowledgement && shouldOfferTaskFollowUp(knowledgeProposal))
+        knowledgeProposal = {
+          ...knowledgeProposal,
+          reply: acknowledgement + knowledgeProposal.reply,
+        };
+    }
     const resumedAppointment = await readPendingTaskAppointmentChoice({
       runtime: resumedSession.runtime,
       projectId: input.runtimeInput.projectId,
@@ -2019,6 +2197,7 @@ async function executeTaskBoundary(input: {
       fields: resumedSession.runtime.fields,
       taskRunId: resumedSession.runtime.run.id,
       inputRequest: getResumedTaskRuntimeInputRequest({
+        afterSideQuestion: true,
         fields: resumedSession.runtime.fields,
         requestedFieldKey: resumedFieldKey,
         snapshot: resumedSession.snapshot,
@@ -2041,6 +2220,22 @@ async function executeTaskBoundary(input: {
           }),
           signals: [],
         };
+    }
+    if (
+      !inputRequest &&
+      knowledgeRequest?.pricingIntent === "quote" &&
+      table &&
+      consent !== true &&
+      knowledgeProposal.safety.reasonCode === "configured_mock_pricing" &&
+      !missingTaskPriceFields(table, knowledgeFields).length &&
+      !shouldOfferTaskFollowUp(knowledgeProposal) &&
+      getResumedTaskRuntimeInputRequest({
+        fields: resumedSession.runtime.fields,
+        requestedFieldKey: null,
+        snapshot,
+      })
+    ) {
+      resumedProposal.reply += `\n\n${CONTINUE_AFTER_ESTIMATE}`;
     }
     // A pure FAQ resumes the same persisted question. Recording it again adds
     // a transaction without changing the field or the conversation position.

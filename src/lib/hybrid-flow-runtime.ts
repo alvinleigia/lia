@@ -406,6 +406,7 @@ function findUnresolvedTaskField(input: TaskRuntimeReconciliationInput) {
 }
 
 function findRequestedOrUnresolvedTaskField(input: {
+  afterSideQuestion?: boolean;
   fields: HybridTaskRuntimeField[];
   requestedFieldKey: string | null;
   snapshot: ConversationalTaskSnapshotV1;
@@ -436,6 +437,18 @@ function findRequestedOrUnresolvedTaskField(input: {
   const definition = input.snapshot.task.definition.fields.find(
     ({ key }) => key === runtimeField.fieldKey,
   );
+  // Keep the draft's contact step pending while the visitor is exploring.
+  const followUp = input.snapshot.task.definition.followUp;
+  if (
+    input.afterSideQuestion &&
+    definition &&
+    (definition.sensitivity !== "standard" ||
+      definition.type === "phone" ||
+      definition.type === "email" ||
+      definition.key === followUp?.nameField ||
+      definition.key === followUp?.contactField)
+  )
+    return null;
   return definition ? { definition, runtimeField } : null;
 }
 
@@ -452,6 +465,7 @@ export function getTaskRuntimeInputRequest(
 }
 
 export function getResumedTaskRuntimeInputRequest(input: {
+  afterSideQuestion?: boolean;
   fields: HybridTaskRuntimeField[];
   requestedFieldKey: string | null;
   snapshot: ConversationalTaskSnapshotV1;
@@ -514,7 +528,10 @@ export function reconcileTaskSideQuestionWithRuntime(input: {
   requestedFieldKey: string | null;
   snapshot: ConversationalTaskSnapshotV1;
 }): TurnResultV1 {
-  const unresolved = findRequestedOrUnresolvedTaskField(input);
+  const unresolved = findRequestedOrUnresolvedTaskField({
+    ...input,
+    afterSideQuestion: true,
+  });
   const resumePrompt = unresolved
     ? (taskFollowUpPrompt({
         definition: input.snapshot.task.definition,

@@ -80,6 +80,7 @@ import {
 } from "@/lib/runtime-stage-timing";
 import {
   answerTaskPricing,
+  extractPricedChoice,
   isStandaloneTaskPricingQuestion,
   isTaskPricingQuestion,
 } from "@/lib/task-price-table";
@@ -529,13 +530,21 @@ function directFieldProposal(
   if (!collectionFields || input.stage !== "extraction") return null;
 
   const value = input.visitorMessage.trim();
-  const localCandidates = extractLocalTaskFieldCandidates({
-    fields: collectionFields,
-    text: value,
-    timezone: String(
-      input.context.find(({ key }) => key === "lia_timezone")?.value ?? "UTC",
-    ),
-  });
+  const localCandidates =
+    (input.activeTask &&
+      extractPricedChoice(
+        input.activeTask.task.definition,
+        input.requestedFieldKey,
+        value,
+      )) ??
+    extractLocalTaskFieldCandidates({
+      fields: collectionFields,
+      requestedFieldKey: input.requestedFieldKey,
+      text: value,
+      timezone: String(
+        input.context.find(({ key }) => key === "lia_timezone")?.value ?? "UTC",
+      ),
+    });
   if (localCandidates?.length) {
     const field = collectionFields.find(
       ({ key }) => key === localCandidates[0].fieldKey,

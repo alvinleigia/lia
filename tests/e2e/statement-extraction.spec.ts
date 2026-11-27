@@ -321,6 +321,55 @@ function input(
   };
 }
 
+test("a complete requested time window is accepted verbatim without a model", async () => {
+  const snapshot = task("Service visit", [
+    ["delivery", "Preferred time window", "text"],
+    ["name", "Contact name", "text"],
+  ]);
+  let calls = 0;
+  const engine = new StructuredTurnEngine({
+    provider: {
+      async generateTurn() {
+        calls++;
+        throw new Error("offline");
+      },
+    },
+  });
+  for (const text of [
+    "Monday, 30 November 2026, between 2 pm and 4 pm India Standard Time.",
+    "2026-11-30 from 14:00 to 16:00 (Asia/Kolkata)",
+  ]) {
+    const result = await engine.execute(input(snapshot, text, "delivery"));
+    expect(result.proposal.fieldCandidates).toMatchObject([
+      { fieldKey: "delivery", naturalValue: text },
+    ]);
+  }
+  expect(calls).toBe(0);
+  for (const text of [
+    "Can you do Monday between 2 pm and 4 pm?",
+    "30 November 2026 from 14:00 to 16:00",
+    "31 November 2026 from 14:00 to 16:00 UTC",
+    "30 November 2026 from 16:00 to 14:00 UTC",
+  ]) {
+    expect(
+      extractLocalTaskFieldCandidates({
+        fields: snapshot.task.definition.fields,
+        requestedFieldKey: "delivery",
+        text,
+        timezone: "UTC",
+      }),
+    ).toBeNull();
+  }
+  expect(
+    extractLocalTaskFieldCandidates({
+      fields: snapshot.task.definition.fields,
+      requestedFieldKey: "name",
+      text: "2026-11-30 from 14:00 to 16:00 UTC",
+      timezone: "UTC",
+    }),
+  ).toBeNull();
+});
+
 test("@live-openai shared controller distinguishes short follow-up, clarification and factual intent across domains", async () => {
   test.skip(
     process.env.LIA_LIVE_KNOWLEDGE_UAT !== "1",

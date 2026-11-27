@@ -1,9 +1,84 @@
 import { isExplicitCancellationRequest } from "@/lib/conversation-control-intents";
 import type { TurnResultV1 } from "@/lib/conversation-turn-contracts";
 import {
+  TASK_FIELD_VALIDATORS,
   type TaskFieldDefinition,
   validateTaskFieldValue,
 } from "@/lib/conversational-task-field-validation";
+
+const clockTime = String.raw`(\d{1,2}(?::\d{2})?(?:\s*[ap]m)?)`;
+const datedWindow = new RegExp(
+  [
+    String.raw`^(?:(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday),?\s+)?`,
+    String.raw`(\d{4}-\d{2}-\d{2}|\d{1,2}\s+[a-z]+\s+\d{4}|[a-z]+\s+\d{1,2},?\s+\d{4}),?\s+`,
+    String.raw`(?:between\s+|from\s+)?`,
+    clockTime,
+    String.raw`\s*(?:and|to|[-–])\s*`,
+    clockTime,
+    String.raw`\s+(\(?)([a-z_]+(?:\/[a-z_+-]+)+|(?:UTC|GMT)(?:[+-](?:0\d|1[0-3]):[0-5]\d|[+-]14:00)?|(?:[a-z]+\s+){1,4}(?:Standard|Daylight|Summer) Time)(\)?)[.]?$`,
+  ].join(""),
+  "i",
+);
+
+// Record a preference for staff, preserving the original zone and wording.
+function isCompleteTimeWindow(
+  text: string,
+  field: TaskFieldDefinition,
+  projectZone: string,
+) {
+  if (
+    field.type !== "text" ||
+    field.optionSource ||
+    !/\b(?:(?:time|callback|delivery|service|contact)\s+(?:window|range)|time\s+slot)\b/i.test(
+      [
+        field.label,
+        field.prompt,
+        field.key.replace(/([a-z])([A-Z])/g, "$1 $2"),
+      ].join(" "),
+    )
+  )
+    return false;
+  const match = datedWindow.exec(text);
+  if (!match) return false;
+  const [, weekday, date, start, end, open, zone, close] = match;
+  if (Boolean(open) !== Boolean(close)) return false;
+  const day = TASK_FIELD_VALIDATORS.date(date, {
+    referenceDate: new Date(),
+    locale: "en",
+    timezone: "UTC",
+  });
+  const from = TASK_FIELD_VALIDATORS.time(start);
+  const to = TASK_FIELD_VALIDATORS.time(end);
+  if (!day.ok || !from.ok || !to.ok || String(from.value) >= String(to.value))
+    return false;
+  const instant = new Date(String(day.value) + "T12:00:00Z");
+  if (
+    weekday &&
+    new Intl.DateTimeFormat("en", { weekday: "long", timeZone: "UTC" })
+      .format(instant)
+      .toLowerCase() !== weekday.toLowerCase()
+  )
+    return false;
+  if (/^(?:UTC|GMT)/i.test(zone)) return true;
+  try {
+    if (zone.includes("/")) {
+      new Intl.DateTimeFormat("en", { timeZone: zone });
+      return true;
+    }
+    return [projectZone, ...Intl.supportedValuesOf("timeZone")].some(
+      (timeZone) =>
+        new Intl.DateTimeFormat("en", { timeZone, timeZoneName: "long" })
+          .formatToParts(instant)
+          .some(
+            (part) =>
+              part.type === "timeZoneName" &&
+              part.value.toLowerCase() === zone.toLowerCase(),
+          ),
+    );
+  } catch {
+    return false;
+  }
+}
 
 // Resolve only an explicit request to use this channel's sender number.
 // Never infer a phone from browser identity or choose between competing fields.
@@ -90,6 +165,7 @@ export function getClearCandidatesDuringClarification(
 // mapping to configured fields. Labels disambiguate multiple fields of one type.
 export function extractLocalTaskFieldCandidates(input: {
   fields: TaskFieldDefinition[];
+  requestedFieldKey?: string | null;
   text: string;
   timezone: string;
   referenceDate?: Date;
@@ -102,6 +178,19 @@ export function extractLocalTaskFieldCandidates(input: {
       field.optionSource?.kind !== "project_resource" &&
       field.cardinality === "single",
   );
+  const requested = fields.find(
+    (field) => field.key === input.requestedFieldKey,
+  );
+  if (requested && isCompleteTimeWindow(text, requested, input.timezone)) {
+    return [
+      {
+        fieldKey: requested.key,
+        naturalValue: text,
+        confidence: 1,
+        source: "visitor",
+      },
+    ];
+  }
   const parts = text
     .split(/\n|;/)
     .map((part) => part.trim())

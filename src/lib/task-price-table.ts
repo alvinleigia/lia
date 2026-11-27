@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { TurnFieldStateV1 } from "@/lib/conversation-turn-contracts";
+import type { ConversationalTaskDefinitionV1 } from "@/lib/conversation-contracts";
+import type {
+  TurnFieldStateV1,
+  TurnResultV1,
+} from "@/lib/conversation-turn-contracts";
 
 const fieldKey = z
   .string()
@@ -99,6 +103,163 @@ export const taskPriceTableSchema = z
 
 export type TaskPriceTable = z.infer<typeof taskPriceTableSchema>;
 
+// Only consume a whole, unambiguous selection. Richer requests and competing
+// options continue through normal model extraction and field validation.
+export function extractPricedChoice(
+  definition: ConversationalTaskDefinitionV1,
+  requestedKey: string | null | undefined,
+  text: string,
+): TurnResultV1["fieldCandidates"] | null {
+  const table = definition.priceTable;
+  const item = definition.fields.find((field) => field.key === requestedKey);
+  if (
+    !table ||
+    !item ||
+    !table.fields.includes(item.key) ||
+    item.optionSource?.kind !== "static"
+  )
+    return null;
+  const words = [
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+  ];
+  const value = text
+    .trim()
+    .toLowerCase()
+    .replace(/(?:,?\s+please)?[.!]?$/, "")
+    .trim();
+  const match = /^(\d+|[a-z]+)\s+(.+)$/.exec(value);
+  if (!match) return null;
+  const quantity = /^\d+$/.test(match[1])
+    ? Number(match[1])
+    : words.indexOf(match[1]);
+  if (!Number.isSafeInteger(quantity) || quantity < 1) return null;
+
+  const visitorFields = definition.fields.filter(
+    (field) =>
+      table.fields.includes(field.key) &&
+      field.cardinality === "single" &&
+      field.sourcePriority.includes("visitor") &&
+      field.sensitivity === "standard",
+  );
+  if (!visitorFields.includes(item)) return null;
+  // Require the same named item and exactly one quantity field. A participant
+  // count or another related measurement must never become the item count.
+  const subjects = (field: typeof item, quantityField: boolean) =>
+    [field.key, field.label]
+      .map((name) =>
+        name
+          .replace(/([a-z])([A-Z])/g, "$1 $2")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, " "),
+      )
+      .filter(
+        (name) => !quantityField || /\b(?:number|count|quantity)\b/.test(name),
+      )
+      .map((name) =>
+        name
+          .replace(
+            /\b(?:the|of|number|quantity|count|preferred|requested|selected|category|choice|type|option|tier)\b/g,
+            "",
+          )
+          .replace(/s\b/g, "")
+          .trim()
+          .replace(/\s+/g, " "),
+      )
+      .filter(Boolean);
+  const itemSubjects = subjects(item, false);
+  const quantities = visitorFields.filter(
+    (field) =>
+      field.type === "integer" &&
+      subjects(field, true).some((name) => itemSubjects.includes(name)),
+  );
+  if (quantities.length !== 1) return null;
+  const plan = visitorFields.find(
+    (field) =>
+      field.key === table.alternativeField &&
+      field.key !== item.key &&
+      (field.type === "text" || field.type === "enum") &&
+      field.optionSource?.kind !== "project_resource",
+  );
+  const selections: TurnResultV1["fieldCandidates"][] = [];
+  for (const option of item.optionSource.options) {
+    const aliases = Object.entries(table.aliases[item.key] ?? {}).filter(
+      ([, canonical]) => canonical === option.value,
+    );
+    const names = new Set(
+      [option.value, option.label, ...aliases.map(([alias]) => alias)].map(
+        (name) => name.toLowerCase(),
+      ),
+    );
+    for (const name of names) {
+      if (match[2] !== name && !match[2].startsWith(name + " ")) continue;
+      const remainder = match[2].slice(name.length).trim();
+      const candidates: TurnResultV1["fieldCandidates"] = [
+        {
+          fieldKey: item.key,
+          naturalValue: option.value,
+          confidence: 1,
+          source: "visitor",
+        },
+        {
+          fieldKey: quantities[0].key,
+          naturalValue: quantity,
+          confidence: 1,
+          source: "visitor",
+        },
+      ];
+      if (remainder) {
+        const planName = /^(?:on|with|under)\s+(?:the\s+)?(.+)$/.exec(
+          remainder,
+        )?.[1];
+        if (!plan || !planName) continue;
+        const selected = normalizeValue(planName, table.aliases[plan.key]);
+        const plans = new Set(
+          table.rows
+            .map((row) => row.match[plan.key])
+            .filter(
+              (name) =>
+                normalizeValue(name, table.aliases[plan.key]) === selected,
+            ),
+        );
+        if (plans.size !== 1) continue;
+        candidates.push({
+          fieldKey: plan.key,
+          naturalValue: [...plans][0],
+          confidence: 1,
+          source: "visitor",
+        });
+      }
+      selections.push(candidates);
+    }
+  }
+  return selections.length === 1 ? selections[0] : null;
+}
+
+export function missingTaskPriceFields(
+  table: TaskPriceTable,
+  fields: TurnFieldStateV1[],
+) {
+  return table.fields.filter(
+    (key) =>
+      !fields.some(
+        (field) =>
+          field.fieldKey === key &&
+          ["valid", "confirmed"].includes(field.state) &&
+          field.value !== null,
+      ),
+  );
+}
+
 function normalizeValue(
   value: unknown,
   aliases?: Record<string, unknown>,
@@ -169,14 +330,7 @@ export function answerTaskPricing(input: {
         input.text,
       );
   const fields = new Map(input.fields.map((field) => [field.fieldKey, field]));
-  const missing = table.fields.filter((key) => {
-    const field = fields.get(key);
-    return (
-      !field ||
-      !["valid", "confirmed"].includes(field.state) ||
-      field.value === null
-    );
-  });
+  const missing = missingTaskPriceFields(table, input.fields);
   if (missing.length) {
     return asksOffers
       ? table.offersMessage

@@ -2271,6 +2271,29 @@ test("side questions resume the exact requested task field without mutations", (
   expect(result.reply).toBe(
     "The spa is open from 9 am to 6 pm.\n\nWhat time would you prefer?",
   );
+  for (const key of ["guestName", "guestPhone", "guestEmail"]) {
+    const pending = fields.map((field) => ({
+      ...field,
+      state: field.fieldKey === key ? "missing" : "valid",
+    }));
+    const interrupted = {
+      fields: pending,
+      requestedFieldKey: key,
+      snapshot: taskSnapshot,
+    };
+    const answer = { ...proposal, reply: "Yes, we have a swimming pool." };
+    expect(
+      reconcileTaskSideQuestionWithRuntime({ ...interrupted, proposal: answer })
+        .reply,
+    ).toBe(answer.reply);
+    expect(
+      getResumedTaskRuntimeInputRequest({
+        ...interrupted,
+        afterSideQuestion: true,
+      }),
+    ).toBeNull();
+    expect(getResumedTaskRuntimeInputRequest(interrupted)?.fieldKey).toBe(key);
+  }
   expect(
     getResumedTaskRuntimeInputRequest({
       fields,

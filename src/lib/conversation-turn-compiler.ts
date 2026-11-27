@@ -386,6 +386,10 @@ function taskContract(
     instructions: task.definition.taskPolicy.instructions,
     followUp: task.definition.followUp ?? null,
     pricingAvailable: Boolean(task.definition.priceTable),
+    ...(!knowledgeOnly &&
+      task.definition.priceTable && {
+        pricingFields: task.definition.priceTable.fields,
+      }),
   };
   // Knowledge interruptions read validated state below; they cannot extract
   // fields or execute operations. Do not resend the unused collection schema.
@@ -527,6 +531,7 @@ ${renderJson(modelVisibleProjectPolicy(input.projectPolicy))}
 
 Current stage: ${input.stage}
 Requested field (other supplied fields are also allowed): ${input.requestedFieldKey ?? "none"}
+${input.stage === "extraction" && input.activeTask?.task.definition.priceTable ? "Capture all explicitly supplied pricing fields, including optional ones. A quantity attached to a selected item (including one) counts those items. Keep it separate from people, category and plan." : ""}
 Opening turn: ${Boolean(input.openingTurn)}
 Assistant already introduced: ${input.assistantIntroduced}
 

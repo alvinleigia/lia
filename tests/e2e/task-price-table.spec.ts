@@ -15,6 +15,7 @@ import { validateConversationalTaskForPublish } from "../../src/lib/conversation
 import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
 import {
   answerTaskPricing,
+  extractPricedChoice,
   isStandaloneTaskPricingQuestion,
   isTaskPricingQuestion,
   taskPriceTableSchema,
@@ -86,6 +87,123 @@ function input(text: string): ExecuteStructuredTurnInput {
     visitorMessage: text,
   };
 }
+
+test("a priced choice retains its explicit quantity and plan before contact collection", async () => {
+  const premium = String(selected.match.roomCategory);
+  const activeTask = structuredClone(snapshot);
+  const common = activeTask.task.definition.fields.find(
+    (field) => field.type === "date",
+  )!;
+  activeTask.task.definition.fields = [
+    {
+      ...common,
+      key: "roomCategory",
+      label: "Room Category",
+      type: "enum",
+      optionSource: {
+        kind: "static",
+        options: [{ label: premium, value: premium }],
+      },
+    },
+    {
+      ...common,
+      key: "roomCount",
+      label: "Preferred Number of Rooms",
+      type: "integer",
+      required: false,
+    },
+    {
+      ...common,
+      key: "ratePlan",
+      label: "Rate Plan",
+      type: "text",
+      required: false,
+    },
+    { ...common, key: "adults", label: "Number of adults", type: "integer" },
+  ];
+  const text = "One Premium bedroom on the Standard Plan, please.";
+  const engine = new StructuredTurnEngine({
+    provider: {
+      async generateTurn() {
+        throw new Error("offline");
+      },
+    },
+  });
+  const result = await engine.execute({
+    ...input(text),
+    activeTask,
+    fieldState: [],
+    stage: "extraction",
+    requestedFieldKey: "roomCategory",
+  });
+  expect(result.source).toBe("deterministic");
+  expect(
+    Object.fromEntries(
+      result.proposal.fieldCandidates.map((field) => [
+        field.fieldKey,
+        field.naturalValue,
+      ]),
+    ),
+  ).toEqual({
+    roomCategory: premium,
+    roomCount: 1,
+    ratePlan: "Standard Plan",
+  });
+  for (const utterance of [
+    "One Premium bedroom or two, I'm not sure.",
+    "One Premium bedroom on the Standard Plan. Is breakfast included?",
+    "One Premium bedroom on an unknown plan",
+  ])
+    expect(
+      extractPricedChoice(
+        activeTask.task.definition,
+        "roomCategory",
+        utterance,
+      ),
+    ).toBeNull();
+  const definition = activeTask.task.definition;
+  definition.fields[0] = {
+    ...definition.fields[0],
+    key: "workshopTier",
+    label: "Workshop tier",
+    optionSource: {
+      kind: "static",
+      options: [{ label: "Advanced workshop", value: "advanced" }],
+    },
+  };
+  definition.fields[1] = {
+    ...definition.fields[1],
+    key: "workshopQuantity",
+    label: "Workshop quantity",
+  };
+  definition.priceTable = {
+    ...table,
+    fields: ["workshopTier", "workshopQuantity", "ratePlan"],
+    aliases: {},
+    rows: [
+      {
+        ...table.rows[0],
+        match: {
+          workshopTier: "advanced",
+          workshopQuantity: 2,
+          ratePlan: "Weekend pass",
+        },
+      },
+    ],
+  };
+  const other = "Two advanced workshop with the Weekend pass";
+  expect(
+    extractPricedChoice(definition, "workshopTier", other)?.map(
+      (field) => field.naturalValue,
+    ),
+  ).toEqual(["advanced", 2, "Weekend pass"]);
+  definition.fields.push({
+    ...definition.fields[1],
+    key: "workshopGroupCount",
+  });
+  definition.priceTable.fields.push("workshopGroupCount");
+  expect(extractPricedChoice(definition, "workshopTier", other)).toBeNull();
+});
 
 test("semantic pricing intents use configured calculations without a model or keyword match", async () => {
   const engine = new StructuredTurnEngine({
