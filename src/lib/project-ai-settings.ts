@@ -1,4 +1,4 @@
-import { stripKnowledgeDiscoursePrefix } from "@/lib/conversation-control-intents";
+import { isStandaloneKnowledgeQuestion, stripKnowledgeDiscoursePrefix } from "@/lib/conversation-control-intents";
 
 export const AI_ASSISTANT_ROLES = [
   "general",
@@ -113,6 +113,20 @@ export function normalizeKnowledgeQuestion(value: string) {
     .toLocaleLowerCase("en")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
+}
+
+export function approvedQuestionKeys(question: string) {
+  const standalone = stripKnowledgeDiscoursePrefix(question);
+  const exact = [...new Set([question, standalone].map(normalizeKnowledgeQuestion))];
+  const match = isStandaloneKnowledgeQuestion(standalone) &&
+    /^do you (?:have|provide|offer) (.+?)\??$/i.exec(standalone);
+  // Only substitute the introductory verb. Every word of the requested
+  // subject, including any performance, price or policy qualifier, must match.
+  const equivalent = match && !/^(?:to|anyone|someone)\b/i.test(match[1]) &&
+    !/\b(?:not|never|or|if|unless)\b/i.test(match[1])
+    ? ["have", "provide", "offer"].map((verb) => normalizeKnowledgeQuestion("Do you " + verb + " " + match[1]))
+    : [];
+  return { exact, equivalent };
 }
 
 function readApprovedKnowledgeAnswers(
@@ -275,23 +289,14 @@ export function resolveApprovedKnowledgeAnswer(
   question: string,
 ) {
   const settings = normalizeProjectAiSettings(value);
-  const normalizedQuestion = normalizeKnowledgeQuestion(question);
-  if (!normalizedQuestion) return null;
-
-  let matchIndex = settings.approvedKnowledgeAnswers.findIndex(
-    (candidate) =>
-      normalizeKnowledgeQuestion(candidate.question) === normalizedQuestion,
-  );
-  // Ignore only the shared, meaning-neutral conversational prefix. Keep every
-  // word of the question: qualifiers, negation and extra requests must not match.
-  if (matchIndex < 0) {
-    const standaloneQuestion = normalizeKnowledgeQuestion(
-      stripKnowledgeDiscoursePrefix(question),
-    );
-    matchIndex = settings.approvedKnowledgeAnswers.findIndex(
-      (candidate) =>
-        normalizeKnowledgeQuestion(candidate.question) === standaloneQuestion,
-    );
+  const { exact, equivalent } = approvedQuestionKeys(question);
+  const keys = settings.approvedKnowledgeAnswers.map((candidate) => normalizeKnowledgeQuestion(candidate.question));
+  let matchIndex = keys.indexOf(exact[0]);
+  if (matchIndex < 0) matchIndex = keys.findIndex((key) => exact.includes(key));
+  if (matchIndex < 0 && equivalent.length) {
+    const matches = settings.approvedKnowledgeAnswers.filter((_, index) => equivalent.includes(keys[index]));
+    if (new Set(matches.map((candidate) => candidate.answer)).size === 1)
+      matchIndex = keys.findIndex((key) => equivalent.includes(key));
   }
   if (matchIndex < 0) return null;
 

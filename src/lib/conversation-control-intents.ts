@@ -74,7 +74,7 @@ export function stripKnowledgeDiscoursePrefix(value: string) {
   return value
     .trim()
     .replace(
-      /^(?:(?:before|after)\s+(?:that|this)|before I (?:give|share|provide) (?:my )?details|by the way)\s*[,;:]\s*/i,
+      /^(?:(?:before|after)\s+(?:that|this)|before (?:we (?:continue|proceed|go on)|I (?:give|share|provide) (?:my )?details)|by the way)\s*[,;:]\s*/i,
       "",
     );
 }

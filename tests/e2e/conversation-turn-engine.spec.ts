@@ -29,7 +29,7 @@ import {
   buildPostConversationJobResult,
   postConversationJobPayloadSchema,
 } from "../../src/lib/post-conversation-jobs";
-import { DEFAULT_PROJECT_AI_SETTINGS } from "../../src/lib/project-ai-settings";
+import { DEFAULT_PROJECT_AI_SETTINGS, resolveApprovedKnowledgeAnswer } from "../../src/lib/project-ai-settings";
 import {
   measureRuntimeRequest,
   type RuntimeRequestLog,
@@ -1864,6 +1864,32 @@ test("an approved exact answer bypasses retrieval and model use", async () => {
   });
   expect(provider.calls).toHaveLength(0);
   expect(retriever.calls).toBe(0);
+});
+
+test("a standalone availability question keeps its subject across polite wording changes", async () => {
+  for (const subject of ["Wi-Fi", "bike pickup"]) {
+    const approvedKnowledgeAnswers = [
+      { question: `Do you have ${subject}?`, answer: `Yes, we offer ${subject}.` },
+      { question: `What is the speed of ${subject}?`, answer: "Our team can check the speed." },
+    ];
+    const settings = { ...DEFAULT_PROJECT_AI_SETTINGS, approvedKnowledgeAnswers };
+    const provider = new QueueProvider([]);
+    const engine = new StructuredTurnEngine({ provider });
+    for (const stage of ["extraction", "knowledge"] as const) {
+      const result = await engine.execute({ ...engineInput(), stage, assistantBehavior: settings,
+        visitorMessage: `Before we continue, do you offer ${subject}?`,
+        history: [{ role: "assistant", content: "What is your name for the enquiry?" }],
+      });
+      expect(result.proposal.turnKind).toBe("side_question");
+      if (stage === "knowledge") expect(result.proposal.reply).toBe(approvedKnowledgeAnswers[0].answer);
+    }
+    expect(provider.calls).toHaveLength(0);
+    expect(resolveApprovedKnowledgeAnswer(settings, `Do you offer free ${subject}?`)).toBeNull();
+    expect(resolveApprovedKnowledgeAnswer(settings, `Do you offer ${subject}? My name is Lee.`)).toBeNull();
+    approvedKnowledgeAnswers.push({ question: `Do you offer ${subject}?`, answer: "A different published answer." });
+    expect(resolveApprovedKnowledgeAnswer(settings, `Do you provide ${subject}?`)).toBeNull();
+    expect(resolveApprovedKnowledgeAnswer(settings, `Do you offer ${subject}?`)?.reply).toBe("A different published answer.");
+  }
 });
 
 test("approved FAQ interruptions bypass both model stages without collecting the question as a field", async () => {

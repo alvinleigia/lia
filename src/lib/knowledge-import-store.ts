@@ -1,7 +1,6 @@
 import { crossPriceFindings, crossPricePlan } from "./knowledge-import-cross-prices";
 import { reviewCrossPrices } from "./knowledge-import-suggestions";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
-import { stripKnowledgeDiscoursePrefix } from "@/lib/conversation-control-intents";
 import { db } from "@/lib/db-config";
 import { documents, sourceDocuments, uploadJobs } from "@/lib/db-schema";
 import {
@@ -12,7 +11,7 @@ import {
   type KnowledgeImportReview,
   knowledgeTextSchema,
 } from "@/lib/knowledge-import";
-import { normalizeKnowledgeQuestion } from "@/lib/project-ai-settings";
+import { approvedQuestionKeys, normalizeKnowledgeQuestion } from "@/lib/project-ai-settings";
 import { conflictingImportPrices, indexImportPrices, prosePriceLines } from "@/lib/knowledge-import-prices";
 
 export async function getKnowledgeImport(
@@ -307,13 +306,8 @@ export async function getImportedKnowledgeAnswers(
   projectId: number,
   question: string,
 ) {
-  const keys = [
-    ...new Set(
-      [question, stripKnowledgeDiscoursePrefix(question)].map(
-        normalizeKnowledgeQuestion,
-      ),
-    ),
-  ];
+  const { exact, equivalent } = approvedQuestionKeys(question);
+  const keys = [...new Set([...exact, ...equivalent])];
   const rows = await db.execute<{ question: string; answer: string }>(sql`
     select matched.question, matched.answer from ${sourceDocuments} d
     cross join lateral (
@@ -331,6 +325,8 @@ export async function getImportedKnowledgeAnswers(
     where d.project_id = ${projectId}
   `);
   // Fail closed if old/manual data somehow contains a contradiction.
-  if (new Set(rows.map((row) => row.answer)).size > 1) return [];
-  return rows.slice(0, 2);
+  const literal = rows.filter((row) => exact.includes(normalizeKnowledgeQuestion(row.question)));
+  const matches = literal.length ? literal : rows;
+  if (new Set(matches.map((row) => row.answer)).size > 1) return [];
+  return matches.slice(0, 2);
 }
