@@ -1888,7 +1888,7 @@ async function executeTaskBoundary(input: {
       ? pendingQuestion
       : input.runtimeInput.text;
     const knowledgeRequest = quoteSelection
-      ? { query: knowledgeText, pricingIntent: "quote" as const }
+      ? { query: "What is the price for my selected options?", pricingIntent: "quote" as const }
       : proposal.knowledgeRequest;
     const knowledgeFields = toRuntimeFieldState({
       runtime: updatedSession.runtime,
@@ -2012,6 +2012,7 @@ async function executeTaskBoundary(input: {
         inputRequest: createTaskRuntimeInputRequest(boundChoice.field),
         signals: [],
       };
+    let priceCheckOffer: string | null = null;
     if (
       table &&
       knowledgeRequest?.pricingIntent === "quote" &&
@@ -2061,11 +2062,14 @@ async function executeTaskBoundary(input: {
           signals: [],
         };
       }
-      if (acknowledgement && shouldOfferTaskFollowUp(knowledgeProposal))
+      if (!missing && shouldOfferTaskFollowUp(knowledgeProposal)) {
+        const subject = typeof plan?.value === "string" ? `that selection on the ${plan.value}` : "that selection";
+        priceCheckOffer = `I don't have an estimate for ${subject}. Would you like our team to check the price?`;
         knowledgeProposal = {
           ...knowledgeProposal,
           reply: acknowledgement + knowledgeProposal.reply,
         };
+      }
     }
     const resumedAppointment = await readPendingTaskAppointmentChoice({
       runtime: resumedSession.runtime,
@@ -2109,7 +2113,7 @@ async function executeTaskBoundary(input: {
             fieldKey: followUp.reasonField,
             naturalValue: appendTaskFollowUpQuestion(
               previousReason,
-              proposal.knowledgeRequest?.query ?? input.runtimeInput.text,
+              knowledgeRequest?.query ?? input.runtimeInput.text,
             ),
             provenance: { source: "visitor", sourceReference: null },
             state: "candidate",
@@ -2175,7 +2179,7 @@ async function executeTaskBoundary(input: {
             outcomeRecommendation: null,
             routeRecommendation: null,
             taskRecommendation: null,
-            reply: `${knowledgeProposal.reply}\n\n${FOLLOW_UP_CONSENT_PROMPT}`,
+            reply: priceCheckOffer ?? `${knowledgeProposal.reply}\n\n${FOLLOW_UP_CONSENT_PROMPT}`,
           },
           signals: [],
         };

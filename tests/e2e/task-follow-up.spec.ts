@@ -250,6 +250,8 @@ test("pending consent survives interruptions and cannot become final submission"
     "We open at 9 am.\n\nWould you like our team to follow up on your earlier unanswered question?",
   );
   expect(parseTaskFollowUpConsent("Yes please")).toBe(true);
+  expect(parseTaskFollowUpConsent("Yes, please continue.")).toBe(true);
+  expect(parseTaskFollowUpConsent("No, thanks.")).toBe(false);
   expect(parseTaskFollowUpConsent("No thanks")).toBe(false);
   expect(parseTaskFollowUpConsent("Maybe, what does it cost?")).toBeNull();
   expect(

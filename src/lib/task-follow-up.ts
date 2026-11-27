@@ -95,12 +95,12 @@ export function isPendingTaskFollowUp(input: {
 
 export function parseTaskFollowUpConsent(text: string): boolean | null {
   if (
-    /^(?:yes(?: please)?|sure|okay|ok|please do|true)[.!\s]*$/i.test(
+    /^(?:yes(?:,?\s+(?:please(?:\s+continue)?|continue|go ahead))?|sure|okay|ok|please do|true)[.!\s]*$/i.test(
       text.trim(),
     )
   )
     return true;
-  if (/^(?:no(?: thanks| thank you)?|not now|false)[.!\s]*$/i.test(text.trim()))
+  if (/^(?:no(?:,?\s+(?:thanks|thank you))?|not now|false)[.!\s]*$/i.test(text.trim()))
     return false;
   return null;
 }
