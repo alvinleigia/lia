@@ -6,6 +6,7 @@ import { useState } from "react";
 import { processDocumentFile } from "@/app/upload/actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -20,6 +21,7 @@ export function UploadFormClient({
 }: UploadFormClientProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [useChoiceHeadings, setUseChoiceHeadings] = useState(false);
   const [message, setMessage] = useState<{
     type: "error" | "success";
     text: string;
@@ -38,6 +40,7 @@ export function UploadFormClient({
       const formData = new FormData();
       formData.append("document", file);
       formData.append("projectId", String(projectId));
+      if (useChoiceHeadings) formData.append("useChoiceHeadings", "true");
 
       const result = await processDocumentFile(formData);
 
@@ -79,6 +82,11 @@ export function UploadFormClient({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Checkbox id="use-choice-headings" checked={useChoiceHeadings} disabled={isLoading}
+            onCheckedChange={value => setUseChoiceHeadings(value === true)} />
+          <Label htmlFor="use-choice-headings">Use this document’s section headings for workflow choices</Label>
+        </div>
         <div>
           <Label htmlFor="document-upload">
             Upload PDF, Markdown, or Text File

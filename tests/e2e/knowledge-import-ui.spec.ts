@@ -81,6 +81,7 @@ test("uploaded knowledge must be reviewed before it becomes a source-owned FAQ",
     .click();
   await page.waitForURL(/\/projects/);
   await page.goto("/projects/documents");
+  await page.getByRole("checkbox", { name: /section headings for workflow choices/ }).check();
   const original =
     "Q: Is internet available? A: Internet is listed. Speed is not supplied.\nQ: Do you offer pickup? A: Bike pickup is listed. Charges are not supplied.\nQ: Can appointment visitors park? A: Parking is listed. Space is not guaranteed.";
   await page.getByLabel("Upload PDF, Markdown, or Text File").setInputFiles({
@@ -89,6 +90,7 @@ test("uploaded knowledge must be reviewed before it becomes a source-owned FAQ",
     buffer: Buffer.from(original),
   });
   await page.waitForURL(/\/review\?projectId=/);
+  await expect(page.getByText(/Saving a draft with differently worded prose prices/)).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Approve and queue indexing" }),
   ).toBeDisabled();
