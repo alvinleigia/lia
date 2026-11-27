@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { PENDING_CHOICE_QUESTION, readPendingChoice, resolveTaskKnowledgeChoice } from "@/lib/task-knowledge-choice";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   ActionSubmissionConflictError,
@@ -494,7 +495,7 @@ function toRuntimeFieldState(input: {
   return input.snapshot.task.definition.fields.map((field) => {
     const current = values.get(field.key);
     const value = toTurnValue(
-      current?.canonicalValue ?? current?.naturalValue ?? null,
+      current?.canonicalValue ?? (field.knowledgeQuestions?.length ? null : current?.naturalValue) ?? null,
     );
     return {
       fieldKey: field.key,
@@ -1095,6 +1096,7 @@ async function recoverCalendarSlot(input: {
 }
 
 async function recordTaskFieldRequest(input: {
+  knowledgeQuestion?: string;
   conversationId: number;
   inputRequest: RuntimeInputRequest | null;
   revision: number;
@@ -1117,6 +1119,7 @@ async function recordTaskFieldRequest(input: {
     eventId: `channel-message:${input.runtimeInput.inboundMessageId}:field-request`,
     expectedRevision: input.revision,
     fieldKey: input.inputRequest.fieldKey,
+    knowledgeQuestion: input.knowledgeQuestion,
     occurredAt: now,
     projectId: input.runtimeInput.projectId,
     providerSequence: null,
@@ -1755,8 +1758,15 @@ async function executeTaskBoundary(input: {
     revision = fieldResult.revision;
   }
 
+  const pendingChoice = readPendingChoice(runtime.context.find(value => value.key === PENDING_CHOICE_QUESTION)?.value);
+  const pendingQuestion = pendingChoice?.question;
+  const answeringPendingChoice = typeof pendingQuestion === "string" &&
+    proposal.safety.decision === "allow" && proposal.nextAction === "ask" &&
+    !proposal.knowledgeRequest && proposal.turnKind !== "follow_up_request" &&
+    proposal.fieldCandidates.some(candidate => snapshot.task.definition.fields.some(field =>
+      field.key === candidate.fieldKey && field.knowledgeQuestions?.includes(pendingQuestion)));
   if (
-    shouldAnswerTaskSideQuestion({
+    answeringPendingChoice || shouldAnswerTaskSideQuestion({
       proposal,
       text: input.runtimeInput.text,
       availabilityHandled: Boolean(calendarAnswer || earlyTimeQuestion),
@@ -1770,6 +1780,9 @@ async function executeTaskBoundary(input: {
     if (!updatedSession.runtime || !updatedSession.snapshot) {
       return { output: proposal, signals: [] };
     }
+    const knowledgeText = answeringPendingChoice ? pendingQuestion : input.runtimeInput.text;
+    const knowledgeFields = toRuntimeFieldState({ runtime: updatedSession.runtime, snapshot: updatedSession.snapshot });
+    const boundChoice = resolveTaskKnowledgeChoice(updatedSession.snapshot.task.definition, knowledgeText, knowledgeFields);
     const now = new Date().toISOString();
     const suspended = await applyConversationalTaskEvent({
       authentication: null,
@@ -1795,6 +1808,7 @@ async function executeTaskBoundary(input: {
     }
 
     let knowledgeProposal: TurnResultV1;
+    let answeredChoiceQuestion: string | undefined;
     let resumedRevision: number | null = null;
     try {
       const knowledgeExecution = await executeConfiguredStructuredTurn(
@@ -1814,10 +1828,7 @@ async function executeTaskBoundary(input: {
           channel: input.runtimeInput.channelType,
           companyName: input.project.companyName,
           context: toRuntimeContext(updatedSession.runtime),
-          fieldState: toRuntimeFieldState({
-            runtime: updatedSession.runtime,
-            snapshot: updatedSession.snapshot,
-          }),
+          fieldState: knowledgeFields,
           history: input.history,
           projectId: input.runtimeInput.projectId,
           projectName: input.project.projectName,
@@ -1825,11 +1836,15 @@ async function executeTaskBoundary(input: {
           publishedTasks: [],
           stage: "knowledge",
           knowledgeRequest: proposal.knowledgeRequest,
-          visitorMessage: input.runtimeInput.text,
+          visitorMessage: knowledgeText,
         },
         turnRetriever,
       );
       knowledgeProposal = knowledgeExecution.proposal;
+      if (boundChoice?.option && boundChoice.question === pendingQuestion &&
+          knowledgeProposal.nextAction === "ask" &&
+          (knowledgeExecution.source === "model" || knowledgeProposal.safety.reasonCode === "knowledge_choice_evidence_missing"))
+        answeredChoiceQuestion = boundChoice.question;
     } finally {
       const resolvedAt = new Date().toISOString();
       const resumed = await applyConversationalTaskEvent({
@@ -1849,6 +1864,7 @@ async function executeTaskBoundary(input: {
         schemaVersion: 1,
         taskRunId: session.runtime.run.id,
         type: "task.side_question_resolved",
+        answeredChoiceQuestion,
       });
       resumedRevision =
         resumed.disposition === "applied" ? resumed.revision : null;
@@ -1871,6 +1887,8 @@ async function executeTaskBoundary(input: {
     }
     if (knowledgeProposal.safety.reasonCode?.startsWith("exception_"))
       return { output: knowledgeProposal, inputRequest: null, signals: [] };
+    if (boundChoice && knowledgeProposal.safety.reasonCode === "knowledge_choice_required")
+      return { output: knowledgeProposal, inputRequest: createTaskRuntimeInputRequest(boundChoice.field), signals: [] };
     const resumedAppointment = await readPendingTaskAppointmentChoice({
       runtime: resumedSession.runtime,
       projectId: input.runtimeInput.projectId,
@@ -1988,7 +2006,7 @@ async function executeTaskBoundary(input: {
     // Corrections can invalidate an earlier field or make a dependent field
     // required. Re-evaluate collection order for mixed turns; a pure FAQ resumes
     // exactly where it was interrupted.
-    const resumedFieldKey = proposal.fieldCandidates.length
+    const resumedFieldKey = answeredChoiceQuestion && pendingChoice ? pendingChoice.returnFieldKey : proposal.fieldCandidates.length
       ? null
       : resumedSession.runtime.run.lastRequestedFieldKey;
     const resumedProposal = reconcileTaskSideQuestionWithRuntime({
@@ -2056,6 +2074,9 @@ async function executeTaskBoundary(input: {
         ? createTaskRuntimeInputRequest(field)
         : null;
     await recordTaskFieldRequest({
+      knowledgeQuestion: proposal.safety.reasonCode === "knowledge_choice_required"
+        ? resolveTaskKnowledgeChoice(snapshot.task.definition, input.runtimeInput.text, [])?.question
+        : undefined,
       conversationId: session.runtime.run.conversationId,
       inputRequest,
       revision,

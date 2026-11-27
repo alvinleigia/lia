@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { startChannelFlow } from "../../src/lib/channel-flow-runtime";
 import type { RuntimeActionStep } from "../../src/lib/action-runtime";
 import { StructuredTurnEngine } from "../../src/lib/conversation-turn-engine";
+import { ProjectDocumentTurnRetriever } from "../../src/lib/conversation-turn-retrieval";
+import { PENDING_CHOICE_QUESTION } from "../../src/lib/task-knowledge-choice";
 import { compileHybridFlowGraph } from "../../src/lib/hybrid-flow-compiler";
 import { runHybridChannelBoundary } from "../../src/lib/hybrid-channel-runtime";
 import { getRuntimeProjectAction } from "../../src/lib/runtime-actions";
@@ -67,7 +69,21 @@ test.describe.configure({ mode: "serial" });
 
 test("resource prompts interpret free-form questions but reject stale buttons without field changes", async () => {
   if (!fixture) throw new Error("Missing runtime fixture");
-  const { projectId, taskId, taskVersionId } = fixture;
+  const { projectId, taskId } = fixture;
+  const [baseVersion] = await db.select().from(conversationalTaskVersions).where(and(
+    eq(conversationalTaskVersions.projectId, projectId), eq(conversationalTaskVersions.id, fixture.taskVersionId),
+  ));
+  const boundarySnapshot = conversationalTaskSnapshotV1Schema.parse(baseVersion.snapshot);
+  const question = "How far can my plan collect?";
+  boundarySnapshot.task.definition.fields.push({
+    ...boundarySnapshot.task.definition.fields[0], id: "1579f072-11cf-4a1f-b310-6c93559cbadc",
+    key: "collectionPlan", type: "enum", label: "Collection plan", prompt: "Which collection plan?",
+    required: false, sensitivity: "standard", knowledgeQuestions: [question],
+    optionSource: { kind: "static", options: [{ value: "fern", label: "Fern Plan" }] },
+  });
+  const [{ id: taskVersionId }] = await db.insert(conversationalTaskVersions).values({
+    projectId, taskId, versionNumber: 2, snapshot: boundarySnapshot,
+  }).returning({ id: conversationalTaskVersions.id });
   const [actionRow] = await db
     .insert(projectActions)
     .values({ projectId, name: "Resource interpretation", status: "active" })
@@ -100,7 +116,7 @@ test("resource prompts interpret free-form questions but reject stale buttons wi
           task: {
             taskId,
             taskVersionId,
-            versionNumber: 1,
+            versionNumber: 2,
             schemaVersion: 1,
             name: "Book a Service",
             outcomes: runtimeTaskDefinition.outcomes,
@@ -163,6 +179,7 @@ test("resource prompts interpret free-form questions but reject stale buttons wi
   };
   let messageId = 0;
   const original = StructuredTurnEngine.prototype.execute;
+  const originalRetrieve = ProjectDocumentTurnRetriever.prototype.retrieve;
   const stages: string[] = [];
   try {
     await runHybridChannelBoundary({
@@ -238,8 +255,28 @@ test("resource prompts interpret free-form questions but reject stale buttons wi
         (field) => field.fieldKey === "serviceCategoryId",
       )?.canonicalValue,
     ).toBeNull();
+    await test.step("a pending option question survives until the visitor selects and collection resumes", async () => {
+      StructuredTurnEngine.prototype.execute = original;
+      const queries: string[] = [];
+      ProjectDocumentTurnRetriever.prototype.retrieve = async ({ query }) => { queries.push(query); return []; };
+      const ask = await runHybridChannelBoundary({ ...runtimeInput, text: question, inboundMessageId: ++messageId });
+      expect(ask.replies[0]).toMatchObject({ text: "Which collection plan?", payload: { inputRequest: { fieldKey: "collectionPlan" } } });
+      expect(queries).toEqual([]);
+      const read = () => getConversationTaskRuntimeSession({ projectId, channelType: "whatsapp", externalConversationId });
+      expect((await read()).runtime?.context).toContainEqual(expect.objectContaining({
+        key: PENDING_CHOICE_QUESTION, value: { question, returnFieldKey: "serviceCategoryId" }, modelVisible: false, toolVisible: false,
+      }));
+      const answer = await runHybridChannelBoundary({ ...runtimeInput, text: "Fern Plan", inboundMessageId: ++messageId,
+        selection: { id: "fern", label: "Fern Plan", value: "fern", resourceId: null, resourceType: null },
+      });
+      expect(queries).toEqual([`Fern Plan\n${question}`]);
+      expect(answer.replies[0].text).toContain("confirm that for Fern Plan");
+      expect(answer.replies[0].payload).toMatchObject({ inputRequest: { fieldKey: "serviceCategoryId" } });
+      expect((await read()).runtime?.context.some(row => row.key === PENDING_CHOICE_QUESTION)).toBe(false);
+    });
   } finally {
     StructuredTurnEngine.prototype.execute = original;
+    ProjectDocumentTurnRetriever.prototype.retrieve = originalRetrieve;
     await deleteConversationRuntimeData({
       projectId,
       conversationId: conversation.id,
@@ -259,6 +296,7 @@ test("resource prompts interpret free-form questions but reject stale buttons wi
       .delete(actionFlowVersions)
       .where(eq(actionFlowVersions.id, version.id));
     await db.delete(projectActions).where(eq(projectActions.id, actionRow.id));
+    await db.delete(conversationalTaskVersions).where(eq(conversationalTaskVersions.id, taskVersionId));
   }
 });
 

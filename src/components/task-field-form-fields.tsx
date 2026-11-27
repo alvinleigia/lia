@@ -225,6 +225,15 @@ export function TaskFieldFormFields({
                 placeholder={"massage|Massage\nfacial|Facial"}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${idPrefix}-knowledgeQuestions`}>Questions about the selected option</Label>
+              <Textarea
+                id={`${idPrefix}-knowledgeQuestions`}
+                name="knowledgeQuestions"
+                defaultValue={field?.knowledgeQuestions?.join("\n") ?? ""}
+              />
+              <p className="text-sm text-muted-foreground">For a single fixed choice with standard sensitivity, enter one visitor question or alternate wording per line. Import a document with preserved headings matching the option labels. Lia answers matching questions from the selected section.</p>
+            </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor={`${idPrefix}-resourceType`}>Project Data</Label>

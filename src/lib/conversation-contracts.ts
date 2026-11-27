@@ -9,6 +9,7 @@ import {
   DEFAULT_PROJECT_AI_SETTINGS,
 } from "@/lib/project-ai-settings";
 import { taskPriceTableSchema } from "@/lib/task-price-table";
+import { questionKey } from "@/lib/task-knowledge-choice";
 
 const schemaVersion = z.literal(1);
 const optionalText = z.string().trim().max(2000).nullable();
@@ -424,6 +425,7 @@ export const taskFieldV1Schema = z.object({
   cardinality: z.enum(FIELD_CARDINALITIES).default("single"),
   prompt: optionalText.default(null),
   optionSource: taskFieldOptionSourceV1Schema.nullable().default(null),
+  knowledgeQuestions: z.array(z.string().trim().min(1).max(240)).max(20).optional(),
   required: z.boolean(),
   requiredWhen: optionalText,
   validation: optionalText,
@@ -434,7 +436,13 @@ export const taskFieldV1Schema = z.object({
     .array(z.enum(["visitor", "profile", "project_resource", "tool"]))
     .min(1),
   dependsOn: z.array(stableKey),
-});
+}).refine(field => !field.knowledgeQuestions?.length || (
+  field.type === "enum" && field.sensitivity === "standard" && field.cardinality === "single" &&
+  field.optionSource?.kind === "static" &&
+  field.knowledgeQuestions.every(question => Boolean(questionKey(question))) &&
+  new Set(field.optionSource.options.map(option => questionKey(option.label))).size === field.optionSource.options.length &&
+  new Set(field.optionSource.options.map(option => option.value)).size === field.optionSource.options.length
+), { message: "Knowledge questions require a single standard-sensitivity choice with distinct option labels and values." });
 
 export const contextVariableDefinitionV1Schema = z.object({
   key: stableKey,
@@ -573,7 +581,10 @@ export const conversationalTaskDefinitionV1Schema = z.object({
   }),
   executionOrder: z.array(z.enum(TASK_EXECUTION_STAGES)),
   fieldTransferWhitelist: z.array(fieldTransferRuleV1Schema),
-  fields: z.array(taskFieldV1Schema),
+  fields: z.array(taskFieldV1Schema).refine(fields => {
+    const questions = fields.flatMap(field => field.knowledgeQuestions?.map(questionKey) ?? []);
+    return new Set(questions).size === questions.length;
+  }, { message: "Each choice-dependent question must appear only once in the task." }),
   outcomes: z.array(taskOutcomeV1Schema),
   returnPolicy: conversationReturnPolicyV1Schema,
   taskPolicy: z.object({

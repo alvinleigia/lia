@@ -38,6 +38,7 @@ import {
 import { ProjectDocumentTurnRetriever } from "@/lib/conversation-turn-retrieval";
 import { evaluateTurnAdmission } from "@/lib/conversation-turn-safety";
 import { getImportedKnowledgeAnswers } from "@/lib/knowledge-import-store";
+import { resolveTaskKnowledgeChoice } from "@/lib/task-knowledge-choice";
 import {
   AiSdkStructuredTurnProvider,
   PLATFORM_EXTRACTION_MODEL_ID,
@@ -164,6 +165,7 @@ export async function executeConfiguredStructuredTurn(
   if (
     consent === undefined &&
     (input.stage === "knowledge" || input.prefetchKnowledge) &&
+    !resolveTaskKnowledgeChoice(input.activeTask?.task.definition, input.visitorMessage, input.fieldState) &&
     input.projectPolicy.knowledge.sourceSelection.allowedSources.includes(
       "project_documents",
     )

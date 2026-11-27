@@ -87,6 +87,8 @@ export function classifyConversationException(
   execution: StructuredTurnExecution,
 ): ExceptionReason | null | "defer" {
   const proposal = execution.proposal;
+  // An expected choice prompt is normal field collection.
+  if (proposal.safety.reasonCode === "knowledge_choice_required") return null;
   if (
     proposal.safety.decision === "refuse" ||
     ["cancel", "handoff", "complete", "confirm"].includes(

@@ -84,11 +84,14 @@ import {
   isTaskPricingQuestion,
 } from "@/lib/task-price-table";
 
+import { choicePassages, resolveTaskKnowledgeChoice } from "@/lib/task-knowledge-choice";
+
 export interface TurnKnowledgeRetriever {
   retrieve(input: {
     limit: number;
     projectId: number;
     query: string;
+    sectionLabel?: string;
   }): Promise<TurnRetrievalExcerptV1[]>;
 }
 
@@ -1001,10 +1004,25 @@ export class StructuredTurnEngine {
       };
     }
 
+    const choice = !input.openingTurn && (input.stage === "extraction" || input.stage === "knowledge")
+      ? resolveTaskKnowledgeChoice(input.activeTask?.task.definition, input.visitorMessage, input.fieldState)
+      : null;
+    if (choice && !choice.option) {
+      const proposal = deterministicProposal({
+        nextAction: "clarify", reasonCode: "knowledge_choice_required",
+        reply: choice.field.prompt ?? `Which ${choice.field.label} should I use?`,
+      });
+      proposal.ambiguity.fieldKeys = [choice.field.key];
+      return {
+        attempts: 0, modelEscalationReason: null, source: "deterministic",
+        proposal: asValidatedDeterministic(proposal),
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      };
+    }
     if (
       input.activeTask &&
       input.stage === "extraction" &&
-      (isStandaloneKnowledgeQuestion(input.visitorMessage) ||
+      (choice || isStandaloneKnowledgeQuestion(input.visitorMessage) ||
         (input.activeTask.task.definition.priceTable &&
           isStandaloneTaskPricingQuestion(input.visitorMessage)) ||
         resolveApprovedKnowledgeAnswer(
@@ -1015,21 +1033,22 @@ export class StructuredTurnEngine {
       return {
         attempts: 0,
         modelEscalationReason: null,
-        proposal: asValidatedDeterministic(
-          deterministicProposal({
+        proposal: asValidatedDeterministic({
+          ...deterministicProposal({
             nextAction: "ask",
             reasonCode: "standalone_knowledge_question",
             reply: "Let me check that information.",
             groundingStatus: "not_needed",
             turnKind: "side_question",
           }),
-        ),
+          ...(choice && { knowledgeRequest: { query: choice.question, pricingIntent: null } }),
+        }),
         source: "deterministic",
         usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
     }
 
-    const priceTable = input.activeTask?.task.definition.priceTable;
+    const priceTable = choice ? undefined : input.activeTask?.task.definition.priceTable;
     if (
       priceTable &&
       input.stage === "knowledge" &&
@@ -1062,7 +1081,7 @@ export class StructuredTurnEngine {
       };
     }
 
-    const directField = directFieldProposal(input, null);
+    const directField = choice ? null : directFieldProposal(input, null);
     if (directField) {
       return {
         attempts: 0,
@@ -1073,7 +1092,7 @@ export class StructuredTurnEngine {
       };
     }
 
-    const approvedKnowledgeAnswer = approvedKnowledgeAnswerProposal(input);
+    const approvedKnowledgeAnswer = choice ? null : approvedKnowledgeAnswerProposal(input);
     if (approvedKnowledgeAnswer) {
       return {
         attempts: 0,
@@ -1162,9 +1181,10 @@ export class StructuredTurnEngine {
                   MAX_MODEL_RETRIEVAL_EXCERPTS,
                 ),
                 projectId: input.projectId,
-                query:
-                  input.knowledgeRequest?.query ??
-                  buildKnowledgeRetrievalQuery(input),
+                ...(choice?.option && { sectionLabel: choice.option.label }),
+                query: choice?.option
+                  ? `${choice.option.label}\n${choice.question}`
+                  : input.knowledgeRequest?.query ?? buildKnowledgeRetrievalQuery(input),
               }),
             ),
           );
@@ -1187,6 +1207,17 @@ export class StructuredTurnEngine {
       }
     }
 
+    if (choice) {
+      retrieval = choicePassages(retrieval, choice);
+      if (!retrieval.length) return {
+        attempts: 0, modelEscalationReason: null, source: "deterministic",
+        proposal: asValidatedDeterministic(deterministicProposal({
+          nextAction: "ask", reasonCode: "knowledge_choice_evidence_missing",
+          reply: `I can’t confirm that for ${choice.option!.label}.`,
+        })),
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      };
+    }
     const channelPhoneFieldKeys =
       input.stage === "extraction" &&
       input.channel === "whatsapp" &&
@@ -1207,6 +1238,7 @@ export class StructuredTurnEngine {
         : [];
     let compiled = compileStructuredTurn({
       ...input,
+      selectedKnowledgeOption: choice?.option?.label,
       retrieval,
       channelPhoneFieldKeys,
     });
@@ -1651,7 +1683,7 @@ export class StructuredTurnEngine {
           // missed the relevant evidence. Retry once, in the same project and
           // within the turn deadline and usage budget; never invent facts.
           if (
-            !retrievalRephrased &&
+            !choice && !retrievalRephrased &&
             retriever &&
             input.stage === "knowledge" &&
             proposal.grounding.status === "no_answer" &&

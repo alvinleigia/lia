@@ -292,6 +292,10 @@ test("approved sections keep their labels through indexing and FAQ publication",
       hits.find((hit) => hit.content === content)?.sectionHeadings,
     ).toEqual([content.split("\n")[0].slice(3)]);
   }
+  const vector = (await embed(scope.projectId, ["query"]))[0];
+  const scoped = await searchProjectDocumentEvidenceWithEmbedding(scope.projectId, "Copper Service pickup", vector, 1, "silver service");
+  expect(scoped.map(hit => hit.sectionHeadings)).toEqual([["Silver Service"]]);
+  expect(await searchProjectDocumentEvidenceWithEmbedding(scope.otherProjectId, "pickup", vector, 1, "Silver Service")).toEqual([]);
   const answers = await getImportedKnowledgeAnswers(
     scope.projectId,
     "How far is pickup available?",

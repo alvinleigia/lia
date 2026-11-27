@@ -100,6 +100,7 @@ export async function searchProjectDocumentEvidence(
   projectId: number,
   query: string,
   limit: number,
+  sectionLabel?: string,
 ) {
   const cached = readCachedEmbedding(projectId, query);
   // Avoid paying for an embedding in an empty project. A cached vector needs
@@ -111,6 +112,7 @@ export async function searchProjectDocumentEvidence(
     query,
     embedding,
     limit,
+    sectionLabel,
   );
 }
 
@@ -119,6 +121,7 @@ export async function searchProjectDocumentEvidenceWithEmbedding(
   query: string,
   embedding: number[],
   limit: number,
+  sectionLabel?: string,
 ) {
   const rows = await rankedChunks(
     projectId,
@@ -127,6 +130,7 @@ export async function searchProjectDocumentEvidenceWithEmbedding(
     limit,
     DEFAULT_SIMILARITY_THRESHOLD,
     true,
+    sectionLabel,
   );
   return rows.map((row, index) => ({
     id: `document:${row.id}`,
@@ -146,6 +150,7 @@ function rankedChunks(
   limit: number,
   threshold: number,
   includePublishedAnswers: boolean,
+  sectionLabel?: string,
 ) {
   // Calculate similarity using Drizzle's cosineDistance function
   // This creates a SQL expression for similarity calculation
@@ -160,6 +165,7 @@ function rankedChunks(
   const lexicalQuery = sql`replace(plainto_tsquery('english', ${query})::text, ' & ', ' | ')::tsquery`;
   const lexicalDocument = sql`to_tsvector('english', ${documents.content})`;
   const lexicalMatch = sql<boolean>`${lexicalDocument} @@ ${lexicalQuery}`;
+  const headings = sql<string[] | null>`${sourceDocuments.importReview}->'publishedSectionHeadings'->(${documents.id}::text)`;
   // Keep keyword matches eligible while limiting the boost from incidental overlap.
   const keywordWeight = includePublishedAnswers ? 0.25 : 1;
   const rank = sql<number>`${similarity} + least(ts_rank_cd(${lexicalDocument}, ${lexicalQuery}), 0.1) * ${keywordWeight}::float8`;
@@ -173,11 +179,7 @@ function rankedChunks(
       answers: includePublishedAnswers
         ? sql<unknown>`${sourceDocuments.importReview}->'publishedAnswers'`
         : sql<null>`null`,
-      headings: includePublishedAnswers
-        ? sql<
-            string[] | null
-          >`${sourceDocuments.importReview}->'publishedSectionHeadings'->(${documents.id}::text)`
-        : sql<null>`null`,
+      headings: includePublishedAnswers ? headings : sql<null>`null`,
     })
     .from(documents)
     .leftJoin(
@@ -190,6 +192,8 @@ function rankedChunks(
     .where(
       and(
         eq(documents.projectId, projectId),
+        sectionLabel ? sql`exists (select 1 from jsonb_array_elements_text(${headings}) as h(label)
+          where lower(normalize(trim(h.label), NFKC)) = lower(normalize(trim(${sectionLabel}::text), NFKC)))` : undefined,
         or(gt(similarity, threshold), lexicalMatch),
       ),
     )

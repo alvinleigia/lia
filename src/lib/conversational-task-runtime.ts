@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { PENDING_CHOICE_QUESTION, readPendingChoice } from "@/lib/task-knowledge-choice";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import {
   appointmentIdentityDefinition,
@@ -1905,6 +1906,20 @@ export async function applyConversationalTaskEvent(
       }
       case "field.requested": {
         runChanges.lastRequestedFieldKey = event.fieldKey;
+        const question = event.knowledgeQuestion;
+        if (question && snapshot.task.definition.fields.some(field =>
+          field.key === event.fieldKey && field.knowledgeQuestions?.includes(question))) {
+          const previous = readPendingChoice(contextValues.get(PENDING_CHOICE_QUESTION));
+          const value = { question, returnFieldKey: previous ? previous.returnFieldKey : run.lastRequestedFieldKey };
+          await tx.insert(conversationalTaskContextValues).values({
+            projectId: event.projectId, taskRunId: run.id, key: PENDING_CHOICE_QUESTION,
+            type: "object", source: "system", value,
+            modelVisible: false, toolVisible: false,
+          }).onConflictDoUpdate({
+            target: [conversationalTaskContextValues.taskRunId, conversationalTaskContextValues.key],
+            set: { value, updatedAt: receivedAt },
+          });
+        }
         const current = fields.get(event.fieldKey);
         if (current) {
           fieldUpdates.set(event.fieldKey, {
@@ -1962,6 +1977,13 @@ export async function applyConversationalTaskEvent(
         break;
       }
       case "task.restart":
+        if (contextValues.has(PENDING_CHOICE_QUESTION)) {
+          await tx.delete(conversationalTaskContextValues).where(and(
+            eq(conversationalTaskContextValues.projectId, event.projectId),
+            eq(conversationalTaskContextValues.taskRunId, run.id),
+            eq(conversationalTaskContextValues.key, PENDING_CHOICE_QUESTION),
+          ));
+        }
         fieldUpdates = resetRuntimeFields(fields, receivedAt);
         runChanges.currentStage = "extraction";
         runChanges.lastRequestedFieldKey = null;
@@ -2081,6 +2103,14 @@ export async function applyConversationalTaskEvent(
           });
         }
         runChanges.suspendedReturnTarget = returnTarget.data.graphReturnTarget;
+        if (event.answeredChoiceQuestion &&
+            readPendingChoice(contextValues.get(PENDING_CHOICE_QUESTION))?.question === event.answeredChoiceQuestion) {
+          await tx.delete(conversationalTaskContextValues).where(and(
+            eq(conversationalTaskContextValues.projectId, event.projectId),
+            eq(conversationalTaskContextValues.taskRunId, run.id),
+            eq(conversationalTaskContextValues.key, PENDING_CHOICE_QUESTION),
+          ));
+        }
         executionChanges.executionMode = "task";
         executionChanges.responseOwner = "task";
         executionChanges.suspendedReturnTarget =

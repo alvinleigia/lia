@@ -293,6 +293,49 @@ function engineInput() {
   };
 }
 
+test("choice-dependent questions use current validated state even after the selection leaves chat history", async () => {
+  const question = "How far can my plan collect?";
+  const field = {
+    ...REFERENCE_BOOKING_TASK_DEFINITION.fields[0], type: "enum" as const,
+    sensitivity: "standard" as const, key: "plan", label: "Plan", prompt: "Which plan?",
+    optionSource: { kind: "static" as const, options: [{ value: "a", label: "Alder" }, { value: "b", label: "Birch" }] },
+    knowledgeQuestions: [question],
+  };
+  const task = structuredClone(snapshot);
+  task.task.definition.fields = [field];
+  const input = { ...engineInput(), activeTask: task, visitorMessage: question, stage: "knowledge" as const,
+    history: Array.from({ length: 20 }, () => ({ role: "assistant" as const, content: "We discussed Alder earlier." })),
+    assistantBehavior: { ...DEFAULT_PROJECT_AI_SETTINGS, approvedKnowledgeAnswers: [{ question, answer: "An unrelated global answer." }] },
+  };
+  for (const state of ["missing", "cleared", "invalid", "candidate", "valid", "confirmed"] as const) {
+    const value = state === "valid" ? "a" : "b";
+    const option = value === "a" ? "Alder" : "Birch";
+    const queries: string[] = [];
+    const provider = new QueueProvider([baseTurn({ turnKind: "side_question", fieldCandidates: [],
+      reply: "Collection covers 12 km.", grounding: { status: "grounded", excerptIds: ["document:2"] } })]);
+    const engine = new StructuredTurnEngine({ provider, retriever: { async retrieve({ query }) {
+      queries.push(query);
+      return [
+        { id: "document:1", content: "Sibling-only fact.", sectionHeadings: [value === "a" ? "Birch" : "Alder"] },
+        { id: "document:2", content: "Collection covers 12 km.", sectionHeadings: [option] },
+        { id: "document:3", content: "Mixed-sibling fact.", sectionHeadings: ["Alder", "Birch"] },
+      ];
+    } } });
+    const r = await engine.execute({ ...input, fieldState: [{ fieldKey: "plan", label: "Plan", required: true, sensitivity: "standard", state, value }] });
+    if (state === "confirmed" || state === "valid") {
+      expect(r.proposal.reply).toBe("Collection covers 12 km.");
+      expect(queries).toEqual([`${option}\n${question}`]);
+      expect(provider.calls[0].system).toContain(`latest validated selection is "${option}"`);
+      expect(provider.calls[0].system).not.toMatch(/Sibling-only|Mixed-sibling|An unrelated global answer|channelPhoneCandidate/);
+    } else {
+      expect(r.proposal.reply).toBe("Which plan?");
+      expect(r.proposal.ambiguity.fieldKeys).toEqual(["plan"]);
+      expect(queries).toHaveLength(0);
+      expect(provider.calls).toHaveLength(0);
+    }
+  }
+});
+
 test("a pilot passage can answer a different fact alongside its published FAQs", () => {
   const input = engineInput();
   const faq = { id: "document:3:answer:1", question: "How long is a class?", answer: "One hour." };

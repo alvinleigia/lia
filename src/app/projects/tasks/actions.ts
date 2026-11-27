@@ -197,6 +197,9 @@ function parseTaskFieldFormData(
     cardinality: formData.get("cardinality") || "single",
     prompt: formData.get("prompt") || null,
     optionSource: parseFieldOptionSource(formData),
+    knowledgeQuestions: String(formData.get("knowledgeQuestions") ?? "").trim()
+      ? String(formData.get("knowledgeQuestions")).split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+      : undefined,
     required: requirement.data === "always",
     requiredWhen,
     validation,
@@ -215,7 +218,7 @@ function parseTaskFieldFormData(
   return parsed.success
     ? ({ field: parsed.data } as const)
     : ({
-        error: "Please check the field details and answer source.",
+        error: parsed.error.issues[0]?.message ?? "Please check the field details and answer source.",
       } as const);
 }
 
@@ -610,13 +613,16 @@ export async function addConversationalTaskFieldAction(
   if (definition.fields.some((field) => field.key === parsed.field.key)) {
     return { error: "Use a valid, unique field key." };
   }
+  const fields = [...definition.fields, parsed.field];
+  const checked = conversationalTaskDefinitionV1Schema.shape.fields.safeParse(fields);
+  if (!checked.success) return { error: checked.error.issues[0].message };
 
   await updateProjectConversationalTaskDefinition(
     context.project.id,
     context.task.id,
     {
       ...definition,
-      fields: [...definition.fields, parsed.field],
+      fields,
     },
   );
   revalidatePath(destination);
@@ -649,15 +655,16 @@ export async function updateConversationalTaskFieldAction(
   if ("error" in parsed) {
     return parsed;
   }
+  const fields = definition.fields.map(field => field.id === existing.id ? parsed.field : field);
+  const checked = conversationalTaskDefinitionV1Schema.shape.fields.safeParse(fields);
+  if (!checked.success) return { error: checked.error.issues[0].message };
 
   await updateProjectConversationalTaskDefinition(
     context.project.id,
     context.task.id,
     {
       ...definition,
-      fields: definition.fields.map((field) =>
-        field.id === existing.id ? parsed.field : field,
-      ),
+      fields,
     },
   );
   revalidatePath(destination);
@@ -685,6 +692,7 @@ export async function duplicateConversationalTaskFieldAction(
 
   const copy: TaskField = {
     ...existing,
+    knowledgeQuestions: undefined,
     id: crypto.randomUUID(),
     key: createUniqueFieldKey(
       existing.key,

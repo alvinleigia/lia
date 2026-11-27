@@ -132,6 +132,7 @@ const inboundEventPayloadV1Schema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("field.requested"),
     fieldKey,
+    knowledgeQuestion: z.string().max(240).optional(),
   }),
   z.object({
     type: z.literal("task.pause"),
@@ -176,6 +177,7 @@ const inboundEventPayloadV1Schema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("task.side_question_resolved"),
+    answeredChoiceQuestion: z.string().max(240).optional(),
   }),
   z.object({
     type: z.literal("owner.change"),

@@ -14,7 +14,7 @@ export class RequestTurnKnowledgeRetriever implements TurnKnowledgeRetriever {
   ) {}
 
   retrieve(input: Parameters<TurnKnowledgeRetriever["retrieve"]>[0]) {
-    const key = JSON.stringify([input.projectId, input.limit, input.query]);
+    const key = JSON.stringify([input.projectId, input.limit, input.query, input.sectionLabel]);
     let result = this.pending.get(key);
     if (!result) {
       result = this.source.retrieve(input).catch((error) => {
@@ -28,11 +28,12 @@ export class RequestTurnKnowledgeRetriever implements TurnKnowledgeRetriever {
 }
 
 export class ProjectDocumentTurnRetriever implements TurnKnowledgeRetriever {
-  async retrieve(input: { limit: number; projectId: number; query: string }) {
+  async retrieve(input: Parameters<TurnKnowledgeRetriever["retrieve"]>[0]) {
     return searchProjectDocumentEvidence(
       input.projectId,
       input.query,
       input.limit,
+      input.sectionLabel,
     );
   }
 }
